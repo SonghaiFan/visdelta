@@ -74,6 +74,21 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
   await ready(page);
   await expect(page.locator('#scenario')).toHaveValue('reaggregate');
   await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
+  const readDivider = async progress => {
+    await page.locator('#progress').fill(String(progress));
+    return page.locator('#chart').evaluate(chart => {
+    const seam = chart.querySelector('path.vd-bar-seam');
+    return seam ? {
+      opacity: Number(getComputedStyle(seam).opacity),
+      length: seam.getTotalLength()
+    } : null;
+    });
+  };
+  const earlyDivider = await readDivider(0.02);
+  const splitDivider = await readDivider(0.06);
+  expect(earlyDivider?.length).toBeGreaterThan(0);
+  expect(earlyDivider?.length).toBeLessThan(splitDivider?.length);
+  expect(splitDivider?.opacity).toBeGreaterThan(0.5);
   await page.locator('#progress').fill('0.5');
   await expect(page.locator('#chart rect.vd-bar')).toHaveCount(4);
   await expect(page.locator('#chart rect.vd-bar').first()).toBeVisible();

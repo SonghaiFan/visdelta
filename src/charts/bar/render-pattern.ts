@@ -184,7 +184,17 @@ export function collapseLineage(chart, parentField) {
 
 export function splitLineage(chart) {
   const enterPlan = chart.transitionPlan?.enter;
-  return enterPlan?.mode === 'parent-child-lineage' && enterPlan.from === 'parent-bounds';
+  if (enterPlan?.mode !== 'parent-child-lineage' || enterPlan.from !== 'parent-bounds' || !enterPlan.parentKey) return null;
+  const bounds = new Map();
+  chart.g.selectAll('rect.vd-bar').each(function() {
+    const node = this;
+    const parent = node.dataset.category || node.dataset.key;
+    const box = rectGeometry(node);
+    if (parent && box) bounds.set(parent, box);
+  });
+  return {
+    start(d) { return bounds.get(String(d[enterPlan.parentKey])) || null; }
+  };
 }
 
 export function baselineEnterPlan(chart, from) {

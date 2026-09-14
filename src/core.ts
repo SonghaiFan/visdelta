@@ -55,9 +55,11 @@ export type {
   LineageAtom,
   LineageCapability,
   LineageCompileOptions,
+  LineageComponent,
   LineageContribution,
   LineageCorrespondence,
   LineageEdge,
+  LineageOperation,
   LineageRow,
   LineageTable
 } from './data/lineage.js';

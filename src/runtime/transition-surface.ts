@@ -58,7 +58,13 @@ export function createTransitionSurface(from: AnyRecord, to: AnyRecord, options:
     const frames = phases.map((phase, index) => {
       if (index > 0) renderSeekPhase(scene, index);
       const evaluator = scene.transitionProgress.compile();
-      return { start: phase.start, end: phase.end, evaluator, dom: captureDomFrame(node) };
+      return {
+        start: phase.start,
+        end: phase.end,
+        evaluator,
+        dom: captureDomFrame(node),
+        reverse: phase.reverse
+      };
     });
     // Save the clean endpoint (no zero-opacity exit marks/ticks), while keeping
     // detached nodes alive in the phase snapshots for later reverse seeks.
@@ -75,9 +81,10 @@ export function createTransitionSurface(from: AnyRecord, to: AnyRecord, options:
         if (value === 1) { endFrame.restore(); activeFrame = endFrame; return; }
         const frame = frames.find(frame => value <= frame.end) ?? frames[frames.length - 1];
         activate(frame.dom);
+        const local = (value - frame.start) / Math.max(Number.EPSILON, frame.end - frame.start);
         frame.evaluator.progress(
-          (value - frame.start) / Math.max(Number.EPSILON, frame.end - frame.start),
-          direction
+          frame.reverse ? 1 - local : local,
+          frame.reverse ? -direction : direction
         );
       }
     };

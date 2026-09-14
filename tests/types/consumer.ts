@@ -33,7 +33,9 @@ await select<typeof a>('#chart').sequence([
 delta(a, b).hasDelta('encoding.y');
 const trackedA = compileLineage([{ id: 'A', group: 'x', value: 1 }], [], { key: 'id', grain: ['group'] });
 const trackedB = compileLineage([{ id: 'A', group: 'y', value: 1 }], [], { key: 'id', grain: ['group'] });
-correspondLineage(trackedA, trackedB, { fromField: 'value', toField: 'value' }).edges;
+const correspondence = correspondLineage(trackedA, trackedB, { fromField: 'value', toField: 'value' });
+correspondence.edges;
+correspondence.components;
 selectedDelta(a, b).hasDelta('encoding.y');
 selectedBar().data([]).x('key');
 selectedPoint().data([]).x('x').y('y').radius(6);

@@ -265,6 +265,53 @@ test('reaggregation composes split, update, and merge between unrelated grouping
   expect(errors).toEqual([]);
 });
 
+test('additive reaggregation bridges the grouped common grain through stacked totals', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const change = await sl.transition(
+      root.x('location').rollup('location'),
+      root.x('year').rollup('year'),
+      { ...opts('#a'), reconstruct: true }
+    );
+    change.progress(0.5);
+    const phases = change.view.__visDeltaScene.seekSequence.phases;
+    const layouts = phases.map(phase =>
+      phase.spec.meta?.state?.sceneState?.detail?.layout ?? null
+    );
+    const rendered = phases.map((phase) => {
+      change.progress((phase.start + phase.end) / 2);
+      const bars = [...change.view.querySelectorAll('rect.vd-bar')]
+        .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
+      return {
+        stacked: bars.some(node => node.classList.contains('vd-bar-stacked')),
+        grouped: bars.some(node => node.classList.contains('vd-bar-grouped'))
+      };
+    });
+    const dividers = [phases[0], phases.at(-1)].map((phase) => {
+      change.progress(phase.start + (phase.end - phase.start) * 0.1);
+      return [...change.view.querySelectorAll('path.vd-bar-seam')].some(node =>
+        Number(getComputedStyle(node).opacity) > 0.001 && node.getTotalLength() > 0
+      );
+    });
+    return { layouts, rendered, dividers };
+  });
+
+  expect(result.layouts).toEqual(['stacked', 'grouped', 'grouped', 'stacked', null]);
+  expect(result.rendered.slice(0, 4)).toEqual([
+    { stacked: true, grouped: false },
+    { stacked: false, grouped: true },
+    { stacked: false, grouped: true },
+    { stacked: true, grouped: false }
+  ]);
+  expect(result.dividers).toEqual([true, true]);
+});
+
 test('reaggregation uses the same lineage motion in reverse', async ({ page }) => {
   const frames = await page.evaluate(async () => {
     const cases = [

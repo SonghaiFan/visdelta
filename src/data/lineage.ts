@@ -50,6 +50,8 @@ export interface LineageCompileOptions {
 }
 
 export interface LineageEdge {
+  /** Direction-independent identity of one non-empty joint-grain cell. */
+  key: string;
   from: string;
   to: string;
   atoms: LineageAtom[];
@@ -57,11 +59,24 @@ export interface LineageEdge {
   targetValue: number | null;
 }
 
+export type LineageOperation = 'update' | 'split' | 'merge' | 'reaggregate' | 'exit' | 'enter';
+
+export interface LineageComponent {
+  operation: LineageOperation;
+  from: string[];
+  to: string[];
+  edges: LineageEdge[];
+}
+
 export interface LineageCorrespondence {
-  mode: 'same' | 'split' | 'merge' | 'reaggregate' | 'mixed' | 'none';
+  /** Homogeneous operation, or `mixed` when components have different operations. */
+  mode: LineageOperation | 'mixed' | 'none';
   commonRefinement: string[];
   fromGrain: string[];
   toGrain: string[];
+  /** Connected components of the bipartite endpoint correspondence graph. */
+  components: LineageComponent[];
+  /** Non-empty intersections of the two endpoint partitions. */
   edges: LineageEdge[];
   enter: string[];
   exit: string[];
@@ -213,30 +228,27 @@ export function correspondLineage(
   }
 
   const edges = [...pairs.values()].map(({ source, target, atoms }): LineageEdge => ({
+    key: canonicalKey(atoms.map((atom) => atom.id).sort()),
     from: source.markKey,
     to: target.markKey,
     atoms,
     sourceValue: contributionValue(source, options.fromField, atoms),
     targetValue: contributionValue(target, options.toField, atoms)
   }));
-  const sourceDegree = degrees(edges, 'from');
-  const targetDegree = degrees(edges, 'to');
-  const hasSplit = [...sourceDegree.values()].some((degree) => degree > 1);
-  const hasMerge = [...targetDegree.values()].some((degree) => degree > 1);
-  const matchedSources = new Set(edges.map((edge) => edge.from));
-  const matchedTargets = new Set(edges.map((edge) => edge.to));
-  const exit = from.rows.map((row) => row.markKey).filter((key) => !matchedSources.has(key));
-  const enter = to.rows.map((row) => row.markKey).filter((key) => !matchedTargets.has(key));
+  const components = correspondenceComponents(from.rows, to.rows, edges);
+  const exit = components.filter(({ operation }) => operation === 'exit').flatMap(({ from }) => from);
+  const enter = components.filter(({ operation }) => operation === 'enter').flatMap(({ to }) => to);
   const reasons = [...new Set([...from.capability.reasons, ...to.capability.reasons])];
 
   return {
-    mode: correspondenceMode(edges, hasSplit, hasMerge, enter, exit),
-    commonRefinement: [...from.grain, ...to.grain.filter((field) => !from.grain.includes(field))],
+    mode: correspondenceMode(components),
+    commonRefinement: [...new Set([...from.grain, ...to.grain])].sort(),
     fromGrain: [...from.grain],
     toGrain: [...to.grain],
+    components,
     edges,
-    enter: [...new Set(enter)],
-    exit: [...new Set(exit)],
+    enter,
+    exit,
     splittable: from.capability.splittable && to.capability.splittable,
     reasons
   };
@@ -439,31 +451,79 @@ function contributionValue(row: LineageRow, field: string | undefined, atoms: Li
   return contributions.filter((entry) => ids.has(entry.atom.id)).reduce((sum, entry) => sum + entry.value, 0);
 }
 
-function correspondenceMode(
-  edges: LineageEdge[],
-  split: boolean,
-  merge: boolean,
-  enter: string[],
-  exit: string[]
-): LineageCorrespondence['mode'] {
-  if (!edges.length) return 'none';
-  if (split && merge) return 'reaggregate';
-  if (split) return enter.length || exit.length ? 'mixed' : 'split';
-  if (merge) return enter.length || exit.length ? 'mixed' : 'merge';
-  if (enter.length || exit.length) return 'mixed';
-  return 'same';
+function correspondenceComponents(
+  fromRows: LineageRow[],
+  toRows: LineageRow[],
+  edges: LineageEdge[]
+): LineageComponent[] {
+  const byFrom = edgeIndexesBy(edges, 'from');
+  const byTo = edgeIndexesBy(edges, 'to');
+  const visitedFrom = new Set<string>();
+  const visitedTo = new Set<string>();
+  const components: LineageComponent[] = [];
+
+  edges.forEach((startEdge) => {
+    if (visitedFrom.has(startEdge.from)) return;
+    const pending: Array<['from' | 'to', string]> = [['from', startEdge.from]];
+    const from = new Set<string>();
+    const to = new Set<string>();
+    const edgeIndexes = new Set<number>();
+    while (pending.length) {
+      const [side, key] = pending.pop()!;
+      const visited = side === 'from' ? visitedFrom : visitedTo;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      (side === 'from' ? from : to).add(key);
+      const indexes = (side === 'from' ? byFrom : byTo).get(key) ?? [];
+      for (const index of indexes) {
+        edgeIndexes.add(index);
+        const edge = edges[index];
+        pending.push(side === 'from' ? ['to', edge.to] : ['from', edge.from]);
+      }
+    }
+    components.push({
+      operation: componentOperation(from.size, to.size),
+      from: [...from],
+      to: [...to],
+      edges: [...edgeIndexes].map((index) => edges[index])
+    });
+  });
+
+  const matchedFrom = new Set(edges.map(({ from }) => from));
+  const matchedTo = new Set(edges.map(({ to }) => to));
+  uniqueMarkKeys(fromRows).filter((key) => !matchedFrom.has(key)).forEach((key) => {
+    components.push({ operation: 'exit', from: [key], to: [], edges: [] });
+  });
+  uniqueMarkKeys(toRows).filter((key) => !matchedTo.has(key)).forEach((key) => {
+    components.push({ operation: 'enter', from: [], to: [key], edges: [] });
+  });
+  return components;
 }
 
-function degrees(edges: LineageEdge[], side: 'from' | 'to'): Map<string, number> {
-  const neighbors = new Map<string, Set<string>>();
-  for (const edge of edges) {
-    const key = edge[side];
-    const other = side === 'from' ? edge.to : edge.from;
-    const values = neighbors.get(key) ?? new Set<string>();
-    values.add(other);
-    neighbors.set(key, values);
-  }
-  return new Map([...neighbors].map(([key, values]) => [key, values.size]));
+function edgeIndexesBy(edges: LineageEdge[], side: 'from' | 'to'): Map<string, number[]> {
+  const result = new Map<string, number[]>();
+  edges.forEach((edge, index) => {
+    const indexes = result.get(edge[side]);
+    if (indexes) indexes.push(index);
+    else result.set(edge[side], [index]);
+  });
+  return result;
+}
+
+function uniqueMarkKeys(rows: LineageRow[]): string[] {
+  return [...new Set(rows.map(({ markKey }) => markKey))];
+}
+
+function componentOperation(fromCount: number, toCount: number): LineageOperation {
+  if (fromCount === 1 && toCount === 1) return 'update';
+  if (fromCount === 1) return 'split';
+  if (toCount === 1) return 'merge';
+  return 'reaggregate';
+}
+
+function correspondenceMode(components: LineageComponent[]): LineageCorrespondence['mode'] {
+  const operations = [...new Set(components.map(({ operation }) => operation))];
+  return operations.length === 0 ? 'none' : operations.length === 1 ? operations[0] : 'mixed';
 }
 
 function combineCapabilities(a: LineageCapability, b: LineageCapability): LineageCapability {

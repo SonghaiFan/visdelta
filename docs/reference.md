@@ -86,9 +86,15 @@ For inline data, `delta(from, to)` also exposes a `lineage` correspondence plan:
 const change = vd.delta(byYear, byLocation);
 
 change.lineage.mode;             // "reaggregate"
-change.lineage.commonRefinement; // ["year", "location"]
-change.lineage.edges;            // contribution routes between marks
+change.lineage.commonRefinement; // ["location", "year"] (canonical order)
+change.lineage.edges;            // non-empty joint-grain cells
+change.lineage.components;       // connected update/split/merge/... operations
 ```
+
+Each connected component is classified only by its endpoint cardinality:
+`1 -> 1` update, `1 -> N` split, `N -> 1` merge, `N -> M` reaggregate,
+`1 -> 0` exit, or `0 -> 1` enter. `mixed` means that disconnected components
+with different operations coexist; it is not a seventh primitive operation.
 
 The lower-level functions are available when a data pipeline needs inspection
 independently of a chart:
@@ -105,13 +111,16 @@ the join identity of a mark in the current view. At the low-level compiler,
 compiled view. They are intentionally separate. Filtering, sorting, limiting,
 binning, time units and folding preserve lineage. `sum` and `count` produce
 additive contribution records. `mean` and non-additive aggregates such as
-`median` retain provenance, but mark the plan as unsafe to split or
-reaggregate because independently stacked subgroup results would not conserve
-the endpoint value.
+`median` retain provenance, but mark arithmetic decomposition as unsafe because
+independently computed subgroup values do not conserve the endpoint value.
 
-For additive, non-negative simple bars, `split`, `merge`, and `reaggregate`
-plans render as source contributions that split, travel, and merge. Unsupported
-cases keep their lineage plan but fall back to the ordinary chart transition.
+Bar transitions use lineage topology to communicate only group membership:
+direct splits follow the authored target layout, while a synthetic joint-grain
+stage used by reaggregation is grouped. For `sum` and `count`, Bar bridges each
+aggregate endpoint through a stacked view that preserves its total, then uses
+grouped views on both sides of the regrouping. Other aggregate operators retain
+lineage but currently use the ordinary transition rather than implying that
+their intermediate values add up to an endpoint value.
 
 ## Chart types
 

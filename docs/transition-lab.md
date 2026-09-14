@@ -24,6 +24,6 @@ combination of transforms and encodings.
 
 Open [Split → move → merge](#reaggregate) to inspect a many-to-many lineage
 transition. VisDelta plans it from existing primitives: two year totals split
-into four common-refinement bars, those same bars move from year to location,
-then they merge into two location totals. The same slider drives the exact path
-in reverse.
+into stacked common-refinement marks, unstack into readable groups, regroup the
+same marks from year to location, stack again, then merge into two location
+totals. The same slider drives the exact path in reverse.

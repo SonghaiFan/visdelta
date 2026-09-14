@@ -92,7 +92,7 @@ export function createGroupedBarRenderer(deps, kit) {
 
 function groupedSegmentGeometryContract(geom, splitLineage, zeroBaselineEnter, sourceBaselineExit, exitPlan) {
   return {
-    start: (d) => groupedSegmentEnterGeometry(d, geom, zeroBaselineEnter),
+    start: (d) => splitLineage?.start(d) || groupedSegmentEnterGeometry(d, geom, zeroBaselineEnter),
     target: groupedSegmentGeometry(geom),
     applyX: (selection) => applyGroupedSegmentX(selection, geom),
     applyY: (selection) => applyGroupedSegmentY(selection, geom),

@@ -7,7 +7,10 @@ import {
   bar,
   delta
 } from '../dist/index.js';
-import { barReaggregationIntermediateSpecs } from '../dist/charts/bar/state.js';
+import {
+  barIntermediateSpecs,
+  barReaggregationIntermediateSpecs
+} from '../dist/charts/bar/state.js';
 
 const cases = [
   { id: 'r1', year: 2020, location: 'A', case: 10 },
@@ -54,7 +57,7 @@ test('year to location is a many-to-many reaggregation through common refinement
 
   assert.equal(plan.mode, 'reaggregate');
   assert.equal(plan.splittable, true);
-  assert.deepEqual(plan.commonRefinement, ['year', 'location']);
+  assert.deepEqual(plan.commonRefinement, ['location', 'year']);
   assert.deepEqual(plan.fromGrain, ['year']);
   assert.deepEqual(plan.toGrain, ['location']);
   assert.deepEqual(plan.edges.map(edge => ({
@@ -69,6 +72,11 @@ test('year to location is a many-to-many reaggregation through common refinement
     { from: '[2021]', to: '["A"]', atoms: ['r3'], sourceValue: 12, targetValue: 12 },
     { from: '[2021]', to: '["B"]', atoms: ['r4'], sourceValue: 8, targetValue: 8 }
   ]);
+  assert.deepEqual(plan.components.map(component => component.operation), ['reaggregate']);
+  assert.deepEqual(
+    plan.edges.map(edge => edge.key).sort(),
+    correspondLineage(byLocation, byYear).edges.map(edge => edge.key).sort()
+  );
 });
 
 test('bar reaggregation plans split, update, and merge through one stable refinement', () => {
@@ -77,23 +85,47 @@ test('bar reaggregation plans split, update, and merge through one stable refine
   const byLocation = base.x('location').rollup('location').toSpec();
   const phases = barReaggregationIntermediateSpecs(byYear, byLocation);
 
-  assert.equal(phases.length, 2);
-  assert.deepEqual(phases.map(phase => phase.scene), ['detail', 'axis']);
+  assert.equal(phases.length, 4);
+  assert.deepEqual(phases.map(phase => phase.scene), ['detail', 'axis', 'axis', 'axis']);
   assert.deepEqual(phases.map(phase => phase.spec.meta.object.key), [
-    ['year', 'location'],
-    ['year', 'location']
+    ['location', 'year'],
+    ['location', 'year'],
+    ['location', 'year'],
+    ['location', 'year']
   ]);
   assert.deepEqual(phases.map(phase => phase.spec.transform.at(-1).aggregate.groupby), [
-    ['year', 'location'],
-    ['year', 'location']
+    ['location', 'year'],
+    ['location', 'year'],
+    ['location', 'year'],
+    ['location', 'year']
   ]);
   assert.deepEqual(phases.map(phase => [
     phase.spec.encoding.x.field,
     phase.spec.encoding.detail.field
   ]), [
     ['year', 'location'],
+    ['year', 'location'],
+    ['location', 'year'],
     ['location', 'year']
   ]);
+  assert.deepEqual(
+    phases.map(phase => phase.spec.meta.state.sceneState.detail.layout),
+    ['stacked', 'grouped', 'grouped', 'stacked']
+  );
+  assert.deepEqual(phases.map(phase => phase.spec.encoding.xOffset?.field ?? null), [
+    null,
+    'location',
+    'year',
+    null
+  ]);
+});
+
+test('direct split follows the authored target layout without a synthetic route', () => {
+  const base = bar(cases).datumKey('id').x('year').y('case');
+  const total = base.rollup('year').toSpec();
+  const grouped = base.breakdown('location').layout('grouped').toSpec();
+
+  assert.deepEqual(barIntermediateSpecs(total, grouped), []);
 });
 
 test('delta exposes lineage correspondence for immutable inline chart endpoints', () => {
@@ -103,7 +135,7 @@ test('delta exposes lineage correspondence for immutable inline chart endpoints'
   const result = delta(byYear, byLocation);
 
   assert.equal(result.lineage.mode, 'reaggregate');
-  assert.deepEqual(result.lineage.commonRefinement, ['year', 'location']);
+  assert.deepEqual(result.lineage.commonRefinement, ['location', 'year']);
   assert.equal(result.lineage.edges.length, 4);
 });
 
@@ -122,6 +154,42 @@ test('adding and removing one grouping level become split and merge plans', () =
 
   assert.equal(correspondLineage(total, byYear).mode, 'split');
   assert.equal(correspondLineage(byYear, total).mode, 'merge');
+});
+
+test('correspondence components derive the six primitive operations from graph cardinality', () => {
+  const same = compileLineage(cases, [], { key: 'id' });
+  const empty = compileLineage([], [], { key: 'id' });
+  const total = compileLineage(cases, [{ aggregate: {
+    groupby: [], fields: [{ op: 'sum', field: 'case', as: 'case' }]
+  } }], { key: 'id' });
+  const byYear = compileLineage(cases, sumBy('year'), { key: 'id' });
+  const byLocation = compileLineage(cases, sumBy('location'), { key: 'id' });
+
+  assert.equal(correspondLineage(same, same).mode, 'update');
+  assert.equal(correspondLineage(total, byYear).mode, 'split');
+  assert.equal(correspondLineage(byYear, total).mode, 'merge');
+  assert.equal(correspondLineage(byYear, byLocation).mode, 'reaggregate');
+  assert.equal(correspondLineage(same, empty).mode, 'exit');
+  assert.equal(correspondLineage(empty, same).mode, 'enter');
+});
+
+test('disconnected split and merge components are mixed, not a false reaggregate', () => {
+  const rows = [
+    { id: 'a', from: 'X', to: 'P', value: 1 },
+    { id: 'b', from: 'X', to: 'Q', value: 1 },
+    { id: 'c', from: 'Y', to: 'R', value: 1 },
+    { id: 'd', from: 'Z', to: 'R', value: 1 }
+  ];
+  const aggregate = field => [{ aggregate: {
+    groupby: [field], fields: [{ op: 'sum', field: 'value', as: 'value' }]
+  } }];
+  const plan = correspondLineage(
+    compileLineage(rows, aggregate('from'), { key: 'id' }),
+    compileLineage(rows, aggregate('to'), { key: 'id' })
+  );
+
+  assert.equal(plan.mode, 'mixed');
+  assert.deepEqual(plan.components.map(component => component.operation), ['split', 'merge']);
 });
 
 test('filter preserves lineage and fold creates stable measure branches', () => {
@@ -175,7 +243,7 @@ test('non-additive aggregates retain provenance but reject split motion', () => 
   assert.match(median.capability.reasons[0], /median/);
 });
 
-test('mean lineage retains provenance but falls back from additive reaggregation', () => {
+test('mean lineage retains provenance but does not use the additive bar path', () => {
   const meanBy = field => [{
     aggregate: { groupby: [field], fields: [{ op: 'mean', field: 'case', as: 'case' }] }
   }];
@@ -198,8 +266,13 @@ test('reaggregation normalizes an omitted aggregate result name', () => {
     spec.encoding.y.field = 'sum_case';
   }
   const phases = barReaggregationIntermediateSpecs(from, to);
-  assert.equal(phases.length, 2);
-  assert.deepEqual(phases.map(phase => phase.spec.encoding.y.field), ['sum_case', 'sum_case']);
+  assert.equal(phases.length, 4);
+  assert.deepEqual(phases.map(phase => phase.spec.encoding.y.field), [
+    'sum_case',
+    'sum_case',
+    'sum_case',
+    'sum_case'
+  ]);
 });
 
 test('datum identity rejects duplicates and reports unsafe index fallback', () => {

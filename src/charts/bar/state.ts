@@ -15,7 +15,6 @@ import type {
 } from '../../types/index.js';
 import {
   barCategoryChannel,
-  barLayoutTransitionRoute,
   barMeasureChannel,
   barOffsetChannelName,
   barRendererKey,
@@ -235,65 +234,11 @@ function canonicalGroupingKey(state: BarInternalState): string {
   ]);
 }
 
-export function barCollapseIntermediateSpec(
-  previousSpec: ViewSpec | null,
-  nextSpec: ViewSpec | null
-): ViewSpec | null {
-  const plan = resolveBarTransitionPlan(previousSpec, nextSpec);
-  const enter = plan.enter;
-  if (enter?.mode !== 'parent-child-lineage' || enter.from !== 'child-bounds') return null;
-
-  const previous = barState(previousSpec);
-  if (!previous?.hasDetail) return null;
-
-  const route = barLayoutTransitionRoute({
-    fromLayout: previous.barLayout,
-    toLayout: barState(nextSpec)?.barLayout,
-    change: 'collapse'
-  });
-  return route[0] ? segmentLayoutSpec(previousSpec!, route[0], nextSpec) : null;
-}
-
-export function barSplitIntermediateSpec(
-  previousSpec: ViewSpec | null,
-  nextSpec: ViewSpec | null
-): ViewSpec | null {
-  const plan = resolveBarTransitionPlan(previousSpec, nextSpec);
-  const enter = plan.enter;
-  if (enter?.mode !== 'parent-child-lineage' || enter.from !== 'parent-bounds') return null;
-
-  const next = barState(nextSpec);
-  if (!next?.hasDetail) return null;
-
-  const route = barLayoutTransitionRoute({
-    fromLayout: barState(previousSpec)?.barLayout,
-    toLayout: next.barLayout,
-    change: 'split'
-  });
-  return route[0] ? segmentLayoutSpec(nextSpec!, route[0], previousSpec) : null;
-}
-
 export function barIntermediateSpecs(
   previousSpec: ViewSpec,
   nextSpec: ViewSpec
 ): IntermediateSpec[] {
-  const reaggregation = barReaggregationIntermediateSpecs(previousSpec, nextSpec);
-  if (reaggregation.length) return reaggregation;
-
-  const direct = directBarIntermediateSpecs(previousSpec, nextSpec);
-  if (!direct.length) return [];
-
-  const previous = barState(previousSpec);
-  const next = barState(nextSpec);
-  if (!previous || !next || previous.orientation === next.orientation) return direct;
-
-  const orientedSource = orientBarSpec(previousSpec, next.orientation);
-  if (!orientedSource) return direct;
-
-  return [
-    { spec: orientedSource, scene: 'axis' },
-    ...directBarIntermediateSpecs(orientedSource, nextSpec)
-  ];
+  return barReaggregationIntermediateSpecs(previousSpec, nextSpec);
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -316,27 +261,14 @@ function staggerMax(stagger: unknown): number {
   return Number.isFinite(max) ? max : 0;
 }
 
-function directBarIntermediateSpecs(
-  previousSpec: ViewSpec,
-  nextSpec: ViewSpec
-): IntermediateSpec[] {
-  const collapseSpec = barCollapseIntermediateSpec(previousSpec, nextSpec);
-  if (collapseSpec) return [{ spec: collapseSpec, scene: 'axis' }];
-
-  const splitSpec = barSplitIntermediateSpec(previousSpec, nextSpec);
-  if (splitSpec) return [{ spec: splitSpec, scene: 'detail' }];
-
-  return [];
-}
-
 /**
  * Reaggregation composes the bar chart's existing motion primitives:
  *
- *   aggregate A -> detail(A x B) -> detail(B x A) -> aggregate B
- *                  split             update          merge
+ *   aggregate A -> stacked(A x B) -> grouped(A x B)
+ *               -> grouped(B x A) -> stacked(B x A) -> aggregate B
  *
- * Both detail views use the same common-refinement key, so the middle leg
- * moves contribution marks rather than replacing them.
+ * Every detail view uses the same common-refinement key. Stacking preserves
+ * additive endpoint value while grouped marks make the joint grain readable.
  */
 export function barReaggregationIntermediateSpecs(
   previousSpec: ViewSpec,
@@ -368,25 +300,43 @@ export function barReaggregationIntermediateSpecs(
   const nextAggregate = singleAggregate(nextSpec);
   if (!compatibleAggregate(previousAggregate, nextAggregate)) return [];
 
+  const detailSpec = (
+    spec: ViewSpec,
+    categoryField: string,
+    segmentField: string,
+    aggregate: SingleAggregate,
+    layout: Extract<BarLayout, 'stacked' | 'grouped'>
+  ) => reaggregationDetailSpec({
+    spec, categoryField, segmentField, refinement, aggregate, layout
+  });
+
   return [
     {
-      spec: reaggregationDetailSpec({
-        spec: previousSpec,
-        categoryField: previous.categoryField,
-        segmentField: next.categoryField,
-        refinement,
-        aggregate: previousAggregate!
-      }),
+      spec: detailSpec(
+        previousSpec, previous.categoryField, next.categoryField,
+        previousAggregate!, 'stacked'
+      ),
       scene: 'detail'
     },
     {
-      spec: reaggregationDetailSpec({
-        spec: nextSpec,
-        categoryField: next.categoryField,
-        segmentField: previous.categoryField,
-        refinement,
-        aggregate: nextAggregate!
-      }),
+      spec: detailSpec(
+        previousSpec, previous.categoryField, next.categoryField,
+        previousAggregate!, 'grouped'
+      ),
+      scene: 'axis'
+    },
+    {
+      spec: detailSpec(
+        nextSpec, next.categoryField, previous.categoryField,
+        nextAggregate!, 'grouped'
+      ),
+      scene: 'axis'
+    },
+    {
+      spec: detailSpec(
+        nextSpec, next.categoryField, previous.categoryField,
+        nextAggregate!, 'stacked'
+      ),
       scene: 'axis'
     }
   ];
@@ -430,13 +380,15 @@ function reaggregationDetailSpec({
   categoryField,
   segmentField,
   refinement,
-  aggregate
+  aggregate,
+  layout
 }: {
   spec: ViewSpec;
   categoryField: string;
   segmentField: string;
   refinement: string[];
   aggregate: SingleAggregate;
+  layout: Extract<BarLayout, 'stacked' | 'grouped'>;
 }): ViewSpec {
   const next = cloneSpec(spec) as ViewSpec;
   const encoding = { ...(next.encoding ?? {}) } as Record<string, any>;
@@ -455,6 +407,9 @@ function reaggregationDetailSpec({
   encoding.color = { field: segmentField, type: 'nominal' };
   delete encoding.xOffset;
   delete encoding.yOffset;
+  if (layout === 'grouped') {
+    encoding[barOffsetChannelName(orientation)] = { field: segmentField, type: 'nominal' };
+  }
 
   const transforms = (next.transform ?? [])
     .filter((transform) => !(transform as { aggregate?: unknown }).aggregate);
@@ -477,7 +432,7 @@ function reaggregationDetailSpec({
   const state = { ...(meta.state ?? {}) };
   const sceneState = { ...(state.sceneState ?? {}) };
   sceneState.detail = {
-    layout: 'stacked',
+    layout,
     fields: [],
     segmentField,
     sourceField: segmentField,
@@ -486,7 +441,7 @@ function reaggregationDetailSpec({
   };
   sceneState.axis = {
     ...(sceneState.axis ?? {}),
-    layout: 'stacked',
+    layout,
     orientation
   };
   state.sceneState = sceneState;
@@ -558,100 +513,6 @@ function stepReason({
   if (changesSegmentLayout && crossesAxis) return 'axis-segment-layout';
   if (orientationChanged && crossesAxis) return 'axis-orientation';
   return 'bar-geometry';
-}
-
-function orientBarSpec(spec: ViewSpec, orientation: BarOrientation): ViewSpec | null {
-  const state = barState(spec);
-  if (!state || state.orientation === orientation) return null;
-
-  const next = cloneSpec(spec) as ViewSpec;
-  const encoding = { ...(next.encoding ?? {}) } as Record<string, unknown>;
-  const categoryEnc = barCategoryChannel(encoding as Record<string, any>);
-  const measureEnc = barMeasureChannel(encoding as Record<string, any>);
-  const category = cloneSpec(categoryEnc);
-  const measure = cloneSpec(measureEnc);
-  if (!category?.field || !measure?.field) return null;
-
-  if (orientation === 'horizontal') {
-    encoding.x = measure;
-    encoding.y = category;
-  } else {
-    encoding.x = category;
-    encoding.y = measure;
-  }
-
-  delete encoding.xOffset;
-  delete encoding.yOffset;
-  if (state.barLayout === 'grouped' && state.segmentField) {
-    encoding[barOffsetChannelName(orientation)] = { field: state.segmentField, type: 'nominal' };
-  }
-
-  const meta = { ...(next.meta ?? {}) } as Record<string, unknown>;
-  const specState = { ...(meta.state ?? {}) } as Record<string, unknown>;
-  const sceneState = { ...(specState.sceneState ?? {}) } as Record<string, unknown>;
-  sceneState.axis = {
-    ...(sceneState.axis as object ?? {}),
-    ...(state.barLayout !== 'simple' ? { layout: state.barLayout } : {}),
-    orientation,
-    order: orientation === 'horizontal' ? ['y', 'x'] : ['x', 'y']
-  };
-  if (state.hasDetail || sceneState.detail) {
-    sceneState.detail = {
-      ...(sceneState.detail as object ?? {}),
-      ...(state.barLayout !== 'simple' ? { layout: state.barLayout } : {})
-    };
-  }
-  specState.sceneState = sceneState;
-  meta.state = specState;
-
-  return {
-    ...next,
-    encoding: encoding as ViewSpec['encoding'],
-    margin: {
-      ...(orientation === 'horizontal' ? { left: 86, right: 42 } : {}),
-      ...(next.margin ?? {})
-    },
-    meta: meta as ViewSpec['meta'],
-    transition: { ...specTransition(spec) }
-  };
-}
-
-function segmentLayoutSpec(
-  spec: ViewSpec,
-  layout: BarLayout,
-  transitionPeerSpec: ViewSpec | null
-): ViewSpec {
-  const state = barState(spec);
-  const next = cloneSpec(spec) as ViewSpec;
-  const encoding = { ...(next.encoding ?? {}) } as Record<string, unknown>;
-  delete encoding.xOffset;
-  delete encoding.yOffset;
-  if (layout === 'grouped' && state?.segmentField) {
-    encoding[barOffsetChannelName(state.orientation)] = {
-      field: state.segmentField,
-      type: 'nominal'
-    };
-  }
-
-  const meta = { ...(next.meta ?? {}) } as Record<string, unknown>;
-  const specStateBlock = { ...(meta.state ?? {}) } as Record<string, unknown>;
-  const sceneState = { ...(specStateBlock.sceneState ?? {}) } as Record<string, unknown>;
-  sceneState.detail = { ...(sceneState.detail as object ?? {}), layout };
-  sceneState.axis = { ...(sceneState.axis as object ?? {}), layout };
-  specStateBlock.sceneState = sceneState;
-  meta.state = specStateBlock;
-
-  return {
-    ...next,
-    encoding: encoding as ViewSpec['encoding'],
-    meta: {
-      ...meta,
-      transition: {
-        ...specTransition(transitionPeerSpec ?? {}),
-        ...specTransition(spec)
-      }
-    } as ViewSpec['meta']
-  };
 }
 
 function cloneSpec<T>(spec: T): T {

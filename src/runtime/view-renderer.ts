@@ -289,43 +289,49 @@ function intermediateRenderPhases(chartType, sourceSpec, targetSpec) {
 }
 
 function renderPhaseConfigs(intermediatePhases, context) {
-  let source = context.transitionSource;
-  const phases = intermediatePhases.map((phase) => {
-    const sceneTransition = sceneTransitionForPhase(phase);
-    const transitionPlanDuration = transitionPlanDurationForPhase(context.chartType, source?.effectiveViewSpec, phase.spec);
+  let authoredSource = context.transitionSource;
+  const phaseConfig = (spec, sceneTransition) => {
+    const authoredTarget = { effectiveViewSpec: spec, sceneTransition };
+    const canonical = context.chartType?.canonicalTransitionPair?.(
+      authoredSource?.effectiveViewSpec,
+      authoredTarget.effectiveViewSpec
+    ) ?? {
+      from: authoredSource?.effectiveViewSpec,
+      to: authoredTarget.effectiveViewSpec,
+      reverse: false
+    };
+    const canonicalSource = canonical.reverse ? authoredTarget : authoredSource;
+    const canonicalTarget = canonical.reverse ? authoredSource : authoredTarget;
     const config = {
       node: context.node,
-      spec: phase.spec,
+      spec: canonical.to,
       viewConfig: context.viewConfig,
       datasets: context.datasets,
       tooltip: context.tooltip,
       d3: context.d3,
       aq: context.aq,
       seekable: context.seekable,
-      sceneTransition,
-      transitionSource: source,
-      transitionPlanDuration
+      sceneTransition: canonicalTarget.sceneTransition,
+      transitionSource: {
+        ...canonicalSource,
+        effectiveViewSpec: canonical.from
+      },
+      transitionPlanDuration: transitionPlanDurationForPhase(
+        context.chartType,
+        canonical.from,
+        canonical.to
+      ),
+      reverse: canonical.reverse
     };
-    source = {
-      effectiveViewSpec: phase.spec,
-      sceneTransition
-    };
+    authoredSource = authoredTarget;
     return config;
-  });
+  };
 
-  phases.push({
-    node: context.node,
-    spec: context.finalSpec,
-    viewConfig: context.viewConfig,
-    datasets: context.datasets,
-    tooltip: context.tooltip,
-    d3: context.d3,
-    aq: context.aq,
-    seekable: context.seekable,
-    sceneTransition: context.finalSceneTransition,
-    transitionSource: source,
-    transitionPlanDuration: transitionPlanDurationForPhase(context.chartType, source?.effectiveViewSpec, context.finalSpec)
-  });
+  const phases = intermediatePhases.map((phase) =>
+    phaseConfig(phase.spec, sceneTransitionForPhase(phase))
+  );
+
+  phases.push(phaseConfig(context.finalSpec, context.finalSceneTransition));
 
   return phases;
 }
@@ -484,10 +490,15 @@ function applySeekSequence(scene, progress, direction = 1) {
 
   renderSeekPhase(scene, Math.max(0, phaseIndex));
   scene.transitionProgress?.progress(
-    clamp((bounded - phase.start) / span, 0, 1),
-    direction
+    phaseProgress(phase, (bounded - phase.start) / span),
+    phase.reverse ? -direction : direction
   );
   return true;
+}
+
+function phaseProgress(phase, value) {
+  const progress = clamp(value, 0, 1);
+  return phase.reverse ? 1 - progress : progress;
 }
 
 }

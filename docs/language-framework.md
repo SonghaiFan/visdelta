@@ -122,8 +122,30 @@ identity while datum identity remains stable.
 
 This lets a change from `sum(case) by year` to `sum(case) by location` compile
 to a many-to-many transport graph through the common refinement
-`[year, location]`. A grouping tree explains the structural change; lineage
+`{year, location}`. A grouping tree explains the structural change; lineage
 explains which values actually move between its branches.
+
+The common refinement is the joint grain of the two endpoint partitions. Each
+non-empty intersection of a source mark and a target mark is one lineage edge.
+Connected components of this bipartite graph derive every primitive operation:
+
+```text
+1 -> 1  update       1 -> N  split       N -> 1  merge
+N -> M  reaggregate  1 -> 0  exit        0 -> 1  enter
+```
+
+Several disconnected components may coexist; `mixed` means that they have
+different operations. A grouping tree is therefore optional planning metadata,
+not the source of object identity or correspondence.
+
+Core reports this topology but does not choose its visual form. A chart plugin
+uses the target layout for a direct split. When reaggregation requires a
+synthetic joint-grain stage with no authored target layout, Bar uses grouped
+marks as the common visual presentation of that maximum common grain. How a
+chart reaches that grouped view is chart- and operation-specific. For Bar
+`sum` and `count`, the path is aggregate A, stacked common-grain marks under A,
+grouped under A, grouped under B, stacked under B, then aggregate B. Other
+aggregate operators currently keep the ordinary fallback transition.
 
 ### Core knows no chart types
 

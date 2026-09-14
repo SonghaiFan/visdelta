@@ -32,62 +32,9 @@ export function barRendererKey(layout: BarLayout, orientation: BarOrientation): 
   return orientation;
 }
 
-export interface LayoutTransitionRouteOptions {
-  fromLayout: BarLayout | undefined;
-  toLayout: BarLayout | undefined;
-  change: 'collapse' | 'split';
-}
-
-export function barLayoutTransitionRoute({
-  fromLayout,
-  toLayout,
-  change
-}: LayoutTransitionRouteOptions): BarLayout[] {
-  const from = barLayoutDefinition(fromLayout);
-  const to = barLayoutDefinition(toLayout);
-  const fromVia = from.transition?.[change]?.to?.[to.key]?.via ?? [];
-  const toVia = to.transition?.[change]?.from?.[from.key]?.via ?? [];
-  return [...fromVia, ...toVia];
-}
-
 export function isSegmentLayout(layout: BarLayout | undefined): boolean {
   return layout === 'grouped' || layout === 'stacked';
 }
-
-// ─── Internal ─────────────────────────────────────────────────────────────────
-
-interface LayoutViaSpec {
-  via: BarLayout[];
-}
-
-interface LayoutTransitionSide {
-  to?: Record<string, LayoutViaSpec>;
-  from?: Record<string, LayoutViaSpec>;
-}
-
-interface LayoutDefinition {
-  key: BarLayout;
-  transition?: {
-    collapse?: LayoutTransitionSide;
-    split?: LayoutTransitionSide;
-  };
-}
-
-function barLayoutDefinition(layout: BarLayout | undefined): LayoutDefinition {
-  return BAR_LAYOUTS[layout ?? 'simple'] ?? BAR_LAYOUTS.simple;
-}
-
-const BAR_LAYOUTS: Record<BarLayout, LayoutDefinition> = {
-  simple: { key: 'simple' },
-  stacked: { key: 'stacked' },
-  grouped: {
-    key: 'grouped',
-    transition: {
-      collapse: { to: { simple: { via: ['stacked'] } } },
-      split: { from: { simple: { via: ['stacked'] } } }
-    }
-  }
-};
 
 function isQuantitative(channel: ChannelSpec | undefined): boolean {
   return channel?.type === 'quantitative';
