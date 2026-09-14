@@ -11,8 +11,8 @@ const MOVE_ACROSS_STAGE_RATIO = 0.24;
 const FALL_STAGGER_RATIO = 0.10;
 const FALL_STAGE_RATIO = 0.38;
 const FORCE_TICK_COUNT = 180;
-const FORCE_ALPHA_START = 1;
-const FORCE_ALPHA_MIN = 0.001;
+const FORCE_ALPHA_START = 0.4;
+const FORCE_ALPHA_MIN = 0.1;
 
 export function expandUnits(rows, spec, d3) {
   const unit = specUnit(spec) || {};
@@ -46,11 +46,14 @@ export function unitLayout(units, chart, spec, deps) {
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
   const requestedRadius = positiveNumber(unit.radius, 12);
   const xChannel = spec.encoding?.x || null;
+  const yChannel = spec.encoding?.y || null;
   const groupKey = unit.group || null;
   const xKey = xChannel?.field;
 
   if (layout === 'force') {
-    return centeredForceLayout(units, chart, requestedRadius, d3);
+    return forceLayout(units, chart, requestedRadius, xChannel, yChannel, {
+      bandOrLinear, d3, position
+    });
   }
 
   if (layout === 'beeswarm') {
@@ -301,19 +304,31 @@ function fitRadius(chart, requestedRadius, { columns = 1, rows = 1 } = {}) {
 }
 
 /** Record a deterministic D3 force trajectory from the current mark positions. */
-function centeredForceLayout(units, chart, requestedRadius, d3) {
+function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
+  const { bandOrLinear, d3, position } = deps;
   if (!units.length) {
     return {
       name: 'force', axes: false, axis: null, r: requestedRadius,
       x: () => chart.innerWidth / 2,
       y: () => chart.innerHeight / 2,
-      trajectory: () => [{ x: chart.innerWidth / 2, y: chart.innerHeight / 2 }]
+      trajectory: () => [{ x: chart.innerWidth / 2, y: chart.innerHeight / 2 }],
+      trajectoryTimeline: [0]
     };
   }
 
   const radius = fitForceRadius(chart, requestedRadius, units.length);
   const centerX = chart.innerWidth / 2;
   const centerY = chart.innerHeight / 2;
+  const xScale = xChannel?.field
+    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 })
+    : null;
+  const yScale = yChannel?.field
+    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear, d3 })
+    : null;
+  const axes = {
+    x: forceAxis(xScale, xChannel),
+    y: forceAxis(yScale, yChannel)
+  };
   const existing = new Map(chart.g.selectAll('circle.vd-unit').nodes().map((node) => [
     String(node.dataset.key ?? node.__data__?.__semanticUnitKey ?? node.__data__?.__unitKey),
     { x: finiteNumber(node.getAttribute('cx')), y: finiteNumber(node.getAttribute('cy')) }
@@ -331,10 +346,11 @@ function centeredForceLayout(units, chart, requestedRadius, d3) {
     point && Number.isFinite(point.x) && Number.isFinite(point.y))) {
     const endpoints = new Map(existingEndpoint);
     return {
-      name: 'force', axes: false, axis: null, r: radius,
+      name: 'force', axes, axis: axes.x, r: radius,
       x: (unit) => endpoints.get(unit.__unitKey).x,
       y: (unit) => endpoints.get(unit.__unitKey).y,
-      trajectory: (unit) => [endpoints.get(unit.__unitKey)]
+      trajectory: (unit) => [endpoints.get(unit.__unitKey)],
+      trajectoryTimeline: [0]
     };
   }
   const columns = Math.max(1, Math.ceil(Math.sqrt(units.length * chart.innerWidth / chart.innerHeight)));
@@ -357,11 +373,16 @@ function centeredForceLayout(units, chart, requestedRadius, d3) {
     node.unit.__unitKey,
     [{ x: node.x, y: node.y }]
   ]));
+  const targetX = xScale
+    ? (node) => position(xScale, node.unit.__row[xChannel.field])
+    : centerX;
+  const targetY = yScale
+    ? (node) => position(yScale, node.unit.__row[yChannel.field])
+    : centerY;
   const simulation = d3.forceSimulation(nodes)
-    .force('center', d3.forceCenter(centerX, centerY))
-    .force('x', d3.forceX(centerX).strength(0.2))
-    .force('y', d3.forceY(centerY).strength(0.2))
-    .force('collide', d3.forceCollide(radius * 1.12).strength(1).iterations(2))
+    .force('x', d3.forceX(targetX).strength(0.2))
+    .force('y', d3.forceY(targetY).strength(0.2))
+    .force('collide', d3.forceCollide(radius * 1.12).strength(1).iterations(10))
     .alpha(FORCE_ALPHA_START)
     .alphaMin(FORCE_ALPHA_MIN)
     .alphaDecay(1 - Math.pow(
@@ -369,20 +390,42 @@ function centeredForceLayout(units, chart, requestedRadius, d3) {
       1 / FORCE_TICK_COUNT
     ))
     .stop();
+  const cumulativeMotion = [0];
   for (let tick = 0; tick < FORCE_TICK_COUNT; tick++) {
+    const previous = nodes.map((node) => ({ x: node.x, y: node.y }));
     simulation.tick();
+    let squaredMotion = 0;
     for (const node of nodes) {
       trajectories.get(node.unit.__unitKey).push({ x: node.x, y: node.y });
     }
+    nodes.forEach((node, index) => {
+      squaredMotion += (node.x - previous[index].x) ** 2 + (node.y - previous[index].y) ** 2;
+    });
+    cumulativeMotion.push(
+      cumulativeMotion[cumulativeMotion.length - 1] + Math.sqrt(squaredMotion / nodes.length)
+    );
   }
   simulation.stop();
   const endpoints = new Map(nodes.map((node) => [node.unit.__unitKey, { x: node.x, y: node.y }]));
+  const totalMotion = cumulativeMotion[cumulativeMotion.length - 1];
+  const trajectoryTimeline = totalMotion > Number.EPSILON
+    ? cumulativeMotion.map((motion) => motion / totalMotion)
+    : cumulativeMotion.map((_, index) => index / Math.max(1, cumulativeMotion.length - 1));
 
   return {
-    name: 'force', axes: false, axis: null, r: radius,
+    name: 'force', axes, axis: axes.x, r: radius,
     x: (unit) => endpoints.get(unit.__unitKey).x,
     y: (unit) => endpoints.get(unit.__unitKey).y,
-    trajectory: (unit) => trajectories.get(unit.__unitKey)
+    trajectory: (unit) => trajectories.get(unit.__unitKey),
+    trajectoryTimeline
+  };
+}
+
+function forceAxis(scale, channel) {
+  if (!scale || !channel?.field) return null;
+  return {
+    scale,
+    channel: { ...channel, title: channel.title || channel.field }
   };
 }
 
