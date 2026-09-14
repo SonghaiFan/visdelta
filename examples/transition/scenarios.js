@@ -48,6 +48,26 @@ const detailed = bar(DATA_URL)
   .breakdown("age")
   .color("age", { domain: AGE_BANDS, range: AGE_COLORS });`;
 
+const lineageReaggregation = `const cases = [
+  { id: "r1", year: 2020, location: "A", cases: 10 },
+  { id: "r2", year: 2020, location: "B", cases: 5 },
+  { id: "r3", year: 2021, location: "A", cases: 12 },
+  { id: "r4", year: 2021, location: "B", cases: 8 }
+];
+
+const base = bar(cases)
+  .datumKey("id")
+  .y("cases", { title: "Cases" })
+  .color("#1c6ae4");
+
+const byYear = base
+  .x("year", { title: "Year" })
+  .rollup("year");
+
+const byLocation = base
+  .x("location", { title: "Location" })
+  .rollup("location");`;
+
 function sample(id, label, description, setup, from, to) {
   return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
@@ -70,5 +90,6 @@ export const scenarios = [
   sample('layout', '10 · Stacked → grouped', 'For six named states, keep the age detail and change from stacked to side-by-side bars.', segmentedFeatured, 'detailed', 'detailed.layout("grouped")'),
   sample('grouped-split', '11 · Split into grouped ages', 'Move six state totals into side-by-side age-band detail.', segmentedFeatured, 'detailed.rollup()', 'detailed.layout("grouped")'),
   sample('grouped-merge', '12 · Merge grouped ages', 'Move the six-state grouped detail back into population totals.', segmentedFeatured, 'detailed.layout("grouped")', 'detailed.rollup()'),
-  sample('focus', '13 · Focus the view', 'Fit one camera around New York and Pennsylvania. Keep all 52 observations, the complete ordered state scale, and every state between the two anchors.', populationFocus, 'under10', 'under10.focus({ field: "state", oneOf: FOCUS_ANCHORS })')
+  sample('focus', '13 · Focus the view', 'Fit one camera around New York and Pennsylvania. Keep all 52 observations, the complete ordered state scale, and every state between the two anchors.', populationFocus, 'under10', 'under10.focus({ field: "state", oneOf: FOCUS_ANCHORS })'),
+  sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. Scrub the four additive lineage fragments through the many-to-many correspondence.', lineageReaggregation, 'byYear', 'byLocation')
 ];

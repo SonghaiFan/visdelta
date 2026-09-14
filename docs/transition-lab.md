@@ -1,6 +1,6 @@
 # Bar transition lab
 
-These thirteen scenarios are the executable transition matrix for VisDelta's
+These fourteen scenarios are the executable transition matrix for VisDelta's
 current bar implementation. Edit either endpoint, run the code, scrub any
 frame, reverse playback, and inspect the computed semantic delta.
 
@@ -21,3 +21,8 @@ adds unchanged rows from the same CSV; it does not invent replacement values.
 The lab is intentionally limited to transitions between bar-chart states. A successful
 render demonstrates this pair, not an undocumented guarantee for every possible
 combination of transforms and encodings.
+
+Open [Split → move → merge](#reaggregate) to inspect a many-to-many lineage
+transition directly. Two year totals split into four source-record
+contributions, move across the common `year × location` refinement, and merge
+into two location totals. The same slider drives the exact path in reverse.

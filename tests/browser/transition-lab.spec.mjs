@@ -8,13 +8,20 @@ const snapshot = page => page.locator('#chart svg').evaluateAll(svgs => svgs.map
     attrs: Array.from(node.attributes).map(attr => [attr.name, attr.value]).sort()
   }))));
 
+function editedScenario(sample) {
+  if (sample.code.includes('"State"')) {
+    return { code: sample.code.replaceAll('"State"', '"Region"'), label: 'Region' };
+  }
+  return { code: sample.code.replace('"Year"', '"Calendar year"'), label: 'Calendar year' };
+}
+
 for (const sample of scenarios) {
   test(`lab ${sample.id}: editable pair, reversible seek, working endpoints`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/transition-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(13);
+    await expect(page.locator('#scenario option')).toHaveCount(14);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
     const start = await snapshot(page);
@@ -29,10 +36,11 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replaceAll('"State"', '"Region"'));
+    const edited = editedScenario(sample);
+    await editor.fill(edited.code);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(page.locator('#chart')).toContainText('Region');
+    await expect(page.locator('#chart')).toContainText(edited.label);
     await page.locator('#reset').click();
     await ready(page);
     await expect(editor).toHaveValue(sample.code);
@@ -57,6 +65,22 @@ test('invalid code and invalid pairs preserve preview; reset recovers', async ({
   await page.locator('#reset').click();
   await ready(page);
   await expect(page.getByRole('alert')).toBeHidden();
+});
+
+test('bar lab exposes the many-to-many split, move, and merge fragments', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/docs/.vitepress/dist/transition-lab.html#reaggregate');
+  await ready(page);
+  await expect(page.locator('#scenario')).toHaveValue('reaggregate');
+  await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
+  await page.locator('#progress').fill('0.5');
+  await expect(page.locator('#chart rect.vd-bar-lineage-fragment')).toHaveCount(4);
+  await expect(page.locator('#chart rect.vd-bar-lineage-fragment').first()).toBeVisible();
+  await page.locator('#end').click();
+  await expect(page.locator('#chart rect.vd-bar-lineage-fragment')).toHaveCount(0);
+  await expect(page.locator('#chart rect.vd-bar')).toHaveCount(2);
+  expect(errors).toEqual([]);
 });
 
 test('bar focus moves one camera over the full category scale without filtering bars', async ({ page }) => {
