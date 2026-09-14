@@ -103,9 +103,11 @@ At chart level, declare source identity with `.datumKey("id")`; `.key()` remains
 the join identity of a mark in the current view. At the low-level compiler,
 `key` identifies immutable source records and `grain` identifies marks in one
 compiled view. They are intentionally separate. Filtering, sorting, limiting,
-binning, time units and folding preserve lineage; `sum`, `count`, and `mean`
-produce contribution records. Non-additive aggregates such as `median` retain
-provenance but mark the plan as unsafe to split.
+binning, time units and folding preserve lineage. `sum` and `count` produce
+additive contribution records. `mean` and non-additive aggregates such as
+`median` retain provenance, but mark the plan as unsafe to split or
+reaggregate because independently stacked subgroup results would not conserve
+the endpoint value.
 
 For additive, non-negative simple bars, `split`, `merge`, and `reaggregate`
 plans render as source contributions that split, travel, and merge. Unsupported

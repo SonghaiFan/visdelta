@@ -9,12 +9,13 @@ for (const width of [1100, 390]) {
     await page.goto('/index.html');
     await expect(page).toHaveURL(/\/docs\/\.vitepress\/dist\/$/);
     await expect(page).toHaveTitle(/VisDelta/);
-    await expect(page.getByRole('heading', { name: 'Declare states. Control frames.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Make data changes feel obvious.' })).toBeVisible();
 
-    const workbench = page.locator('.transition-workbench');
-    await workbench.scrollIntoViewIfNeeded();
-    await expect(workbench.locator('.workbench-kicker')).toContainText('Ready');
-    await expect(workbench.locator('rect.vd-bar')).toHaveCount(4);
+    const showcase = page.locator('.transition-showcase');
+    await showcase.scrollIntoViewIfNeeded();
+    await expect(showcase).toBeVisible();
+    await expect(showcase.locator('.transition-showcase-topline')).toContainText(/Auto-playing|Paused/);
+    await expect(showcase.locator('rect.vd-bar').first()).toBeVisible();
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);

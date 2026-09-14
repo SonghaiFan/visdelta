@@ -54,20 +54,20 @@ export interface FilterSpec {
 }
 
 export interface AggregateFieldSpec {
-  op: string;
+  op?: string;
   field?: string;
-  as: string;
+  as?: string;
 }
 
 export interface AggregateTransform {
-  groupby: string[];
-  fields: AggregateFieldSpec[];
+  groupby?: string[];
+  fields?: AggregateFieldSpec[];
 }
 
 export interface TimeUnitTransform {
   field: string;
   unit: string;
-  as: string;
+  as?: string;
 }
 
 export type TransformSpec =

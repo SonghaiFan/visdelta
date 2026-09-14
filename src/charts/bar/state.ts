@@ -399,11 +399,19 @@ type SingleAggregate = {
 
 function singleAggregate(spec: ViewSpec): SingleAggregate | null {
   const aggregates = (spec.transform ?? [])
-    .map((transform) => (transform as { aggregate?: SingleAggregate }).aggregate)
-    .filter((aggregate): aggregate is SingleAggregate => Boolean(aggregate));
-  return aggregates.length === 1 && aggregates[0].fields?.length === 1
-    ? aggregates[0]
-    : null;
+    .map((transform) => (transform as { aggregate?: {
+      groupby?: string[];
+      fields?: Array<{ op?: string; field?: string; as?: string }>;
+    } }).aggregate)
+    .filter((aggregate): aggregate is NonNullable<typeof aggregate> => Boolean(aggregate));
+  if (aggregates.length !== 1 || aggregates[0].fields?.length !== 1) return null;
+  const metric = aggregates[0].fields[0];
+  const op = metric.op ?? 'count';
+  const field = metric.field;
+  return {
+    groupby: [...(aggregates[0].groupby ?? [])],
+    fields: [{ op, ...(field ? { field } : {}), as: metric.as ?? `${op}_${field || 'rows'}` }]
+  };
 }
 
 function compatibleAggregate(
@@ -413,7 +421,8 @@ function compatibleAggregate(
   if (!previous || !next) return false;
   const a = previous.fields[0];
   const b = next.fields[0];
-  return a.op === b.op && a.field === b.field && a.as === b.as;
+  return (a.op === 'sum' || a.op === 'count') &&
+    a.op === b.op && a.field === b.field && a.as === b.as;
 }
 
 function reaggregationDetailSpec({

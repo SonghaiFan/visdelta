@@ -145,6 +145,22 @@ test('filter preserves lineage and fold creates stable measure branches', () => 
   assert.deepEqual(table.rows.map(row => row.contributions.value[0].value), [10, 3]);
 });
 
+test('lineage transform values match renderer missing-value semantics', () => {
+  const source = [
+    { id: 'A', value: 1 },
+    { id: 'B', value: null },
+    { id: 'C', value: '' },
+    { id: 'D', value: false }
+  ];
+  const mean = compileLineage(source, [{
+    aggregate: { fields: [{ op: 'mean', field: 'value', as: 'result' }] }
+  }], { key: 'id' });
+  assert.equal(mean.rows[0].datum.result, 1 / 3);
+
+  const binned = compileLineage(source, [{ bin: { field: 'value', step: 1 } }], { key: 'id' });
+  assert.deepEqual(binned.rows.map(row => row.datum.value_bin), ['1-2', null, null, null]);
+});
+
 test('non-additive aggregates retain provenance but reject split motion', () => {
   const median = compileLineage(cases, [{
     aggregate: {
@@ -159,6 +175,33 @@ test('non-additive aggregates retain provenance but reject split motion', () => 
   assert.match(median.capability.reasons[0], /median/);
 });
 
+test('mean lineage retains provenance but falls back from additive reaggregation', () => {
+  const meanBy = field => [{
+    aggregate: { groupby: [field], fields: [{ op: 'mean', field: 'case', as: 'case' }] }
+  }];
+  const byYear = compileLineage(cases, meanBy('year'), { key: 'id' });
+  assert.equal(byYear.capability.splittable, false);
+  assert.match(byYear.capability.reasons[0], /mean/);
+
+  const base = bar(cases).datumKey('id').y('case');
+  const from = base.x('year').rollup('year', { op: 'mean' }).toSpec();
+  const to = base.x('location').rollup('location', { op: 'mean' }).toSpec();
+  assert.deepEqual(barReaggregationIntermediateSpecs(from, to), []);
+});
+
+test('reaggregation normalizes an omitted aggregate result name', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const from = structuredClone(base.x('year').rollup('year').toSpec());
+  const to = structuredClone(base.x('location').rollup('location').toSpec());
+  for (const spec of [from, to]) {
+    delete spec.transform.at(-1).aggregate.fields[0].as;
+    spec.encoding.y.field = 'sum_case';
+  }
+  const phases = barReaggregationIntermediateSpecs(from, to);
+  assert.equal(phases.length, 2);
+  assert.deepEqual(phases.map(phase => phase.spec.encoding.y.field), ['sum_case', 'sum_case']);
+});
+
 test('datum identity rejects duplicates and reports unsafe index fallback', () => {
   assert.throws(
     () => compileLineage([{ id: 'A' }, { id: 'A' }], [], { key: 'id' }),
@@ -168,4 +211,8 @@ test('datum identity rejects duplicates and reports unsafe index fallback', () =
   assert.equal(fallback.identity.mode, 'index');
   assert.equal(fallback.identity.stable, false);
   assert.equal(fallback.capability.splittable, false);
+
+  const duplicateIds = compileLineage([{ id: 'A', value: 1 }, { id: 'A', value: 2 }]);
+  assert.equal(duplicateIds.identity.mode, 'index');
+  assert.equal(duplicateIds.identity.stable, false);
 });

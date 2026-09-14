@@ -8,6 +8,11 @@ const ready = async page => {
     throw new Error(await page.getByRole('alert').textContent());
   }
 };
+const selectScenario = async (page, id) => {
+  await page.locator('#scenario').selectOption(id);
+  await expect(page.locator('#status')).toHaveText('Waiting for input');
+  await ready(page);
+};
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
   Array.from(svg.querySelectorAll('path.vd-line, circle.vd-line-point, .tick, .vd-legend-item')).map(node => ({
     tag: node.tagName,
@@ -92,8 +97,7 @@ test('line highlight and style are real renderer behavior', async ({ page }) => 
     })).sort((a, b) => a.key.localeCompare(b.key)));
   expect(highlightedLines.map(line => line.opacity).sort()).toEqual([0.12, 1]);
 
-  await page.locator('#scenario').selectOption('style');
-  await ready(page);
+  await selectScenario(page, 'style');
   await page.locator('#start').click();
   await expect(page.locator('#chart path.vd-line')).toHaveAttribute('stroke-width', '2');
   await page.locator('#progress').fill('0.55');
@@ -123,8 +127,7 @@ test('line filter keeps an internal gap while focus keeps every observation', as
   await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(21);
   await expect(page.locator('#chart path.vd-line')).toHaveCount(2);
 
-  await page.locator('#scenario').selectOption('focus');
-  await ready(page);
+  await selectScenario(page, 'focus');
   await expect(page.locator('.playground-line-plan')).toContainText('Focus view');
   await page.locator('#end').click();
   await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(24);
@@ -153,11 +156,9 @@ test('line lab names the authored observation direction', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/line-lab.html#restore');
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Add points');
-  await page.locator('#scenario').selectOption('add');
-  await ready(page);
+  await selectScenario(page, 'add');
   await expect(page.locator('.playground-line-plan')).toContainText('Add points');
-  await page.locator('#scenario').selectOption('remove');
-  await ready(page);
+  await selectScenario(page, 'remove');
   await expect(page.locator('.playground-line-plan')).toContainText('Remove points');
 });
 

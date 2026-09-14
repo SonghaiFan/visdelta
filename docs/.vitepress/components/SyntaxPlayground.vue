@@ -418,6 +418,7 @@ function lineTransitionLabel(result, root) {
   const specs = [result?.from, result?.to].map(state =>
     typeof state?.toSpec === 'function' ? state.toSpec() : state);
   const focusesView = specs.some(spec =>
+    spec?.meta?.state?.scopes?.focus?.mode === 'focus' ||
     spec?.meta?.state?.sceneState?.selection?.mode === 'focus');
   if (focusesView) return 'Focus view';
   const counts = specs.map(lineObservationCount);

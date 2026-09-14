@@ -32,11 +32,9 @@ class AreaChart extends BaseChart {
     const pointKey = areaPointKeyAccessor(spec, xField);
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const domainLayers = areaLayers(domainRows, xField, yField, state, pointKey);
-    const filtersRows = Boolean(state.selection?.filter) &&
-      state.selection?.mode !== 'focus' && state.selection?.mode !== 'highlight';
-    const scaleRows = filtersRows ? domainRows : rows;
+    const scaleRows = state.filtersRows ? domainRows : rows;
     const layers = areaLayers(rows, xField, yField, state, pointKey);
-    const lineageLayers = filtersRows && state.connect !== 'across'
+    const lineageLayers = state.filtersRows && state.connect !== 'across'
       ? domainLayers
       : layers;
     const cells = areaCells(layers, lineageLayers);

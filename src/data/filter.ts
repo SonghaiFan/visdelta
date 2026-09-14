@@ -63,6 +63,13 @@ export function matchesFilter(row: Record<string, unknown>, filter: FilterSpec):
     return true;
 }
 
+/** Whether a view changes row membership through its data pipeline. */
+export function hasRowFilter(spec: { filter?: unknown; transform?: unknown[] }): boolean {
+  return spec.filter != null || (spec.transform ?? []).some((transform) =>
+    Boolean(transform && typeof transform === 'object' && 'filter' in transform)
+  );
+}
+
 function isRangeBound(value: unknown): boolean {
   return (typeof value === 'number' && Number.isFinite(value)) || Boolean(temporalDate(value));
 }

@@ -1,5 +1,5 @@
 import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
-import { matchesFilter, normalizeFilter } from '../../data/filter.js';
+import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
@@ -8,6 +8,7 @@ import { matchesSelection, viewHighlight, viewSelection } from '../../focus.js';
 export interface AreaSceneState {
   selection: SelectionSpec | null;
   highlight: SelectionSpec | null;
+  filtersRows: boolean;
   mode: 'single' | 'stacked';
   seriesField: string | null;
   baseline: number;
@@ -50,6 +51,7 @@ export function areaState(spec: ViewSpec, enc: Record<string, ChannelSpec> = {})
   return {
     selection: viewSelection(spec),
     highlight: viewHighlight(spec),
+    filtersRows: hasRowFilter(spec),
     mode,
     seriesField: mode === 'stacked'
       ? String(detail?.['seriesField'] || enc['color']?.field || '') || null

@@ -33,6 +33,7 @@ features:
     </div>
     <a class="home-inline-link" href="./examples">Explore editable examples <span aria-hidden="true">→</span></a>
   </div>
+  <BarTransitionShowcase />
 </section>
 
 </div>

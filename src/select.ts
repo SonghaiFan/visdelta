@@ -1,5 +1,5 @@
 import type { Visualization } from './core.js';
-import { mountedAt, registerMounted } from './runtime/mounted.js';
+import { mountedAt, registerMounted, unregisterMounted } from './runtime/mounted.js';
 import { sequence as createSequence } from './sequence.js';
 import { transition } from './transition.js';
 import type { SequencePlayOptions } from './sequence.js';
@@ -102,10 +102,11 @@ function update<S extends Visualization>(target: Element, from: Visualization, t
       }
       target.replaceChildren(root);
       preparation.remove();
-      registerMounted(target, to, { ...options, target }, controller);
+      const owned = ownTransition(target, controller);
+      registerMounted(target, to, { ...options, target }, owned);
       current.controller.destroy();
-      controller.play(playOptions);
-      return motion(live<S>(target), controller);
+      owned.play(playOptions);
+      return motion(live<S>(target), owned);
     }
   };
 }
@@ -118,10 +119,11 @@ function sequence(target: Element, from: Visualization, states: Visualization[],
       // Preparation is off-host. It mounts only after every adjacent leg is
       // ready, so an existing chart remains visible during setup.
       const controller = await createSequence(states, { ...options, target });
-      registerMounted(target, states[states.length - 1], { ...options, target }, controller);
+      const owned = ownSequence(target, controller);
+      registerMounted(target, states[states.length - 1], { ...options, target }, owned);
       current.controller.destroy();
-      controller.play(playOptions);
-      return sequenceMotion(live(target), controller);
+      owned.play(playOptions);
+      return sequenceMotion(live(target), owned);
     }
   };
 }
@@ -146,6 +148,44 @@ function sequenceMotion(chart: LiveChart, controller: Awaited<ReturnType<typeof 
     resize() { controller.resize(); return this; },
     destroy() { controller.destroy(); }
   };
+}
+
+function ownTransition(target: Element, controller: VisualizationTransition): VisualizationTransition {
+  const owned: VisualizationTransition = {
+    from: controller.from,
+    to: controller.to,
+    delta: controller.delta,
+    view: controller.view,
+    get value() { return controller.value; },
+    progress(value) { controller.progress(value); return owned; },
+    play(options) { controller.play(options); return owned; },
+    pause() { controller.pause(); return owned; },
+    resize() { controller.resize(); return owned; },
+    destroy() {
+      controller.destroy();
+      unregisterMounted(target, owned);
+    }
+  };
+  return owned;
+}
+
+function ownSequence(
+  target: Element,
+  controller: Awaited<ReturnType<typeof createSequence>>
+): Awaited<ReturnType<typeof createSequence>> {
+  const owned: Awaited<ReturnType<typeof createSequence>> = {
+    states: controller.states,
+    get value() { return controller.value; },
+    progress(value) { controller.progress(value); return owned; },
+    play(options) { controller.play(options); return owned; },
+    pause() { controller.pause(); return owned; },
+    resize() { controller.resize(); return owned; },
+    destroy() {
+      controller.destroy();
+      unregisterMounted(target, owned);
+    }
+  };
+  return owned;
 }
 
 function requireMounted(target: Element) {

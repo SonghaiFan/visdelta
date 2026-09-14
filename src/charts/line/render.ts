@@ -56,9 +56,7 @@ class LineChart extends BaseChart {
     const lineageRows = state.detailPosition === 'total'
       ? lineRowsAtTotal(domainRows, enc.x?.field, enc.y?.field, state.detailParentOp)
       : domainRows;
-    const filtersRows = Boolean(state.selection?.filter) &&
-      state.selection?.mode !== 'focus' && state.selection?.mode !== 'highlight';
-    const scaleRows = filtersRows ? lineageRows : plottedRows;
+    const scaleRows = state.filtersRows ? lineageRows : plottedRows;
     const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], d3);
     const baseY = bandOrLinear(scaleRows, enc.y, [chart.innerHeight, 0], d3);
     const authoredPointRadius = Number.isFinite(Number(spec.pointSize))
@@ -87,7 +85,8 @@ class LineChart extends BaseChart {
       state.seriesField,
       key,
       state.selection,
-      state.connect
+      state.connect,
+      state.filtersRows
     );
     const line = d3
       .line()

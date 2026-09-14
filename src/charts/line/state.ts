@@ -1,5 +1,5 @@
 import type { CanonicalTransitionPair, ChannelSpec, IntermediateSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
-import { matchesFilter, normalizeFilter } from '../../data/filter.js';
+import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
@@ -9,6 +9,7 @@ import { viewHighlight, viewSelection } from '../../focus.js';
 interface LineState {
   selection: SelectionSpec | null;
   highlight: SelectionSpec | null;
+  filtersRows: boolean;
   seriesField: string | null;
   detailMode: string | null;
   detailStage: string | null;
@@ -30,6 +31,7 @@ export function lineState(spec: ViewSpec = {}, enc: Record<string, ChannelSpec> 
   return {
     selection: viewSelection(spec),
     highlight: viewHighlight(spec),
+    filtersRows: hasRowFilter(spec),
     seriesField: (detail['seriesField'] as string) || enc['color']?.field || null,
     detailMode: (detail['mode'] as string) || null,
     detailStage: (detail['stage'] as string) || null,
@@ -258,16 +260,16 @@ export function connectedLineStretches(
   seriesField: string | null,
   pointKey: (row: Record<string, unknown>, index: number) => string | number,
   selection: SelectionSpec | null,
-  connect: 'adjacent' | 'across' = 'adjacent'
+  connect: 'adjacent' | 'across' = 'adjacent',
+  filtersRows = Boolean(selection?.filter) && selection?.mode !== 'focus' && selection?.mode !== 'highlight'
 ): LineSeries[] {
   const series = lineSeries(rows, seriesField);
-  const isRowFilter = Boolean(selection?.filter) && selection?.mode !== 'focus' && selection?.mode !== 'highlight';
   const lineageBySeries = new Map(
     lineSeries(lineageRows, seriesField).map((entry) => [entry.key, entry.rows])
   );
 
   return series.flatMap((entry) => {
-    const preserveLineage = connect === 'adjacent' && isRowFilter && rows.length !== lineageRows.length;
+    const preserveLineage = connect === 'adjacent' && filtersRows && rows.length !== lineageRows.length;
     const lineage = preserveLineage
       ? lineageBySeries.get(entry.key) || entry.rows
       : entry.rows;

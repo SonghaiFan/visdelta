@@ -68,6 +68,36 @@ test('live charts evolve selected endpoints and own multi-state sequences', asyn
   expect(errors).toEqual([]);
 });
 
+test('selected update and sequence controllers unregister their adopted mount on destroy', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const updated = await (await sl.mount(base, opts('#a')))
+      .update(view => view.y('other'))
+      .play({ duration: 0 });
+    updated.controller.destroy();
+    let updateRejected = false;
+    try { sl.select('#a'); } catch { updateRejected = true; }
+
+    const sequenced = await (await sl.mount(base, opts('#b')))
+      .sequence([view => view.y('other'), view => view.y('value')])
+      .play({ duration: 0 });
+    sequenced.destroy();
+    let sequenceRejected = false;
+    try { sl.select('#b'); } catch { sequenceRejected = true; }
+    return {
+      updateRejected,
+      sequenceRejected,
+      updateEmpty: document.querySelector('#a').children.length === 0,
+      sequenceEmpty: document.querySelector('#b').children.length === 0
+    };
+  });
+  expect(result).toEqual({
+    updateRejected: true,
+    sequenceRejected: true,
+    updateEmpty: true,
+    sequenceEmpty: true
+  });
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
   test(`${scenario}: direct seek equals history, endpoints restore, frame stays still`, async ({ page }) => {
     const errors = [];

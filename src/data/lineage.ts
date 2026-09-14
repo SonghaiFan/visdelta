@@ -248,9 +248,13 @@ export function lineageMarkKey(datum: DataRow, grain: string[]): string {
 }
 
 function resolveIdentity(source: DataRow[], requested?: DatumKeySpec) {
+  const inferredIds = source.map((row) => row.id);
+  const hasUniqueIds = source.length > 0 &&
+    inferredIds.every((value) => value != null) &&
+    new Set(inferredIds.map(canonicalKey)).size === source.length;
   const mode = requested != null
     ? 'explicit' as const
-    : source.every((row) => row.id != null)
+    : hasUniqueIds
       ? 'inferred-id' as const
       : 'index' as const;
   const key: DatumKeySpec = requested ?? (mode === 'inferred-id' ? 'id' : (_row: DataRow, index: number) => index);
@@ -272,8 +276,8 @@ function createAtom(datumKey: DatumKey, branch: string[]): LineageAtom {
 
 function numericContributions(datum: DataRow, atom: LineageAtom): Record<string, LineageContribution[]> {
   return Object.fromEntries(Object.entries(datum).flatMap(([field, value]) =>
-    Number.isFinite(Number(value)) && value !== '' && value != null && typeof value !== 'boolean'
-      ? [[field, [{ atom, value: Number(value) }]]]
+    aggregateNumber(value) != null
+      ? [[field, [{ atom, value: aggregateNumber(value)! }]]]
       : []
   ));
 }
@@ -321,13 +325,13 @@ function foldRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
 function binRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
   const field = String(config.field);
   const as = String(config.as ?? `${field}_bin`);
-  const values = rows.map((row) => Number(row.datum[field])).filter(Number.isFinite);
+  const values = rows.map((row) => binNumber(row.datum[field])).filter((value): value is number => value != null);
   const min = values.length ? Math.min(...values) : 0;
   const max = values.length ? Math.max(...values) : 0;
   const step = Number(config.step ?? Math.max(1, Math.ceil((max - min) / Number(config.maxbins ?? 10))));
   return rows.map((row) => {
-    const value = Number(row.datum[field]);
-    if (!Number.isFinite(value)) return { ...row, datum: { ...row.datum, [as]: null, [`${as}_start`]: null, [`${as}_end`]: null } };
+    const value = binNumber(row.datum[field]);
+    if (value == null) return { ...row, datum: { ...row.datum, [as]: null, [`${as}_start`]: null, [`${as}_end`]: null } };
     const start = Math.floor((value - min) / step) * step + min;
     return { ...row, datum: { ...row.datum, [as]: `${start}-${start + step}`, [`${as}_start`]: start, [`${as}_end`]: start + step } };
   });
@@ -354,7 +358,7 @@ function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
       const op = String(metric.op ?? 'count');
       const field = metric.field == null ? '' : String(metric.field);
       const as = String(metric.as ?? `${op}_${field || 'rows'}`);
-      const numeric = group.map((row) => Number(row.datum[field])).filter(Number.isFinite);
+      const numeric = group.map((row) => aggregateNumber(row.datum[field])).filter((value): value is number => value != null);
       if (op === 'sum') {
         datum[as] = numeric.reduce((sum, value) => sum + value, 0);
         contributions[as] = mergeContributions(group.flatMap((row) => row.contributions[field] ?? []));
@@ -368,6 +372,7 @@ function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
         datum[as] = numeric.length ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : undefined;
         contributions[as] = mergeContributions(group.flatMap((row) => row.contributions[field] ?? []))
           .map((entry) => ({ ...entry, value: entry.value / Math.max(1, numeric.length) }));
+        reasons.push(`${op}(${field}) is not additively splittable`);
       } else {
         datum[as] = aggregateNonAdditive(numeric, op);
         reasons.push(`${op}(${field}) is not additively splittable`);
@@ -380,6 +385,18 @@ function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
     grain,
     capability: { splittable: reasons.length === 0, reasons: [...new Set(reasons)] }
   };
+}
+
+function aggregateNumber(value: unknown): number | null {
+  if (value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function binNumber(value: unknown): number | null {
+  if (value == null || value === '' || typeof value === 'boolean') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function aggregateNonAdditive(values: number[], op: string): number | undefined {
