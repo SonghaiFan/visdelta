@@ -85,18 +85,25 @@ test('unit bar uses category position while every unit keeps equal size', async 
   });
 });
 
-test('Unit force layout is centered, deterministic, non-overlapping, and axis-free', async ({ page }) => {
+test('Unit forceX uses the declared species scale and keeps one deterministic path', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/unit-lab.html#force');
   await ready(page);
-  await page.locator('#progress').fill('0.9');
-  const frameAt090 = await page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
+  const readPositions = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
       .sort((a, b) => a[0].localeCompare(b[0])));
-  await page.locator('#progress').fill('0.99');
+  const positionsAt = async value => {
+    await page.locator('#progress').fill(String(value));
+    return readPositions();
+  };
+  const sampledFrames = [];
+  for (const progress of [0, 0.1, 0.3, 0.6, 0.9, 0.99]) {
+    sampledFrames.push(await positionsAt(progress));
+  }
+  sampledFrames.slice(1).forEach((frame, index) => {
+    expect(frame).not.toEqual(sampledFrames[index]);
+  });
 
-  const beforeForce = await page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
-    nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
-      .sort((a, b) => a[0].localeCompare(b[0])));
+  const beforeForce = sampledFrames[sampledFrames.length - 1];
   await page.waitForTimeout(120);
   expect(await page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
@@ -108,9 +115,11 @@ test('Unit force layout is centered, deterministic, non-overlapping, and axis-fr
     const plot = svg.querySelector('clipPath[id^="vd-mark-clip-"] rect');
     const marks = [...svg.querySelectorAll('circle.vd-unit')].map(node => ({
       key: node.dataset.key,
+      species: node.__data__.__row.species,
       x: Number(node.getAttribute('cx')),
       y: Number(node.getAttribute('cy')),
-      r: Number(node.getAttribute('r'))
+      r: Number(node.getAttribute('r')),
+      screenX: node.getBoundingClientRect().left + node.getBoundingClientRect().width / 2
     })).sort((a, b) => a.key.localeCompare(b.key));
     let minimumGap = Infinity;
     for (let i = 0; i < marks.length; i++) {
@@ -127,12 +136,18 @@ test('Unit force layout is centered, deterministic, non-overlapping, and axis-fr
       centroidX: marks.reduce((sum, mark) => sum + mark.x, 0) / marks.length,
       centroidY: marks.reduce((sum, mark) => sum + mark.y, 0) / marks.length,
       minimumGap,
-      ticks: svg.querySelectorAll('.vd-x-axis .tick, .vd-y-axis .tick').length
+      xLabels: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => node.textContent),
+      xTickCenters: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return box.left + box.width / 2;
+      }),
+      yTicks: svg.querySelectorAll('.vd-y-axis .tick').length,
+      groupCenters: Object.values(Object.groupBy(marks, mark => mark.species)).map(group =>
+        group.reduce((sum, mark) => sum + mark.screenX, 0) / group.length)
     };
   });
 
   const first = await readLayout();
-  expect(beforeForce).not.toEqual(frameAt090);
   const frameAt099 = new Map(beforeForce.map(([key, x, y]) => [key, { x: Number(x), y: Number(y) }]));
   const largestLastStep = Math.max(...first.marks.map(mark => {
     const before = frameAt099.get(mark.key);
@@ -147,7 +162,11 @@ test('Unit force layout is centered, deterministic, non-overlapping, and axis-fr
   expect(first.centroidX).toBeCloseTo(first.plotWidth / 2, 5);
   expect(first.centroidY).toBeCloseTo(first.plotHeight / 2, 5);
   expect(first.minimumGap).toBeGreaterThan(-0.05);
-  expect(first.ticks).toBe(0);
+  expect(first.xLabels).toEqual(['setosa', 'versicolor', 'virginica']);
+  expect(first.yTicks).toBe(0);
+  first.groupCenters.forEach((center, index) => {
+    expect(Math.abs(center - first.xTickCenters[index])).toBeLessThan(30);
+  });
   expect(second.marks).toEqual(first.marks);
 
   await page.locator('#start').click();
@@ -161,6 +180,55 @@ test('Unit force layout is centered, deterministic, non-overlapping, and axis-fr
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
       .sort((a, b) => a[0].localeCompare(b[0])));
   expect(reverseFrame).toEqual(forwardFrame);
+});
+
+test('Unit force accepts simultaneous explicit x and y targets', async ({ page }) => {
+  await page.goto('/tests/fixtures/isolated.html');
+  const result = await page.evaluate(async () => {
+    const [{ unit }, { transition }] = await Promise.all([
+      import('/dist/unit.js'),
+      import('/dist/transition-entry.js')
+    ]);
+    const rows = [
+      { id: 'A-low', species: 'A', score: 1 },
+      { id: 'A-high', species: 'A', score: 9 },
+      { id: 'B-low', species: 'B', score: 1 },
+      { id: 'B-high', species: 'B', score: 9 }
+    ];
+    const source = unit(rows).key('id').layout('grid', { radius: 7 });
+    const target = source
+      .x('species', { type: 'nominal', title: 'Species' })
+      .y('score', { type: 'quantitative', title: 'Score' })
+      .layout('force', { radius: 7 });
+    const change = await transition(source, target, {
+      target: '#chart', d3, aq, height: 320
+    });
+    change.progress(1);
+    return true;
+  });
+  expect(result).toBe(true);
+
+  const layout = await page.locator('#chart svg').evaluate(svg => {
+    const marks = [...svg.querySelectorAll('circle.vd-unit')].map(node => ({
+      species: node.__data__.__row.species,
+      score: node.__data__.__row.score,
+      x: Number(node.getAttribute('cx')),
+      y: Number(node.getAttribute('cy'))
+    }));
+    const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    return {
+      xLabels: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => node.textContent),
+      yTicks: svg.querySelectorAll('.vd-y-axis .tick').length,
+      aX: mean(marks.filter(mark => mark.species === 'A').map(mark => mark.x)),
+      bX: mean(marks.filter(mark => mark.species === 'B').map(mark => mark.x)),
+      lowY: mean(marks.filter(mark => mark.score === 1).map(mark => mark.y)),
+      highY: mean(marks.filter(mark => mark.score === 9).map(mark => mark.y))
+    };
+  });
+  expect(layout.xLabels).toEqual(['A', 'B']);
+  expect(layout.yTicks).toBeGreaterThan(0);
+  expect(layout.aX).toBeLessThan(layout.bX);
+  expect(layout.highY).toBeLessThan(layout.lowY);
 });
 
 test('Unit force endpoints preserve update identity and support enter and exit', async ({ page }) => {

@@ -168,6 +168,9 @@ Curve names are exact D3 exports such as `curveLinear`, `curveStep`, and
 .radius(number)
 ```
 
+For `force`, shared `.x()` and `.y()` channels become per-unit `forceX` and
+`forceY` targets. Without either channel, the target is the plot center.
+
 See [Chart types](/chart-types) for the behavioral rules rather than repeating
 them here.
 

@@ -113,9 +113,14 @@ may use a declared parent position because that movement carries meaning.
 | `.layout("grid" | "force" | "bar" | "beeswarm", options?)` | Arrange the same units |
 | `.columns(number)` | Set grid or unit-bar columns |
 | `.radius(number)` | Set requested unit radius |
+| `.x(field, options?)`, `.y(field, options?)` | Declare force targets; x also positions a beeswarm |
 
-`force` records a D3 simulation's ticks as a reversible path into one centered,
-non-overlapping cluster. `bar` centers each unit stack on its category tick.
+`force` records a D3 simulation's ticks as a reversible physical path and maps
+progress to its cumulative movement. With no positional channel, every unit is
+attracted to the plot center. An explicit x or y channel instead supplies a
+per-unit `forceX` or `forceY` target through that channel's scale; categorical
+fields therefore form labelled attractor bands without being inferred from color.
+`bar` centers each unit stack on its category tick.
 `beeswarm` uses a non-overlapping placement along x. Layout changes preserve matching keys;
 remaining unmatched units use a global minimum-travel assignment. Unit layout
 changes use a short bounded per-mark stagger unless the author overrides it.

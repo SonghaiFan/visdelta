@@ -4,7 +4,7 @@ import { cameraPosition, cameraScale, cameraSize, focusCamera, pointBounds, view
 import { specTransition } from '../../spec-meta.js';
 import { directionalEase } from '../../transition-progress.js';
 import { unitKey } from './keys.js';
-import { clearUnitAxes, drawUnitXAxis } from './axes.js';
+import { clearUnitAxes, drawUnitAxes } from './axes.js';
 import {
   expandUnits,
   matchUnitSlotsByIdentityAndTravel,
@@ -48,6 +48,7 @@ class UnitChart extends BaseChart {
     const baseLayout = unitLayout(units, chart, spec, {
       bandOrLinear, chartStyle, d3, drawGrid, drawXAxis, drawYAxis, niceExtent, position, updateGrid
     });
+    if (baseLayout.trajectory && stage) chart.transition.base = originalTransition;
     const camera = focusCamera(
       units.map((unit, index) => ({
         datum: unit.__row || unit,
@@ -65,15 +66,26 @@ class UnitChart extends BaseChart {
         trajectory: (unit) => baseLayout.trajectory(unit).map((point) => ({
           x: cameraPosition(point.x, camera, 'x'),
           y: cameraPosition(point.y, camera, 'y')
-        }))
+        })),
+        trajectoryTimeline: baseLayout.trajectoryTimeline
       } : {})
     };
-    const xScale = baseLayout.axis
-      ? cameraScale(baseLayout.axis.scale, camera, 'x')
+    const baseAxes = {
+      x: baseLayout.axes?.x || baseLayout.axis || null,
+      y: baseLayout.axes?.y || null
+    };
+    const xScale = baseAxes.x
+      ? cameraScale(baseAxes.x.scale, camera, 'x')
+      : null;
+    const yScale = baseAxes.y
+      ? cameraScale(baseAxes.y.scale, camera, 'y')
       : null;
     chart.camera = camera;
-    if (baseLayout.axis) {
-      drawUnitXAxis(chart, xScale, baseLayout.axis.channel, d3, {
+    if (xScale || yScale) {
+      drawUnitAxes(chart, { x: xScale, y: yScale }, {
+        x: baseAxes.x?.channel,
+        y: baseAxes.y?.channel
+      }, d3, {
         chartStyle, drawGrid, drawXAxis, drawYAxis, updateGrid
       }, { position: cameraPosition(chart.innerHeight, camera, 'y') });
     } else {
@@ -81,7 +93,12 @@ class UnitChart extends BaseChart {
     }
 
     fadeNonUnitShapes(chart);
-    chart.scales = { color, layout: layout.name, ...(xScale ? { x: xScale } : {}) };
+    chart.scales = {
+      color,
+      layout: layout.name,
+      ...(xScale ? { x: xScale } : {}),
+      ...(yScale ? { y: yScale } : {})
+    };
     chart.channels = enc;
     chart.position = { x: layout.x, y: layout.y };
     drawLegend(chart, rows, enc.color, d3);
@@ -89,15 +106,20 @@ class UnitChart extends BaseChart {
 
     const match = matchUnitSlotsByIdentityAndTravel(chart, units, layout);
     units = match.units;
-    const markDuration = stage && layout.trajectory
-      ? stage.markDuration + stage.travelDelay
-      : stage?.markDuration;
-    const enterTransition = stage
-      ? transitionFor(chart, d3, markDuration)
-      : (chart.transition.enter || originalTransition);
+    const totalDuration = Math.max(1, Number(chart.transition.duration) || 900);
+    const markDuration = stage?.markDuration;
     const fallsToAxis = Number.isFinite(stage?.moveAcrossDuration);
+    const enterDuration = layout.trajectory
+      ? Math.max(1, totalDuration - (chart.transition.enterDelay || 0))
+      : markDuration;
+    const updateDuration = layout.trajectory
+      ? Math.max(1, totalDuration - (chart.transition.exitDuration || 0))
+      : (fallsToAxis ? stage?.moveAcrossDuration : markDuration);
+    const enterTransition = stage
+      ? transitionFor(chart, d3, enterDuration)
+      : (chart.transition.enter || originalTransition);
     const updateTransition = stage
-      ? transitionFor(chart, d3, fallsToAxis ? stage.moveAcrossDuration : markDuration)
+      ? transitionFor(chart, d3, updateDuration)
       : originalTransition;
     const transitionOptions = specTransition(spec);
     const hasStaggerOverride = Object.prototype.hasOwnProperty.call(transitionOptions, 'stagger');
@@ -111,7 +133,9 @@ class UnitChart extends BaseChart {
           index,
           hasStaggerOverride ? transitionOptions.stagger : DEFAULT_UNIT_STAGGER
         );
-    const baseMarkDelay = (unit, index) => camera.bounds
+    const baseMarkDelay = (unit, index) => layout.trajectory
+      ? 0
+      : camera.bounds
       ? 0
         : stage
         ? stage.viewDuration + (fallsToAxis
@@ -187,7 +211,7 @@ class UnitChart extends BaseChart {
         },
         (exit) => exit
           .transition(chart.transition.exit || updateTransition)
-          .delay(stage ? stage.viewDuration : 0)
+          .delay(layout.trajectory ? 0 : stage ? stage.viewDuration : 0)
           .attr('r', 0)
           .style('opacity', 0)
           .remove()
@@ -197,9 +221,9 @@ class UnitChart extends BaseChart {
 
 function applyForceTrajectory(transition, layout, d3) {
   return transition
-    // The force cooling schedule already supplies the motion curve. Linear
-    // playback keeps normalized progress aligned with the recorded tick index.
-    .ease(d3.easeLinear)
+    // Preserve the shared physical path, but distribute its aggregate motion
+    // across progress so raw force cooling does not create long idle ranges.
+    .ease(d3.easeSinInOut)
     .attrTween('cx', (unit) => (progress) => trajectoryPoint(layout, unit, progress).x)
     .attrTween('cy', (unit) => (progress) => trajectoryPoint(layout, unit, progress).y);
 }
@@ -212,10 +236,29 @@ function trajectoryPoint(layout, unit, progress) {
   const frames = layout.trajectory(unit);
   if (!frames?.length) return { x: layout.x(unit), y: layout.y(unit) };
   if (frames.length === 1) return frames[0];
-  const scaled = Math.max(0, Math.min(1, progress)) * (frames.length - 1);
-  const lower = Math.floor(scaled);
-  const upper = Math.min(frames.length - 1, lower + 1);
-  const mix = scaled - lower;
+  const bounded = Math.max(0, Math.min(1, progress));
+  if (bounded === 0) return frames[0];
+  if (bounded === 1) return frames[frames.length - 1];
+  const timeline = layout.trajectoryTimeline;
+  if (!timeline || timeline.length !== frames.length) {
+    const scaled = bounded * (frames.length - 1);
+    return interpolateTrajectory(frames, Math.floor(scaled), Math.ceil(scaled), scaled % 1);
+  }
+  let low = 1;
+  let high = timeline.length - 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (timeline[middle] < bounded) low = middle + 1;
+    else high = middle;
+  }
+  const upper = low;
+  const lower = upper - 1;
+  const span = timeline[upper] - timeline[lower];
+  const mix = span > Number.EPSILON ? (bounded - timeline[lower]) / span : 1;
+  return interpolateTrajectory(frames, lower, upper, mix);
+}
+
+function interpolateTrajectory(frames, lower, upper, mix) {
   return {
     x: frames[lower].x + (frames[upper].x - frames[lower].x) * mix,
     y: frames[lower].y + (frames[upper].y - frames[lower].y) * mix

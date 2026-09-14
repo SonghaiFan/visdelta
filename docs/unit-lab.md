@@ -15,7 +15,8 @@ The public grammar separates meaning from arrangement:
 - `.group("team")` declares which categorical group owns each unit;
 - `.layout("bar")` arranges those groups as unit bars;
 - `.layout("grid")` makes one overall grid;
-- `.layout("force")` packs units into one centered, non-overlapping cluster;
+- `.layout("force")` packs units around the center or around explicitly mapped
+  x and y force targets;
 - `.x("year").layout("beeswarm")` places units around mapped positions without
   overlaps.
 
@@ -67,10 +68,18 @@ trajectory: progress seeks between adjacent ticks, and reverse reads the same
 ticks backward. Centering and collision are therefore visible in every frame
 without leaving a live simulation running after the endpoint. The sample count,
 starting alpha, minimum alpha, and alpha decay are coupled so the final recorded
-tick is cooled; tick playback is linear because the force cooling schedule
-already supplies its motion curve. A clean endpoint reuses that last recorded
+tick is cooled. Playback re-parameterizes that shared path by the units'
+collective movement, so rapid early ticks and tiny late ticks occupy a useful,
+smooth progress range with gentle symmetric easing, without putting different
+units on different simulation frames. A clean endpoint reuses the last recorded
 position instead of reheating the simulation. Unit enter/update/exit and
 key-first matching remain part of the same cached path.
+
+Force position remains an explicit encoding. With no x or y channel, every unit
+uses the plot center. `.x("species").layout("force")` instead makes the center of
+each categorical x band that flower's `forceX` target and draws the explaining
+axis. `.y(...)` works the same way with a reversed screen range. Color never
+silently becomes a force target.
 
 Unit transitions use a light per-mark delay by default. Layout changes order
 marks by travel distance, so short moves start first; other Unit changes use
