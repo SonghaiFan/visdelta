@@ -1,5 +1,5 @@
-import { bar, delta } from 'visdelta';
-import { transition } from 'visdelta/transition';
+import { bar, delta, mount, select, sequence } from 'visdelta';
+import { sequence as selectedSequence, transition } from 'visdelta/transition';
 import { delta as selectedDelta } from 'visdelta/core';
 import { bar as selectedBar, barModule } from 'visdelta/bar';
 import { area as selectedArea, areaModule } from 'visdelta/area';
@@ -20,6 +20,16 @@ const b = a.y('next');
 const pair = await transition(a, b, { target: '#chart', d3 });
 pair.progress(0.4).play({ duration: 300 }).pause().resize();
 pair.destroy();
+const journey = await sequence([a, b, a], { target: '#chart', d3 });
+journey.progress(1.5).play({ duration: 300 }).pause().resize();
+journey.destroy();
+await selectedSequence([a, b], { target: '#chart', d3 });
+await mount(a, { target: '#chart', d3 });
+await select<typeof a>('#chart').update(view => view.focus({ key: 'A' })).play({ duration: 300 });
+await select<typeof a>('#chart').sequence([
+  view => view.focus({ key: 'A' }),
+  view => view.highlight({ key: 'A' })
+]).play({ duration: 300 });
 delta(a, b).hasDelta('encoding.y');
 selectedDelta(a, b).hasDelta('encoding.y');
 selectedBar().data([]).x('key');

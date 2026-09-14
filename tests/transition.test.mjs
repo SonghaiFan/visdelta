@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bar, line, point, unit, transition } from '../dist/index.js';
+import { bar, line, point, sequence, unit, transition } from '../dist/index.js';
 import { diffViewStates, sameValue } from '../dist/grammar/diff.js';
 import { resolveBarTransitionPlan } from '../dist/charts/bar/state.js';
 
@@ -48,6 +48,13 @@ test('pair validation runs before DOM access', async () => {
   const a = { mark: 'bar', data: [{ category: 'A', value: 1 }] };
   await assert.rejects(() => transition(a, { ...a, transform: [null] }, { d3: {} }), /transform\[0\]/);
   await assert.rejects(() => transition(a, { ...a, transform: [{ limit: -1 }] }, { d3: {} }), /transform\[0\]/);
+});
+
+test('sequence validates its minimum authored timeline before DOM access', async () => {
+  await assert.rejects(
+    () => sequence([bar('rows')], { target: '#chart', d3: {} }),
+    /at least two visualization states/
+  );
 });
 
 test('bar steps keep scale, axis, and marks in one chart-part change', () => {

@@ -166,14 +166,59 @@ change.destroy();
 
 See [Transition runtime](/runtime-api) for lifecycle details.
 
+## `sequence(states, options)`
+
+`sequence()` makes an ordered set of authored states a single seekable
+timeline. Adjacent legs are explicit: `A → B`, then `B → C`. Its `value` uses
+state positions, so `1.5` is halfway from the second state to the third.
+
+```js
+import { sequence } from "visdelta/transition";
+
+const story = await sequence([revenue, profit, ranked], { target: "#chart", d3 });
+
+story.progress(1.5);              // halfway through profit → ranked
+story.play({ duration: 900 });    // 900ms for each adjacent leg
+story.pause();
+story.destroy();
+```
+
+The runtime prepares each adjacent pair before showing it. At a shared state it
+hands off directly—there is no empty chart frame between `A → B` and `B → C`.
+For a repeating story, include the starting state again at the end:
+`[revenue, profit, ranked, revenue]`.
+
+## `mount(view, options)` and `select(target)`
+
+Mount a state once, then evolve the chart already at that DOM target. This is
+the D3-like imperative entry point: selection finds VisDelta's current endpoint;
+grammar calls still return a new immutable state; `play()` promotes it.
+
+```js
+import * as vd from "visdelta";
+
+await vd.mount(salesByRegion, { target: "#chart", d3 });
+
+await vd.select("#chart")
+  .update(view => view.focus({ region: "North" }))
+  .play({ duration: 700 });
+```
+
+The `update()` callback receives the current immutable builder, so it exposes
+the complete chart grammar without the runtime API having to mirror methods
+such as `focus`, `where`, `sort`, or future chart-specific operations.
+`select()` only addresses a target mounted by VisDelta. It preserves the
+existing chart's runtime dependencies and starts the new state at the current
+endpoint without clearing the host between frames.
+
 ## Public modules
 
 | Entry | Exports |
 | --- | --- |
-| `visdelta` | All built-in charts, `delta`, `transition`, data types, styles, and registration |
+| `visdelta` | All built-in charts, `delta`, `transition`, `sequence`, `mount`, `select`, data types, styles, and registration |
 | `visdelta/core` | DOM-free state/difference helpers plus camera math |
 | `visdelta/area`, `/bar`, `/line`, `/point`, `/unit` | One focused chart builder and module |
-| `visdelta/transition` | Standalone transition controller |
+| `visdelta/transition` | Standalone pair, sequence, and mounted-selection controllers |
 | `visdelta/plugins` | Chart-module definition and registration |
 | `visdelta/chart-style` | Structural style definition and presets |
 | `visdelta/browser` | Browser-global dependency adapter |

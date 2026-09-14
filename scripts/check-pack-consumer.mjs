@@ -21,11 +21,14 @@ const expectedApi = [
   "detectDataTypes",
   "diffViewStates",
   "line",
+  "mount",
   "paperChartStyle",
   "point",
   "registerChartModule",
   "registerChartType",
   "resolveEncodingTypes",
+  "select",
+  "sequence",
   "transition",
   "unit",
   "visualizationSpec"
@@ -93,7 +96,7 @@ import { point as selectedPoint, pointModule } from "visdelta/point";
 import { D3_CURVE_NAMES as selectedCurveNames, line as selectedLine, lineModule } from "visdelta/line";
 import { UNIT_LAYOUTS as selectedUnitLayouts, unit as selectedUnit, unitModule } from "visdelta/unit";
 import { delta as selectedDelta } from "visdelta/core";
-import { transition as selectedTransition } from "visdelta/transition";
+import { mount as selectedMount, select as selectedSelect, sequence as selectedSequence, transition as selectedTransition } from "visdelta/transition";
 import { defineChartStyle as selectedChartStyle, d3ChartStyle as selectedD3Style } from "visdelta/chart-style";
 import {
   ChartState as SelectedChartState,
@@ -114,10 +117,12 @@ if (typeof selectedBar !== "function") throw new Error("bar subpath did not expo
 if (typeof selectedPoint !== "function") throw new Error("point subpath did not export point()");
 if (typeof selectedLine !== "function") throw new Error("line subpath did not export line()");
 if (selectedCurveNames.length !== 20) throw new Error("line subpath did not export all D3 curve names");
-if (typeof selectedUnit !== "function" || selectedUnitLayouts.length !== 3) throw new Error("unit subpath did not export Unit grammar");
+if (typeof selectedUnit !== "function" || selectedUnitLayouts.length !== 4) throw new Error("unit subpath did not export Unit grammar");
 if (areaModule.key !== "area" || barModule.key !== "bar" || pointModule.key !== "point" || lineModule.key !== "line" || unitModule.key !== "unit") throw new Error("focused chart module mismatch");
 if (typeof selectedDelta !== "function") throw new Error("core subpath did not export delta()");
 if (typeof selectedTransition !== "function") throw new Error("transition subpath did not export transition()");
+if (typeof selectedSequence !== "function") throw new Error("transition subpath did not export sequence()");
+if (typeof selectedMount !== "function" || typeof selectedSelect !== "function") throw new Error("transition subpath did not export mounted runtime helpers");
 if (typeof selectedChartStyle !== "function" || selectedD3Style.key !== "d3") throw new Error("chart-style subpath mismatch");
 if (typeof selectedPlugin !== "function") throw new Error("plugins subpath did not export defineChartType()");
 if (typeof selectedChartModule !== "function") throw new Error("plugins subpath did not export defineChartModule()");

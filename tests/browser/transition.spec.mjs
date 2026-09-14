@@ -35,6 +35,32 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test('live charts evolve selected endpoints and own multi-state sequences', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const result = await page.evaluate(async () => {
+    const chart = await sl.mount(base, opts('#a'));
+    const focused = await chart
+      .update(view => view.focus({ type: 'one' }))
+      .play({ duration: 0 });
+    const journey = await focused.chart.sequence([
+      view => view.focus({ type: 'two' }),
+      view => view.focus({ type: 'one' })
+    ]).play({ duration: 0 });
+    return {
+      focused: focused.chart.state.toSpec().meta.state.sceneState.selection,
+      final: journey.chart.state.toSpec().meta.state.sceneState.selection,
+      value: journey.controller.value,
+      roots: document.querySelectorAll('#a > .vd-transition-root').length
+    };
+  });
+  expect(result.focused).toMatchObject({ mode: 'focus', filter: { field: 'type', equal: 'one' } });
+  expect(result.final).toMatchObject({ mode: 'focus', filter: { field: 'type', equal: 'one' } });
+  expect(result.value).toBe(2);
+  expect(result.roots).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
   test(`${scenario}: direct seek equals history, endpoints restore, frame stays still`, async ({ page }) => {
     const errors = [];

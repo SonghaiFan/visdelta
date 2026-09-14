@@ -25,15 +25,15 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'VisDelta',
     nav: [
-      { text: 'Principles', link: '/language-framework' },
       { text: 'Guide', link: '/getting-started' },
-      { text: 'API Reference', link: '/reference' },
-      { text: 'Bar Lab', link: '/transition-lab' },
-      { text: 'Point Lab', link: '/point-lab' },
-      { text: 'Line Lab', link: '/line-lab' },
-      { text: 'Area Lab', link: '/area-lab' },
-      { text: 'Unit Lab', link: '/unit-lab' },
-      { text: 'Examples', link: '/examples' },
+      { text: 'Playground', link: '/examples' },
+      { text: 'API', link: '/reference' },
+      { text: 'Learn', items: [
+        { text: 'Design principles', link: '/language-framework' },
+        { text: 'Chart types', link: '/chart-types' },
+        { text: 'Data and transforms', link: '/data-sources-and-transforms' },
+        { text: 'Chart styling', link: '/chart-style' }
+      ] },
       { text: '0.2.0', items: [
         { text: 'Changelog', link: 'https://github.com/SonghaiFan/visdelta/blob/main/CHANGELOG.md' },
         { text: 'npm package', link: 'https://www.npmjs.com/package/visdelta' }
@@ -44,24 +44,29 @@ export default defineConfig({
         text: 'Start',
         items: [
           { text: 'Overview', link: '/' },
-          { text: 'Design principles', link: '/language-framework' },
           { text: 'Getting started', link: '/getting-started' },
           { text: 'Interactive reference', link: '/reference' },
-          { text: 'Bar transition lab', link: '/transition-lab' },
-          { text: 'Point transition lab', link: '/point-lab' },
-          { text: 'Line transition lab', link: '/line-lab' },
-          { text: 'Area transition lab', link: '/area-lab' },
-          { text: 'Unit transition lab', link: '/unit-lab' },
           { text: 'Examples', link: '/examples' }
         ]
       },
       {
-        text: 'Language',
+        text: 'Learn',
         items: [
+          { text: 'Design principles', link: '/language-framework' },
           { text: 'Chart types', link: '/chart-types' },
-          { text: 'Chart style', link: '/chart-style' },
           { text: 'Data and transforms', link: '/data-sources-and-transforms' },
+          { text: 'Chart style', link: '/chart-style' },
           { text: 'Transition runtime', link: '/runtime-api' }
+        ]
+      },
+      {
+        text: 'Playground',
+        items: [
+          { text: 'Bar transition lab', link: '/transition-lab' },
+          { text: 'Point transition lab', link: '/point-lab' },
+          { text: 'Line transition lab', link: '/line-lab' },
+          { text: 'Area transition lab', link: '/area-lab' },
+          { text: 'Unit transition lab', link: '/unit-lab' }
         ]
       },
       {

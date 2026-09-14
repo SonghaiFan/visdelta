@@ -57,3 +57,68 @@ Controls remain outside VisDelta. Buttons, sliders, scroll, gestures, routes,
 media clocks, and tests all use the same `progress()` method.
 
 Call `destroy()` when the host component unmounts.
+
+## `sequence(states, options)`
+
+Use `sequence()` when a chart has more than two authored states. It creates a
+timeline of adjacent transitions rather than asking application code to tear
+down and recreate one pair at a time.
+
+```js
+import { sequence } from "visdelta/transition";
+
+const journey = await sequence([revenue, profit, ranked, revenue], {
+  target: "#chart",
+  d3
+});
+
+journey.progress(1.5);           // halfway through profit → ranked
+journey.play({ duration: 850 }); // duration per adjacent leg
+```
+
+| Member | Meaning |
+| --- | --- |
+| `states` | Authored states in order |
+| `value` | Timeline position from `0` to `states.length - 1` |
+| `progress(value)` | Seek a leg or exact authored state; `1.5` is halfway through the second leg |
+| `play({ duration?, from?, to? })` | Play across adjacent legs; duration applies to each leg |
+| `pause()`, `resize()`, `destroy()` | Same lifecycle meaning as the pair controller |
+
+All adjacent states must still use the same chart type. Repeat the first state
+at the end when a sequence should return to its starting visual state.
+
+## `mount(view, options)` and `select(target)`
+
+`mount()` establishes a VisDelta-owned chart at a target. `select()` retrieves
+that mounted endpoint later and applies a new grammar operation to it.
+
+```js
+await vd.mount(byRegion, { target: "#chart", d3 });
+
+await vd.select("#chart")
+  .update(view => view.focus({ region: "North" }))
+  .play({ duration: 700 });
+```
+
+`update()` returns a pending immutable state; it has no visual effect until
+`play()`. The promise resolves to a motion object with its controller and live
+chart handle. Selecting the host again is equally valid:
+
+```js
+await vd.select("#chart").update(view => view.focus({ region: "North" })).play();
+await vd.select("#chart").update(view => view.focus({ region: "South" })).play();
+```
+
+The same live chart can create a sequence from grammar callbacks. Each callback
+receives the endpoint from the preceding step, so the path is authored as
+`A → B → C`, not as unrelated chart remounts.
+
+```js
+await vd.select("#chart")
+  .sequence([
+    view => view.focus({ region: "North" }),
+    view => view.highlight({ region: "North" }),
+    view => view.sort("sales", "descending")
+  ])
+  .play({ duration: 850 });
+```

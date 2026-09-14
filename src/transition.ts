@@ -12,6 +12,7 @@ import { createChartRuntimeDeps } from './runtime/chart-deps.js';
 import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
+import { registerMounted, unregisterMounted } from './runtime/mounted.js';
 
 export type { Visualization } from './core.js';
 
@@ -157,11 +158,13 @@ export async function transition(
       stop();
       surface.destroy();
       destroyed = true;
+      unregisterMounted(host, controller);
     }
   };
   try {
     show(0);
     surface.commitMount();
+    registerMounted(host, to, options, controller);
   } catch (error) {
     surface.rollbackMount();
     controller.destroy();

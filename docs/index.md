@@ -3,41 +3,55 @@ layout: home
 
 hero:
   name: VisDelta
-  text: Declare states. Control frames.
-  tagline: Describe two chart states. VisDelta finds the difference and lets you play or scrub the change.
+  text: Make data changes feel obvious.
+  tagline: Declare the before and after. VisDelta turns the difference into a reversible, scrubbable chart transition.
   actions:
     - theme: brand
-      text: Start building
-      link: /getting-started
+      text: Try the live demo
+      link: '#showcase'
     - theme: alt
-      text: Read the design rules
-      link: /language-framework
+      text: Get started
+      link: /getting-started
 
 features:
-  - title: Safe chart states
-    details: Make many new states from one chart without changing the original.
-  - title: Meaningful differences
-    details: Compare data, mappings, matching keys, filters, axes, layout, and detail.
-  - title: Scrubbable movement
-    details: Play by time or show any exact frame with a progress value from 0 to 1.
-  - title: External control
-    details: Buttons, sliders, gestures, routes, timers, or scroll can provide the same normalized progress value.
-  - title: Chart-owned behavior
-    details: Each chart module owns its marks and transitions while the core stays chart-agnostic.
-  - title: Small building blocks
-    details: Import only the chart and transition pieces your project needs.
+  - title: Declare endpoints
+    details: Branch from an immutable chart state and describe exactly what changed.
+  - title: Seek any frame
+    details: Time, scroll, sliders, gestures, and tests can all drive the same progress value.
+  - title: Keep the chart honest
+    details: Marks, scales, axes, and labels move together through every frame.
 ---
 
-## The language in one line
+<div class="home-content">
 
-<div class="ontology-flow">
-  <code>Chart state</code><span>to</span><code>Difference</code><span>to</span><code>Transition</code><span>to</span><code>Control</code>
+<section id="showcase" class="home-section home-section--demo">
+  <p class="home-eyebrow">Live transition</p>
+  <div class="home-section-heading">
+    <div>
+      <h2>Pull the timeline. The chart stays truthful.</h2>
+      <p>VisDelta resolves the semantic difference between two states, then lets your application control every frame. Scrub, reverse, pause, or hand progress to scroll.</p>
+    </div>
+    <a class="home-inline-link" href="./examples">Explore editable examples <span aria-hidden="true">→</span></a>
+  </div>
+</section>
+
 </div>
+
+<div class="home-content">
+
+<section class="home-section home-section--code">
+  <div class="home-section-heading">
+    <div>
+      <p class="home-eyebrow">The small idea</p>
+      <h2>Many states in. One controllable story out.</h2>
+    </div>
+    <p class="home-aside">No animation timeline to manually synchronize. Adjacent state differences are the source of truth.</p>
+  </div>
 
 ```js
 import * as d3 from "d3";
 import { bar } from "visdelta/bar";
-import { transition } from "visdelta/transition";
+import { sequence } from "visdelta/transition";
 import "visdelta/style.css";
 
 const revenue = bar(rows)
@@ -46,32 +60,25 @@ const revenue = bar(rows)
   .key("category");
 
 const profit = revenue.y("profit");
-const change = await transition(revenue, profit, { target: "#chart", d3 });
+const ranked = revenue.sort("sales", "descending");
+const story = await sequence([revenue, profit, ranked, revenue], { target: "#chart", d3 });
 
-change.progress(0.42);
-change.play({ duration: 800 });
+story.progress(1.42);
+story.play({ duration: 800 });
 ```
 
-The chart states describe the two endpoints. VisDelta finds what changed and
-turns that difference into a transition that can be controlled independently
-of scrolling.
+  <div class="home-flow" aria-label="VisDelta transition pipeline">
+    <span>Chart state</span><i aria-hidden="true">→</i><span>Difference</span><i aria-hidden="true">→</i><span>Transition</span><i aria-hidden="true">→</i><span>Frame</span>
+  </div>
+</section>
 
-## Try the real runtime
+<section class="home-section home-section--paths">
+  <p class="home-eyebrow">Choose a path</p>
+  <div class="home-path-grid">
+    <a href="./getting-started"><strong>Build your first transition</strong><span>Install VisDelta and make a state change in a few minutes.</span><b>Getting started →</b></a>
+    <a href="./examples"><strong>Experiment in the playground</strong><span>Edit real endpoint code, run it locally, and inspect the computed delta.</span><b>Open examples →</b></a>
+    <a href="./reference"><strong>Read the runtime contract</strong><span>Understand lifecycle, progress control, sizing, data, and cleanup.</span><b>API reference →</b></a>
+  </div>
+</section>
 
-<TransitionWorkbench />
-
-Continue into the complete twelve-scenario [Bar Lab](/transition-lab) or
-[Point Lab](/point-lab) to edit endpoint declarations, scrub frames, reverse
-animations, and inspect their computed differences.
-
-## Core and controls
-
-<div class="doc-decision-grid">
-  <div><strong><code>transition()</code></strong><p>Two states of the same chart type, with direct play and progress control.</p></div>
-  <div><strong>Application controls</strong><p>Buttons, sliders, gestures, routes, and timers set progress from 0 to 1.</p></div>
-  <div><strong>Plugins</strong><p>Add another chart type while keeping the same state, difference, transition, and control model.</p></div>
 </div>
-
-Start with the [design rules](/language-framework) for the language and module
-boundaries. Continue to the [interactive API reference](/reference) for exact
-runtime contracts.
