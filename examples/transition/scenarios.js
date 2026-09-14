@@ -91,5 +91,5 @@ export const scenarios = [
   sample('grouped-split', '11 · Split into grouped ages', 'Move six state totals into side-by-side age-band detail.', segmentedFeatured, 'detailed.rollup()', 'detailed.layout("grouped")'),
   sample('grouped-merge', '12 · Merge grouped ages', 'Move the six-state grouped detail back into population totals.', segmentedFeatured, 'detailed.layout("grouped")', 'detailed.rollup()'),
   sample('focus', '13 · Focus the view', 'Fit one camera around New York and Pennsylvania. Keep all 52 observations, the complete ordered state scale, and every state between the two anchors.', populationFocus, 'under10', 'under10.focus({ field: "state", oneOf: FOCUS_ANCHORS })'),
-  sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. Scrub the four additive lineage fragments through the many-to-many correspondence.', lineageReaggregation, 'byYear', 'byLocation')
+  sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. VisDelta identifies and composes split, update, and merge stages automatically.', lineageReaggregation, 'byYear', 'byLocation')
 ];

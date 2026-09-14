@@ -1,4 +1,5 @@
 import { specTransition } from '../../spec-meta.js';
+import { viewLineageCorrespondence } from '../../data/view-lineage.js';
 import { diffBarViewStates } from './diff.js';
 import { defaultTransition, stepDuration } from '../../timing.js';
 import { normalizeMarkRendererKey } from '../index.js';
@@ -276,6 +277,9 @@ export function barIntermediateSpecs(
   previousSpec: ViewSpec,
   nextSpec: ViewSpec
 ): IntermediateSpec[] {
+  const reaggregation = barReaggregationIntermediateSpecs(previousSpec, nextSpec);
+  if (reaggregation.length) return reaggregation;
+
   const direct = directBarIntermediateSpecs(previousSpec, nextSpec);
   if (!direct.length) return [];
 
@@ -323,6 +327,168 @@ function directBarIntermediateSpecs(
   if (splitSpec) return [{ spec: splitSpec, scene: 'detail' }];
 
   return [];
+}
+
+/**
+ * Reaggregation composes the bar chart's existing motion primitives:
+ *
+ *   aggregate A -> detail(A x B) -> detail(B x A) -> aggregate B
+ *                  split             update          merge
+ *
+ * Both detail views use the same common-refinement key, so the middle leg
+ * moves contribution marks rather than replacing them.
+ */
+export function barReaggregationIntermediateSpecs(
+  previousSpec: ViewSpec,
+  nextSpec: ViewSpec
+): IntermediateSpec[] {
+  const previous = barState(previousSpec);
+  const next = barState(nextSpec);
+  if (
+    !previous || !next ||
+    previous.orientation !== next.orientation ||
+    previous.barLayout !== 'simple' || next.barLayout !== 'simple' ||
+    !previous.hasAggregate || !next.hasAggregate ||
+    previous.hasDetail || next.hasDetail ||
+    !previous.categoryField || !next.categoryField ||
+    previous.categoryField === next.categoryField ||
+    previous.measureField !== next.measureField
+  ) return [];
+
+  const lineage = viewLineageCorrespondence(previousSpec, nextSpec);
+  if (lineage?.mode !== 'reaggregate' || !lineage.splittable) return [];
+
+  const refinement = lineage.commonRefinement;
+  if (
+    !refinement.includes(previous.categoryField) ||
+    !refinement.includes(next.categoryField)
+  ) return [];
+
+  const previousAggregate = singleAggregate(previousSpec);
+  const nextAggregate = singleAggregate(nextSpec);
+  if (!compatibleAggregate(previousAggregate, nextAggregate)) return [];
+
+  return [
+    {
+      spec: reaggregationDetailSpec({
+        spec: previousSpec,
+        categoryField: previous.categoryField,
+        segmentField: next.categoryField,
+        refinement,
+        aggregate: previousAggregate!
+      }),
+      scene: 'detail'
+    },
+    {
+      spec: reaggregationDetailSpec({
+        spec: nextSpec,
+        categoryField: next.categoryField,
+        segmentField: previous.categoryField,
+        refinement,
+        aggregate: nextAggregate!
+      }),
+      scene: 'axis'
+    }
+  ];
+}
+
+type SingleAggregate = {
+  groupby: string[];
+  fields: Array<{ op: string; field?: string; as: string }>;
+};
+
+function singleAggregate(spec: ViewSpec): SingleAggregate | null {
+  const aggregates = (spec.transform ?? [])
+    .map((transform) => (transform as { aggregate?: SingleAggregate }).aggregate)
+    .filter((aggregate): aggregate is SingleAggregate => Boolean(aggregate));
+  return aggregates.length === 1 && aggregates[0].fields?.length === 1
+    ? aggregates[0]
+    : null;
+}
+
+function compatibleAggregate(
+  previous: SingleAggregate | null,
+  next: SingleAggregate | null
+): boolean {
+  if (!previous || !next) return false;
+  const a = previous.fields[0];
+  const b = next.fields[0];
+  return a.op === b.op && a.field === b.field && a.as === b.as;
+}
+
+function reaggregationDetailSpec({
+  spec,
+  categoryField,
+  segmentField,
+  refinement,
+  aggregate
+}: {
+  spec: ViewSpec;
+  categoryField: string;
+  segmentField: string;
+  refinement: string[];
+  aggregate: SingleAggregate;
+}): ViewSpec {
+  const next = cloneSpec(spec) as ViewSpec;
+  const encoding = { ...(next.encoding ?? {}) } as Record<string, any>;
+  const categoryChannel = barCategoryChannel(encoding);
+  const measureChannel = barMeasureChannel(encoding);
+  const orientation = barState(spec)!.orientation;
+
+  if (orientation === 'horizontal') {
+    encoding.y = { ...categoryChannel, field: categoryField, type: 'nominal' };
+    encoding.x = { ...measureChannel, field: aggregate.fields[0].as, type: 'quantitative' };
+  } else {
+    encoding.x = { ...categoryChannel, field: categoryField, type: 'nominal' };
+    encoding.y = { ...measureChannel, field: aggregate.fields[0].as, type: 'quantitative' };
+  }
+  encoding.detail = { field: segmentField, type: 'nominal' };
+  encoding.color = { field: segmentField, type: 'nominal' };
+  delete encoding.xOffset;
+  delete encoding.yOffset;
+
+  const transforms = (next.transform ?? [])
+    .filter((transform) => !(transform as { aggregate?: unknown }).aggregate);
+  transforms.push({
+    aggregate: {
+      groupby: refinement,
+      fields: cloneSpec(aggregate.fields)
+    }
+  });
+
+  const meta = { ...(next.meta ?? {}) } as Record<string, any>;
+  meta.object = {
+    ...(meta.object ?? {}),
+    key: refinement,
+    semantic: {
+      entity: refinement.map((field) => ({ field })),
+      measure: { value: aggregate.fields[0].as }
+    }
+  };
+  const state = { ...(meta.state ?? {}) };
+  const sceneState = { ...(state.sceneState ?? {}) };
+  sceneState.detail = {
+    layout: 'stacked',
+    fields: [],
+    segmentField,
+    sourceField: segmentField,
+    segments: null,
+    valueField: aggregate.fields[0].as
+  };
+  sceneState.axis = {
+    ...(sceneState.axis ?? {}),
+    layout: 'stacked',
+    orientation
+  };
+  state.sceneState = sceneState;
+  meta.state = state;
+
+  return {
+    ...next,
+    encoding: encoding as ViewSpec['encoding'],
+    transform: transforms,
+    meta: meta as ViewSpec['meta']
+  };
 }
 
 function stepOrder(options: Record<string, unknown>, orientation: BarOrientation): Array<'x' | 'y'> {

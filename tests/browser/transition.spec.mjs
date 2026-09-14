@@ -188,7 +188,7 @@ test('inline data without transforms does not require Arquero', async ({ page })
   expect(result).toEqual({ value: 0.5, marks: 3 });
 });
 
-test('reaggregation moves additive lineage fragments between unrelated grouping keys', async ({ page }) => {
+test('reaggregation composes split, update, and merge between unrelated grouping keys', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const result = await page.evaluate(async () => {
@@ -206,7 +206,8 @@ test('reaggregation moves additive lineage fragments between unrelated grouping 
       change.progress(progress);
       return {
         bars: change.view.querySelectorAll('rect.vd-bar').length,
-        fragments: [...change.view.querySelectorAll('rect.vd-bar-lineage-fragment')].map(node => ({
+        marks: [...change.view.querySelectorAll('rect.vd-bar')].map(node => ({
+          key: node.dataset.key,
           opacity: Number(getComputedStyle(node).opacity),
           x: Number(node.getAttribute('x')),
           y: Number(node.getAttribute('y')),
@@ -227,10 +228,10 @@ test('reaggregation moves additive lineage fragments between unrelated grouping 
   expect(result.mode).toBe('reaggregate');
   expect(result.edges).toBe(4);
   expect(result.start.bars).toBe(2);
-  expect(result.middle.fragments).toHaveLength(4);
-  expect(result.middle.fragments.some(fragment => fragment.opacity > 0)).toBe(true);
+  expect(result.middle.bars).toBe(4);
+  expect(new Set(result.middle.marks.map(mark => mark.key)).size).toBe(4);
+  expect(result.middle.marks.every(mark => mark.opacity > 0)).toBe(true);
   expect(result.end.bars).toBe(2);
-  expect(result.end.fragments).toHaveLength(0);
   expect(errors).toEqual([]);
 });
 
@@ -247,7 +248,7 @@ test('reaggregation uses the same lineage motion in reverse', async ({ page }) =
     const byLocation = root.x('location').rollup('location');
     const forward = await sl.transition(byYear, byLocation, opts('#a'));
     const backward = await sl.transition(byLocation, byYear, opts('#b'));
-    const motionSnapshot = selector => [...document.querySelectorAll(`${selector} rect.vd-bar, ${selector} rect.vd-bar-lineage-fragment`)]
+    const motionSnapshot = selector => [...document.querySelectorAll(`${selector} rect.vd-bar`)]
       .map(node => ({
         className: node.getAttribute('class'),
         opacity: Math.round(Number(getComputedStyle(node).opacity) * 1e6) / 1e6,

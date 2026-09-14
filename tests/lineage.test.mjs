@@ -7,7 +7,7 @@ import {
   bar,
   delta
 } from '../dist/index.js';
-import { planBarLineageMotion } from '../dist/charts/bar/lineage-motion.js';
+import { barReaggregationIntermediateSpecs } from '../dist/charts/bar/state.js';
 
 const cases = [
   { id: 'r1', year: 2020, location: 'A', case: 10 },
@@ -71,28 +71,29 @@ test('year to location is a many-to-many reaggregation through common refinement
   ]);
 });
 
-test('bar motion partitions both sides of a many-to-many reaggregation', () => {
-  const byYear = compileLineage(cases, sumBy('year'), { key: 'id' });
-  const byLocation = compileLineage(cases, sumBy('location'), { key: 'id' });
-  const lineage = correspondLineage(byYear, byLocation, { fromField: 'case', toField: 'case' });
-  const fragments = planBarLineageMotion({
-    lineage,
-    orientation: 'vertical',
-    sourceRects: new Map([
-      ['[2020]', { x: 0, y: 0, width: 20, height: 150 }],
-      ['[2021]', { x: 30, y: 0, width: 20, height: 200 }]
-    ]),
-    targetRects: new Map([
-      ['["A"]', { x: 100, y: 0, width: 20, height: 220 }],
-      ['["B"]', { x: 130, y: 0, width: 20, height: 130 }]
-    ])
-  });
+test('bar reaggregation plans split, update, and merge through one stable refinement', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const byYear = base.x('year').rollup('year').toSpec();
+  const byLocation = base.x('location').rollup('location').toSpec();
+  const phases = barReaggregationIntermediateSpecs(byYear, byLocation);
 
-  assert.equal(fragments.length, 4);
-  const area = (rect) => rect.width * rect.height;
-  assert.equal(fragments.filter(item => item.edge.from === '[2020]').reduce((sum, item) => sum + area(item.source), 0), 3000);
-  assert.equal(fragments.filter(item => item.edge.to === '["A"]').reduce((sum, item) => sum + area(item.target), 0), 4400);
-  assert.deepEqual(fragments.map(item => item.edge.sourceValue).sort((a, b) => a - b), [5, 8, 10, 12]);
+  assert.equal(phases.length, 2);
+  assert.deepEqual(phases.map(phase => phase.scene), ['detail', 'axis']);
+  assert.deepEqual(phases.map(phase => phase.spec.meta.object.key), [
+    ['year', 'location'],
+    ['year', 'location']
+  ]);
+  assert.deepEqual(phases.map(phase => phase.spec.transform.at(-1).aggregate.groupby), [
+    ['year', 'location'],
+    ['year', 'location']
+  ]);
+  assert.deepEqual(phases.map(phase => [
+    phase.spec.encoding.x.field,
+    phase.spec.encoding.detail.field
+  ]), [
+    ['year', 'location'],
+    ['location', 'year']
+  ]);
 });
 
 test('delta exposes lineage correspondence for immutable inline chart endpoints', () => {

@@ -67,7 +67,7 @@ test('invalid code and invalid pairs preserve preview; reset recovers', async ({
   await expect(page.getByRole('alert')).toBeHidden();
 });
 
-test('bar lab exposes the many-to-many split, move, and merge fragments', async ({ page }) => {
+test('bar lab exposes the planned split, move, and merge stages', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/docs/.vitepress/dist/transition-lab.html#reaggregate');
@@ -75,10 +75,9 @@ test('bar lab exposes the many-to-many split, move, and merge fragments', async 
   await expect(page.locator('#scenario')).toHaveValue('reaggregate');
   await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
   await page.locator('#progress').fill('0.5');
-  await expect(page.locator('#chart rect.vd-bar-lineage-fragment')).toHaveCount(4);
-  await expect(page.locator('#chart rect.vd-bar-lineage-fragment').first()).toBeVisible();
+  await expect(page.locator('#chart rect.vd-bar')).toHaveCount(4);
+  await expect(page.locator('#chart rect.vd-bar').first()).toBeVisible();
   await page.locator('#end').click();
-  await expect(page.locator('#chart rect.vd-bar-lineage-fragment')).toHaveCount(0);
   await expect(page.locator('#chart rect.vd-bar')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
