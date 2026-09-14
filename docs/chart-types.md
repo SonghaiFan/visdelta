@@ -89,18 +89,23 @@ retracts.
 
 ## Point
 
-`point()` shows the relationship between two quantities with compact Cartesian
-axes.
+`point()` places observations on compact Cartesian axes. It covers scatterplots,
+dot plots, dumbbells, and lollipops without changing datum identity.
 
 | Method | Meaning |
 | --- | --- |
 | `.pointSize(number)`, `.radius(number)` | Set a constant point radius |
+| `.connector({ from, channel? })` | Draw a lollipop stem from a quantitative baseline |
+| `.connector({ by, orderBy? })` | Connect adjacent dots within each ordered group |
 | `.flip(options?)` | Swap x and y in an explicit order |
 | `.rollup(groupby, options?)` | Combine details into summary points |
 | `.breakdown(detail?, options?)` | Reveal detailed points |
 
 An ordinary entering point grows at its target position. Summary/detail motion
 may use a declared parent position because that movement carries meaning.
+Connectors are Point-owned derived geometry: they sit behind the dots and never
+become object identity. Baseline connectors grow from `from` to each dot;
+grouped connectors connect adjacent members after optional ordering.
 
 ## Unit
 
@@ -108,7 +113,7 @@ may use a declared parent position because that movement carries meaning.
 
 | Method | Meaning |
 | --- | --- |
-| `.value(field, { maxUnits? })` | Expand a count field into units |
+| `.value(field, { unitValue?, maxUnits? })` | Expand a count field into units; `unitValue` is the quantity per circle |
 | `.group(field)` | Declare categorical membership without choosing color |
 | `.layout("grid" | "force" | "bar" | "beeswarm", options?)` | Arrange the same units |
 | `.columns(number)` | Set grid or unit-bar columns |

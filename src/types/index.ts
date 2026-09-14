@@ -133,6 +133,24 @@ export interface ViewScopes {
   highlight?: SelectionSpec | null;
 }
 
+export type ConnectorSpec =
+  | {
+      /** Constant baseline used by lollipop connectors. */
+      from: number;
+      /** Positional channel for the baseline; inferred when unambiguous. */
+      channel?: 'x' | 'y';
+      by?: never;
+      orderBy?: never;
+    }
+  | {
+      /** Fields that identify one connected group. */
+      by: string | string[];
+      /** Field that orders dots within a connected group. */
+      orderBy?: string;
+      from?: never;
+      channel?: never;
+    };
+
 export interface AxisSpec {
   flip?: boolean;
   layout?: BarLayout;
@@ -246,6 +264,7 @@ export interface ViewSpec {
   selection?: SelectionSpec | null;
   scopes?: ViewScopes;
   unit?: Record<string, unknown> | null;
+  connector?: ConnectorSpec | null;
   meta?: SpecMeta;
   margin?: Partial<MarginSpec>;
   [field: string]: unknown;

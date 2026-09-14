@@ -59,6 +59,8 @@
   --vd-line-width: 2;
   --vd-mark-stroke: var(--vd-color-surface);
   --vd-point-stroke-width: 1.5;
+  --vd-point-connector: var(--vd-color-on-surface-variant);
+  --vd-point-connector-width: 2px;
   --vd-unit-stroke-width: 0.75;
   --vd-line-point-size: 3.5;
   --vd-dim-opacity: 0.22;
@@ -186,6 +188,10 @@
   stroke-dasharray: 3px 3px;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+.vd-point-connector {
+  vector-effect: non-scaling-stroke;
 }
 
 .vd-bar,

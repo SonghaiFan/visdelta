@@ -305,6 +305,22 @@ test('unit separates group meaning from layout and preserves count identity', ()
   assert.throws(() => base.columns(0), /positive integer/);
   assert.throws(() => base.radius(0), /positive finite/);
   assert.throws(() => base.value('count', { maxUnits: 0 }), /positive integer/);
+  assert.throws(() => base.value('count', { unitValue: 0 }), /positive finite/);
+});
+
+test('unit value supports a quantity represented by each circle', () => {
+  const rows = [
+    { id: 'exact', sites: 50 },
+    { id: 'remainder', sites: 51 },
+    { id: 'empty', sites: 0 }
+  ];
+  const spec = unit(rows).value('sites', { unitValue: 10 }).key('id').toSpec();
+
+  assert.equal(spec.meta.unit.unitValue, 10);
+  assert.deepEqual(
+    expandUnits(spec.data, spec, {}).map((datum) => datum.__unitKey),
+    ['exact\u00000', 'exact\u00001', 'exact\u00002', 'exact\u00003', 'exact\u00004', 'remainder\u00000', 'remainder\u00001', 'remainder\u00002', 'remainder\u00003', 'remainder\u00004', 'remainder\u00005']
+  );
 });
 
 test('unit matching fills each target slot with the closest available unit globally', () => {
@@ -520,6 +536,26 @@ test('point size and summary parent fields survive compilation', () => {
     summary.breakdown('id').toSpec().meta.state.sceneState.detail.parentField,
     'region'
   );
+});
+
+test('point connector grammar distinguishes baselines from grouped endpoints', () => {
+  const rows = [
+    { country: 'Norway', year: 2004, value: 5 },
+    { country: 'Norway', year: 2022, value: 8 }
+  ];
+  const base = point(rows).x('value').y('country').key(['country', 'year']);
+
+  assert.deepEqual(base.connector({ from: 0 }).toSpec().connector, { from: 0 });
+  assert.deepEqual(
+    base.connector({ by: 'country', orderBy: 'year' }).toSpec().connector,
+    { by: 'country', orderBy: 'year' }
+  );
+  assert.throws(() => base.connector({}), /finite from value or a by field/);
+  assert.throws(
+    () => base.connector({ from: 0, by: 'country' }),
+    /cannot combine a constant from value with by grouping/
+  );
+  assert.throws(() => base.connector({ orderBy: 'year' }), /orderBy requires by grouping/);
 });
 
 test('point detail first sets the target view while keeping summary marks', () => {

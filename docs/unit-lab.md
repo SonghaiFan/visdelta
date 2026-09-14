@@ -1,6 +1,6 @@
 # Unit transition lab
 
-These fourteen editable scenarios use the 150-observation Iris dataset to define
+These fifteen editable scenarios use the 150-observation Iris dataset to define
 the first complete transition matrix for VisDelta's Unit module. Each flower is
 one row and one unit. The added `flowerId` field gives every observation a stable
 identity, including the two flowers whose measurements are otherwise identical.
@@ -32,15 +32,18 @@ const byTeam = unit(rows)
   .color("team");
 ```
 
-The lab therefore does not call `.value()`: it does not turn a measurement into
-a count. Sepal and petal measurements are used only when a scenario explicitly
-maps one of them to position, and species is mapped to color only when `.color()`
-appears in the example.
+Most lab scenarios do not call `.value()`: they keep the Iris observation grain.
+The represented-quantity scenario explicitly aggregates a small Iris sample to
+counts and changes `unitValue` from `4` to `1`.
 
-Unit does not have `.rollup()` or `.breakdown()`. It never replaces many units
-with one summary mark, so there is no split/merge mechanic. Count changes use
-ordinary unit Enter/Stay/Exit: surviving unit keys move, added units grow from
-radius zero, and removed units shrink to radius zero.
+Unit does not expose `.rollup()` or `.breakdown()`, but changing `unitValue`
+does change visual grain. Each coarse circle owns the quantity interval it
+represents. On split, its finer overlapping intervals emerge from that specific
+parent circle; on merge, those same children gather back into it. During motion,
+the crisp endpoint dots hand visibility to the same temporary liquid-like
+parent/child silhouette used by Point Blend. Parent radius is transferred only
+while its children remain visually connected, and both authored directions
+evaluate one cached coarse-to-fine path.
 
 `.focus()` uses the same Core camera as every other chart type. Unit contributes
 only each circle's visual bounds; Core applies one 2D pan and zoom while all 150

@@ -239,3 +239,97 @@ that replaced it, and the regression evidence that must remain true.
   CodeMirror document update. Ordinary edits wait briefly for typing to settle.
   The version guard advances at input time, so incomplete or older candidates
   cannot commit errors or output after newer text arrives.
+
+## 2026-09-14 - Stacked-filter survivors jumped after exits
+
+- **Observed:** Filtering a stacked Bar faded removed segments correctly, but
+  surviving segments whose stack bases changed snapped to their final position.
+  The same filter on a simple Bar appeared continuous.
+- **Wrong model:** Treating a row filter as category geometry only.
+- **Root cause:** In a stack, membership is also measure geometry: removing one
+  segment recomputes the `__stack0` and `__stack1` interval of every surviving
+  segment above it.
+- **Invariant:** A membership transition animates both sides of the join. Marks
+  that leave exit in source geometry; every surviving mark then continuously
+  updates through all geometry derived from the remaining rows.
+- **Resolution:** Bar's semantic state now includes filter dependencies in the
+  measure dimension for stacked layouts. Simple and grouped Bars retain their
+  existing geometry rules.
+- **Regression evidence:** A planner test requires both stacked geometry parts.
+  Browser and live-lab checks sample a surviving upper segment after exit,
+  between its source and target stack bases, at its endpoint, and after reverse
+  scrubbing. Existing Area and Line keyed-frame interpolation remains continuous;
+  Point and Unit update surviving positions on their delayed base transition.
+
+## 2026-09-14 - Continuous axes hid endpoints and clipped point footprints
+
+- **Observed:** A 2004-to-2022 Line labelled only round interior years, while
+  Point marks centred on the minimum and maximum domains were cut in half by
+  the plot clip.
+- **Wrong model:** Assuming D3 `nice()` and automatic ticks represent every
+  semantically important value, and treating a mark as a zero-area coordinate.
+- **Root cause:** `nice()` rounds a continuous domain and `ticks(count)` returns
+  approximately that many readable values; neither prioritizes the observed
+  extent. A scale spanning the full pixel range also leaves no room for a
+  point's radius and stroke.
+- **Invariant:** Default continuous axes prioritize the actual data endpoints,
+  then admit ordinary nice ticks when labels have enough room. Chart plugins
+  declare pixel footprint; shared scale code extends only inferred domains so
+  the full mark remains inside the plot. Explicit author domains stay exact.
+- **Resolution:** Continuous scales retain their observed extent for axis and
+  grid tick selection. Point and explicitly marked Line charts pass their
+  radius plus stroke footprint to shared domain padding.
+- **Regression evidence:** Desktop and mobile homepage tests require 2004 and
+  2022 ticks and verify every Point circle lies wholly inside the plot clip.
+
+## 2026-09-14 - Unit anchors looked like a continuous axis
+
+- **Observed:** Force collections for 2004 and 2022 sat at the ends of a line
+  labelled with invented intermediate ticks such as 2010 and 2015. The endpoint
+  clusters were clipped, and attempts to fit them by zooming changed Unit size.
+- **Wrong model:** Treating a Unit collection anchor as a continuous Cartesian
+  coordinate and then repairing its visual footprint with a camera zoom.
+- **Invariant:** Force x/y encodings identify distinct collection anchors. Show
+  only values that exist in the data, without a Cartesian axis title or a
+  connecting domain line, and preserve the authored Unit radius. Beeswarm is a
+  positional distribution and retains its standard continuous axis; grid has
+  no positional guide.
+- **Resolution:** Force resolves positional fields through discrete band
+  anchors regardless of whether their labels are numeric or temporal, and its
+  guides hide axis titles and domain lines. Beeswarm continues through the
+  authored continuous scale and standard axis. The force band inset gives
+  complete clusters room without scaling their nodes.
+- **Regression evidence:** The exact 2004/2022 World Heritage force example must
+  show only those two x ticks, hide the domain line, retain radius 12, and keep
+  all 55 units within the plot at desktop and mobile widths.
+
+## 2026-09-14 - Point could place dots but could not express their connection
+
+- **Observed:** Point could render an ordinary dot plot, but a lollipop required
+  stems from a constant baseline and a dumbbell required links between related
+  observations. Treating those as separate chart types would duplicate the same
+  derived line geometry and transition rules.
+- **Invariant:** A connector communicates a relationship between existing Point
+  marks. It is derived geometry owned by the Point plugin, sits behind the dots,
+  and never becomes datum identity or changes data grain.
+- **Resolution:** `.connector({ from, channel? })` creates lollipop stems and
+  includes the baseline in an inferred quantitative domain. `.connector({ by,
+  orderBy? })` connects adjacent dots within each ordered group. A constant
+  connector infers its channel only when exactly one positional channel is
+  quantitative; otherwise the author must name `x` or `y`.
+- **Regression evidence:** Browser tests require connector endpoints to meet dot
+  centres, the connector layer to remain behind dots, add/remove frames to be
+  exact reverses, and ambiguous constant baselines to report a useful error.
+
+## 2026-09-14 - Direct browser ESM tests cannot resolve bare Arquero imports
+
+- **Observed:** The global bundle and documentation labs render correctly, but
+  browser tests that call `import('/dist/*.js')` fail before chart code runs with
+  `Failed to resolve module specifier "arquero"`.
+- **Scope:** This is a test-serving/package-resolution problem shared by Area,
+  Bar, Line, Point, and module-registration tests; it is not caused by Point
+  connector geometry. Tests using `window.VisDelta` are unaffected.
+- **Unresolved invariant:** Browser regressions must exercise the selected ESM
+  entries as well as the global bundle. The local test server needs an import map
+  or another standards-valid way to resolve package bare specifiers without
+  changing production module ownership.

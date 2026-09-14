@@ -42,8 +42,15 @@ class UnitChart extends BaseChart {
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     let units = expandUnits(rows, spec, d3);
     const color = colorScale(domainRows, enc.color, d3);
+    const isUnitValueSplit = chart.transitionPlan?.detailChange?.mode === 'split';
+    const sourceLineage = isUnitValueSplit
+      ? unitLineageSources(chart.g.selectAll('circle.vd-unit').nodes())
+      : [];
     const originalTransition = chart.transition.base;
-    const stage = unitStageTiming(chart);
+    const grainTransition = isUnitValueSplit
+      ? originalTransition.ease(d3.easeCubicOut)
+      : originalTransition;
+    const stage = isUnitValueSplit ? null : unitStageTiming(chart);
     if (stage) chart.transition.base = transitionFor(chart, d3, stage.viewDuration);
     const baseLayout = unitLayout(units, chart, spec, {
       bandOrLinear, chartStyle, d3, drawGrid, drawXAxis, drawYAxis, niceExtent, position, updateGrid
@@ -87,7 +94,10 @@ class UnitChart extends BaseChart {
         y: baseAxes.y?.channel
       }, d3, {
         chartStyle, drawGrid, drawXAxis, drawYAxis, updateGrid
-      }, { position: cameraPosition(chart.innerHeight, camera, 'y') });
+      }, {
+        position: cameraPosition(chart.innerHeight, camera, 'y'),
+        anchorsOnly: layout.name === 'force'
+      });
     } else {
       clearUnitAxes(chart, d3, { drawXAxis, drawYAxis, updateGrid });
     }
@@ -105,7 +115,9 @@ class UnitChart extends BaseChart {
     chart.transition.base = originalTransition;
 
     const match = matchUnitSlotsByIdentityAndTravel(chart, units, layout);
-    units = match.units;
+    units = isUnitValueSplit
+      ? assignUnitValueLineage(match.units, sourceLineage)
+      : match.units;
     const totalDuration = Math.max(1, Number(chart.transition.duration) || 900);
     const markDuration = stage?.markDuration;
     const fallsToAxis = Number.isFinite(stage?.moveAcrossDuration);
@@ -123,7 +135,9 @@ class UnitChart extends BaseChart {
       : originalTransition;
     const transitionOptions = specTransition(spec);
     const hasStaggerOverride = Object.prototype.hasOwnProperty.call(transitionOptions, 'stagger');
-    const perMarkDelay = (unit, index) => stage && !hasStaggerOverride
+    const perMarkDelay = (unit, index) => isUnitValueSplit
+      ? 0
+      : stage && !hasStaggerOverride
       ? layout.trajectory
         ? 0
         : travelDelay(unit, match.maxDistance, stage.travelDelay)
@@ -133,7 +147,9 @@ class UnitChart extends BaseChart {
           index,
           hasStaggerOverride ? transitionOptions.stagger : DEFAULT_UNIT_STAGGER
         );
-    const baseMarkDelay = (unit, index) => layout.trajectory
+    const baseMarkDelay = (unit, index) => isUnitValueSplit
+      ? 0
+      : layout.trajectory
       ? 0
       : camera.bounds
       ? 0
@@ -149,8 +165,21 @@ class UnitChart extends BaseChart {
     const opacity = (unit) => unitSelectionOpacity(
       unit, spec, themeValue('--vd-dim-opacity', 0.22)
     );
+    const enterPosition = (unit, index) => unit.__lineageAnchor
+      || trajectoryStart(layout, unit, 'position', {
+        x: layout.x(unit, index), y: layout.y(unit, index)
+      });
 
-    chart.g.selectAll('circle.vd-unit')
+    const crispLayer = chart.g.selectAll('g.vd-unit-crisp-layer')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-unit-crisp-layer');
+    drawUnitValueBlend({
+      chart, crispLayer, enabled: isUnitValueSplit, sourceLineage, units,
+      layout, color, transition: grainTransition, d3
+    });
+
+    crispLayer.selectAll('circle.vd-unit')
       .data(units, unitKey)
       .join(
         (enter) => {
@@ -163,8 +192,8 @@ class UnitChart extends BaseChart {
           .attr('data-parent-key', (d) => d.__parentKey)
           .attr('data-unit-index', (d) => d.__unitIndex)
           .attr('data-group-key', (d) => layout.groupField ? d.__row[layout.groupField] : null)
-          .attr('cx', (unit, index) => trajectoryStart(layout, unit, 'x', layout.x(unit, index)))
-          .attr('cy', (unit, index) => trajectoryStart(layout, unit, 'y', layout.y(unit, index)))
+          .attr('cx', (unit, index) => enterPosition(unit, index).x)
+          .attr('cy', (unit, index) => enterPosition(unit, index).y)
           .attr('r', 0)
           .attr('fill', (d) => color(d.__row || d))
           .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
@@ -174,7 +203,9 @@ class UnitChart extends BaseChart {
           .delay(enterMarkDelay)
           .attr('r', layout.r)
           .style('opacity', opacity);
-          return layout.trajectory ? applyForceTrajectory(entering, layout, d3) : entering;
+          return layout.trajectory
+            ? applyForceTrajectory(entering, layout, d3, enterPosition)
+            : entering;
         },
         (update) => {
           const moveAcross = update
@@ -219,17 +250,231 @@ class UnitChart extends BaseChart {
   }
 }
 
-function applyForceTrajectory(transition, layout, d3) {
+function applyForceTrajectory(transition, layout, d3, entryPosition) {
   return transition
     // Preserve the shared physical path, but distribute its aggregate motion
     // across progress so raw force cooling does not create long idle ranges.
     .ease(d3.easeSinInOut)
-    .attrTween('cx', (unit) => (progress) => trajectoryPoint(layout, unit, progress).x)
-    .attrTween('cy', (unit) => (progress) => trajectoryPoint(layout, unit, progress).y);
+    .attrTween('cx', function(unit, index) {
+      const start = entryPosition?.(unit, index);
+      return (progress) => forceTrajectoryPosition(layout, unit, progress, start).x;
+    })
+    .attrTween('cy', function(unit, index) {
+      const start = entryPosition?.(unit, index);
+      return (progress) => forceTrajectoryPosition(layout, unit, progress, start).y;
+    });
 }
 
 function trajectoryStart(layout, unit, axis, fallback) {
+  if (axis === 'position') return layout.trajectory?.(unit)?.[0] ?? fallback;
   return layout.trajectory?.(unit)?.[0]?.[axis] ?? fallback;
+}
+
+function forceTrajectoryPosition(layout, unit, progress, entryPosition) {
+  const target = trajectoryPoint(layout, unit, progress);
+  if (!entryPosition) return target;
+  return {
+    x: entryPosition.x + (target.x - entryPosition.x) * progress,
+    y: entryPosition.y + (target.y - entryPosition.y) * progress
+  };
+}
+
+function unitLineageSources(nodes) {
+  return nodes.map((node, index) => {
+    const unit = node.__data__ || {};
+    const x = Number(node.getAttribute('cx'));
+    const y = Number(node.getAttribute('cy'));
+    const radius = Number(node.getAttribute('r'));
+    return {
+      key: String(unit.__unitKey ?? node.dataset.key ?? index),
+      parentKey: String(unit.__parentKey ?? node.dataset.parentKey ?? ''),
+      valueStart: Number(unit.__valueStart) || 0,
+      valueEnd: Number(unit.__valueEnd) || 0,
+      x, y,
+      radius: Number.isFinite(radius) ? radius : 0,
+      fill: node.getAttribute('fill'),
+      opacity: node.style.opacity || '1'
+    };
+  }).filter((source) => Number.isFinite(source.x) && Number.isFinite(source.y));
+}
+
+function assignUnitValueLineage(units, sources) {
+  const sourcesByParent = new Map();
+  sources.forEach((source) => {
+    const values = sourcesByParent.get(source.parentKey) || [];
+    values.push(source);
+    sourcesByParent.set(source.parentKey, values);
+  });
+  return units.map((unit, targetIndex) => {
+    const candidates = sourcesByParent.get(String(unit.__parentKey)) || [];
+    const targetStart = Number(unit.__valueStart) || 0;
+    const targetEnd = Number(unit.__valueEnd) || targetStart;
+    const targetMiddle = (targetStart + targetEnd) / 2;
+    const source = candidates.reduce((best, candidate) => {
+      const overlap = Math.max(0,
+        Math.min(targetEnd, candidate.valueEnd) - Math.max(targetStart, candidate.valueStart));
+      const distance = Math.abs(targetMiddle - (candidate.valueStart + candidate.valueEnd) / 2);
+      if (!best || overlap > best.overlap || (overlap === best.overlap && distance < best.distance)) {
+        return { candidate, overlap, distance };
+      }
+      return best;
+    }, null)?.candidate;
+    if (!source) return { ...unit, __targetIndex: targetIndex };
+    return {
+      ...unit,
+      __targetIndex: targetIndex,
+      __lineageSourceKey: source.key,
+      __lineageAnchor: { x: source.x, y: source.y }
+    };
+  });
+}
+
+/**
+ * Unit-value changes use the same handoff as Point Blend: crisp endpoint marks
+ * are hidden only during motion while a filtered parent/child silhouette shows
+ * quantity being transferred. Every coarse interval owns its overlapping fine
+ * intervals, rather than collapsing an entire source row to one centroid.
+ */
+function drawUnitValueBlend({
+  chart, crispLayer, enabled, sourceLineage, units, layout, color, transition, d3
+}) {
+  crispLayer.interrupt().style('visibility', 'visible');
+  chart.g.selectAll('g.vd-unit-blend-layer').remove();
+  if (!enabled || !sourceLineage.length) return;
+
+  const layer = chart.g.append('g')
+    .attr('class', 'vd-unit-blend-layer')
+    .style('pointer-events', 'none')
+    .style('visibility', 'hidden')
+    .raise();
+  const filterId = ensureUnitBlendFilter(chart.scene, d3);
+  const childrenBySource = d3.group(
+    units.filter((unit) => unit.__lineageSourceKey),
+    (unit) => unit.__lineageSourceKey
+  );
+  const groups = sourceLineage
+    .map((source) => ({ source, children: childrenBySource.get(source.key) || [] }))
+    .filter((entry) => entry.children.length);
+
+  const group = layer.selectAll('g.vd-unit-blend-group')
+    .data(groups, (entry) => entry.source.key)
+    .join('g')
+    .attr('class', 'vd-unit-blend-group')
+    .attr('data-parent-unit-key', (entry) => entry.source.key)
+    .attr('filter', `url(#${filterId})`);
+
+  group.each(function(entry) {
+    const parent = d3.select(this).append('circle')
+      .attr('class', 'vd-unit-blend')
+      .attr('data-blend-role', 'parent')
+      .attr('cx', entry.source.x)
+      .attr('cy', entry.source.y)
+      .attr('r', entry.source.radius)
+      .attr('fill', entry.source.fill)
+      .style('opacity', entry.source.opacity);
+    const childPaths = entry.children.map((unit) => ({
+      start: { x: entry.source.x, y: entry.source.y },
+      end: { x: layout.x(unit, unit.__targetIndex), y: layout.y(unit, unit.__targetIndex) },
+      radius: Math.max(4, layout.r)
+    }));
+    parent.transition(transition)
+      .attrTween('r', () => (progress) => String(unitBlendParentRadius({
+        progress,
+        startRadius: entry.source.radius,
+        parent: { x: entry.source.x, y: entry.source.y },
+        children: childPaths
+      })))
+      .remove();
+
+    d3.select(this).selectAll('circle.vd-unit-blend-child')
+      .data(entry.children, (unit) => unit.__unitKey)
+      .join('circle')
+      .attr('class', 'vd-unit-blend vd-unit-blend-child')
+      .attr('data-blend-role', 'child')
+      .attr('data-key', (unit) => unit.__unitKey)
+      .attr('cx', entry.source.x)
+      .attr('cy', entry.source.y)
+      .attr('r', Math.max(4, layout.r))
+      .attr('fill', (unit) => color(unit.__row || unit))
+      .transition(transition)
+      .attrTween('cx', (unit) => (progress) =>
+        unitBlendPosition(layout, unit, progress, entry.source).x)
+      .attrTween('cy', (unit) => (progress) =>
+        unitBlendPosition(layout, unit, progress, entry.source).y);
+  });
+
+  layer.transition(transition)
+    .styleTween('visibility', () => (progress) =>
+      progress > 0 && progress < 1 ? 'visible' : 'hidden');
+  crispLayer.transition(transition)
+    .styleTween('visibility', () => (progress) =>
+      progress > 0 && progress < 1 ? 'hidden' : 'visible');
+}
+
+function unitBlendPosition(layout, unit, progress, source) {
+  if (layout.trajectory) {
+    return forceTrajectoryPosition(layout, unit, progress, source);
+  }
+  const target = {
+    x: layout.x(unit, unit.__targetIndex),
+    y: layout.y(unit, unit.__targetIndex)
+  };
+  return {
+    x: source.x + (target.x - source.x) * progress,
+    y: source.y + (target.y - source.y) * progress
+  };
+}
+
+const UNIT_BLEND_BLUR = 5;
+const UNIT_BLEND_REACH = UNIT_BLEND_BLUR * 2;
+
+function unitBlendParentRadius({ progress, startRadius, parent, children }) {
+  const connectionTotal = children.reduce((total, child) => {
+    const point = {
+      x: child.start.x + (child.end.x - child.start.x) * progress,
+      y: child.start.y + (child.end.y - child.start.y) * progress
+    };
+    const distance = Math.hypot(point.x - parent.x, point.y - parent.y);
+    const disconnectAt = child.radius + UNIT_BLEND_REACH;
+    const shrinkFrom = disconnectAt * 0.7;
+    return total + 1 - smoothStep(shrinkFrom, disconnectAt, distance);
+  }, 0);
+  const connectedShare = children.length ? connectionTotal / children.length : 0;
+  const endpoint = 1 - smoothStep(0.82, 1, progress);
+  return startRadius * Math.min(connectedShare, endpoint);
+}
+
+function smoothStep(from, to, value) {
+  const progress = Math.max(0, Math.min(1,
+    (value - from) / Math.max(Number.EPSILON, to - from)));
+  return progress * progress * (3 - 2 * progress);
+}
+
+function ensureUnitBlendFilter(scene, d3) {
+  const id = `vd-unit-blend-${scene.clipIdentity}`;
+  const defs = scene.svg.selectAll('defs.vd-unit-blend-defs')
+    .data([null])
+    .join('defs')
+    .attr('class', 'vd-unit-blend-defs');
+  let filter = defs.select(`#${id}`);
+  if (!filter.empty()) return id;
+
+  filter = defs.append('filter')
+    .attr('id', id)
+    .attr('x', '-60%')
+    .attr('y', '-60%')
+    .attr('width', '220%')
+    .attr('height', '220%')
+    .attr('color-interpolation-filters', 'sRGB');
+  filter.append('feGaussianBlur')
+    .attr('in', 'SourceGraphic')
+    .attr('stdDeviation', UNIT_BLEND_BLUR)
+    .attr('result', 'blur');
+  filter.append('feColorMatrix')
+    .attr('in', 'blur')
+    .attr('mode', 'matrix')
+    .attr('values', '1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -8');
+  return id;
 }
 
 function trajectoryPoint(layout, unit, progress) {

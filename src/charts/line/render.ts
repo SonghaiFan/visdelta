@@ -57,11 +57,15 @@ class LineChart extends BaseChart {
       ? lineRowsAtTotal(domainRows, enc.x?.field, enc.y?.field, state.detailParentOp)
       : domainRows;
     const scaleRows = state.filtersRows ? lineageRows : plottedRows;
-    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], d3);
-    const baseY = bandOrLinear(scaleRows, enc.y, [chart.innerHeight, 0], d3);
     const authoredPointRadius = Number.isFinite(Number(spec.pointSize))
       ? Number(spec.pointSize)
       : themeValue('--vd-line-point-size', 4.5);
+    const pointsAreExplicit = Number.isFinite(Number(spec.pointSize));
+    const pointPadding = pointsAreExplicit
+      ? authoredPointRadius + themeValue('--vd-point-stroke-width', 1.5) / 2
+      : 0;
+    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], d3, { domainPadding: pointPadding });
+    const baseY = bandOrLinear(scaleRows, enc.y, [chart.innerHeight, 0], d3, { domainPadding: pointPadding });
     const camera = focusCamera(
       plottedRows.map((row) => ({
         datum: row,
@@ -127,7 +131,6 @@ class LineChart extends BaseChart {
     const lineIsZipper = lineStage.startsWith('zipper-');
     const lineAtAttractor = lineStage === 'zipper-attractor';
     const lineShowsReference = lineIsZipper;
-    const pointsAreExplicit = Number.isFinite(Number(spec.pointSize));
     // A line is the default mark. Keyed circles remain as invisible geometry
     // for tooltips and path matching unless the author explicitly requests dots.
     const visiblePointRadius = pointsAreExplicit ? pointRadius : 0;

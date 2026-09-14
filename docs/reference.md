@@ -336,20 +336,53 @@ Curve names are exact D3 exports such as `curveLinear`, `curveStep`, and
 ```ts
 .pointSize(number)
 .radius(number)
+.connector({ from: number, channel?: "x" | "y" })
+.connector({ by: string | string[], orderBy?: string })
 .flip(options?)
 .rollup(groupby, options?)
 .breakdown(detail?, options?)
 ```
 
+Point connectors are derived geometry behind the dots; they do not change the
+data grain or datum identity. A constant `from` creates lollipop stems. VisDelta
+infers the connector channel when exactly one positional channel is quantitative;
+set `channel` when both x and y are quantitative. A `by` connector groups dots
+and connects adjacent members in `orderBy` order, or input order when omitted.
+
+```js
+point(rows)
+  .x("region")
+  .y("sales")
+  .connector({ from: 0 });
+
+point(rows)
+  .x("value")
+  .y("country")
+  .color("year")
+  .connector({ by: "country", orderBy: "year" });
+```
+
 ### `unit(data?)`
 
 ```ts
-.value(field, { maxUnits? })
+.value(field, { unitValue?, maxUnits? })
 .group(field)
 .layout("grid" | "force" | "bar" | "beeswarm", { columns?, radius? })
 .columns(number)
 .radius(number)
 ```
+
+`unitValue` sets the quantity represented by each circle and defaults to `1`.
+For example, `.value("sites", { unitValue: 10 })` renders 5 circles for 50
+sites. A positive remainder gets another circle, so 51 sites renders 6 circles;
+label the chart or legend with the chosen unit value. `maxUnits` remains a
+whole-chart safety cap after expansion.
+
+Changing `unitValue` is a semantic change in data grain: a coarser circle is
+the parent of the finer circles from the same source row. VisDelta animates
+that relationship as a reversible split/merge, using the parent row's current
+circle centroid as the shared anchor rather than treating the extra circles as
+unrelated enters or exits.
 
 For `force`, shared `.x()` and `.y()` channels become per-unit `forceX` and
 `forceY` targets. Without either channel, the target is the plot center.

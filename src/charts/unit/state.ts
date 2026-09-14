@@ -18,12 +18,16 @@ export function expandUnits(rows, spec, d3) {
   const unit = specUnit(spec) || {};
   const valueKey = unit.value;
   const rowKey = unit.key || specObjectKey(spec) || 'id';
+  const unitValue = positiveNumber(unit.unitValue, 1);
   const maxUnits = positiveInteger(unit.maxUnits, 240);
   const units = [];
 
   rows.forEach((row, rowIndex) => {
     const rawCount = valueKey ? Number(row[valueKey]) : 1;
-    const count = Math.max(0, Math.round(Number.isFinite(rawCount) ? rawCount : 0));
+    const quantity = Math.max(0, Number.isFinite(rawCount) ? rawCount : 0);
+    // A positive remainder receives a circle so the displayed units never
+    // understate the source quantity (e.g. 51 at 10 per circle becomes 6).
+    const count = Math.ceil(quantity / unitValue);
     Array.from({ length: count }, (_, unitIndex) => {
       units.push({
         ...row,
@@ -31,6 +35,9 @@ export function expandUnits(rows, spec, d3) {
         __unitIndex: unitIndex,
         __rowIndex: rowIndex,
         __parentKey: String(row[rowKey] ?? rowIndex),
+        __unitValue: unitValue,
+        __valueStart: unitIndex * unitValue,
+        __valueEnd: Math.min(quantity, (unitIndex + 1) * unitValue),
         __unitKey: `${String(row[rowKey] ?? rowIndex)}\u0000${unitIndex}`
       });
     });
@@ -230,6 +237,7 @@ export function matchUnitSlotsByIdentityAndTravel(chart, units, layout) {
 export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
   if (!previousSpec || !nextSpec) return {};
   const diff = diffViewStates(previousSpec, nextSpec);
+  const unitValueChanged = unitValueForSpec(previousSpec) !== unitValueForSpec(nextSpec);
   const positionChanged = unitPositionSignature(previousSpec) !== unitPositionSignature(nextSpec)
     || ['data', 'filter', 'transform', 'encoding.x'].some((type) => diff.hasDelta(type));
   const timing = defaultTransition({
@@ -238,7 +246,7 @@ export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
   });
   const plan = {
     diff: diff.deltas.map(({ type, action, previous, next }) => ({ type, action, previous, next })),
-    reason: positionChanged ? 'unit-key-first-layout' : 'unit-default-plan',
+    reason: unitValueChanged ? 'unit-value-split' : positionChanged ? 'unit-key-first-layout' : 'unit-default-plan',
     timing,
     totalDuration: timing.duration
   };
@@ -248,6 +256,14 @@ export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
   return {
     ...plan,
     match: { mode: 'key-first-travel', reason: 'same-key-first-then-closest-unmatched-unit' },
+    ...(unitValueChanged ? {
+      detailChange: {
+        mode: 'split',
+        parent: 'source-row',
+        summaryUnitValue: unitValueForSpec(previousSpec),
+        detailUnitValue: unitValueForSpec(nextSpec)
+      }
+    } : {}),
     ...(fallsToAxis ? { motion: { mode: 'move-across-then-fall' } } : {}),
     steps: fallsToAxis
       ? [
@@ -264,6 +280,16 @@ export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
 
 /** Evaluate either authored direction on one deterministic cached path. */
 export function canonicalUnitTransitionPair(previousSpec, nextSpec) {
+  const previousUnitValue = unitValueForSpec(previousSpec);
+  const nextUnitValue = unitValueForSpec(nextSpec);
+  // A larger value-per-circle is the summary. Always render summary -> detail
+  // and evaluate the exact cached path backward for detail -> summary.
+  if (previousUnitValue !== nextUnitValue) {
+    if (previousUnitValue > nextUnitValue) {
+      return { from: previousSpec, to: nextSpec, reverse: false };
+    }
+    return { from: nextSpec, to: previousSpec, reverse: true };
+  }
   const previousOrder = canonicalUnitOrder(previousSpec);
   const nextOrder = canonicalUnitOrder(nextSpec);
   if (previousOrder <= nextOrder) return { from: previousSpec, to: nextSpec, reverse: false };
@@ -288,11 +314,12 @@ export function unitStageTiming(chart) {
   };
 }
 
-function unitXScale(units, channel, range, deps) {
+function unitXScale(units, channel, range, deps, options = {}) {
   const rows = units.map((d) => d.__row);
-  const scale = deps.bandOrLinear(rows, channel, range, deps.d3);
-  if (typeof scale.nice === 'function') scale.nice();
-  return scale;
+  // Force positions are collection anchors. Beeswarm remains a quantitative
+  // positional distribution and therefore retains its authored scale type.
+  const resolved = options.anchors ? { ...channel, type: 'nominal' } : channel;
+  return deps.bandOrLinear(rows, resolved, range, deps.d3);
 }
 
 function fitRadius(chart, requestedRadius, { columns = 1, rows = 1 } = {}) {
@@ -319,10 +346,10 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
   const centerX = chart.innerWidth / 2;
   const centerY = chart.innerHeight / 2;
   const xScale = xChannel?.field
-    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 })
+    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 }, { anchors: true })
     : null;
   const yScale = yChannel?.field
-    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear, d3 })
+    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear, d3 }, { anchors: true })
     : null;
   const axes = {
     x: forceAxis(xScale, xChannel),
@@ -365,46 +392,66 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
       y: startY + Math.floor(index / columns) * cell
     }];
   }));
-  const nodes = [...units]
-    .sort((a, b) => String(a.__unitKey).localeCompare(String(b.__unitKey)))
-    .map((unit) => ({ unit, ...seeds.get(unit.__unitKey), vx: 0, vy: 0 }));
-  const trajectories = new Map(nodes.map((node) => [
-    node.unit.__unitKey,
-    [{ x: node.x, y: node.y }]
-  ]));
-  const targetX = xScale
-    ? (node) => position(xScale, node.unit.__row[xChannel.field])
-    : centerX;
-  const targetY = yScale
-    ? (node) => position(yScale, node.unit.__row[yChannel.field])
-    : centerY;
-  const simulation = d3.forceSimulation(nodes)
-    .force('x', d3.forceX(targetX).strength(0.2))
-    .force('y', d3.forceY(targetY).strength(0.2))
-    .force('collide', d3.forceCollide(radius * 1.12).strength(1).iterations(10))
-    .alpha(FORCE_ALPHA_START)
-    .alphaMin(FORCE_ALPHA_MIN)
-    .alphaDecay(1 - Math.pow(
-      FORCE_ALPHA_MIN / FORCE_ALPHA_START,
-      1 / FORCE_TICK_COUNT
-    ))
-    .stop();
-  const cumulativeMotion = [0];
-  for (let tick = 0; tick < FORCE_TICK_COUNT; tick++) {
-    const previous = nodes.map((node) => ({ x: node.x, y: node.y }));
-    simulation.tick();
-    let squaredMotion = 0;
-    for (const node of nodes) {
-      trajectories.get(node.unit.__unitKey).push({ x: node.x, y: node.y });
+  const orderedUnits = [...units]
+    .sort((a, b) => String(a.__unitKey).localeCompare(String(b.__unitKey)));
+  const resolveForce = () => {
+    const nodes = orderedUnits.map((unit) => ({
+      unit, ...seeds.get(unit.__unitKey), vx: 0, vy: 0
+    }));
+    const trajectories = new Map(nodes.map((node) => [
+      node.unit.__unitKey,
+      [{ x: node.x, y: node.y }]
+    ]));
+    const targetX = xScale
+      ? (node) => position(xScale, node.unit.__row[xChannel.field])
+      : centerX;
+    const targetY = yScale
+      ? (node) => position(yScale, node.unit.__row[yChannel.field])
+      : centerY;
+    const simulation = d3.forceSimulation(nodes)
+      .force('x', d3.forceX(targetX).strength(0.2))
+      .force('y', d3.forceY(targetY).strength(0.2))
+      .force('collide', d3.forceCollide(radius * 1.12).strength(1).iterations(10))
+      .alpha(FORCE_ALPHA_START)
+      .alphaMin(FORCE_ALPHA_MIN)
+      .alphaDecay(1 - Math.pow(
+        FORCE_ALPHA_MIN / FORCE_ALPHA_START,
+        1 / FORCE_TICK_COUNT
+      ))
+      .stop();
+    const cumulativeMotion = [0];
+    for (let tick = 0; tick < FORCE_TICK_COUNT; tick++) {
+      const previous = nodes.map((node) => ({ x: node.x, y: node.y }));
+      simulation.tick();
+      let squaredMotion = 0;
+      for (const node of nodes) {
+        trajectories.get(node.unit.__unitKey).push({ x: node.x, y: node.y });
+      }
+      nodes.forEach((node, index) => {
+        squaredMotion += (node.x - previous[index].x) ** 2 + (node.y - previous[index].y) ** 2;
+      });
+      cumulativeMotion.push(
+        cumulativeMotion[cumulativeMotion.length - 1] + Math.sqrt(squaredMotion / nodes.length)
+      );
     }
-    nodes.forEach((node, index) => {
-      squaredMotion += (node.x - previous[index].x) ** 2 + (node.y - previous[index].y) ** 2;
-    });
-    cumulativeMotion.push(
-      cumulativeMotion[cumulativeMotion.length - 1] + Math.sqrt(squaredMotion / nodes.length)
+    simulation.stop();
+    return { nodes, trajectories, cumulativeMotion };
+  };
+
+  // The force result is the geometry ground truth. If a cluster crosses the
+  // plot, move its discrete anchor range inward and resolve again; never scale
+  // the circles or infer padding from row counts.
+  let resolved;
+  for (let pass = 0; pass < 4; pass++) {
+    resolved = resolveForce();
+    const overflow = forceOverflow(
+      resolved.nodes, radius, chart.innerWidth, chart.innerHeight
     );
+    const changedX = pass < 3 && xScale && insetScaleRange(xScale, overflow.left, overflow.right);
+    const changedY = pass < 3 && yScale && insetScaleRange(yScale, overflow.top, overflow.bottom);
+    if (!changedX && !changedY) break;
   }
-  simulation.stop();
+  const { nodes, trajectories, cumulativeMotion } = resolved;
   const endpoints = new Map(nodes.map((node) => [node.unit.__unitKey, { x: node.x, y: node.y }]));
   const totalMotion = cumulativeMotion[cumulativeMotion.length - 1];
   const trajectoryTimeline = totalMotion > Number.EPSILON
@@ -418,6 +465,27 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
     trajectory: (unit) => trajectories.get(unit.__unitKey),
     trajectoryTimeline
   };
+}
+
+function forceOverflow(nodes, radius, width, height) {
+  return {
+    left: Math.max(0, -Math.min(...nodes.map((node) => node.x - radius))),
+    right: Math.max(0, Math.max(...nodes.map((node) => node.x + radius)) - width),
+    top: Math.max(0, -Math.min(...nodes.map((node) => node.y - radius))),
+    bottom: Math.max(0, Math.max(...nodes.map((node) => node.y + radius)) - height)
+  };
+}
+
+function insetScaleRange(scale, lowOverflow, highOverflow) {
+  const low = Math.max(0, Number(lowOverflow) || 0);
+  const high = Math.max(0, Number(highOverflow) || 0);
+  if (low < 0.01 && high < 0.01) return false;
+  const range = scale.range();
+  const start = Number(range[0]);
+  const end = Number(range[range.length - 1]);
+  if (start <= end) scale.range([start + low, end - high]);
+  else scale.range([start - high, end + low]);
+  return true;
 }
 
 function forceAxis(scale, channel) {
@@ -565,8 +633,13 @@ function unitPositionSignature(spec) {
     radius: unit.radius ?? null,
     group: unit.group ?? null,
     value: unit.value ?? null,
+    unitValue: unitValueForSpec(spec),
     x: spec.encoding?.x ?? null
   });
+}
+
+function unitValueForSpec(spec) {
+  return positiveNumber(specUnit(spec)?.unitValue, 1);
 }
 
 function canonicalUnitOrder(spec) {

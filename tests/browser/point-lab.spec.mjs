@@ -479,3 +479,140 @@ test('point lab fits a narrow viewport and keeps progress after resize', async (
   await page.setViewportSize({ width: 1360, height: 1000 });
   await page.screenshot({ path: 'test-results/point-lab-desktop.png', fullPage: true });
 });
+
+test('point connector renders lollipop stems and ordered dumbbell links behind dots', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  const result = await page.evaluate(async () => {
+    const { mount, point } = window.VisDelta;
+    document.body.innerHTML = '<div id="lollipop"></div><div id="dumbbell"></div>';
+
+    const lollipop = point([
+      { region: 'North', sales: 85 },
+      { region: 'South', sales: 60 },
+      { region: 'East', sales: 92 }
+    ])
+      .x('region')
+      .y('sales')
+      .key('region')
+      .connector({ from: 0 });
+
+    const dumbbell = point([
+      { country: 'Australia', year: 2005, value: 0.14 },
+      { country: 'Australia', year: 2015, value: 0.12 },
+      { country: 'Chile', year: 2005, value: 0.39 },
+      { country: 'Chile', year: 2015, value: 0.32 }
+    ])
+      .x('value')
+      .y('country')
+      .color('year')
+      .key(['country', 'year'])
+      .connector({ by: 'country', orderBy: 'year' });
+
+    await mount(lollipop, { target: '#lollipop', d3, aq, height: 320 });
+    await mount(dumbbell, { target: '#dumbbell', d3, aq, height: 320 });
+
+    const geometry = (selector) => {
+      const root = document.querySelector(selector);
+      const circles = [...root.querySelectorAll('circle.vd-point')].map(node => ({
+        x: Number(node.getAttribute('cx')),
+        y: Number(node.getAttribute('cy'))
+      }));
+      const lines = [...root.querySelectorAll('line.vd-point-connector')].map(node => ({
+        key: node.getAttribute('data-key'),
+        x1: Number(node.getAttribute('x1')),
+        y1: Number(node.getAttribute('y1')),
+        x2: Number(node.getAttribute('x2')),
+        y2: Number(node.getAttribute('y2'))
+      }));
+      const layer = root.querySelector('.vd-point-connector-layer');
+      const marks = root.querySelector('.vd-point-crisp-layer');
+      return {
+        circles,
+        lines,
+        behindDots: Boolean(
+          layer && marks &&
+          (layer.compareDocumentPosition(marks) & Node.DOCUMENT_POSITION_FOLLOWING)
+        )
+      };
+    };
+    return { lollipop: geometry('#lollipop'), dumbbell: geometry('#dumbbell') };
+  });
+
+  expect(result.lollipop.lines).toHaveLength(3);
+  expect(new Set(result.lollipop.lines.map(line => line.y1.toFixed(6))).size).toBe(1);
+  for (const line of result.lollipop.lines) {
+    expect(line.x1).toBeCloseTo(line.x2, 6);
+    expect(result.lollipop.circles.some(point =>
+      Math.abs(point.x - line.x2) < 1e-6 && Math.abs(point.y - line.y2) < 1e-6
+    )).toBe(true);
+  }
+  expect(result.lollipop.behindDots).toBe(true);
+
+  expect(result.dumbbell.lines).toHaveLength(2);
+  for (const line of result.dumbbell.lines) {
+    expect(line.y1).toBeCloseTo(line.y2, 6);
+    const endpoints = result.dumbbell.circles.filter(point =>
+      (Math.abs(point.x - line.x1) < 1e-6 && Math.abs(point.y - line.y1) < 1e-6) ||
+      (Math.abs(point.x - line.x2) < 1e-6 && Math.abs(point.y - line.y2) < 1e-6)
+    );
+    expect(endpoints).toHaveLength(2);
+  }
+  expect(result.dumbbell.behindDots).toBe(true);
+});
+
+test('adding and removing a point connector are the same motion in reverse', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  const frames = await page.evaluate(async () => {
+    const { point, transition } = window.VisDelta;
+    document.body.innerHTML = '<div id="forward"></div><div id="reverse"></div>';
+    const rows = [
+      { region: 'North', sales: 85 },
+      { region: 'South', sales: 60 },
+      { region: 'East', sales: 92 }
+    ];
+    const dots = point(rows).x('region').y('sales').key('region');
+    const lollipop = dots.connector({ from: 0 });
+    const options = target => ({ target, d3, aq, height: 320 });
+    const forward = await transition(dots, lollipop, options('#forward'));
+    const reverse = await transition(lollipop, dots, options('#reverse'));
+    const geometry = selector => [...document.querySelectorAll(`${selector} .vd-point-connector`)]
+      .map(node => ({
+        key: node.getAttribute('data-key'),
+        x1: Number(Number(node.getAttribute('x1')).toFixed(6)),
+        y1: Number(Number(node.getAttribute('y1')).toFixed(6)),
+        x2: Number(Number(node.getAttribute('x2')).toFixed(6)),
+        y2: Number(Number(node.getAttribute('y2')).toFixed(6)),
+        opacity: Number(Number(getComputedStyle(node).opacity).toFixed(6))
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+
+    return [0.1, 0.28, 0.5, 0.73, 0.9].map(progress => {
+      forward.progress(progress);
+      reverse.progress(1 - progress);
+      return { forward: geometry('#forward'), reverse: geometry('#reverse') };
+    });
+  });
+
+  for (const frame of frames) expect(frame.reverse).toEqual(frame.forward);
+});
+
+test('a constant connector needs an explicit channel when both axes are quantitative', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  const message = await page.evaluate(async () => {
+    const { mount, point } = window.VisDelta;
+    document.body.innerHTML = '<div id="ambiguous"></div>';
+    const state = point([{ id: 'A', x: 10, y: 20 }])
+      .x('x')
+      .y('y')
+      .key('id')
+      .connector({ from: 0 });
+    try {
+      await mount(state, { target: '#ambiguous', d3, aq, height: 320 });
+      return '';
+    } catch (error) {
+      return error.message;
+    }
+  });
+
+  expect(message).toContain('needs channel "x" or "y"');
+});

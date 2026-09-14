@@ -265,17 +265,21 @@ function drawUnsupported(chart, spec, availableTypes = []) {
     .text(`Unsupported chart type "${spec.mark}"${availableTypes.length ? ` · available: ${availableTypes.join(', ')}` : ''}`);
 }
 
-function bandOrLinear(rows, channel, range, d3) {
+function bandOrLinear(rows, channel, range, d3, options = {}) {
   if (!channel) return d3.scaleLinear().domain([0, 1]).range(range);
   const resolved = channel.field && !channel.type
     ? { ...channel, type: inferFieldType(rows, channel.field) }
     : channel;
   let scale;
-  if (resolved.type === 'quantitative') scale = quantitativeScale(rows, resolved, range, d3);
+  if (resolved.type === 'quantitative') scale = quantitativeScale(rows, resolved, range, d3, options);
   else if (resolved.type === 'temporal') {
+    const explicitDomain = Array.isArray(resolved.domain);
+    const dataDomain = d3.extent(rows, (d) => channelValue(d[resolved.field], resolved));
     const domain = (resolved.domain || d3.extent(rows, (d) => channelValue(d[resolved.field], resolved)))
       .map((value) => channelValue(value, resolved));
-    scale = d3.scaleTime().domain(domain).range(range);
+    scale = d3.scaleTime().domain(domain).range(range).nice();
+    scale.__visDeltaDataDomain = dataDomain;
+    if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
   } else {
     scale = d3.scaleBand().domain(channelDomain(rows, resolved)).range(range).padding(0.24);
   }
@@ -283,9 +287,12 @@ function bandOrLinear(rows, channel, range, d3) {
   return scale;
 }
 
-function quantitativeScale(rows, channel = {}, range, d3) {
+function quantitativeScale(rows, channel = {}, range, d3, options = {}) {
   const scaleType = channel.scale?.type || channel.scaleType || 'linear';
   const domain = quantitativeDomain(rows, channel, scaleType === 'log' ? 1 : undefined);
+  const values = rows.map((row) => Number(row[channel.field])).filter(Number.isFinite);
+  const dataDomain = values.length ? d3.extent(values) : domain;
+  const explicitDomain = Array.isArray(channel.domain);
   let scale;
   if (scaleType === 'log') {
     const safeDomain = domain.map((value) => Math.max(Number(value) || 1, 0.1));
@@ -295,7 +302,31 @@ function quantitativeScale(rows, channel = {}, range, d3) {
   } else {
     scale = d3.scaleLinear().domain(domain).range(range).nice();
   }
+  scale.__visDeltaDataDomain = dataDomain;
+  if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
   scale.__visDeltaChannel = { ...channel, type: 'quantitative' };
+  return scale;
+}
+
+/**
+ * Extend a continuous domain by the exact amount needed to keep a mark with a
+ * pixel footprint inside the plot clip. The scale still owns the full plot
+ * range; only its inferred domain grows. Explicit author domains remain
+ * authoritative and never reach this helper.
+ */
+function padContinuousDomain(scale, padding = 0) {
+  const pixels = Math.max(0, Number(padding) || 0);
+  if (!pixels || typeof scale.copy !== 'function' || typeof scale.invert !== 'function') return scale;
+  const range = scale.range();
+  if (range.length < 2) return scale;
+  const start = Number(range[0]);
+  const end = Number(range[range.length - 1]);
+  const span = Math.abs(end - start);
+  if (!Number.isFinite(span) || span <= pixels * 2) return scale;
+  const direction = Math.sign(end - start) || 1;
+  const inner = [start + direction * pixels, end - direction * pixels];
+  const projection = scale.copy().range(inner);
+  scale.domain([projection.invert(start), projection.invert(end)]);
   return scale;
 }
 
@@ -364,6 +395,9 @@ function drawXAxis(chart, scale, title, d3, transition = chart.transition.base, 
   let axis = typeof scale.bandwidth === 'function'
     ? axisFactory(scale)
     : axisFactory(scale).ticks(tickCount, options.tickFormat);
+  if (typeof scale.bandwidth !== 'function') {
+    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 44));
+  }
   axis = axis.tickSizeOuter(0);
   // Adaptive label thinning for band (categorical) x-axes:
   // when available px-per-band < threshold, skip every Nth label so they never overlap.
@@ -425,6 +459,9 @@ function drawYAxis(chart, scale, title, d3, transition = chart.transition.base, 
   let axis = typeof scale.bandwidth === 'function'
     ? axisFactory(scale)
     : axisFactory(scale).ticks(tickCount, options.tickFormat);
+  if (typeof scale.bandwidth !== 'function') {
+    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 22));
+  }
   axis = axis.tickSizeOuter(0);
   // Adaptive label thinning for band (categorical) y-axes (horizontal bar charts):
   if (typeof scale.bandwidth === 'function') {
@@ -474,7 +511,11 @@ function updateGrid(chart, y, d3, transition = chart.transition.base, options = 
   }
   const grid = chart.scene.grid.interrupt().attr('transform', null);
   const tickCount = options.tickCount ?? themeValue('--vd-tick-count', 6);
-  renderAxisWithGuard(grid, d3.axisLeft(y).ticks(tickCount).tickSize(-chart.innerWidth).tickFormat(''), transition, axisKind('grid-left', y), options.duration);
+  renderAxisWithGuard(grid, d3.axisLeft(y)
+    .ticks(tickCount)
+    .tickValues(prioritizedContinuousTicks(y, tickCount, 22))
+    .tickSize(-chart.innerWidth)
+    .tickFormat(''), transition, axisKind('grid-left', y), options.duration);
   timedTransition(grid, transition, options.duration).style('opacity', 1);
 }
 
@@ -489,7 +530,9 @@ function updateXGrid(chart, x, d3, transition, tickCount, duration) {
   if (!x) return;
 
   const count = tickCount ?? themeValue('--vd-tick-count', 6);
-  const values = typeof x.ticks === 'function' ? x.ticks(count) : x.domain();
+  const values = typeof x.ticks === 'function'
+    ? prioritizedContinuousTicks(x, count, 44)
+    : x.domain();
   layer.interrupt().style('opacity', 1)
     .selectAll('line')
     .data(values, (value) => String(value))
@@ -616,6 +659,34 @@ function alignEdgeTickLabels(axisGroup, scale, d3) {
     else if (Math.abs(x - max) <= 1) text.attr('text-anchor', 'end').attr('dx', '-0.15em');
     else text.attr('text-anchor', 'middle').attr('dx', null);
   });
+}
+
+/**
+ * D3 ticks optimize for round, evenly spaced labels and may omit the actual
+ * observations at either end. Keep data endpoints first, then admit ordinary
+ * ticks only when they have enough screen distance from those endpoints.
+ */
+function prioritizedContinuousTicks(scale, count, minSpacing) {
+  const ordinary = typeof scale.ticks === 'function' ? scale.ticks(count) : scale.domain();
+  const scaleDomain = scale.domain().map((value) => Number(value));
+  const domainMin = Math.min(...scaleDomain);
+  const domainMax = Math.max(...scaleDomain);
+  const endpoints = Array.isArray(scale.__visDeltaDataDomain)
+    ? scale.__visDeltaDataDomain.filter((value) => {
+        const number = Number(value);
+        return value != null && Number.isFinite(number) && number >= domainMin && number <= domainMax;
+      })
+    : [];
+  if (!endpoints.length) return ordinary;
+  const valueKey = (value) => value instanceof Date ? value.getTime() : Number(value);
+  const uniqueEndpoints = [...new Map(endpoints.map((value) => [valueKey(value), value])).values()];
+  const accepted = [...uniqueEndpoints];
+  for (const tick of ordinary) {
+    const duplicate = accepted.some((value) => valueKey(value) === valueKey(tick));
+    const crowded = uniqueEndpoints.some((value) => Math.abs(scale(value) - scale(tick)) < minSpacing);
+    if (!duplicate && !crowded) accepted.push(tick);
+  }
+  return accepted.sort((a, b) => scale(a) - scale(b));
 }
 
 function axisKind(placement, scale) {

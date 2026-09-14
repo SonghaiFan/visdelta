@@ -50,6 +50,9 @@ for (const width of [1100, 390]) {
     const editor = studio.getByRole('textbox', { name: 'Editable VisDelta chart code' });
     await expect(editor).toContainText('const chart = line(rows)');
     await expect(studio.locator('path.vd-line')).toHaveCount(3);
+    const lineXTicks = (await studio.locator('.vd-x-axis .tick text').allTextContents())
+      .map(value => value.replaceAll(',', ''));
+    expect(lineXTicks).toEqual(expect.arrayContaining(['2004', '2022']));
     await expect(studio.getByRole('button', { name: 'Line' })).toHaveAttribute('aria-pressed', 'true');
     await expect(inputTable.getByRole('columnheader')).toHaveCount(3);
     await expect(inputTable.getByRole('row')).toHaveCount(7);
@@ -64,6 +67,23 @@ for (const width of [1100, 390]) {
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
     await expect(studio.locator('circle.vd-point')).toHaveCount(6);
     await expect(editor).toContainText('const chart = point(rows)');
+    const pointBounds = await studio.locator('.home-studio-chart').evaluate(chart => {
+      const clip = chart.querySelector('clipPath[id^="vd-mark-clip-"] rect');
+      const width = Number(clip?.getAttribute('width'));
+      const height = Number(clip?.getAttribute('height'));
+      return [...chart.querySelectorAll('circle.vd-point')].map(point => {
+        const cx = Number(point.getAttribute('cx'));
+        const cy = Number(point.getAttribute('cy'));
+        const r = Number(point.getAttribute('r'));
+        return { left: cx - r, right: cx + r, top: cy - r, bottom: cy + r, width, height };
+      });
+    });
+    for (const point of pointBounds) {
+      expect(point.left).toBeGreaterThanOrEqual(0);
+      expect(point.right).toBeLessThanOrEqual(point.width);
+      expect(point.top).toBeGreaterThanOrEqual(0);
+      expect(point.bottom).toBeLessThanOrEqual(point.height);
+    }
 
     await studio.getByRole('button', { name: 'Area' }).click();
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
@@ -72,6 +92,53 @@ for (const width of [1100, 390]) {
     await studio.getByRole('button', { name: 'Unit' }).click();
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
     await expect(studio.locator('circle.vd-unit')).toHaveCount(55);
+    await expect(studio.locator('.vd-x-label')).toContainText('Year');
+    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '1');
+    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '1');
+    expect((await studio.locator('.vd-x-axis .tick text').allTextContents()).length).toBeGreaterThan(2);
+    await editor.fill(`const chart = unit(rows)
+  .datumKey(["year", "country"])
+  .key(["year", "country"])
+  .x("year", { title: "Year" })
+  .color("country", { range: ["#195fb5", "#f28e2b", "#0fa470"] })
+  .value("sites", { maxUnits: 60 })
+  .layout("force");`);
+    await editor.press('Enter');
+    await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
+    await expect(studio.locator('circle.vd-unit').first()).toHaveAttribute('r', '12');
+    expect(await studio.locator('.vd-x-axis .tick text').allTextContents()).toEqual(['2004', '2022']);
+    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '0');
+    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '0');
+    const unitBounds = await studio.locator('.home-studio-chart').evaluate(chart => {
+      const clip = chart.querySelector('clipPath[id^="vd-mark-clip-"] rect');
+      const width = Number(clip?.getAttribute('width'));
+      const height = Number(clip?.getAttribute('height'));
+      return [...chart.querySelectorAll('circle.vd-unit')].map(unit => {
+        const cx = Number(unit.getAttribute('cx'));
+        const cy = Number(unit.getAttribute('cy'));
+        const r = Number(unit.getAttribute('r'));
+        return { left: cx - r, right: cx + r, top: cy - r, bottom: cy + r, width, height };
+      });
+    });
+    for (const unit of unitBounds) {
+      expect(unit.left).toBeGreaterThanOrEqual(0);
+      expect(unit.right).toBeLessThanOrEqual(unit.width);
+      expect(unit.top).toBeGreaterThanOrEqual(0);
+      expect(unit.bottom).toBeLessThanOrEqual(unit.height);
+    }
+    await editor.fill(`const chart = unit(rows)
+  .datumKey(["year", "country"])
+  .key(["year", "country"])
+  .y("year", { title: "Year" })
+  .color("country", { range: ["#195fb5", "#f28e2b", "#0fa470"] })
+  .value("sites", { maxUnits: 60 })
+  .layout("force");`);
+    await editor.press('Enter');
+    await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
+    await expect(studio.locator('.vd-y-axis .tick')).toHaveCount(2);
+    expect(await studio.locator('.vd-y-axis .tick text').allTextContents()).toEqual(['2004', '2022']);
+    await expect(studio.locator('.vd-y-axis .domain')).toHaveCSS('opacity', '0');
+    await expect(studio.locator('.vd-y-label')).toHaveCSS('opacity', '0');
 
     await studio.getByRole('button', { name: 'Bar' }).click();
     await expect(studio.locator('rect.vd-bar').first()).toBeVisible();

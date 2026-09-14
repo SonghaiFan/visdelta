@@ -438,6 +438,79 @@ test('a Unit transition does not import another chart module', async ({ page }) 
   expect(modules.filter(path => /\/charts\/(area|bar|line|point)\//.test(path))).toEqual([]);
 });
 
+test('changing unitValue morphs each coarse interval through the Point-style blend path', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
+  const result = await page.evaluate(async () => {
+    const { unit, transition } = window.VisDelta;
+    const rows = [
+      { id: 'A', sites: 8 },
+      { id: 'B', sites: 4 }
+    ];
+    const summary = unit(rows).value('sites', { unitValue: 4 }).key('id')
+      .layout('grid', { columns: 6, radius: 8 })
+      .transition({ duration: 1000, ease: 'linear' });
+    const detail = summary.value('sites', { unitValue: 1 });
+    const forwardHost = document.querySelector('#chart');
+    const reverseHost = document.body.appendChild(document.createElement('div'));
+    const split = await transition(summary, detail, { target: forwardHost, d3, aq, height: 260 });
+    const merge = await transition(detail, summary, { target: reverseHost, d3, aq, height: 260 });
+    const geometry = (host) => [...host.querySelectorAll('circle.vd-unit, circle.vd-unit-blend')]
+      .map((node) => [
+        node.dataset.key || node.parentElement?.dataset.parentUnitKey,
+        node.dataset.blendRole || 'crisp',
+        Number(node.getAttribute('cx')).toFixed(3),
+        Number(node.getAttribute('cy')).toFixed(3),
+        Number(node.getAttribute('r')).toFixed(3)
+      ].join('|')).sort();
+
+    split.progress(0.35);
+    const blendLayer = forwardHost.querySelector('.vd-unit-blend-layer');
+    const crispLayer = forwardHost.querySelector('.vd-unit-crisp-layer');
+    const childCounts = [...blendLayer.querySelectorAll('.vd-unit-blend-group')]
+      .map((group) => group.querySelectorAll('[data-blend-role="child"]').length)
+      .sort((a, b) => a - b);
+    const blendCircleCount = blendLayer.querySelectorAll('circle').length;
+    const intermediateCount = forwardHost.querySelectorAll('circle.vd-unit').length;
+
+    const childDistances = [];
+    for (const progress of [0.05, 0.2, 0.4, 0.6, 0.8]) {
+      split.progress(progress);
+      const child = [...forwardHost.querySelectorAll('[data-blend-role="child"]')]
+        .find((node) => node.__data__?.__parentKey === 'A' && node.__data__?.__unitIndex === 7);
+      const parent = child?.parentElement?.querySelector('[data-blend-role="parent"]');
+      childDistances.push(Math.hypot(
+        Number(child?.getAttribute('cx')) - Number(parent?.getAttribute('cx')),
+        Number(child?.getAttribute('cy')) - Number(parent?.getAttribute('cy'))
+      ));
+    }
+    const childMovesContinuously = childDistances.every((distance, index) =>
+      index === 0 || distance > childDistances[index - 1]);
+
+    split.progress(0.43);
+    merge.progress(0.57);
+    return {
+      blendVisibility: blendLayer.style.visibility,
+      crispVisibility: crispLayer.style.visibility,
+      childCounts,
+      blendCircleCount,
+      intermediateCount,
+      childMovesContinuously,
+      reverseMatches: JSON.stringify(geometry(forwardHost)) === JSON.stringify(geometry(reverseHost)),
+      steps: split.view.dataset.transitionSteps
+    };
+  });
+
+  expect(result.blendVisibility).toBe('visible');
+  expect(result.crispVisibility).toBe('hidden');
+  expect(result.childCounts).toEqual([4, 4, 4]);
+  expect(result.blendCircleCount).toBe(15);
+  expect(result.intermediateCount).toBe(12);
+  expect(result.childMovesContinuously).toBe(true);
+  expect(result.reverseMatches).toBe(true);
+  expect(result.steps).toBe('view marks');
+});
+
 test('grid reflow stages the view, preserves keyed identity, and uses the same path backward', async ({ page }) => {
   await page.goto('/tests/fixtures/isolated.html');
   const result = await page.evaluate(async () => {

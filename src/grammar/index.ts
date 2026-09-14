@@ -5,6 +5,6 @@ export { D3_AREA_CURVE_NAMES, D3_CURVE_NAMES } from '../charts/curve.js';
 export type { D3AreaCurveName, D3CurveName } from '../charts/curve.js';
 export { point, PointState } from '../charts/point/grammar.js';
 export { unit, UNIT_LAYOUTS, UnitState } from '../charts/unit/grammar.js';
-export type { UnitLayout, UnitLayoutOptions, UnitViewState } from '../charts/unit/grammar.js';
+export type { UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from '../charts/unit/grammar.js';
 export { diffViewStates } from './diff.js';
 export { inferTransition } from './infer-transition.js';

@@ -4,7 +4,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   await page.waitForSelector('rect.vd-bar');
   await page.evaluate(async () => {
-    window.sl = await import('/dist/visdelta.esm.js');
+    window.sl = window.VisDelta;
     document.body.innerHTML = '<div id="a" style="width:800px"></div><div id="b" style="width:800px"></div>';
     window.rows = [
       { category: 'A', value: 10, other: 35, type: 'one' },
@@ -174,6 +174,45 @@ for (const layout of ['stacked', 'grouped']) {
     for (const frame of result.frames) expect(frame.merge).toEqual(frame.split);
   });
 }
+
+test('stacked filter continuously moves surviving segments onto their new stack bases', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const data = [
+      { id: 'a-low', category: 'A', segment: 'low', value: 4 },
+      { id: 'a-high', category: 'A', segment: 'high', value: 6 },
+      { id: 'b-low', category: 'B', segment: 'low', value: 3 },
+      { id: 'b-high', category: 'B', segment: 'high', value: 5 }
+    ];
+    const stacked = sl.bar().data(data)
+      .datumKey('id')
+      .x('category')
+      .y('value')
+      .breakdown('segment');
+    const filtered = stacked.where({ segment: 'high' });
+    const change = await sl.transition(stacked, filtered, opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      const node = change.view.querySelector('rect[data-key="B|high"]');
+      return {
+        y: Number(node?.getAttribute('y')),
+        height: Number(node?.getAttribute('height'))
+      };
+    };
+    const source = frame(0);
+    const afterExit = frame(0.55);
+    const middle = frame(0.75);
+    const target = frame(1);
+    const reverseMiddle = frame(0.75);
+    return { source, afterExit, middle, target, reverseMiddle };
+  });
+
+  expect(result.source).not.toEqual(result.target);
+  expect(result.afterExit).not.toEqual(result.target);
+  expect(result.middle.y).toBeGreaterThan(Math.min(result.source.y, result.target.y));
+  expect(result.middle.y).toBeLessThan(Math.max(result.source.y, result.target.y));
+  expect(result.middle.height).toBe(result.target.height);
+  expect(result.reverseMiddle).toEqual(result.middle);
+});
 
 test('play uses seek frames; pause, replay, resize and destruction', async ({ page }) => {
   await page.evaluate(async () => {

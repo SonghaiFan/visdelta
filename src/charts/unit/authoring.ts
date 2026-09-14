@@ -19,6 +19,13 @@ export interface UnitLayoutOptions {
   radius?: number;
 }
 
+export interface UnitValueOptions {
+  /** The quantity represented by one unit circle. Defaults to 1. */
+  unitValue?: number;
+  /** Maximum number of circles rendered across the chart. */
+  maxUnits?: number;
+}
+
 export function unit(data?: unknown): UnitState {
   return new UnitState({ data: normalizeDataSource(data) as UnitViewState['data'], mark: 'unit', encoding: {}, unit: {} });
 }
@@ -32,8 +39,11 @@ export class UnitState extends ChartState<UnitViewState> {
     return compileViewWithCompiler(spec, { scene: [] }, UNIT_SPEC_COMPILER, { axis: 'layout' });
   }
 
-  value(field: string, options: { maxUnits?: number } = {}): this {
+  value(field: string, options: UnitValueOptions = {}): this {
     if (!field) throw new Error('Unit value requires a field name.');
+    if (options.unitValue != null && (!Number.isFinite(options.unitValue) || options.unitValue <= 0)) {
+      throw new Error('Unit unitValue must be a positive finite number.');
+    }
     if (options.maxUnits != null && (!Number.isInteger(options.maxUnits) || options.maxUnits <= 0)) {
       throw new Error('Unit maxUnits must be a positive integer.');
     }
@@ -41,6 +51,7 @@ export class UnitState extends ChartState<UnitViewState> {
       unit: {
         ...(this.state['unit'] as Record<string, unknown> || {}),
         value: field,
+        ...(options.unitValue != null ? { unitValue: options.unitValue } : {}),
         ...(options.maxUnits != null ? { maxUnits: options.maxUnits } : {})
       }
     });

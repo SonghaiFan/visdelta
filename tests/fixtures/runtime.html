@@ -13,9 +13,10 @@
     <output id="value">0.00</output>
     <script src="/node_modules/d3/dist/d3.min.js"></script>
     <script src="/node_modules/arquero/dist/arquero.min.js"></script>
-    <script type="module">
-      import { bar } from '/dist/bar.js';
-      import { transition } from '/dist/transition-entry.js';
+    <script src="/dist/visdelta.global.js"></script>
+    <script>
+      (async () => {
+      const { bar, transition } = VisDelta;
 
       const rows = [
         { category: 'A', value: 10, other: 35, type: 'one' },
@@ -33,6 +34,7 @@
         value.value = progress.valueAsNumber.toFixed(2);
       });
       document.querySelector('#status').textContent = 'Ready';
+      })();
     </script>
   </body>
 </html>

@@ -43,6 +43,20 @@ const bySpeciesForce = colored
   .x("species", { title: "Species" })
   .layout("force");`;
 
+const unitValueSplit = `${base}
+
+const sampleRows = [...rows.slice(0, 8), ...rows.slice(50, 54)];
+const counts = Array.from(
+  d3.rollup(sampleRows, values => values.length, row => row.species),
+  ([species, count]) => ({ species, count })
+);
+const detailed = unit(counts)
+  .value("count", { unitValue: 1, maxUnits: 40 })
+  .key("species")
+  .group("species")
+  .layout("bar", { columns: 5, radius: 8 })
+  .color("species", { title: "Species", range: ${speciesColors} });`;
+
 function sample(id, label, description, setup, from, to) {
   return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
@@ -66,5 +80,6 @@ export const scenarios = [
   sample('beeswarm', '11 · Beeswarm by petal length', 'Move flowers across to their measured petal lengths, then use dodge placement to form a non-overlapping swarm.', positioned, 'colored', 'byPetalLength'),
   sample('force', '12 · Gather with forceX', 'Use the explicitly mapped species positions as forceX attractors while collision keeps every flower separate.', forced, 'colored', 'bySpeciesForce'),
   sample('grid', '13 · Return to one grid', 'Move the three species bars back into one grid while every flower keeps its identity.', bars, 'bySpecies', 'colored.layout("grid", { columns: 15, radius: 6 })'),
-  sample('focus', '14 · Focus one flower', 'Keep all 150 flowers and use the shared 2D camera to fit one selected unit to the plot.', base, 'flowers', 'flowers.focus({ flowerId: "iris-001" })')
+  sample('unit-value', '14 · Split represented quantities', 'Split each coarse circle into the finer quantity intervals it represents; reverse merges those exact children into their parent.', unitValueSplit, 'detailed.value("count", { unitValue: 4, maxUnits: 40 })', 'detailed'),
+  sample('focus', '15 · Focus one flower', 'Keep all 150 flowers and use the shared 2D camera to fit one selected unit to the plot.', base, 'flowers', 'flowers.focus({ flowerId: "iris-001" })')
 ];

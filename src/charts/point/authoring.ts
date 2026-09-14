@@ -1,4 +1,4 @@
-import type { AxisSpec, ViewSpec } from '../../types/index.js';
+import type { AxisSpec, ConnectorSpec, ViewSpec } from '../../types/index.js';
 import { ChartState, normalizeDataSource } from '../authoring.js';
 import { compileViewWithCompiler } from '../compile-view.js';
 import { createPointSpecCompiler } from './compile.js';
@@ -9,6 +9,7 @@ const POINT_SPEC_COMPILER = createPointSpecCompiler();
 export interface PointViewState extends ViewSpec {
   mark: 'point';
   size?: number;
+  connector?: ConnectorSpec | null;
 }
 
 export function point(data?: unknown): PointState {
@@ -33,6 +34,28 @@ export class PointState extends ChartState<PointViewState> {
 
   radius(value: number): this {
     return this.pointSize(value);
+  }
+
+  connector(options: ConnectorSpec): this {
+    const hasBaseline = typeof options?.from === 'number' && Number.isFinite(options.from);
+    const groupFields = Array.isArray(options?.by) ? options.by : [options?.by].filter(Boolean);
+    const hasGroup = groupFields.length > 0;
+    if (options?.orderBy && !hasGroup) {
+      throw new Error('Point connector orderBy requires by grouping.');
+    }
+    if (options?.channel && !hasBaseline) {
+      throw new Error('Point connector channel requires a constant from value.');
+    }
+    if (!hasBaseline && !hasGroup) {
+      throw new Error('Point connector needs a finite from value or a by field.');
+    }
+    if (hasBaseline && hasGroup) {
+      throw new Error('Point connector cannot combine a constant from value with by grouping.');
+    }
+    if (options.channel && options.channel !== 'x' && options.channel !== 'y') {
+      throw new Error('Point connector channel must be "x" or "y".');
+    }
+    return this.with({ connector: { ...options } });
   }
 
   flip(options: Record<string, unknown> = {}): this {

@@ -185,7 +185,18 @@ function barGeometryState({
   segmentField: string | null;
 }): { x: BarGeometryState; y: BarGeometryState } {
   const category = { role: 'category' as const, field: categoryField, filters };
-  const measure = { role: 'measure' as const, field: measureField };
+  // Filtering a stacked view changes more than membership: every surviving
+  // segment above a removed row receives a new stack interval. Keep that
+  // dependency in the measure geometry so the transition plan animates the
+  // recomputed __stack0/__stack1 bounds instead of correcting them only at the
+  // terminal frame. Simple and grouped bars do not derive their measure
+  // position from neighbouring rows, so their existing filter plan stays
+  // unchanged.
+  const measure = {
+    role: 'measure' as const,
+    field: measureField,
+    ...(layout === 'stacked' ? { filters } : {})
+  };
   const segment = segmentField
     ? { field: segmentField, color: channelSignature(enc.color) }
     : null;

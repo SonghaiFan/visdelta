@@ -68,3 +68,26 @@ test('bar steps keep scale, axis, and marks in one chart-part change', () => {
   ]);
   assert.equal(plan.match, undefined);
 });
+
+test('stacked bar filters update surviving stack intervals as well as membership', () => {
+  const rows = [
+    { id: 'a-low', category: 'A', segment: 'low', value: 4 },
+    { id: 'a-high', category: 'A', segment: 'high', value: 6 },
+    { id: 'b-low', category: 'B', segment: 'low', value: 3 },
+    { id: 'b-high', category: 'B', segment: 'high', value: 5 }
+  ];
+  const stacked = bar(rows)
+    .datumKey('id')
+    .x('category')
+    .y('value')
+    .breakdown('segment');
+  const plan = resolveBarTransitionPlan(
+    stacked.toSpec(),
+    stacked.where({ segment: 'high' }).toSpec()
+  );
+
+  assert.deepEqual(plan.steps, [
+    { part: 'x', changes: ['scale', 'axis', 'marks'] },
+    { part: 'y', changes: ['scale', 'axis', 'marks'] }
+  ]);
+});

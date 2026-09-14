@@ -36,6 +36,7 @@ class PointChart extends BaseChart {
     const viewRows = state.view
       ? applyTransforms(chart.sourceRows, state.view.transform || [], chart.aq)
       : rows;
+    const connector = resolvePointConnector(spec, viewEnc);
     const selection = viewSelection(spec);
     const movesPoints = state.detailMode === 'detail' && !state.view;
     // Summary -> detail is the canonical path. Giving that path ease-out makes
@@ -44,13 +45,24 @@ class PointChart extends BaseChart {
     const t = movesPoints
       ? chart.transition.base.ease(d3.easeCubicOut)
       : chart.transition.base;
-    const baseX = bandOrLinear(viewRows, viewEnc.x, [0, chart.innerWidth], d3);
-    const baseY = bandOrLinear(viewRows, viewEnc.y, [chart.innerHeight, 0], d3);
-    const color = colorScale(domainRows, enc.color, d3);
     const fallbackRadius = Number.isFinite(Number(spec.size))
       ? Number(spec.size)
       : defaultPointRadius(rows.length);
     const baseRadius = radiusScale(domainRows, enc.size, fallbackRadius, d3, quantitativeDomain);
+    const largestRadius = domainRows.reduce(
+      (largest, row) => Math.max(largest, baseRadius(row)),
+      fallbackRadius
+    );
+    const markPadding = largestRadius + themeValue('--vd-point-stroke-width', 1.5) / 2;
+    const xDomainRows = connector?.mode === 'baseline' && connector.channel === 'x'
+      ? rowsIncludingBaseline(viewRows, viewEnc.x, connector.from)
+      : viewRows;
+    const yDomainRows = connector?.mode === 'baseline' && connector.channel === 'y'
+      ? rowsIncludingBaseline(viewRows, viewEnc.y, connector.from)
+      : viewRows;
+    const baseX = bandOrLinear(xDomainRows, viewEnc.x, [0, chart.innerWidth], d3, { domainPadding: markPadding });
+    const baseY = bandOrLinear(yDomainRows, viewEnc.y, [chart.innerHeight, 0], d3, { domainPadding: markPadding });
+    const color = colorScale(domainRows, enc.color, d3);
     const camera = focusCamera(
       viewRows.map((row) => ({
         datum: row,
@@ -114,6 +126,12 @@ class PointChart extends BaseChart {
     });
     drawPointAxes(chart, x, y, viewEnc, d3, { chartStyle, drawGrid, drawXAxis, drawYAxis });
     drawLegend(chart, rows, enc.color, d3);
+    drawPointConnectors({
+      chart,
+      connectors: pointConnectorSegments(rows, connector, chartPosition, { x, y }, position, key),
+      transition: t,
+      themeValue
+    });
 
     const crispLayer = chart.g.selectAll('g.vd-point-crisp-layer')
       .data([null])
@@ -188,6 +206,128 @@ class PointChart extends BaseChart {
       .style('opacity', 0)
       .remove();
   }
+}
+
+function resolvePointConnector(spec, encoding) {
+  const connector = spec.connector;
+  if (!connector) return null;
+  if (Number.isFinite(connector.from)) {
+    const candidates = ['x', 'y'].filter((channel) =>
+      encoding[channel]?.field && encoding[channel]?.type === 'quantitative');
+    const channel = connector.channel || (candidates.length === 1 ? candidates[0] : null);
+    if (!channel) {
+      throw new Error('Point connector from a constant needs channel "x" or "y" when it cannot be inferred.');
+    }
+    if (encoding[channel]?.type !== 'quantitative' || !encoding[channel]?.field) {
+      throw new Error(`Point connector channel "${channel}" must be a quantitative positional channel.`);
+    }
+    return { mode: 'baseline', channel, from: Number(connector.from) };
+  }
+  const by = Array.isArray(connector.by) ? connector.by.map(String) : [connector.by].filter(Boolean).map(String);
+  if (!by.length) throw new Error('Point connector needs a finite from value or a by field.');
+  return { mode: 'group', by, orderBy: connector.orderBy ? String(connector.orderBy) : null };
+}
+
+function rowsIncludingBaseline(rows, channel, baseline) {
+  if (!channel?.field || Array.isArray(channel.domain)) return rows;
+  return [...rows, { [channel.field]: baseline }];
+}
+
+function pointConnectorSegments(rows, connector, chartPosition, scales, position, key) {
+  if (!connector) return [];
+  if (connector.mode === 'baseline') {
+    const scale = scales[connector.channel];
+    const start = position(scale, connector.from);
+    return rows.map((row, index) => {
+      const point = chartPosition(row);
+      return {
+        key: `baseline:${String(key(row, index))}`,
+        x1: connector.channel === 'x' ? start : point.x,
+        y1: connector.channel === 'y' ? start : point.y,
+        x2: point.x,
+        y2: point.y
+      };
+    });
+  }
+
+  for (const field of [...connector.by, connector.orderBy].filter(Boolean)) {
+    if (rows.length && !rows.some((row) => Object.hasOwn(row, field))) {
+      throw new Error(`Point connector references missing field "${field}".`);
+    }
+  }
+
+  const groups = new Map();
+  rows.forEach((row, index) => {
+    const groupKey = connector.by.map((field) => String(row[field])).join('\u0000');
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push({ row, index });
+  });
+  return Array.from(groups, ([groupKey, members]) => {
+    const ordered = connector.orderBy
+      ? [...members].sort((a, b) => compareConnectorValues(
+          a.row[connector.orderBy], b.row[connector.orderBy]
+        ))
+      : members;
+    return ordered.slice(0, -1).map((member, index) => {
+      const next = ordered[index + 1];
+      const from = chartPosition(member.row);
+      const to = chartPosition(next.row);
+      return {
+        key: `group:${groupKey}:${String(key(member.row, member.index))}:${String(key(next.row, next.index))}`,
+        x1: from.x,
+        y1: from.y,
+        x2: to.x,
+        y2: to.y
+      };
+    });
+  }).flat();
+}
+
+function compareConnectorValues(a, b) {
+  const left = a instanceof Date ? a.getTime() : a;
+  const right = b instanceof Date ? b.getTime() : b;
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function drawPointConnectors({ chart, connectors, transition, themeValue }) {
+  const layer = chart.g.selectAll('g.vd-point-connector-layer')
+    .data([null])
+    .join('g')
+    .attr('class', 'vd-point-connector-layer')
+    .style('pointer-events', 'none')
+    .lower();
+  layer.selectAll('line.vd-point-connector')
+    .data(connectors, (connector) => connector.key)
+    .join(
+      (enter) => enter.append('line')
+        .attr('class', 'vd-point-connector')
+        .attr('data-key', (connector) => connector.key)
+        .attr('x1', (connector) => connector.x1)
+        .attr('y1', (connector) => connector.y1)
+        .attr('x2', (connector) => connector.x1)
+        .attr('y2', (connector) => connector.y1)
+        .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
+        .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
+        .style('opacity', 0)
+        .transition(transition)
+        .attr('x2', (connector) => connector.x2)
+        .attr('y2', (connector) => connector.y2)
+        .style('opacity', 1),
+      (update) => update.transition(transition)
+        .attr('x1', (connector) => connector.x1)
+        .attr('y1', (connector) => connector.y1)
+        .attr('x2', (connector) => connector.x2)
+        .attr('y2', (connector) => connector.y2)
+        .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
+        .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
+        .style('opacity', 1),
+      (exit) => exit.transition(transition)
+        .attr('x2', (connector) => connector.x1)
+        .attr('y2', (connector) => connector.y1)
+        .style('opacity', 0)
+        .remove()
+    );
 }
 
 /** A deterministic, decorative layer for summary/detail movement. */
