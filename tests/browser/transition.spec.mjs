@@ -43,19 +43,26 @@ test('live charts evolve selected endpoints and own multi-state sequences', asyn
     const focused = await chart
       .update(view => view.focus({ type: 'one' }))
       .play({ duration: 0 });
+    const focusedState = focused.chart.state.toSpec().meta.state.scopes.focus;
     const journey = await focused.chart.sequence([
       view => view.focus({ type: 'two' }),
       view => view.focus({ type: 'one' })
     ]).play({ duration: 0 });
     return {
-      focused: focused.chart.state.toSpec().meta.state.sceneState.selection,
-      final: journey.chart.state.toSpec().meta.state.sceneState.selection,
+      focused: focusedState,
+      final: journey.chart.state.toSpec().meta.state.scopes.focus,
       value: journey.controller.value,
       roots: document.querySelectorAll('#a > .vd-transition-root').length
     };
   });
   expect(result.focused).toMatchObject({ mode: 'focus', filter: { field: 'type', equal: 'one' } });
-  expect(result.final).toMatchObject({ mode: 'focus', filter: { field: 'type', equal: 'one' } });
+  expect(result.final).toMatchObject({
+    mode: 'focus',
+    filters: [
+      { field: 'type', equal: 'one' },
+      { field: 'type', equal: 'two' }
+    ]
+  });
   expect(result.value).toBe(2);
   expect(result.roots).toBe(1);
   expect(errors).toEqual([]);
@@ -179,6 +186,108 @@ test('inline data without transforms does not require Arquero', async ({ page })
     };
   });
   expect(result).toEqual({ value: 0.5, marks: 3 });
+});
+
+test('reaggregation moves additive lineage fragments between unrelated grouping keys', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const byYear = root.x('year').rollup('year');
+    const byLocation = root.x('location').rollup('location');
+    const change = await sl.transition(byYear, byLocation, opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      return {
+        bars: change.view.querySelectorAll('rect.vd-bar').length,
+        fragments: [...change.view.querySelectorAll('rect.vd-bar-lineage-fragment')].map(node => ({
+          opacity: Number(getComputedStyle(node).opacity),
+          x: Number(node.getAttribute('x')),
+          y: Number(node.getAttribute('y')),
+          width: Number(node.getAttribute('width')),
+          height: Number(node.getAttribute('height'))
+        }))
+      };
+    };
+    const start = frame(0);
+    const middle = frame(0.5);
+    const end = frame(1);
+    return {
+      mode: change.delta.lineage.mode,
+      edges: change.delta.lineage.edges.length,
+      start, middle, end
+    };
+  });
+  expect(result.mode).toBe('reaggregate');
+  expect(result.edges).toBe(4);
+  expect(result.start.bars).toBe(2);
+  expect(result.middle.fragments).toHaveLength(4);
+  expect(result.middle.fragments.some(fragment => fragment.opacity > 0)).toBe(true);
+  expect(result.end.bars).toBe(2);
+  expect(result.end.fragments).toHaveLength(0);
+  expect(errors).toEqual([]);
+});
+
+test('reaggregation uses the same lineage motion in reverse', async ({ page }) => {
+  const frames = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases').color('#195fb5');
+    const byYear = root.x('year').rollup('year');
+    const byLocation = root.x('location').rollup('location');
+    const forward = await sl.transition(byYear, byLocation, opts('#a'));
+    const backward = await sl.transition(byLocation, byYear, opts('#b'));
+    const motionSnapshot = selector => [...document.querySelectorAll(`${selector} rect.vd-bar, ${selector} rect.vd-bar-lineage-fragment`)]
+      .map(node => ({
+        className: node.getAttribute('class'),
+        opacity: Math.round(Number(getComputedStyle(node).opacity) * 1e6) / 1e6,
+        rect: ['x', 'y', 'width', 'height'].map(name => Math.round(Number(node.getAttribute(name)) * 1e6) / 1e6)
+      }))
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    return [0, 0.25, 0.5, 0.75, 1].map(progress => {
+      forward.progress(progress);
+      backward.progress(1 - progress);
+      return { forward: motionSnapshot('#a'), backward: motionSnapshot('#b') };
+    });
+  });
+  for (const frame of frames) expect(frame.backward).toEqual(frame.forward);
+});
+
+test('a reaggregation sequence hands B to B without an empty boundary frame', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const byYear = root.x('year').rollup('year');
+    const byLocation = root.x('location').rollup('location');
+    const story = await sl.sequence([byYear, byLocation, byYear], opts('#a'));
+    const inspect = progress => {
+      story.progress(progress);
+      return {
+        bars: document.querySelectorAll('#a rect.vd-bar').length,
+        roots: document.querySelectorAll('#a > .vd-transition-root').length
+      };
+    };
+    return [inspect(0.999), inspect(1), inspect(1.001)];
+  });
+  expect(result.every(frame => frame.bars > 0 && frame.roots === 1)).toBe(true);
+  expect(errors).toEqual([]);
 });
 
 test('reject incompatible pairs and missing data without changing target', async ({ page }) => {

@@ -1,9 +1,9 @@
 import * as core from './index.js';
 import type { Visualization, TransitionOptions } from './transition.js';
 
-export { area, availableChartTypes, bar, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, delta, detectDataTypes, diffViewStates, defineChartType,
+export { area, availableChartTypes, bar, buildGroupingTree, compileLineage, correspondLineage, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, delta, detectDataTypes, diffViewStates, defineChartType, lineageMarkKey,
   chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, line, paperChartStyle, point, registerChartType, registerChartModule, unit,
-  resolveEncodingTypes, select, UNIT_LAYOUTS, visualizationSpec } from './index.js';
+  resolveEncodingTypes, select, UNIT_LAYOUTS, viewLineageCorrespondence, visualizationSpec } from './index.js';
 
 type BrowserOptions = Record<string, unknown>;
 function dependencies(options: BrowserOptions): BrowserOptions {

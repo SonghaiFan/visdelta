@@ -106,8 +106,12 @@ chart handle. Selecting the host again is equally valid:
 
 ```js
 await vd.select("#chart").update(view => view.focus({ region: "North" })).play();
-await vd.select("#chart").update(view => view.focus({ region: "South" })).play();
+await vd.select("#chart").update(view => view.reset().focus({ region: "South" })).play();
 ```
+
+The explicit `reset()` matters here: a second `.focus()` narrows the existing
+camera scope, so `focus(North).focus(South)` means their intersection rather
+than “replace North with South.”
 
 The same live chart can create a sequence from grammar callbacks. Each callback
 receives the endpoint from the preceding step, so the path is authored as

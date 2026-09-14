@@ -43,6 +43,7 @@ See [Data and transforms](/data-sources-and-transforms).
 .color(valueOrField, options?)
 .size(field, options?)
 .key(fieldOrFields)
+.datumKey(fieldOrFields)
 .tooltip(fieldOrFields)
 ```
 
@@ -58,6 +59,7 @@ an authored type always wins.
 .where(selector)
 .highlight(selector, { opacity? })
 .focus(selector)
+.reset()
 .axis(config)
 .transition({ duration?, ease?, stagger? })
 ```
@@ -68,10 +70,46 @@ Selectors accept a field comparison such as:
 { field: "sales", gte: 10, lt: 100 }
 { field: "region", oneOf: ["North", "South"] }
 { region: "North" }
+{ region: "North", age: { gt: 80 } }
 ```
 
 `where()` changes membership, `highlight()` changes attention, and `focus()`
-changes only the camera.
+changes only the camera. Repeated selectors compose as logical AND and act on
+the preceding immutable state. `reset()` returns a new visualization equal to
+the declaration before the chain's first semantic operation.
+
+### Lineage-aware delta
+
+For inline data, `delta(from, to)` also exposes a `lineage` correspondence plan:
+
+```js
+const change = vd.delta(byYear, byLocation);
+
+change.lineage.mode;             // "reaggregate"
+change.lineage.commonRefinement; // ["year", "location"]
+change.lineage.edges;            // contribution routes between marks
+```
+
+The lower-level functions are available when a data pipeline needs inspection
+independently of a chart:
+
+```ts
+compileLineage(rows, transforms, { key?, grain? })
+buildGroupingTree(table)
+correspondLineage(from, to, { fromField?, toField? })
+```
+
+At chart level, declare source identity with `.datumKey("id")`; `.key()` remains
+the join identity of a mark in the current view. At the low-level compiler,
+`key` identifies immutable source records and `grain` identifies marks in one
+compiled view. They are intentionally separate. Filtering, sorting, limiting,
+binning, time units and folding preserve lineage; `sum`, `count`, and `mean`
+produce contribution records. Non-additive aggregates such as `median` retain
+provenance but mark the plan as unsafe to split.
+
+For additive, non-negative simple bars, `split`, `merge`, and `reaggregate`
+plans render as source contributions that split, travel, and merge. Unsupported
+cases keep their lineage plan but fall back to the ordinary chart transition.
 
 ## Chart types
 

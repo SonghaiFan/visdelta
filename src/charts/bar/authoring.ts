@@ -1,6 +1,5 @@
 import { serializeViewSpec } from '../../spec-meta.js';
 import { cloneState } from '../../grammar/view-state.js';
-import { normalizeFilter } from '../../data/filter.js';
 import { titleize } from '../../labels.js';
 import { ChartState, channelFrom, colorFrom, normalizeDataSource, resolveInlineDataTypes } from '../authoring.js';
 import { compileViewWithCompiler } from '../compile-view.js';
@@ -19,7 +18,6 @@ import type {
 
 export interface BarViewState extends ViewSpec {
   mark: 'bar';
-  where?: FilterSpec[];
   detail?: DetailSpec | null;
   axis?: AxisSpec | null;
   aggregate?: unknown;
@@ -41,17 +39,13 @@ export class BarState extends ChartState<BarViewState> {
     const spec = cloneState(this.state) as BarViewState & { __grammar?: unknown };
     delete spec.__grammar;
 
-    const filters: FilterSpec[] = [
-      ...((spec.where ?? []) as FilterSpec[]),
-      ...(spec.filter ? [spec.filter as FilterSpec] : [])
-    ];
+    const filters: FilterSpec[] = spec.filter ? [spec.filter as FilterSpec] : [];
     if (filters.length) {
       spec.transform = [
         ...filters.map((filter) => ({ filter })),
         ...(spec.transform ?? [])
       ];
     }
-    delete spec.where;
     delete spec.filter;
     if (spec.detail == null) delete spec.detail;
     if (spec.axis == null) delete spec.axis;
@@ -87,14 +81,8 @@ export class BarState extends ChartState<BarViewState> {
     } as Partial<BarViewState>);
   }
 
-  where(selector: string | Record<string, unknown> | FilterSpec | null): this {
-    if (selector == null) {
-      return this.with({ where: [] } as Partial<BarViewState>, 'selection');
-    }
-    const selectors = normalizeSelectors(selector);
-    return this.with({
-      where: setConstraints((this.state as BarViewState).where ?? [], selectors)
-    } as Partial<BarViewState>, 'selection');
+  override where(selector: string | Record<string, unknown> | FilterSpec): this {
+    return super.where(selector);
   }
 
   flip(options: TransitionOrder & {
@@ -262,7 +250,6 @@ export class BarState extends ChartState<BarViewState> {
 
     return this.with({
       key: config.key ?? [category, segment],
-      where: tidy ? clearConstraint(state.where ?? [], segment) : state.where,
       detail: {
         category,
         categoryTitle: config.categoryTitle ?? state.encoding?.x?.title,
@@ -341,7 +328,6 @@ function aggregateBarState(
   if (segment) {
     return view.with({
       key: normalized.key ?? [normalized.category, segment],
-      where: clearConstraint((view.state as BarViewState).where ?? [], segment),
       detail: {
         category: normalized.category,
         categoryTitle: normalized.categoryTitle,
@@ -366,7 +352,6 @@ function aggregateBarState(
     detail: null,
     axis: null,
     semanticKey: normalized.semanticKey ?? null,
-    where: (view.state as BarViewState).where,
     transform: [
       ...((view.state as BarViewState).transform ?? []),
       {
@@ -377,25 +362,6 @@ function aggregateBarState(
       }
     ]
   } as Partial<BarViewState>, 'detail');
-}
-
-function normalizeSelectors(
-  selector: string | Record<string, unknown> | FilterSpec
-): FilterSpec[] {
-  if (typeof selector === 'string') return [normalizeFilter(selector)];
-  const sel = selector as Record<string, unknown>;
-  if (sel.field) return [cloneState(normalizeFilter(sel))];
-  return Object.entries(sel).map(([field, equal]) => ({ field, equal }));
-}
-
-function setConstraints(constraints: FilterSpec[], selectors: FilterSpec[]): FilterSpec[] {
-  const fields = new Set(selectors.map((s) => s.field));
-  const next = constraints.filter((c) => !fields.has(c.field));
-  return [...next, ...selectors.map(cloneState)];
-}
-
-function clearConstraint(constraints: FilterSpec[], field: string): FilterSpec[] {
-  return constraints.filter((c) => c.field !== field);
 }
 
 function normalizeAggregation(

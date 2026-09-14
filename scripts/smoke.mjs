@@ -14,6 +14,9 @@ const publicApi = [
   'area',
   'availableChartTypes',
   'bar',
+  'buildGroupingTree',
+  'compileLineage',
+  'correspondLineage',
   'detectDataTypes',
   'chartStylePresets',
   'd3ChartStyle',
@@ -23,13 +26,18 @@ const publicApi = [
   'defineChartType',
   'diffViewStates',
   'line',
+  'lineageMarkKey',
+  'mount',
   'paperChartStyle',
   'point',
   'registerChartType',
   'registerChartModule',
   'resolveEncodingTypes',
+  'select',
+  'sequence',
   'transition',
   'unit',
+  'viewLineageCorrespondence',
   'visualizationSpec'
 ];
 

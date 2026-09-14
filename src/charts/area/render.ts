@@ -96,7 +96,7 @@ class AreaChart extends BaseChart {
       ? areaDividerPaths(cells, layers, frame, edge)
       : [];
     const opacity = (cell) => areaSelectionOpacity(
-      cell.layer, state.selection, themeValue('--vd-dim-opacity', 0.22)
+      cell.layer, state.highlight, themeValue('--vd-dim-opacity', 0.22)
     );
     const addedKeys = new Set((chart.transitionPlan?.observation?.addedKeys || []).map(String));
     const isAdded = (cell) => addedKeys.has(String(cell.observationKey));

@@ -33,6 +33,16 @@ export function resolveBarTransitionPlan(
 
   const diff = diffBarViewStates(previousSpec, nextSpec);
   const plan: TransitionPlan = {
+    source: {
+      orientation: previous.orientation,
+      layout: previous.barLayout,
+      renderer: barRendererKey(previous.barLayout, previous.orientation)
+    },
+    target: {
+      orientation: next.orientation,
+      layout: next.barLayout,
+      renderer: barRendererKey(next.barLayout, next.orientation)
+    },
     diff: diff.deltas.map(({ type, action, previous: p, next: n }) => ({
       type, action, previous: p, next: n
     }))
@@ -143,11 +153,6 @@ export function resolveBarTransitionPlan(
   const totalDuration = stepTiming.duration * orderedParts.length + staggerMaxVal;
 
   plan.reason = reason;
-  plan.target = {
-    orientation: next.orientation,
-    layout: next.barLayout,
-    renderer: barRendererKey(next.barLayout, next.orientation)
-  };
   plan.steps = orderedParts.map((part) => ({
     part,
     changes: ['scale', 'axis', 'marks']
@@ -202,9 +207,31 @@ export function canonicalBarTransitionPair<S extends ViewSpec>(
     next?.hasAggregate &&
     !next.hasDetail
   );
+  const isReaggregate = Boolean(
+    previous?.hasAggregate &&
+    next?.hasAggregate &&
+    previous.categoryField !== next.categoryField
+  );
+  if (isReaggregate) {
+    const previousKey = canonicalGroupingKey(previous!);
+    const nextKey = canonicalGroupingKey(next!);
+    return previousKey.localeCompare(nextKey) <= 0
+      ? { from: previousSpec, to: nextSpec, reverse: false }
+      : { from: nextSpec, to: previousSpec, reverse: true };
+  }
   return isCollapse
     ? { from: nextSpec, to: previousSpec, reverse: true }
     : { from: previousSpec, to: nextSpec, reverse: false };
+}
+
+function canonicalGroupingKey(state: BarInternalState): string {
+  return JSON.stringify([
+    state.categoryField,
+    state.segmentField,
+    state.measureField,
+    state.barLayout,
+    state.orientation
+  ]);
 }
 
 export function barCollapseIntermediateSpec(

@@ -92,16 +92,16 @@ function update<S extends Visualization>(target: Element, from: Visualization, t
     async play(playOptions = {}) {
       const current = requireMounted(target);
       if (current.visualization !== from) throw new Error('The mounted chart changed before this update was played. Select it again and retry.');
-      const staging = stagingMount(target, options.height);
-      const controller = await transition(from, to, { ...options, target: staging });
-      const root = staging.firstElementChild;
+      const preparation = preparationMount(target, options.height);
+      const controller = await transition(from, to, { ...options, target: preparation });
+      const root = preparation.firstElementChild;
       if (!root) {
         controller.destroy();
-        staging.remove();
+        preparation.remove();
         throw new Error('LiveChart.update() could not prepare a transition surface.');
       }
       target.replaceChildren(root);
-      staging.remove();
+      preparation.remove();
       registerMounted(target, to, { ...options, target }, controller);
       current.controller.destroy();
       controller.play(playOptions);
@@ -161,11 +161,11 @@ function resolveTarget(target: Target): Element {
   return node;
 }
 
-function stagingMount(host: Element, height: number | undefined): HTMLDivElement {
-  const staging = document.createElement('div');
+function preparationMount(host: Element, height: number | undefined): HTMLDivElement {
+  const preparation = document.createElement('div');
   const width = Math.max(60, host.clientWidth || 720);
   const measuredHeight = Math.max(1, host.clientHeight || height || 500);
-  staging.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;height:${measuredHeight}px;visibility:hidden;pointer-events:none;`;
-  document.body.append(staging);
-  return staging;
+  preparation.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;height:${measuredHeight}px;visibility:hidden;pointer-events:none;`;
+  document.body.append(preparation);
+  return preparation;
 }

@@ -122,8 +122,15 @@ export interface SelectionSpec {
   equal?: unknown;
   mode?: 'highlight' | 'filter' | 'focus';
   filter?: FilterSpec;
+  /** Conjunctive selector chain. Every filter must match. */
+  filters?: FilterSpec[];
   opacity?: number;
   [key: string]: unknown;
+}
+
+export interface ViewScopes {
+  focus?: SelectionSpec | null;
+  highlight?: SelectionSpec | null;
 }
 
 export interface AxisSpec {
@@ -185,6 +192,8 @@ export interface ObjectMeta {
 
 export interface ChartChangeState {
   selection?: SelectionSpec;
+  focus?: SelectionSpec | null;
+  highlight?: SelectionSpec | null;
   axis?: AxisSpec;
   detail?: DetailSpec;
   [key: string]: unknown;
@@ -195,10 +204,12 @@ export interface ChartStateMeta {
   axis?: AxisSpec | null;
   detail?: DetailSpec | null;
   sceneState?: ChartChangeState;
+  scopes?: ViewScopes;
 }
 
 export interface SpecMeta {
   object?: ObjectMeta;
+  lineage?: { key?: string | string[] };
   state?: ChartStateMeta;
   transition?: TransitionSpec;
   transform?: TransformSpec[];
@@ -212,6 +223,7 @@ export interface ResolvedChartState {
   axis: AxisSpec | null;
   detail: DetailSpec | null;
   sceneState: ChartChangeState;
+  scopes: ViewScopes;
 }
 
 // ─── View Spec ────────────────────────────────────────────────────────────────
@@ -225,11 +237,14 @@ export interface ViewSpec {
   transform?: TransformSpec[];
   filter?: FilterSpec;
   key?: string | string[] | null;
+  /** Stable identity of source data records; distinct from the current mark key. */
+  datumKey?: string | string[] | null;
   semanticKey?: SemanticKey | null;
   transition?: TransitionSpec;
   axis?: AxisSpec | null;
   detail?: DetailSpec | null;
   selection?: SelectionSpec | null;
+  scopes?: ViewScopes;
   unit?: Record<string, unknown> | null;
   meta?: SpecMeta;
   margin?: Partial<MarginSpec>;
@@ -312,6 +327,7 @@ export interface SemanticViewState {
   filters: FilterSpec[];
   nonFilterTransforms: TransformSpec[];
   selection: SelectionSpec | null;
+  scopes: ViewScopes;
   axis: AxisSpec | null;
   detail: DetailSpec | null;
 }
@@ -333,6 +349,8 @@ export interface DiffResult {
   semantic: SemanticDiffResult;
   previous: SemanticViewState;
   next: SemanticViewState;
+  /** Data-level mark correspondence when both endpoints have inline data. */
+  lineage?: import('../data/lineage.js').LineageCorrespondence;
 }
 
 // ─── Transition planning ──────────────────────────────────────────────────────
@@ -390,6 +408,7 @@ export interface TransitionPlanDiffEntry {
 export interface TransitionPlan {
   diff?: TransitionPlanDiffEntry[];
   reason?: string;
+  source?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
   target?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
   match?: TransitionMatch;
   motion?: TransitionMotion;
@@ -398,6 +417,8 @@ export interface TransitionPlan {
   steps?: TransitionStep[];
   timing?: TransitionSpec;
   totalDuration?: number;
+  /** Datum-provenance correspondence shared by planning and rendering. */
+  lineage?: import('../data/lineage.js').LineageCorrespondence;
 }
 
 // ─── Chart type ───────────────────────────────────────────────────────────────

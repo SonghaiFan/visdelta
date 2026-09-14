@@ -9,6 +9,7 @@ import type {
   SpecMeta,
   ChartStateMeta,
   ResolvedChartState,
+  ViewScopes,
   SemanticKey,
   TransformSpec,
   TransitionSpec,
@@ -17,7 +18,7 @@ import type {
 
 export const SPEC_META_KEY = 'meta';
 
-const INTERNAL_STATE_FIELDS = ['selection', 'detail', 'axis', 'sceneState'] as const;
+const INTERNAL_STATE_FIELDS = ['selection', 'detail', 'axis', 'sceneState', 'scopes'] as const;
 
 export function getSpecMeta(spec: ViewSpec | Record<string, unknown>): SpecMeta {
   return mergeSpecMeta((spec as Record<string, unknown>)[SPEC_META_KEY] ?? {});
@@ -39,6 +40,11 @@ export function serializeViewSpec(spec: ViewSpec): ViewSpec {
   if (next.key !== undefined) {
     meta.object = { ...(meta.object ?? {}), key: next.key as ObjectMeta['key'] };
     delete next.key;
+  }
+
+  if (next.datumKey !== undefined) {
+    meta.lineage = { ...(meta.lineage ?? {}), key: next.datumKey ?? undefined };
+    delete next.datumKey;
   }
 
   if (next.semanticKey !== undefined) {
@@ -108,6 +114,7 @@ export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unk
   return {
     ...baseSpec,
     key: object.key ?? (spec.encoding?.key?.field ?? null) as string | null,
+    datumKey: meta.lineage?.key ?? null,
     semanticKey: semanticFromMeta(object.semantic) ?? null,
     transition: (meta.transition ?? {}) as TransitionSpec,
     unit: meta.unit ?? null,
@@ -115,6 +122,7 @@ export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unk
     axis: state.axis ?? null,
     detail: state.detail ?? null,
     sceneState: state.sceneState ?? {},
+    scopes: state.scopes ?? {},
     ...(transforms.length ? { transform: dedupeArray(transforms) as TransformSpec[] } : {})
   };
 }
@@ -122,6 +130,10 @@ export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unk
 export function specObjectKey(spec: ViewSpec): string | string[] | null {
   const meta = getSpecMeta(spec);
   return meta.object?.key ?? (spec.encoding?.key?.field as string | undefined) ?? null;
+}
+
+export function specDatumKey(spec: ViewSpec): string | string[] | null {
+  return getSpecMeta(spec).lineage?.key ?? spec.datumKey ?? null;
 }
 
 export function specSemanticKey(spec: ViewSpec): SemanticKey | null {
@@ -146,7 +158,8 @@ export function specState(spec: ViewSpec): ResolvedChartState {
     selection: state.selection ?? null,
     axis: state.axis ?? null,
     detail: state.detail ?? null,
-    sceneState: state.sceneState ?? {}
+    sceneState: state.sceneState ?? {},
+    scopes: (state.scopes ?? {}) as ViewScopes
   };
 }
 

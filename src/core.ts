@@ -4,6 +4,7 @@ import { diffViewStates } from './grammar/diff.js';
 import { serializeViewSpec } from './spec-meta.js';
 import type { ChartModule } from './charts/module.js';
 import { resolveSpecDataTypes } from './data/types.js';
+import { viewLineageCorrespondence } from './data/view-lineage.js';
 
 export type Visualization = ViewSpec | {
   toSpec(): ViewSpec;
@@ -37,11 +38,29 @@ export function delta(from: Visualization, to: Visualization): DiffResult {
   if (!source.mark || source.mark !== target.mark) {
     throw new Error('delta() requires two states of the same chart type.');
   }
-  return diffViewStates(source, target);
+  const diff = diffViewStates(source, target);
+  const lineage = viewLineageCorrespondence(source, target);
+  return lineage ? { ...diff, lineage } : diff;
 }
 
 export { diffViewStates };
 export { detectDataTypes, resolveEncodingTypes } from './data/types.js';
+export { buildGroupingTree, compileLineage, correspondLineage, lineageMarkKey } from './data/lineage.js';
+export { viewLineageCorrespondence } from './data/view-lineage.js';
+export type {
+  CorrespondenceOptions,
+  DatumKey,
+  DatumKeySpec,
+  GroupingTreeNode,
+  LineageAtom,
+  LineageCapability,
+  LineageCompileOptions,
+  LineageContribution,
+  LineageCorrespondence,
+  LineageEdge,
+  LineageRow,
+  LineageTable
+} from './data/lineage.js';
 export { cameraPosition, cameraScale, cameraSize, fitCamera, focusCamera, pointBounds, rectBounds } from './focus.js';
 export type { FocusBounds, FocusCamera, FocusTarget, FocusViewport } from './focus.js';
 export type { ChannelType } from './types/index.js';

@@ -1,5 +1,5 @@
 // @ts-nocheck — complex layout algorithms with D3-style scale patterns
-import { matchesFilter } from '../../data/filter.js';
+import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
 import { specObjectKey, specState, specTransition, specUnit } from '../../spec-meta.js';
 import { defaultTransition } from '../../timing.js';
@@ -108,10 +108,9 @@ export function unitLayout(units, chart, spec, deps) {
 }
 
 export function unitSelectionOpacity(unit, spec, dimOpacity = 0.22) {
-  const state = specState(spec);
-  const selection = state.sceneState?.selection || state.selection || null;
-  if (selection?.mode !== 'highlight' || !selection.filter) return 1;
-  return matchesFilter(unit.__row || unit, selection.filter)
+  const selection = viewHighlight(spec);
+  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
+  return matchesSelection(unit.__row || unit, selection)
     ? 1
     : Number(selection.opacity ?? dimOpacity);
 }

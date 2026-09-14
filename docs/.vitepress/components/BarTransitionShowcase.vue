@@ -13,11 +13,11 @@ const currentLabel = ref('Revenue by category');
 const nextLabel = ref('Profit by category');
 
 const rows = [
-  { category: 'Hardware', sales: 86, profit: 34, region: 'Core' },
-  { category: 'Software', sales: 64, profit: 49, region: 'Core' },
-  { category: 'Services', sales: 51, profit: 27, region: 'Growth' },
-  { category: 'Support', sales: 39, profit: 18, region: 'Growth' },
-  { category: 'Partners', sales: 28, profit: 14, region: 'New' }
+  { id: 'hardware', category: 'Hardware', sales: 86, profit: 34, region: 'Core' },
+  { id: 'software', category: 'Software', sales: 64, profit: 49, region: 'Core' },
+  { id: 'services', category: 'Services', sales: 51, profit: 27, region: 'Growth' },
+  { id: 'support', category: 'Support', sales: 39, profit: 18, region: 'Growth' },
+  { id: 'partners', category: 'Partners', sales: 28, profit: 14, region: 'New' }
 ];
 
 let transition = null;
@@ -40,12 +40,14 @@ onMounted(async () => {
     runtimeAq = aq;
 
     const base = bar(rows)
+      .datumKey('id')
       .x('category', { title: 'Category' })
       .key('category')
       .tooltip(['category', 'sales', 'profit']);
 
     states = [
       { label: 'Revenue by category', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5') },
+      { label: 'Revenue regrouped by region', chart: bar(rows).datumKey('id').x('region', { title: 'Region' }).y('sales', { title: 'Revenue' }).rollup('region').color('#7656d6') },
       { label: 'Profit by category', chart: base.y('profit', { title: 'Profit' }).color('#0fa470') },
       { label: 'Revenue, ranked', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5').sort('sales', 'descending') },
       { label: 'Growth categories', chart: base.y('sales', { title: 'Revenue' }).color('#f57c2f').where({ region: 'Growth' }) },

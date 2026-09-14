@@ -89,6 +89,42 @@ base.focus({ region: "North" })     // keep rows; move the camera
 fits a two-dimensional camera around selected mark bounds; each chart module
 provides those bounds.
 
+Selection calls form a narrowing chain rather than replacing one another:
+
+```js
+base
+  .where({ region: ["North", "South"] })
+  .where({ age: { gt: 80 } })
+  .focus({ gender: "female" });
+```
+
+Each call acts on the previous state. `where`, `focus`, and `highlight` keep
+independent scopes, so focus remains a camera operation and highlight remains
+an attention operation. Calling `.reset()` returns to `base`; ordinary chaining
+still contributes only its final endpoint to `delta(base, next)`.
+
+### Identity, grain, and lineage are different
+
+A source datum keeps one stable identity, while each visualization derives its
+own mark identity from its grouping grain. Aggregated marks also retain the
+source atoms and their numeric contributions:
+
+```text
+datum key     id of an immutable source record
+mark grain    dimensions defining one mark in this view
+lineage       source records contributing to that mark
+contribution  amount each source record contributes to an additive measure
+```
+
+In the chart grammar, `.datumKey("id")` declares the first line and `.key()`
+declares the second. They must not be aliases: aggregation can change mark
+identity while datum identity remains stable.
+
+This lets a change from `sum(case) by year` to `sum(case) by location` compile
+to a many-to-many transport graph through the common refinement
+`[year, location]`. A grouping tree explains the structural change; lineage
+explains which values actually move between its branches.
+
 ### Core knows no chart types
 
 Core owns shared state, difference, progress, frame evaluation, lifecycle, and

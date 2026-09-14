@@ -1,7 +1,8 @@
 // @ts-nocheck — D3 rendering pattern; typed via deps injection
-import { specState } from '../../spec-meta.js';
-import { matchesFilter as rowMatchesFilter } from '../../data/filter.js';
+import { matchesSelection, viewHighlight } from '../../focus.js';
 import { DIVIDER_DRAW_PROGRESS } from '../detail-timing.js';
+import { lineageMarkKey } from '../../data/lineage.js';
+import { planBarLineageMotion } from './lineage-motion.js';
 
 export function createBarRenderKit(deps) {
   const { easeFor, staggerDelay, themeValue } = deps;
@@ -64,6 +65,7 @@ export function createBarRenderKit(deps) {
     barSelectionOpacity,
     collapseLineage,
     renderBarJoin,
+    renderLineageTransport,
     renderBarSeams,
     setRectGeometry,
     splitLineage,
@@ -82,6 +84,9 @@ export function createBarRenderKit(deps) {
       applyGeometry = geometry?.apply,
       exitGeometry = geometry?.exit
     } = options;
+    const transport = renderLineageTransport({
+      chart, rows, d3, fill, orientation, targetGeometry
+    });
     // A focus change is one rigid camera move. Per-mark staggering would bend
     // the coordinate system: bars would temporarily leave the shared axis
     // baseline even though neither their data nor identity changed.
@@ -101,7 +106,7 @@ export function createBarRenderKit(deps) {
           .attr('fill', fill)
           .style('opacity', 0)
           .call(bindTooltip, spec, tooltip)
-          .each(function(d) { setRectGeometry(d3.select(this), startGeometry(d)); })
+          .each(function(d) { setRectGeometry(d3.select(this), transport ? materializeRect(targetGeometry, d) : startGeometry(d)); })
           .transition(chart.transition.enter || chart.transition.base)
           .delay((d, i) => (chart.transition.enterDelay || 0) + delay(d, i))
           .style('opacity', (d) => barSelectionOpacity(d, spec, themeValue('--vd-dim-opacity', 0.22)))
@@ -136,6 +141,49 @@ export function createBarRenderKit(deps) {
       );
   }
 
+  function renderLineageTransport({ chart, rows, d3, fill, orientation, targetGeometry }) {
+    const lineage = chart.transitionPlan?.lineage;
+    const plan = chart.transitionPlan;
+    if (!lineage || plan?.source?.layout !== 'simple' || plan?.target?.layout !== 'simple') return null;
+    if (plan.source.orientation !== plan.target.orientation) return null;
+
+    const sourceRects = new Map();
+    chart.g.selectAll('rect.vd-bar').each(function(d) {
+      const rect = rectGeometry(this);
+      if (rect) sourceRects.set(lineageMarkKey(d?.__row || d, lineage.fromGrain), rect);
+    });
+    const targetRects = new Map(rows.map((datum) => [
+      lineageMarkKey(datum?.__row || datum, lineage.toGrain),
+      { ...materializeRect(targetGeometry, datum), datum }
+    ]));
+    const fragments = planBarLineageMotion({
+      lineage,
+      sourceRects,
+      targetRects,
+      orientation: String(orientation).includes('horizontal') ? 'horizontal' : 'vertical'
+    });
+    if (!fragments.length) return null;
+
+    chart.g.selectAll('rect.vd-bar').interrupt().style('opacity', 0);
+    const selection = chart.g.selectAll('rect.vd-bar-lineage-fragment')
+      .data(fragments, (d) => d.key)
+      .join('rect')
+      .attr('class', 'vd-bar-lineage-fragment')
+      .attr('rx', 0)
+      .attr('fill', (d) => fill(d.targetDatum))
+      .style('pointer-events', 'none')
+      .style('opacity', 1)
+      .each(function(d) { setRectGeometry(d3.select(this), d.source); });
+    selection.transition(chart.transition.base)
+      .attr('x', (d) => d.target.x)
+      .attr('y', (d) => d.target.y)
+      .attr('width', (d) => d.target.width)
+      .attr('height', (d) => d.target.height)
+      .style('opacity', 0)
+      .remove();
+    return fragments;
+  }
+
   function renderBarSeams({ chart, path = '', startPath = path, draw = false }) {
     const seams = chart.g.selectAll('path.vd-bar-seam').data(path ? [path] : []);
     seams.exit().transition(chart.transition.base).style('opacity', 0).remove();
@@ -165,6 +213,16 @@ export function setRectGeometry(selection, geometry) {
     .attr('y', rect.y)
     .attr('width', Math.max(0, rect.width))
     .attr('height', Math.max(0, rect.height));
+}
+
+function materializeRect(geometry, datum) {
+  const value = (property) => typeof property === 'function' ? property(datum) : property;
+  return {
+    x: Number(value(geometry.x)) || 0,
+    y: Number(value(geometry.y)) || 0,
+    width: Math.max(0, Number(value(geometry.width)) || 0),
+    height: Math.max(0, Number(value(geometry.height)) || 0)
+  };
 }
 
 export function collapseLineage(chart, parentField) {
@@ -239,9 +297,9 @@ function sourceValue(d, value) {
 }
 
 export function barSelectionOpacity(row, spec = {}, dimOpacity = 0.22) {
-  const selection = specState(spec).sceneState?.selection || specState(spec).selection || null;
-  if (selection?.mode !== 'highlight' || !selection.filter) return 1;
-  return rowMatchesFilter(row?.__row || row, selection.filter) ? 1 : Number(selection.opacity ?? dimOpacity);
+  const selection = viewHighlight(spec);
+  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
+  return matchesSelection(row?.__row || row, selection) ? 1 : Number(selection.opacity ?? dimOpacity);
 }
 
 function rectGeometry(node) {

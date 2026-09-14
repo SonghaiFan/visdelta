@@ -1,9 +1,7 @@
 // @ts-nocheck — D3 rendering code; typed via deps injection
 import { BaseChart } from '../base.js';
-import { cameraScale, cameraSize, focusCamera, pointBounds, viewSelection } from '../../focus.js';
-import { matchesFilter } from '../../data/filter.js';
+import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds, viewHighlight, viewSelection } from '../../focus.js';
 import { applyTransforms } from '../../data/transforms.js';
-import { specState } from '../../spec-meta.js';
 import { drawPointAxes } from './axes.js';
 import { applyPointIdentity, pointKeyAccessor, pointStoredKey } from './keys.js';
 import { defaultPointRadius, parentAnchors, parentKey, pointState, radiusScale } from './state.js';
@@ -387,10 +385,9 @@ function ensurePointBlendFilter(scene, d3) {
 }
 
 export function pointSelectionOpacity(row, spec = {}, dimOpacity = 0.22) {
-  const state = specState(spec);
-  const selection = state.sceneState?.selection || state.selection || null;
-  if (selection?.mode !== 'highlight' || !selection.filter) return 1;
-  return matchesFilter(row?.__row || row, selection.filter)
+  const selection = viewHighlight(spec);
+  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
+  return matchesSelection(row?.__row || row, selection)
     ? 1
     : Number(selection.opacity ?? dimOpacity);
 }

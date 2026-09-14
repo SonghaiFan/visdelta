@@ -12,6 +12,7 @@ import { VISDELTA_TRANSITION_NAME, clearSceneTransitionProgress, createSceneTran
 import { createViewCompiler } from './view-compile.js';
 import type { AnyRecord } from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
+import { viewLineageCorrespondence } from '../data/view-lineage.js';
 
 /** Per-instance rendering pipeline for standalone transitions. */
 export function createViewRenderer(chartTypes: ChartTypeRegistry) {
@@ -156,6 +157,9 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
     observationChange,
     { d3, seekable }
   );
+  const transitionPlan = chartType?.resolveTransitionPlan?.(previousSpec, renderSpec) || {};
+  const lineage = previousSpec ? viewLineageCorrespondence(previousSpec, renderSpec) : null;
+  if (lineage) transitionPlan.lineage = lineage;
   const chart: AnyRecord = {
     scene,
     type: rendererKey,
@@ -163,7 +167,7 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
     height,
     margin,
     transition: chartTransition,
-    transitionPlan: chartType?.resolveTransitionPlan?.(previousSpec, renderSpec) || {},
+    transitionPlan,
     sceneTransition,
     seekable,
     seekTransitionName: VISDELTA_TRANSITION_NAME,

@@ -9,8 +9,10 @@ import type {
   EncodingSpec,
   FilterSpec,
   SelectionSpec,
+  ViewScopes,
   AxisSpec,
   SortOrder,
+  TransformSpec,
   TransitionSpec,
   ViewSpec
 } from '../types/index.js';
@@ -94,6 +96,12 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     return this.with({ key: value } as Partial<S>);
   }
 
+  /** Declare stable source-row identity independently of the current mark grain. */
+  datumKey(fields: string | string[]): this {
+    const value = Array.isArray(fields) && fields.length === 1 ? fields[0] : fields;
+    return this.with({ datumKey: value } as Partial<S>);
+  }
+
   tooltip(items: string | ChannelSpec | Array<string | ChannelSpec>): this {
     const list = Array.isArray(items) ? items : [items];
     return this.with({
@@ -121,16 +129,22 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   }
 
   where(selector: string | Record<string, unknown> | FilterSpec): this {
-    return this.with({ selection: selectorFrom(selector) } as Partial<S>, 'selection');
+    return this.with({
+      transform: appendConjunctiveFilters(
+        (this.state as ViewSpec).transform ?? [],
+        selectorsFrom(selector)
+      )
+    } as Partial<S>, 'selection');
   }
 
   /** Fit one camera around selected marks without changing rows or mark identity. */
   focus(selector: string | Record<string, unknown> | FilterSpec): this {
+    const scopes = ((this.state as ViewSpec).scopes ?? {}) as ViewScopes;
     return this.with({
-      selection: {
-        mode: 'focus',
-        filter: selectorFrom(selector)
-      } as SelectionSpec
+      scopes: {
+        ...scopes,
+        focus: appendScopeFilters(scopes.focus, selectorsFrom(selector), 'focus')
+      }
     } as Partial<S>, 'selection');
   }
 
@@ -138,12 +152,12 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     selector: string | Record<string, unknown> | FilterSpec,
     options: { opacity?: number } = {}
   ): this {
+    const scopes = ((this.state as ViewSpec).scopes ?? {}) as ViewScopes;
     return this.with({
-      selection: {
-        mode: 'highlight',
-        filter: selectorFrom(selector),
-        ...(options.opacity != null ? { opacity: options.opacity } : {})
-      } as SelectionSpec
+      scopes: {
+        ...scopes,
+        highlight: appendScopeFilters(scopes.highlight, selectorsFrom(selector), 'highlight', options)
+      }
     } as Partial<S>, 'selection');
   }
 
@@ -206,6 +220,68 @@ export function selectorFrom(
     return { field, equal };
   }
   throw new Error('Use a single field comparison for this chart selector.');
+}
+
+export function selectorsFrom(
+  selector: string | Record<string, unknown> | FilterSpec = {}
+): FilterSpec[] {
+  if (typeof selector === 'string') return [normalizeFilter(selector)];
+  const sel = selector as Record<string, unknown>;
+  if (sel.field) return [cloneState(normalizeFilter(sel))];
+  const entries = Object.entries(sel);
+  if (!entries.length) throw new Error('Chart selectors require at least one field.');
+  return entries.map(([field, constraint]) => normalizeFilter(
+    Array.isArray(constraint)
+      ? { field, oneOf: constraint }
+      : constraint && typeof constraint === 'object'
+      ? { field, ...(constraint as Record<string, unknown>) }
+      : { field, equal: constraint }
+  ));
+}
+
+function appendScopeFilters(
+  current: SelectionSpec | null | undefined,
+  filters: FilterSpec[],
+  mode: 'focus' | 'highlight',
+  options: { opacity?: number } = {}
+): SelectionSpec {
+  const combined = canonicalFilters([...(current?.filters ?? (current?.filter ? [current.filter] : [])), ...filters]);
+  return {
+    mode,
+    filters: combined,
+    filter: combined.length === 1 ? combined[0] : undefined,
+    ...(mode === 'highlight' && (options.opacity != null || current?.opacity != null)
+      ? { opacity: options.opacity ?? current?.opacity }
+      : {})
+  };
+}
+
+function appendConjunctiveFilters(transforms: TransformSpec[], filters: FilterSpec[]): TransformSpec[] {
+  const next = [...transforms];
+  const trailing: FilterSpec[] = [];
+  while (next.length) {
+    const transform = next[next.length - 1] as Record<string, unknown>;
+    if (!transform.filter || Object.keys(transform).some((key) => key !== 'filter')) break;
+    trailing.unshift(normalizeFilter(transform.filter));
+    next.pop();
+  }
+  return [
+    ...next,
+    ...canonicalFilters([...trailing, ...filters]).map((filter) => ({ filter }))
+  ];
+}
+
+function canonicalFilters(filters: FilterSpec[]): FilterSpec[] {
+  const entries = new Map(filters.map((filter) => {
+    const normalized = normalizeFilter(filter);
+    return [stableFilterKey(normalized), normalized];
+  }));
+  return [...entries.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, filter]) => filter);
+}
+
+function stableFilterKey(filter: FilterSpec): string {
+  const { field, ...operators } = filter;
+  return JSON.stringify([field, Object.fromEntries(Object.entries(operators).sort(([a], [b]) => a.localeCompare(b)))]);
 }
 
 // ─── Spec pruning ─────────────────────────────────────────────────────────────

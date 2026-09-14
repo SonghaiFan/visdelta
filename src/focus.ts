@@ -1,4 +1,4 @@
-import { filterPredicate } from './data/filter.js';
+import { matchesFilter, normalizeFilter } from './data/filter.js';
 import { specState } from './spec-meta.js';
 import type { DataRow, SelectionSpec, ViewSpec } from './types/index.js';
 
@@ -32,7 +32,23 @@ const IDENTITY_CAMERA: FocusCamera = Object.freeze({ k: 1, x: 0, y: 0, bounds: n
 
 export function viewSelection(spec: ViewSpec): SelectionSpec | null {
   const state = specState(spec);
-  return (state.sceneState?.selection || state.selection || null) as SelectionSpec | null;
+  return (state.scopes.focus ||
+    (state.sceneState?.selection?.mode === 'focus' ? state.sceneState.selection : null) ||
+    (state.selection?.mode === 'focus' ? state.selection : null)) as SelectionSpec | null;
+}
+
+/** Resolve the independent highlight scope, retaining legacy selection specs. */
+export function viewHighlight(spec: ViewSpec): SelectionSpec | null {
+  const state = specState(spec);
+  return (state.scopes.highlight ||
+    (state.sceneState?.selection?.mode === 'highlight' ? state.sceneState.selection : null) ||
+    (state.selection?.mode === 'highlight' ? state.selection : null)) as SelectionSpec | null;
+}
+
+/** All selectors in a scope compose as logical AND. */
+export function matchesSelection(row: DataRow, selection: SelectionSpec | null | undefined): boolean {
+  const filters = selection?.filters ?? (selection?.filter ? [selection.filter] : []);
+  return filters.length > 0 && filters.every((filter) => matchesFilter(row, normalizeFilter(filter)));
 }
 
 /**
@@ -44,9 +60,9 @@ export function focusCamera(
   selection: SelectionSpec | null | undefined,
   viewport: FocusViewport
 ): FocusCamera {
-  if (selection?.mode !== 'focus' || !selection.filter) return { ...IDENTITY_CAMERA };
+  if (selection?.mode !== 'focus' || !(selection.filters?.length || selection.filter)) return { ...IDENTITY_CAMERA };
 
-  const selected = targets.filter((target) => filterPredicate(selection.filter!)(target.datum));
+  const selected = targets.filter((target) => matchesSelection(target.datum, selection));
   const bounds = unionBounds(selected.map((target) => target.bounds));
   if (!bounds) return { ...IDENTITY_CAMERA };
 

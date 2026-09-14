@@ -1,4 +1,4 @@
-import { bar, delta, mount, select, sequence } from 'visdelta';
+import { bar, compileLineage, correspondLineage, delta, mount, select, sequence } from 'visdelta';
 import { sequence as selectedSequence, transition } from 'visdelta/transition';
 import { delta as selectedDelta } from 'visdelta/core';
 import { bar as selectedBar, barModule } from 'visdelta/bar';
@@ -15,7 +15,7 @@ import {
 import * as browser from 'visdelta/browser';
 
 declare const d3: Record<string, unknown>;
-const a = bar().data([{ key: 'A', value: 1, next: 2 }]).x('key').y('value');
+const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
 const pair = await transition(a, b, { target: '#chart', d3 });
 pair.progress(0.4).play({ duration: 300 }).pause().resize();
@@ -31,6 +31,9 @@ await select<typeof a>('#chart').sequence([
   view => view.highlight({ key: 'A' })
 ]).play({ duration: 300 });
 delta(a, b).hasDelta('encoding.y');
+const trackedA = compileLineage([{ id: 'A', group: 'x', value: 1 }], [], { key: 'id', grain: ['group'] });
+const trackedB = compileLineage([{ id: 'A', group: 'y', value: 1 }], [], { key: 'id', grain: ['group'] });
+correspondLineage(trackedA, trackedB, { fromField: 'value', toField: 'value' }).edges;
 selectedDelta(a, b).hasDelta('encoding.y');
 selectedBar().data([]).x('key');
 selectedPoint().data([]).x('x').y('y').radius(6);

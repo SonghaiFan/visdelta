@@ -185,12 +185,61 @@ test('where changes rows while focus keeps rows and changes the view', () => {
     const focused = chart.focus({ region: 'North' }).toSpec();
     assert.ok(filtered.transform?.some(transform => transform.filter));
     assert.equal(focused.transform?.some(transform => transform.filter) ?? false, false);
-    assert.equal(focused.meta.state.sceneState.selection.mode, 'focus');
+    assert.equal(focused.meta.state.scopes.focus.mode, 'focus');
   }
 
   const filteredBar = charts[0].where({ type: 'Hot days' }).toSpec();
   assert.equal(filteredBar.meta.object.key, 'id');
   assert.equal(filteredBar.encoding.y.title, 'Y');
+});
+
+test('selectors compose from the previous immutable state and reset to the declaration baseline', () => {
+  const rows = [
+    { id: 'n-old', region: 'North', age: 85, value: 4 },
+    { id: 'n-young', region: 'North', age: 40, value: 3 },
+    { id: 's-old', region: 'South', age: 82, value: 2 }
+  ];
+  const initial = bar(rows).x('id').y('value').key('id');
+  const changed = initial
+    .where({ region: ['North', 'South'] })
+    .where({ region: 'North' })
+    .where({ age: { gt: 80 } })
+    .focus({ region: 'North' })
+    .focus({ age: { gt: 80 } })
+    .highlight({ region: 'North' })
+    .highlight({ age: { gt: 80 } });
+  const spec = changed.toSpec();
+
+  assert.deepEqual(spec.transform.map(transform => transform.filter), [
+    { field: 'age', gt: 80 },
+    { field: 'region', equal: 'North' },
+    { field: 'region', oneOf: ['North', 'South'] }
+  ]);
+  assert.deepEqual(spec.meta.state.scopes.focus.filters, [
+    { field: 'age', gt: 80 },
+    { field: 'region', equal: 'North' }
+  ]);
+  assert.deepEqual(spec.meta.state.scopes.highlight.filters, [
+    { field: 'age', gt: 80 },
+    { field: 'region', equal: 'North' }
+  ]);
+  assert.deepEqual(initial.toSpec().transform, undefined);
+  assert.deepEqual(changed.reset().toSpec(), initial.toSpec());
+});
+
+test('where preserves its position in an order-sensitive transform pipeline', () => {
+  const initial = bar([{ year: 2020, region: 'North', value: 4 }])
+    .x('year')
+    .y('value');
+  const spec = initial
+    .where({ region: 'North' })
+    .rollup('year')
+    .where({ field: 'value', gt: 2 })
+    .toSpec();
+
+  assert.ok(spec.transform[0].filter);
+  assert.ok(spec.transform[1].aggregate);
+  assert.ok(spec.transform[2].filter);
 });
 
 test('unit separates group meaning from layout and preserves count identity', () => {

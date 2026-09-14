@@ -56,7 +56,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
     for (let index = 0; index < states.length - 1; index += 1) {
       // D3 schedules named transitions on connected nodes. Prepare each leg in
       // a same-sized, hidden document mount; the visible host stays untouched.
-      const mount = stagingMount(host, options.height);
+      const mount = preparationMount(host, options.height);
       const controller = await transition(states[index], states[index + 1], { ...options, target: mount });
       const root = mount.firstElementChild;
       if (!root) throw new Error('sequence() could not prepare a transition surface.');
@@ -164,7 +164,7 @@ function resolveTarget(target: string | Element): Element {
   return node;
 }
 
-function stagingMount(host: Element, height: number | undefined): HTMLDivElement {
+function preparationMount(host: Element, height: number | undefined): HTMLDivElement {
   const mount = document.createElement('div');
   const width = Math.max(60, host.clientWidth || 720);
   const measuredHeight = Math.max(1, host.clientHeight || height || 500);

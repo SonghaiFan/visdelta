@@ -1,7 +1,6 @@
 // @ts-nocheck — D3 rendering code; typed via deps injection
 import { BaseChart } from '../base.js';
-import { cameraScale, cameraSize, focusCamera, pointBounds } from '../../focus.js';
-import { matchesFilter } from '../../data/filter.js';
+import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds } from '../../focus.js';
 import { d3Curve } from './curve.js';
 import { linePointKeyAccessor, lineSeriesKey } from './keys.js';
 import { matchLinePathFrames } from './path.js';
@@ -127,7 +126,7 @@ class LineChart extends BaseChart {
     const lineWidth = cameraSize(spec.strokeWidth || themeValue('--vd-line-width', 3), camera);
     const lineIsSplit = state.detailStage === 'segments';
     const visiblePointRadius = lineIsSplit ? 0 : pointRadius;
-    const pointOpacity = (row) => lineSelectionOpacity(row, state.selection, themeValue('--vd-dim-opacity', 0.22));
+    const pointOpacity = (row) => lineSelectionOpacity(row, state.highlight, themeValue('--vd-dim-opacity', 0.22));
     const visiblePointOpacity = (row) => lineIsSplit ? 0 : pointOpacity(row);
     const seriesOpacity = (entry) => entry.rows.length
       ? Math.max(...entry.rows.map(pointOpacity))
@@ -261,8 +260,8 @@ class LineChart extends BaseChart {
 }
 
 export function lineSelectionOpacity(row, selection, dimOpacity = 0.22) {
-  if (selection?.mode !== 'highlight' || !selection.filter) return 1;
-  return matchesFilter(row?.__row || row, selection.filter)
+  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
+  return matchesSelection(row?.__row || row, selection)
     ? 1
     : Number(selection.opacity ?? dimOpacity);
 }

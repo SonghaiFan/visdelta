@@ -9,6 +9,8 @@ interface OperationConfig {
   replaceLast?: string;
 }
 
+type InternalGrammarMeta = GrammarMeta & { initialState?: object };
+
 export class ViewState<S extends object = Record<string, unknown>> {
   readonly state: Readonly<StateWithMeta<S>>;
 
@@ -33,14 +35,27 @@ export class ViewState<S extends object = Record<string, unknown>> {
         }
       }
 
+      const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
       next.__grammar = {
         ...(next.__grammar ?? {}),
+        initialState: cloneState(grammar?.initialState ?? withoutGrammar(this.state)),
         operations: operationName ? [...ops, operationName] : ops
-      };
+      } as GrammarMeta;
     }
 
     const Ctor = this.constructor as new (s: S) => this;
     return new Ctor(next as S);
+  }
+
+  /** Return a new state equal to the declaration before its first semantic operation. */
+  reset(): this {
+    const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
+    const initial = cloneState((grammar?.initialState ?? withoutGrammar(this.state)) as S);
+    const Ctor = this.constructor as new (s: S) => this;
+    const next = new Ctor(initial);
+    return next.with({} as Partial<StateWithMeta<S>>, {
+      name: 'reset'
+    });
   }
 
   /** Replace one semantic state family instead of leaking fields from its previous mode. */
@@ -65,6 +80,12 @@ export class ViewState<S extends object = Record<string, unknown>> {
   capabilities(): Record<string, boolean> {
     return { ...(this.state.__grammar?.capabilities ?? {}) };
   }
+}
+
+function withoutGrammar<S extends object>(state: StateWithMeta<S>): S {
+  const next = cloneState(state) as StateWithMeta<S>;
+  delete next.__grammar;
+  return next as S;
 }
 
 export function cloneState<T>(value: T): T {

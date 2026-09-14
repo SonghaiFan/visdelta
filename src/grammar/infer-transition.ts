@@ -30,7 +30,12 @@ export function inferTransition(previous: SpecLike, next: SpecLike): string[] {
     !sameValue(prev[channel], curr[channel])
   );
 
-  if (diff.hasDelta('filter') || diff.hasDelta('selection')) scenes.push('selection');
+  if (
+    diff.hasDelta('filter') ||
+    diff.hasDelta('selection') ||
+    diff.hasDelta('focus') ||
+    diff.hasDelta('highlight')
+  ) scenes.push('selection');
   // A pure axis swap changes reading direction, not the selected variables.
   // Generated aggregate fields belong to detail rather than mapping.
   if (fieldChanged && !swapped && !detail) scenes.push('mapping');

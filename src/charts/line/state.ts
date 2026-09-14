@@ -4,9 +4,11 @@ import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
 import { linePointKeyAccessor } from './keys.js';
+import { viewHighlight, viewSelection } from '../../focus.js';
 
 interface LineState {
   selection: SelectionSpec | null;
+  highlight: SelectionSpec | null;
   seriesField: string | null;
   detailMode: string | null;
   detailStage: string | null;
@@ -26,7 +28,8 @@ export function lineState(spec: ViewSpec = {}, enc: Record<string, ChannelSpec> 
   const detail = (state.sceneState as Record<string, unknown> | undefined)?.['detail'] as Record<string, unknown> | undefined ?? {};
   const axis = (state.sceneState as Record<string, unknown> | undefined)?.['axis'] as Record<string, unknown> | undefined ?? {};
   return {
-    selection: ((state.sceneState as Record<string, unknown> | undefined)?.['selection'] || state.selection || null) as SelectionSpec | null,
+    selection: viewSelection(spec),
+    highlight: viewHighlight(spec),
     seriesField: (detail['seriesField'] as string) || enc['color']?.field || null,
     detailMode: (detail['mode'] as string) || null,
     detailStage: (detail['stage'] as string) || null,

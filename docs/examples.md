@@ -12,6 +12,10 @@ Start with one visualization, derive another, and return both endpoints. Try cha
 
 Edit the selector or combine constraints. This example also exercises the real Arquero transform path.
 
+Adjacent calls are conjunctive: `.where(a).where(b)` retains rows matching both
+selectors. Their position in the transform pipeline is preserved, so filtering
+before an aggregate is distinct from filtering its aggregate result.
+
 <SyntaxPlayground initial="filter" compact />
 
 ## Focusing the view with `.focus()`
@@ -24,6 +28,7 @@ marks in x and y, so the motion reads as a pan or zoom rather than an exit.
 ## Highlighting with `.highlight()`
 
 All marks remain present while the unmatched subset is visually de-emphasized.
+Highlight and focus are independent scopes and may exist on the same state.
 
 <SyntaxPlayground initial="highlight" compact />
 

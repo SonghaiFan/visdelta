@@ -12,7 +12,10 @@ const expectedApi = [
   "area",
   "availableChartTypes",
   "bar",
+  "buildGroupingTree",
   "chartStylePresets",
+  "compileLineage",
+  "correspondLineage",
   "d3ChartStyle",
   "darkChartStyle",
   "defineChartStyle",
@@ -21,6 +24,7 @@ const expectedApi = [
   "detectDataTypes",
   "diffViewStates",
   "line",
+  "lineageMarkKey",
   "mount",
   "paperChartStyle",
   "point",
@@ -31,6 +35,7 @@ const expectedApi = [
   "sequence",
   "transition",
   "unit",
+  "viewLineageCorrespondence",
   "visualizationSpec"
 ];
 

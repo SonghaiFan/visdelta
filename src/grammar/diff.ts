@@ -91,6 +91,8 @@ export function diffSemanticViewStates(
     pushDelta(deltas, `encoding.${channel}`, prev.encoding[channel], curr.encoding[channel]);
   }
   pushStateDelta(deltas, 'selection', prev.selection, curr.selection);
+  pushStateDelta(deltas, 'focus', prev.scopes.focus, curr.scopes.focus);
+  pushStateDelta(deltas, 'highlight', prev.scopes.highlight, curr.scopes.highlight);
   pushStateDelta(deltas, 'axis', prev.axis, curr.axis);
   pushStateDelta(deltas, 'detail', prev.detail, curr.detail);
 
@@ -121,6 +123,7 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
     ],
     nonFilterTransforms: transforms.filter((t) => !t.filter),
     selection: sceneState.selection ?? stateFields.selection ?? null,
+    scopes: stateFields.scopes ?? {},
     axis: sceneState.axis ?? stateFields.axis ?? null,
     detail: (sceneState.detail ?? stateFields.detail ?? null) as DetailSpec | null
   };

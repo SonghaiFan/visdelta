@@ -3,9 +3,11 @@ import { matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
+import { matchesSelection, viewHighlight, viewSelection } from '../../focus.js';
 
 export interface AreaSceneState {
   selection: SelectionSpec | null;
+  highlight: SelectionSpec | null;
   mode: 'single' | 'stacked';
   seriesField: string | null;
   baseline: number;
@@ -46,7 +48,8 @@ export function areaState(spec: ViewSpec, enc: Record<string, ChannelSpec> = {})
   const mode = detail?.['mode'] === 'stacked' ? 'stacked' : 'single';
   const baseline = Number(spec.baseline ?? 0);
   return {
-    selection: (scene?.['selection'] || state.selection || null) as SelectionSpec | null,
+    selection: viewSelection(spec),
+    highlight: viewHighlight(spec),
     mode,
     seriesField: mode === 'stacked'
       ? String(detail?.['seriesField'] || enc['color']?.field || '') || null
@@ -148,8 +151,8 @@ export function areaSelectionOpacity(
   selection: SelectionSpec | null,
   dimOpacity = 0.22
 ): number {
-  if (selection?.mode !== 'highlight' || !selection.filter) return 1;
-  return layer.rows.some((row) => matchesFilter(row, selection.filter!))
+  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
+  return layer.rows.some((row) => matchesSelection(row, selection))
     ? 1
     : Number(selection.opacity ?? dimOpacity);
 }
