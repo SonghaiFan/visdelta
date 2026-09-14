@@ -3,6 +3,7 @@ import { defineAsyncComponent, h } from 'vue';
 import './custom.css';
 import '../../../dist/visdelta.css';
 import BarTransitionShowcase from '../components/BarTransitionShowcase.vue';
+import HomeLiveStudio from '../components/HomeLiveStudio.vue';
 
 export default {
   extends: DefaultTheme,
@@ -17,6 +18,7 @@ export default {
       () => import('../components/TransitionWorkbench.vue')
     ));
     app.component('BarTransitionShowcase', BarTransitionShowcase);
+    app.component('HomeLiveStudio', HomeLiveStudio);
     app.component('ChartStyleGallery', defineAsyncComponent(
       () => import('../components/ChartStyleGallery.vue')
     ));

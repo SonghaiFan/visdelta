@@ -52,6 +52,25 @@ test('line infers an ISO date x field and places every mark on its time scale', 
   expect(result.ticks.length).toBeGreaterThan(1);
 });
 
+test('line granularity examples keep time on x while resampling daily observations', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/line-lab.html#x');
+  await ready(page);
+  await expect(page.locator('.vd-x-label')).toHaveText('Date →');
+  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(24);
+
+  await page.locator('#end').click();
+  const weeklyCount = await page.locator('#chart circle.vd-line-point').count();
+  expect(weeklyCount).toBeGreaterThan(3);
+  expect(weeklyCount).toBeLessThan(24);
+  await expect(page.locator('#chart path.vd-line')).toHaveCount(1);
+  await expect(page.locator('.vd-x-label')).toHaveText('Date →');
+
+  await selectScenario(page, 'xy');
+  await page.locator('#end').click();
+  await expect(page.locator('.vd-x-label')).toHaveText('Date →');
+  await expect(page.locator('.vd-y-label')).toHaveText('↑ High (USD)');
+});
+
 for (const sample of scenarios) {
   test(`line lab ${sample.id}: editable pair and reversible seek`, async ({ page }) => {
     const errors = [];
@@ -297,22 +316,24 @@ test('line time window combines keyed add and remove without a path wiggle', asy
   const late = await frameAt(0.8);
   const end = await frameAt(1);
   const radius = (frame, key) => frame.circles.find(point => point.key === key)?.radius ?? 0;
-  const leavingKey = start.circles.find(point => point.radius > 0 && radius(end, point.key) === 0)?.key;
-  const enteringKey = end.circles.find(point => point.radius > 0 && radius(start, point.key) === 0)?.key;
+  const startKeys = new Set(start.circles.map(point => point.key));
+  const endKeys = new Set(end.circles.map(point => point.key));
+  const leavingKey = [...startKeys].find(key => !endKeys.has(key));
+  const enteringKey = [...endKeys].find(key => !startKeys.has(key));
 
   expect(middle.strategy).toBe('add-remove-points');
   expect(middle.d).not.toBe(early.d);
   expect(middle.backwards).toBe(false);
   expect(leavingKey).toBeTruthy();
   expect(enteringKey).toBeTruthy();
-  expect(radius(early, leavingKey)).toBeGreaterThan(0);
+  expect(radius(early, leavingKey)).toBe(0);
   expect(Math.abs(early.first.x - startPoint.x)).toBeLessThan(1);
   expect(Math.abs(early.first.y - startPoint.y)).toBeLessThan(1);
   expect(radius(middle, leavingKey)).toBe(0);
   expect(radius(beforeEnter, enteringKey)).toBe(0);
   expect(Math.abs(beforeEnter.last.x - end.last.x)).toBeLessThan(1);
   expect(Math.abs(beforeEnter.last.y - end.last.y)).toBeLessThan(1);
-  expect(radius(late, enteringKey)).toBeGreaterThan(0);
+  expect(radius(late, enteringKey)).toBe(0);
 });
 
 test('opposite time-window endpoints use the same add-and-remove frames in reverse', async ({ page }) => {
@@ -434,7 +455,7 @@ test('line add and remove are the same transition in reverse', async ({ page }) 
   for (const frame of result.frames) expect(frame.remove).toEqual(frame.add);
   expect(result.beforePoint.radius).toBe(0);
   expect(result.beforePoint.path).not.toBe(result.startPath);
-  expect(result.afterLine.radius).toBeGreaterThan(0);
+  expect(result.afterLine.radius).toBe(0);
   expect(result.afterLine.path).toBe(result.frames.at(-1).add.find(item => item.tag === 'path')?.d);
 });
 
@@ -509,7 +530,7 @@ test('line filter and restore are the same transition in reverse', async ({ page
   });
 
   for (const frame of result.frames) expect(frame.restore).toEqual(frame.filter);
-  expect(result.pointIsLeaving.radius).toBeGreaterThan(0);
+  expect(result.pointIsLeaving.radius).toBe(0);
   expect(result.pointIsLeaving.lineOffset).toBe(0);
   expect(result.lineIsRetracting.radius).toBe(0);
   expect(result.lineIsRetracting.lineOffset).toBeGreaterThan(0);
@@ -538,13 +559,19 @@ test('line split and merge are one transition in reverse', async ({ page }) => {
     const options = target => ({ target, d3, aq, height: 360 });
     const split = await transition(total, detailed, options('#split'));
     const merge = await transition(detailed, total, options('#merge'));
-    const geometry = selector => [...document.querySelectorAll(`${selector} path.vd-line, ${selector} circle.vd-line-point`)]
+    const geometry = selector => [...document.querySelectorAll(
+      `${selector} path.vd-line, ${selector} path.vd-line-reference, ` +
+      `${selector} path.vd-line-reference-mask, ${selector} circle.vd-line-point`
+    )]
       .map(node => ({
         tag: node.tagName,
+        class: node.getAttribute('class'),
         key: node.getAttribute('data-key'),
         d: node.getAttribute('d'),
         cx: node.getAttribute('cx'),
         cy: node.getAttribute('cy'),
+        dasharray: node.getAttribute('stroke-dasharray'),
+        dashoffset: node.getAttribute('stroke-dashoffset'),
         opacity: node.style.opacity
       }))
       .sort((a, b) => `${a.tag}${a.key}`.localeCompare(`${b.tag}${b.key}`));
@@ -557,30 +584,60 @@ test('line split and merge are one transition in reverse', async ({ page }) => {
   for (const frame of frames) expect(frame.merge).toEqual(frame.split);
 });
 
-test('line split cuts first, moves second, and connects last', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#split');
+test('line merge draws its dashed reference before zipper motion', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/line-lab.html#merge');
   await ready(page);
 
-  await page.locator('#progress').fill('0.24');
-  await expect(page.locator('#chart path.vd-line[data-line-stage="segments"]')).toHaveCount(2);
-  const cutPositions = await page.locator('#chart circle.vd-line-point[data-key*="|"]').evaluateAll(nodes =>
-    nodes.map(node => ({ key: node.getAttribute('data-key'), y: Number(node.getAttribute('cy')) })));
-  const byPeriod = new Map();
-  for (const point of cutPositions) {
-    const period = point.key.split('|')[0];
-    if (!byPeriod.has(period)) byPeriod.set(period, []);
-    byPeriod.get(period).push(point.y);
-  }
-  for (const values of byPeriod.values()) expect(new Set(values).size).toBe(1);
+  const visibleDots = () => page.locator('#chart circle.vd-line-point').evaluateAll(nodes =>
+    nodes.filter(node => Number(node.getAttribute('r')) > 0 && Number(getComputedStyle(node).opacity) > 0.001).length);
+  expect(await visibleDots()).toBe(0);
+  await expect(page.locator('#chart path.vd-line-reference')).toHaveCount(0);
+  const initialSeries = await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('d')));
 
-  await page.locator('#progress').fill('0.58');
-  await expect(page.locator('#chart path.vd-line[data-line-stage="segments"]')).toHaveCount(2);
-  const movedPositions = await page.locator('#chart circle.vd-line-point[data-key*="|"]').evaluateAll(nodes =>
-    nodes.map(node => ({ key: node.getAttribute('data-key'), y: Number(node.getAttribute('cy')) })));
-  expect(movedPositions.map(point => point.y)).not.toEqual(cutPositions.map(point => point.y));
+  // The first phase only previews the target mean. The original lines have not
+  // moved yet, so the reader can compare all three shapes in context.
+  await page.locator('#progress').fill('0.08');
+  await expect(page.locator('#chart path.vd-line-reference')).toHaveCount(1);
+  const preview = await page.locator('#chart path.vd-line-reference').evaluate(node => ({
+    opacity: Number(getComputedStyle(node).opacity),
+    dash: getComputedStyle(node).strokeDasharray,
+    stroke: getComputedStyle(node).stroke
+  }));
+  expect(preview.opacity).toBeGreaterThan(0.05);
+  expect(preview.dash).not.toBe('none');
+  expect(preview.stroke).toBe('rgb(231, 234, 237)');
+  expect(await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('d')))).toEqual(initialSeries);
+  const earlyOffset = Number(await page.locator('#chart path.vd-line-reference-mask')
+    .getAttribute('stroke-dashoffset'));
+  expect(earlyOffset).toBeGreaterThan(0);
 
-  await page.locator('#progress').fill('0.92');
-  await expect(page.locator('#chart path.vd-line[data-line-stage="connected"]')).toHaveCount(2);
+  await page.locator('#progress').fill('0.28');
+  const laterOffset = Number(await page.locator('#chart path.vd-line-reference-mask')
+    .getAttribute('stroke-dashoffset'));
+  expect(laterOffset).toBeGreaterThanOrEqual(0);
+  expect(laterOffset).toBeLessThan(earlyOffset);
+  expect(await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('d')))).toEqual(initialSeries);
+  expect(await visibleDots()).toBe(0);
+
+  await page.locator('#progress').fill('0.5');
+  await expect(page.locator('#chart path.vd-line-reference')).toHaveCount(1);
+  const solid = await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.every(node => !node.getAttribute('stroke-dasharray')));
+  expect(solid).toBe(true);
+  const zipperStrategies = await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('data-line-transition')));
+  expect(zipperStrategies).toEqual(['zipper', 'zipper']);
+  expect(await page.locator('#chart path.vd-line').evaluateAll(nodes =>
+    nodes.map(node => node.getAttribute('d')))).not.toEqual(initialSeries);
+  expect(await visibleDots()).toBe(0);
+
+  await page.locator('#end').click();
+  await expect(page.locator('#chart path.vd-line-reference')).toHaveCount(0);
+  await expect(page.locator('#chart path.vd-line')).toHaveCount(1);
+  expect(await visibleDots()).toBe(0);
 });
 
 test('line lab fits a narrow viewport and keeps progress after resize', async ({ page }) => {

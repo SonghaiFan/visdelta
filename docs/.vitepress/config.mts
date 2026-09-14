@@ -56,6 +56,7 @@ export default defineConfig({
           { text: 'Chart types', link: '/chart-types' },
           { text: 'Data and transforms', link: '/data-sources-and-transforms' },
           { text: 'Chart style', link: '/chart-style' },
+          { text: 'Transition regression log', link: '/transition-regression-log' },
           { text: 'Transition runtime', link: '/runtime-api' }
         ]
       },

@@ -107,14 +107,9 @@
     "prepack": "npm test",
     "prepublishOnly": "npm run release:check"
   },
-  "peerDependencies": {
+  "dependencies": {
     "arquero": "^8.0.0",
     "d3": "^7.0.0"
-  },
-  "peerDependenciesMeta": {
-    "arquero": {
-      "optional": true
-    }
   },
   "keywords": [
     "animated-transition",
@@ -125,9 +120,9 @@
     "esm"
   ],
   "devDependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
     "@playwright/test": "^1.63.0",
-    "arquero": "^8.0.0",
-    "d3": "^7.0.0",
+    "codemirror": "^6.0.2",
     "esbuild": "0.28.2",
     "typescript": "^5.9.3",
     "vitepress": "2.0.0-alpha.20"

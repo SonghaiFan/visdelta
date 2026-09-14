@@ -147,6 +147,11 @@ chart reaches that grouped view is chart- and operation-specific. For Bar
 grouped under A, grouped under B, stacked under B, then aggregate B. Other
 aggregate operators currently keep the ordinary fallback transition.
 
+Every adjacent leg is canonicalized independently. Reverse playback evaluates
+the same canonical frame at `1 - p`; visual details such as Bar dividers must
+not introduce direction-specific logic. Problems that reveal a missing rule are
+preserved in the [Transition Regression Log](./transition-regression-log.md).
+
 ### Core knows no chart types
 
 Core owns shared state, difference, progress, frame evaluation, lifecycle, and

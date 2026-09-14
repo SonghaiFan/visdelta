@@ -1,6 +1,7 @@
 import type { FilterSpec, TransformSpec } from '../types/index.js';
 import { filterPredicate } from './filter.js';
 import { validateTransforms } from './validate.js';
+import { runtimeAq } from '../runtime/dependencies.js';
 
 interface ArqueroTable {
   objects(): Record<string, unknown>[];
@@ -68,13 +69,10 @@ interface AggregateTransform {
 export function applyTransforms(
   source: Record<string, unknown>[],
   transforms: TransformSpec[] = [],
-  aq: Arquero
+  aq: Arquero = runtimeAq as unknown as Arquero
 ): Record<string, unknown>[] {
   validateTransforms(transforms);
   if (!transforms.length) return source.map((row) => ({ ...row }));
-  if (!aq) {
-    throw new Error('VisDelta data transforms require Arquero. Pass { aq } to transition().');
-  }
   const fields = [...new Set(source.flatMap(row => Object.keys(row)))];
   let table = aq.from(source.map(row => Object.fromEntries(fields.map(field => [field, row[field]]))));
 

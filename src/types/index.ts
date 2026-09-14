@@ -524,7 +524,8 @@ export type AnyRecord = Record<string, any>;
 
 export interface RuntimeOptions {
   target?: Target;
-  d3: D3Lib;
+  /** Uses VisDelta's bundled runtime unless an embedding host overrides it. */
+  d3?: D3Lib;
   aq?: Record<string, unknown>;
   debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */

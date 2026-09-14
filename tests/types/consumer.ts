@@ -14,17 +14,18 @@ import {
 } from 'visdelta/plugins';
 import * as browser from 'visdelta/browser';
 
-declare const d3: Record<string, unknown>;
 const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
-const pair = await transition(a, b, { target: '#chart', d3 });
+const currentRows = a.rows();
+currentRows[0]?.value;
+const pair = await transition(a, b, { target: '#chart' });
 pair.progress(0.4).play({ duration: 300 }).pause().resize();
 pair.destroy();
-const journey = await sequence([a, b, a], { target: '#chart', d3 });
+const journey = await sequence([a, b, a], { target: '#chart' });
 journey.progress(1.5).play({ duration: 300 }).pause().resize();
 journey.destroy();
-await selectedSequence([a, b], { target: '#chart', d3 });
-await mount(a, { target: '#chart', d3 });
+await selectedSequence([a, b], { target: '#chart' });
+await mount(a, { target: '#chart' });
 await select<typeof a>('#chart').update(view => view.focus({ key: 'A' })).play({ duration: 300 });
 await select<typeof a>('#chart').sequence([
   view => view.focus({ key: 'A' }),

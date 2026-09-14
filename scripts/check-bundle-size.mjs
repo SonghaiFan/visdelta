@@ -106,4 +106,4 @@ for (const path of loaded) {
 // Includes seekable semantic bar splits plus the chart-owned responsive axis,
 // title, number-format retention, legend, axis-system timing, and the shared
 // field-type detection plus the chart-agnostic 2D camera used by focus.
-console.log(`bar + transition (entry, shared chunks, bar plugin): ${gzipBytes} bytes gzip (excludes D3, optional Arquero, CSS).`);
+console.log(`bar + transition (entry, shared chunks, bar plugin): ${gzipBytes} bytes gzip (includes VisDelta's D3 and Arquero runtime, excludes CSS).`);

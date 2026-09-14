@@ -16,6 +16,25 @@ const base = line(aaplRows)
   .key("date")
   .tooltip(["date", "ticker", "open", "high", "low", "close", "volume"]);`;
 
+const timeGrain = `${base}
+
+const weeklyRows = Array.from(
+  d3.group(
+    aaplRows,
+    (row) => d3.utcMonday.floor(row.date).getTime()
+  ).values(),
+  (rows) => ({
+    ...rows.at(-1),
+    open: rows[0].open,
+    high: d3.max(rows, (row) => row.high),
+    low: d3.min(rows, (row) => row.low),
+    close: rows.at(-1).close,
+    volume: d3.sum(rows, (row) => row.volume)
+  })
+);
+
+const weekly = base.data(weeklyRows);`;
+
 const series = `${stockData}
 
 const companyRows = [...aaplRows, ...googRows];
@@ -76,9 +95,9 @@ export async function loadChart() {
 }
 
 export const scenarios = [
-  sample('x', '01 · Change x field', 'Move the same AAPL trading days from time to their opening-price positions.', base, 'base', 'base.x("open", { title: "Open (USD)" })'),
+  sample('x', '01 · Daily → weekly', 'Keep time on x and summarize daily AAPL observations into weekly OHLC rows represented by each week\'s final trading date.', timeGrain, 'base', 'weekly'),
   sample('y', '02 · Change y field', 'Keep the trading dates and change the AAPL measure from close to high.', base, 'base', 'base.y("high", { title: "High (USD)", format: "$.2f" })'),
-  sample('xy', '03 · Change both fields', 'Map each AAPL trading day from date and close to open and high.', base, 'base', 'base.x("open", { title: "Open (USD)" }).y("high", { title: "High (USD)" })'),
+  sample('xy', '03 · Daily close → weekly high', 'Keep time on x while changing both temporal grain and measure: daily closes become weekly highs.', timeGrain, 'base', 'weekly.y("high", { title: "High (USD)", format: "$.2f" })'),
   sample('filter', '04 · Filter observations', 'Remove AAPL high-volume days: points disappear first, then their connecting line retracts and leaves an honest gap.', filtered, 'base', 'filtered'),
   sample('restore', '05 · Restore observations', 'Restore the same AAPL days in exact reverse: the line reaches each observation before its point appears.', filtered, 'filtered', 'base'),
   sample('add', '06 · Add an observation', 'Extend the AAPL line to the latest trading day first, then reveal its point.', added, 'base', 'withLatest'),
@@ -88,8 +107,8 @@ export const scenarios = [
   sample('color', '10 · Change line color', 'Change a constant color without changing AAPL data or position.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),
   sample('style', '11 · Change line style', 'Change the D3 curve, line width, and point size as one visual state change.', base, 'base.curve("curveLinear").strokeWidth(2).pointSize(3)', 'base.curve("curveStep").strokeWidth(6).pointSize(7)'),
   sample('flip', '12 · Flip orientation', 'Move AAPL close from a vertical value axis to a horizontal value axis, changing x before y.', base, 'base', 'base.flip({ order: ["x", "y"] })'),
-  sample('split', '13 · Split into company lines', 'Cut the equal-weight average into pieces, move them to AAPL and GOOG, then connect each company line.', series, 'average', 'detailed'),
-  sample('merge', '14 · Merge into an average', 'Use the exact reverse: disconnect the company lines, move them to their equal-weight average, then join the pieces.', series, 'detailed', 'average'),
+  sample('split', '13 · Split into company lines', 'Release AAPL and GOOG from the mean reference like a zipper, then remove the reference once both company lines are readable.', series, 'average', 'detailed'),
+  sample('merge', '14 · Merge into an average', 'Grow the mean as a thin dashed reference, zip AAPL and GOOG onto it, then snap the coincident paths into one line.', series, 'detailed', 'average'),
   sample('shift', '15 · Shift the time window', 'Remove the leaving AAPL day, move the shared observations, extend the line, then reveal the entering day.', slidingWindow, 'firstWindow', 'nextWindow'),
   sample('focus', '16 · Focus the view', 'Keep every AAPL observation and the full line, but fit the view around days whose close is at least $325.', base, 'base', 'base.focus("datum.close >= 325")')
 ];

@@ -7,8 +7,6 @@ Creates one seekable transition between two states of the same chart type.
 ```js
 const change = await transition(from, to, {
   target: "#chart",
-  d3,
-  aq,
   data: { sales: rows },
   height: 420,
   chartStyle: paperChartStyle
@@ -18,8 +16,8 @@ const change = await transition(from, to, {
 | Option | Meaning |
 | --- | --- |
 | `target` | CSS selector or element; defaults to `#app` |
-| `d3` | Required D3 dependency |
-| `aq` | Arquero dependency, required only when transforms run |
+| `d3` | Optional embedding override; VisDelta uses its shared D3 runtime by default |
+| `aq` | Optional embedding override; VisDelta uses its shared Arquero runtime by default |
 | `data` | Named tidy datasets used by either state |
 | `height` | Explicit chart height |
 | `chartStyle` | One structural style shared by both endpoints |
@@ -68,8 +66,7 @@ down and recreate one pair at a time.
 import { sequence } from "visdelta/transition";
 
 const journey = await sequence([revenue, profit, ranked, revenue], {
-  target: "#chart",
-  d3
+  target: "#chart"
 });
 
 journey.progress(1.5);           // halfway through profit → ranked
@@ -93,7 +90,7 @@ at the end when a sequence should return to its starting visual state.
 that mounted endpoint later and applies a new grammar operation to it.
 
 ```js
-await vd.mount(byRegion, { target: "#chart", d3 });
+await vd.mount(byRegion, { target: "#chart" });
 
 await vd.select("#chart")
   .update(view => view.focus({ region: "North" }))

@@ -19,6 +19,7 @@ export interface LinePathFrame {
 export type LinePathStrategy =
   | 'keep-shape'
   | 'move-points'
+  | 'zipper'
   | 'add-points'
   | 'remove-points'
   | 'add-remove-points'
@@ -77,6 +78,48 @@ export function matchLinePathFrames(
   return {
     strategy: 'match-shape',
     interpolate: matchLinePaths(fromNode, to.path)
+  };
+}
+
+/**
+ * Move two complete series to or from their shared aggregate path like a
+ * zipper. The caller may separately render the aggregate geometry as a
+ * reference guide; this matcher only owns the two moving series paths.
+ *
+ * Canonical progress runs aggregate -> series. Merge evaluates these exact
+ * frames backward, so its attraction progress is `1 - progress`. Squaring that
+ * value gives the requested slow-then-fast pull; a short index offset makes
+ * observations attach in x order instead of collapsing everywhere at once.
+ */
+export function matchLineZipperFrames(
+  from: LinePathFrame | null | undefined,
+  to: LinePathFrame,
+  renderPoints: (points: readonly LinePathPoint[]) => string
+): LinePathMatch | null {
+  if (!from || !from.points.length || from.points.length !== to.points.length) return null;
+  if (!sameKeysInOrder(from.points.map(point => point.key), to.points.map(point => point.key))) return null;
+
+  return {
+    strategy: 'zipper',
+    interpolate: (progress: number) => {
+      const splitProgress = clampProgress(progress);
+      if (splitProgress === 0) return from.path;
+      if (splitProgress === 1) return to.path;
+
+      const attraction = (1 - splitProgress) ** 2;
+      const spread = 0.42;
+      const last = Math.max(1, from.points.length - 1);
+      return renderPoints(from.points.map((source, index) => {
+        const offset = index / last * spread;
+        const attached = clampProgress((attraction - offset) / (1 - spread));
+        const detached = 1 - attached;
+        const target = to.points[index]!;
+        return {
+          x: source.x + (target.x - source.x) * detached,
+          y: source.y + (target.y - source.y) * detached
+        };
+      }));
+    }
   };
 }
 

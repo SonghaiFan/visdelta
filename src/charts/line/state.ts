@@ -158,10 +158,11 @@ export function lineIntermediateSpecs<S extends ViewSpec>(
 }
 
 /**
- * A total-to-series change has three readable states:
- * total line -> colored segments at the total positions -> those segments at
- * their series positions -> connected series. Merge reuses these states in
- * reverse through canonicalLineTransitionPair.
+ * A total-to-series change has two semantic waypoints:
+ * total line -> complete series at the total positions -> reference preview
+ * with series in their own positions -> series lines. Merge reuses those exact
+ * frames backward, so the reference appears before either series starts to
+ * move, the solid lines zip onto it, and the coincident paths collapse cleanly.
  */
 function lineDetailIntermediateSpecs<S extends ViewSpec>(
   previousSpec: S,
@@ -174,7 +175,7 @@ function lineDetailIntermediateSpecs<S extends ViewSpec>(
   return [
     {
       spec: withLineDetailStage(nextSpec, {
-        stage: 'segments',
+        stage: 'zipper-attractor',
         position: 'total',
         parentOp: previous.detailParentOp
       }),
@@ -182,7 +183,7 @@ function lineDetailIntermediateSpecs<S extends ViewSpec>(
     },
     {
       spec: withLineDetailStage(nextSpec, {
-        stage: 'segments',
+        stage: 'zipper-preview',
         position: 'series',
         parentOp: previous.detailParentOp
       }),
@@ -193,7 +194,11 @@ function lineDetailIntermediateSpecs<S extends ViewSpec>(
 
 function withLineDetailStage<S extends ViewSpec>(
   spec: S,
-  patch: { stage: 'segments'; position: 'total' | 'series'; parentOp: string }
+  patch: {
+    stage: 'zipper-attractor' | 'zipper-preview';
+    position: 'total' | 'series';
+    parentOp: string;
+  }
 ): S {
   return withSpecMeta(cloneState(spec), {
     state: { sceneState: { detail: patch } }

@@ -43,7 +43,7 @@ test('same result has the same delta independent of derivation and property orde
 
 test('pair validation runs before DOM access', async () => {
   await assert.rejects(() => transition(bar('a'), line('a'), {}), /same chart type/);
-  await assert.rejects(() => transition(bar('a'), bar('a'), {}), /target, d3/);
+  await assert.rejects(() => transition(bar('a'), bar('a'), {}), /missing dataset/);
   await assert.rejects(() => transition(bar('a'), bar('a'), { d3: {}, aq: {} }), /missing dataset/);
   const a = { mark: 'bar', data: [{ category: 'A', value: 1 }] };
   await assert.rejects(() => transition(a, { ...a, transform: [null] }, { d3: {} }), /transform\[0\]/);

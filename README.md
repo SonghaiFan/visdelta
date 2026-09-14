@@ -9,7 +9,6 @@ Data -> Chart state -> Difference -> Transition -> Frame
 ```
 
 ```js
-import * as d3 from "d3";
 import { bar } from "visdelta/bar";
 import { transition } from "visdelta/transition";
 import "visdelta/style.css";
@@ -21,8 +20,7 @@ const revenue = bar(rows)
 
 const profit = revenue.y("profit");
 const change = await transition(revenue, profit, {
-  target: "#chart",
-  d3
+  target: "#chart"
 });
 
 change.progress(0.42);
@@ -34,7 +32,7 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 ## Install
 
 ```sh
-npm install visdelta@0.2.0 d3
+npm install visdelta@0.2.0
 ```
 
 `0.2.0` is the first-release candidate in this checkout. Arquero is an optional

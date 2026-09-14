@@ -1,6 +1,6 @@
 import { serializeViewSpec } from '../../spec-meta.js';
 import { cloneState } from '../../grammar/view-state.js';
-import { titleize } from '../../labels.js';
+import { aggregateTitle, titleize } from '../../labels.js';
 import { ChartState, channelFrom, colorFrom, normalizeDataSource, resolveInlineDataTypes } from '../authoring.js';
 import { compileViewWithCompiler } from '../compile-view.js';
 import { createBarSpecCompiler } from './compile.js';
@@ -118,20 +118,25 @@ export class BarState extends ChartState<BarViewState> {
   ): this {
     const category = options.category ?? (this.state as BarViewState).encoding?.x?.field;
     const value = options.value ?? (this.state as BarViewState).encoding?.y?.field ?? 'count';
+    const op = options.op ?? 'sum';
+    const currentY = (this.state as BarViewState).encoding?.y;
+    const nextTitle = options.title === false
+      ? currentY?.title ?? titleize(value)
+      : options.title ?? aggregateTitle(op, currentY?.title ?? value);
     const { by, category: _cat, value: _val, ...rest } = options;
     const next = aggregateBarState(this, {
       ...rest,
       by: by ?? ([category, segment].filter(Boolean) as string[]),
       segment,
       value,
+      valueTitle: nextTitle,
       layout: options.layout ?? 'stacked',
-      op: options.op ?? 'sum'
+      op
     });
-    const currentY = (this.state as BarViewState).encoding?.y;
     return (options.title === false
       ? next
       : next.y(value, {
-          title: options.title ?? currentY?.title ?? titleize(value),
+          title: nextTitle,
           format: currentY?.format
         })) as unknown as this;
   }
@@ -170,6 +175,7 @@ export class BarState extends ChartState<BarViewState> {
       ?? (this.state as BarViewState).encoding?.x?.field;
     const fields = (asArray(parent as string | string[] | null).filter(Boolean) as string[]);
     const value = options.value ?? (this.state as BarViewState).encoding?.y?.field ?? 'count';
+    const op = options.op ?? 'sum';
     const { color, title, by: _by, groupby: _groupby, value: _value, ...rest } = options;
 
     // A wide-data segment creates its measure field through a fold. Preserve
@@ -198,7 +204,7 @@ export class BarState extends ChartState<BarViewState> {
       groupby: fields,
       value,
       as: options.as ?? value,
-      op: options.op ?? 'sum'
+      op
     });
     if (!color) {
       const next = cloneState(nextState.state) as BarViewState;
@@ -208,7 +214,11 @@ export class BarState extends ChartState<BarViewState> {
         nextState = new BarState(next);
       }
     }
-    if (title) nextState = nextState.y(value, { title }) as BarState;
+    const currentY = (this.state as BarViewState).encoding?.y;
+    nextState = nextState.y(value, {
+      title: title ?? aggregateTitle(op, currentY?.title ?? value),
+      format: currentY?.format
+    }) as BarState;
     if (color) nextState = nextState.color(color as string | ChannelSpec) as BarState;
     return nextState as unknown as this;
   }
@@ -401,7 +411,10 @@ function normalizeAggregation(
     segment,
     value,
     as,
-    valueTitle: (config.valueTitle ?? state.encoding?.y?.title ?? titleize(segment ? value : as)) as string,
+    valueTitle: (config.valueTitle ?? aggregateTitle(
+      op,
+      state.encoding?.y?.title ?? titleize(segment ? value : as)
+    )) as string,
     op
   };
 }

@@ -179,6 +179,15 @@
   pointer-events: none;
 }
 
+.vd-line-reference {
+  fill: none;
+  stroke: var(--vd-grid);
+  stroke-width: 1px;
+  stroke-dasharray: 3px 3px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .vd-bar,
 .vd-point,
 .vd-line,

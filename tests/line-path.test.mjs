@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as d3 from 'd3';
 import { D3_CURVE_NAMES, d3Curve } from '../dist/charts/line/curve.js';
-import { interpolateLinePoints, matchLinePathFrames } from '../dist/charts/line/path.js';
+import { interpolateLinePoints, matchLinePathFrames, matchLineZipperFrames } from '../dist/charts/line/path.js';
 
 const short = value => Math.round(value * 1000) / 1000;
 const renderPoints = points => points
@@ -114,4 +114,31 @@ test('a shifted key window combines add and remove timing', () => {
   for (const progress of [0, 0.17, 0.5, 0.83, 1]) {
     assert.equal(forward.interpolate(progress), reverse.interpolate(1 - progress));
   }
+});
+
+test('line zipper attaches in x order and accelerates into the aggregate path', () => {
+  const aggregate = frame([
+    { key: 'Q1|A', x: 0, y: 0 },
+    { key: 'Q2|A', x: 10, y: 0 },
+    { key: 'Q3|A', x: 20, y: 0 }
+  ]);
+  const series = frame([
+    { key: 'Q1|A', x: 0, y: 12 },
+    { key: 'Q2|A', x: 10, y: 12 },
+    { key: 'Q3|A', x: 20, y: 12 }
+  ]);
+  const zipper = matchLineZipperFrames(aggregate, series, points => JSON.stringify(points));
+  const mergeFrame = progress => JSON.parse(zipper.interpolate(1 - progress));
+  const start = series.points;
+  const slow = mergeFrame(0.2);
+  const fast = mergeFrame(0.4);
+  const middle = mergeFrame(0.6);
+
+  assert.equal(zipper.strategy, 'zipper');
+  assert.equal(start[0].y, 12);
+  assert.ok(start[0].y - slow[0].y < slow[0].y - fast[0].y);
+  assert.ok(middle[0].y < middle[1].y);
+  assert.ok(middle[1].y <= middle[2].y);
+  assert.equal(zipper.interpolate(0), aggregate.path);
+  assert.equal(zipper.interpolate(1), series.path);
 });

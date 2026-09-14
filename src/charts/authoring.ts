@@ -2,6 +2,7 @@ import { serializeViewSpec } from '../spec-meta.js';
 import { ViewState, cloneState } from '../grammar/view-state.js';
 import { titleize } from '../labels.js';
 import { normalizeFilter } from '../data/filter.js';
+import { applyTransforms } from '../data/transforms.js';
 import { resolveSpecDataTypes } from '../data/types.js';
 import type {
   ChannelSpec,
@@ -67,6 +68,16 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     (spec as ViewSpec).data = normalizeDataSource(data) as ViewSpec['data'];
     const Ctor = this.constructor as new (state: S) => this;
     return new Ctor(spec as S);
+  }
+
+  /** Materialize the tidy rows represented by this immutable chart state. */
+  rows(source?: Record<string, unknown>[]): Record<string, unknown>[] {
+    const spec = this.toSpec() as ViewSpec;
+    const records = source ?? inlineRows(spec.data);
+    if (!records) {
+      throw new Error('VisDelta rows() needs inline records or source rows for a named dataset.');
+    }
+    return applyTransforms(records, spec.transform ?? []);
   }
 
   x(field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
@@ -171,6 +182,16 @@ export function resolveInlineDataTypes(spec: ViewSpec): ViewSpec {
   const data = spec.data as { values?: unknown[] } | unknown[] | undefined;
   const rows = Array.isArray(data) ? data : Array.isArray(data?.values) ? data.values : null;
   return rows ? resolveSpecDataTypes(spec, rows) : spec;
+}
+
+function inlineRows(data: ViewSpec['data']): Record<string, unknown>[] | null {
+  const values = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { values?: unknown[] } | undefined)?.values)
+    ? (data as { values: unknown[] }).values
+    : null;
+  if (!values) return null;
+  return values.map((row) => ({ ...(row as Record<string, unknown>) }));
 }
 
 function compileAuthoredView(spec: ViewSpec): ViewSpec {

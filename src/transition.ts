@@ -13,6 +13,7 @@ import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import { registerMounted, unregisterMounted } from './runtime/mounted.js';
+import { resolveRuntime } from './runtime/dependencies.js';
 
 export type { Visualization } from './core.js';
 
@@ -49,8 +50,9 @@ export interface VisualizationTransition {
 export async function transition(
   from: Visualization,
   to: Visualization,
-  options: TransitionOptions
+  options: TransitionOptions = {}
 ): Promise<VisualizationTransition> {
+  const runtime = resolveRuntime(options);
   const localModules = [visualizationChartModule(from), visualizationChartModule(to)]
     .filter((module): module is ChartModule => module !== null);
   const source = visualizationSpec(from);
@@ -62,9 +64,6 @@ export async function transition(
     if (normalizeChartKey(module.key) !== normalizeChartKey(source.mark)) {
       throw new Error(`Visualization uses chart module "${module.key}" but declares mark "${source.mark}".`);
     }
-  }
-  if (!options?.d3) {
-    throw new Error('Pass { target, d3 } to transition().');
   }
   validateTransforms(source.transform ?? []);
   validateTransforms(target.transform ?? []);
@@ -88,7 +87,7 @@ export async function transition(
     const cacheKey = JSON.stringify(data);
     let pending = sourceCache.get(cacheKey);
     if (!pending) {
-      pending = loadData({ rows: data }, options.d3).then(result => cloneState(result.rows));
+      pending = loadData({ rows: data }, runtime.d3).then(result => cloneState(result.rows));
       sourceCache.set(cacheKey, pending);
     }
     const rows = await pending;
@@ -98,7 +97,7 @@ export async function transition(
   const host = resolveTarget(options.target ?? '#app');
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntimeDeps({ root: host, chartStyle }), localModules);
-  const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...options, chartStyle }, chartTypes);
+  const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...runtime, chartStyle }, chartTypes);
   let value = 0;
   let lastDirection = 1;
   let animation: number | null = null;

@@ -68,18 +68,13 @@ try {
   run(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
     "--noEmit", "--strict", "--target", "ES2022", "--module", "NodeNext",
     "--lib", "ES2022,DOM", "consumer.ts"], consumerDir);
-  // Also test ordinary npm resolution: D3 is a required peer, while Arquero
-  // must remain absent unless the consumer explicitly requests transforms.
+  // A normal consumer gets VisDelta's complete shared runtime: neither D3 nor
+  // Arquero is an authoring concern or a peer-installation obligation.
   run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumerDir);
   run(process.execPath, ["--input-type=module", "--eval", `
-    import * as d3 from 'd3';
     import { bar, delta } from 'visdelta';
-    if (typeof d3.scaleLinear !== 'function') throw new Error('Normal install did not resolve D3.');
-    let optionalInstalled = false;
-    try { import.meta.resolve('arquero'); optionalInstalled = true; }
-    catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
-    if (optionalInstalled) throw new Error('Arquero was unexpectedly required by a no-transform consumer.');
     const a = bar([{ key: 'A', value: 1, next: 2 }]).x('key').y('value');
+    if (a.rollup().rows()[0].value !== 1) throw new Error('Normal install did not materialize transforms.');
     if (!delta(a, a.y('next')).hasDelta('encoding.y')) throw new Error('Normal installed authoring failed.');
   `], consumerDir);
   console.log("Pack consumer invariants ok.");

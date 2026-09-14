@@ -51,13 +51,13 @@ export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>
       const detail = nextSpec
         ? specState(nextSpec).sceneState?.detail as Record<string, unknown> | undefined
         : undefined;
-      if (detail?.['stage'] === 'segments') {
-        plan.reason = detail['position'] === 'total'
-          ? 'split-line-into-segments'
-          : 'move-line-segments-to-series';
+      if (detail?.['stage'] === 'zipper-attractor') {
+        plan.reason = 'prepare-line-zipper';
+      } else if (detail?.['stage'] === 'zipper-preview') {
+        plan.reason = 'zip-line-series-with-reference';
       } else if (previousSpec && nextSpec) {
         const previousDetail = specState(previousSpec).sceneState?.detail as Record<string, unknown> | undefined;
-        if (previousDetail?.['stage'] === 'segments') plan.reason = 'connect-line-segments';
+        if (previousDetail?.['stage'] === 'zipper-preview') plan.reason = 'remove-line-reference';
       }
       return plan;
     }

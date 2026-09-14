@@ -3,7 +3,7 @@ import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds } from '../../focus.js';
 import { d3Curve } from './curve.js';
 import { linePointKeyAccessor, lineSeriesKey } from './keys.js';
-import { matchLinePathFrames } from './path.js';
+import { matchLinePathFrames, matchLinePaths, matchLineZipperFrames } from './path.js';
 import { connectedLineStretches, lineRowsAtTotal, lineState } from './state.js';
 import { drawLineAxes } from './axes.js';
 
@@ -123,10 +123,16 @@ class LineChart extends BaseChart {
     });
     const pointRadius = cameraSize(authoredPointRadius, camera);
     const lineWidth = cameraSize(spec.strokeWidth || themeValue('--vd-line-width', 3), camera);
-    const lineIsSplit = state.detailStage === 'segments';
-    const visiblePointRadius = lineIsSplit ? 0 : pointRadius;
+    const lineStage = state.detailStage || 'connected';
+    const lineIsZipper = lineStage.startsWith('zipper-');
+    const lineAtAttractor = lineStage === 'zipper-attractor';
+    const lineShowsReference = lineIsZipper;
+    const pointsAreExplicit = Number.isFinite(Number(spec.pointSize));
+    // A line is the default mark. Keyed circles remain as invisible geometry
+    // for tooltips and path matching unless the author explicitly requests dots.
+    const visiblePointRadius = pointsAreExplicit ? pointRadius : 0;
     const pointOpacity = (row) => lineSelectionOpacity(row, state.highlight, themeValue('--vd-dim-opacity', 0.22));
-    const visiblePointOpacity = (row) => lineIsSplit ? 0 : pointOpacity(row);
+    const visiblePointOpacity = (row) => pointsAreExplicit ? pointOpacity(row) : 0;
     const seriesOpacity = (entry) => entry.rows.length
       ? Math.max(...entry.rows.map(pointOpacity))
       : 1;
@@ -152,9 +158,8 @@ class LineChart extends BaseChart {
             .attr('d', (d) => line(d.rows))
             .attr('data-line-transition', 'draw-line')
             .each(function(d) { this.__visDeltaLineFrame = pathFrame(d); })
-            .attr('data-line-stage', lineIsSplit ? 'segments' : 'connected');
-          if (lineIsSplit) {
-            applySegmentPattern(entered, d3);
+            .attr('data-line-stage', lineIsZipper ? lineStage : 'connected');
+          if (lineAtAttractor) {
             return entered.style('opacity', 0).transition(t).style('opacity', (d) => seriesOpacity(d));
           }
           return entered
@@ -164,13 +169,14 @@ class LineChart extends BaseChart {
             .style('opacity', (d) => seriesOpacity(d));
         },
         (update) => {
-          const wasSplit = update.nodes().some((node) => node.getAttribute('data-line-stage') === 'segments');
+          const wasAttractor = update.nodes().some((node) =>
+            node.getAttribute('data-line-stage') === 'zipper-attractor');
           const prepared = update
             .attr('data-key', lineSeriesKey)
-            .attr('data-line-stage', lineIsSplit ? 'segments' : 'connected');
-          if (lineIsSplit) applySegmentPattern(prepared, d3);
-          else if (!wasSplit) prepared.attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
-          const moving = prepared
+            .attr('data-line-stage', lineIsZipper ? lineStage : 'connected')
+            .attr('stroke-dasharray', null)
+            .attr('stroke-dashoffset', null);
+          return prepared
             .transition(t)
             .duration(scaleDuration)
             .style('opacity', (d) => seriesOpacity(d))
@@ -178,18 +184,15 @@ class LineChart extends BaseChart {
             .attr('stroke-width', lineWidth)
             .attrTween('d', function(d) {
               const targetFrame = pathFrame(d);
-              const match = matchLinePathFrames(
-                this,
-                this.__visDeltaLineFrame,
-                targetFrame,
-                (points) => pointLine(points) || ''
-              );
+              const renderPoints = (points) => pointLine(points) || '';
+              const match = wasAttractor && lineStage === 'zipper-preview'
+                ? matchLineZipperFrames(this.__visDeltaLineFrame, targetFrame, renderPoints)
+                  || matchLinePathFrames(this, this.__visDeltaLineFrame, targetFrame, renderPoints)
+                : matchLinePathFrames(this, this.__visDeltaLineFrame, targetFrame, renderPoints);
               this.__visDeltaLineFrame = targetFrame;
               this.setAttribute('data-line-transition', match.strategy);
               return match.interpolate;
             });
-          if (wasSplit && !lineIsSplit) connectSegmentPattern(moving, d3);
-          return moving;
         },
         (exit) => exit
           .attr('data-line-transition', 'remove-line')
@@ -201,6 +204,84 @@ class LineChart extends BaseChart {
           // while the missing connection is drawn over them. The clean target
           // frame removes these duplicate pieces at progress 1.
           .style('opacity', addsObservations ? 1 : 0)
+          .remove()
+      );
+
+    // The reference is a temporary preview of the authored aggregate line.
+    // It uses the same thinnest reverse-contrast, dashed guide grammar as a
+    // structural divider, while a path-shaped SVG mask gives it the ordinary
+    // Line enter/retract motion. The preview waypoint finishes that draw before
+    // merge motion begins; canonical reverse playback gives split the exact
+    // opposite ordering.
+    const referenceRows = lineReferenceRows(
+      rows,
+      enc.x?.field,
+      enc.y?.field,
+      state.detailParentOp
+    );
+    const referencePath = lineShowsReference ? line(referenceRows) || '' : '';
+    const referenceMaskId = `vd-line-reference-mask-${chart.scene.clipIdentity}`;
+    const referenceDefs = chart.scene.svg.selectAll('defs.vd-line-reference-defs')
+      .data([null])
+      .join('defs')
+      .attr('class', 'vd-line-reference-defs');
+    const referenceMask = referenceDefs.selectAll(`mask#${referenceMaskId}`)
+      .data([null])
+      .join('mask')
+      .attr('id', referenceMaskId)
+      .attr('maskUnits', 'userSpaceOnUse')
+      .attr('x', -lineWidth)
+      .attr('y', -lineWidth)
+      .attr('width', chart.innerWidth + lineWidth * 2)
+      .attr('height', chart.innerHeight + lineWidth * 2);
+    referenceMask.selectAll('path.vd-line-reference-mask')
+      .data(referencePath ? [{ key: 'aggregate-reference-mask', path: referencePath }] : [], (d) => d.key)
+      .join(
+        (enter) => enter
+          .append('path')
+          .attr('class', 'vd-line-reference-mask')
+          .attr('data-key', (d) => d.key)
+          .attr('fill', 'none')
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 3)
+          .attr('d', (d) => d.path),
+        (update) => update
+          .attr('stroke-dasharray', null)
+          .attr('stroke-dashoffset', null)
+          .transition(t)
+          .attrTween('d', function(d) {
+            return matchLinePaths(this, d.path);
+          }),
+        (exit) => exit
+          .each(function() {
+            const length = Math.max(0, this.getTotalLength());
+            d3.select(this)
+              .attr('stroke-dasharray', `${length} ${length}`)
+              .attr('stroke-dashoffset', 0);
+          })
+          .transition(t)
+          .attr('stroke-dashoffset', function() { return this.getTotalLength(); })
+          .remove()
+      );
+    chart.g.selectAll('path.vd-line-reference')
+      .data(referencePath ? [{ key: 'aggregate-reference', path: referencePath }] : [], (d) => d.key)
+      .join(
+        (enter) => enter
+          .append('path')
+          .attr('class', 'vd-line-reference')
+          .attr('data-key', (d) => d.key)
+          .attr('data-line-stage', lineStage)
+          .attr('fill', 'none')
+          .attr('d', (d) => d.path)
+          .attr('mask', `url(#${referenceMaskId})`),
+        (update) => update
+          .attr('data-line-stage', lineStage)
+          .transition(t)
+          .attrTween('d', function(d) {
+            return matchLinePaths(this, d.path);
+          }),
+        (exit) => exit
+          .transition(t)
           .remove()
       );
 
@@ -218,6 +299,7 @@ class LineChart extends BaseChart {
           .attr('fill', (d) => color(d))
           .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
           .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
+          .style('opacity', pointsAreExplicit ? null : 0)
           .call(bindTooltip, spec, tooltip)
           .transition(enterTransition)
           .delay((d, i) => addedKeys.has(String(key(d, i)))
@@ -246,6 +328,7 @@ class LineChart extends BaseChart {
             ? chart.transition.exitDuration
             : (removedKeys.has(String(key(d, i))) ? pointDuration : lineDuration))
           .style('opacity', function(d, i) {
+            if (!pointsAreExplicit) return 0;
             return removedKeys.has(String(key(d, i)))
               ? this.style.opacity || 1
               : 0;
@@ -256,6 +339,18 @@ class LineChart extends BaseChart {
 
     drawLegend(chart, rows, enc.color, d3);
   }
+}
+
+function lineReferenceRows(rows, xField, yField, op) {
+  if (!xField || !yField) return [];
+  const aggregated = lineRowsAtTotal(rows, xField, yField, op);
+  const seen = new Set();
+  return aggregated.filter((row) => {
+    const key = row[xField];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function lineSelectionOpacity(row, selection, dimOpacity = 0.22) {
@@ -280,30 +375,4 @@ function drawLinePath(selection, transition, d3, duration = null) {
         d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
       });
   });
-}
-
-/** Give each series alternating ownership of short pieces of the parent line. */
-function applySegmentPattern(selection, d3) {
-  const count = Math.max(1, selection.size());
-  selection.each(function(d, index) {
-    const length = Math.max(1, this.getTotalLength());
-    const pieces = Math.max(4, (d.rows?.length || 2) - 1);
-    const piece = length / pieces / count;
-    d3.select(this)
-      .attr('stroke-dasharray', `${piece} ${piece * (count - 1)}`)
-      .attr('stroke-dashoffset', -index * piece);
-  });
-}
-
-/** Join the already-positioned pieces; geometry does not move in this step. */
-function connectSegmentPattern(transition, d3) {
-  transition
-    .attr('stroke-dasharray', function() {
-      const length = Math.max(1, this.getTotalLength());
-      return `${length} 0`;
-    })
-    .attr('stroke-dashoffset', 0)
-    .on('end.line-connect', function() {
-      d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
-    });
 }

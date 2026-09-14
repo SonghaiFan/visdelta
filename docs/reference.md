@@ -55,6 +55,7 @@ an authored type always wins.
 
 ```ts
 .data(source)
+.rows(source?)
 .sort(field, "ascending" | "descending")
 .where(selector)
 .highlight(selector, { opacity? })
@@ -64,18 +65,189 @@ an authored type always wins.
 .transition({ duration?, ease?, stagger? })
 ```
 
-Selectors accept a field comparison such as:
+`rows()` returns the current state’s tidy rows after all declared transforms.
+VisDelta owns the D3 and Arquero runtime, so no runtime object is required.
+Inline data is read directly; pass source rows only when the state uses a named
+dataset.
 
-```js
-{ field: "sales", gte: 10, lt: 100 }
-{ field: "region", oneOf: ["North", "South"] }
-{ region: "North" }
-{ region: "North", age: { gt: 80 } }
+### Selectors
+
+`where()`, `highlight()`, and `focus()` accept the same `selector`. A selector
+can use any one of these three forms:
+
+```ts
+type Selector =
+  | string
+  | {
+      field: string;
+      equal?: unknown;
+      notEqual?: unknown;
+      oneOf?: unknown[];
+      gt?: number | string | Date;
+      gte?: number | string | Date;
+      lt?: number | string | Date;
+      lte?: number | string | Date;
+    }
+  | Record<string, unknown>;
 ```
 
-`where()` changes membership, `highlight()` changes attention, and `focus()`
-changes only the camera. Repeated selectors compose as logical AND and act on
-the preceding immutable state. `reset()` returns a new visualization equal to
+#### Field shorthand
+
+Use a scalar for equality, an array for membership, or a constraint object for
+one or more comparisons. Multiple fields in one object are joined with AND.
+
+```js
+{ region: "North" }                         // region equal "North"
+{ region: ["North", "South"] }             // region oneOf [...]
+{ age: { gte: 18, lt: 65 } }                // 18 <= age < 65
+{ region: "North", age: { gt: 80 } }        // region AND age
+{ cancelledAt: null }                       // equality with null
+```
+
+#### Explicit field comparison
+
+Use `field` when the comparison should be explicit or when applying several
+bounds to the same field.
+
+```js
+{ field: "sales", equal: 100 }
+{ field: "sales", notEqual: 0 }
+{ field: "region", oneOf: ["North", "South"] }
+{ field: "sales", gt: 10 }
+{ field: "sales", gte: 10 }
+{ field: "sales", lt: 100 }
+{ field: "sales", lte: 100 }
+{ field: "sales", gte: 10, lt: 100 }
+{ field: "date", gte: "2026-01-01", lt: "2027-01-01" }
+```
+
+The supported operator names are exactly:
+
+| Operator | Meaning |
+| --- | --- |
+| `equal` | Strictly equal after date normalization |
+| `notEqual` | Not strictly equal after date normalization |
+| `oneOf` | Equal to at least one value in the array |
+| `gt` | Greater than |
+| `gte` | Greater than or equal |
+| `lt` | Less than |
+| `lte` | Less than or equal |
+
+Range operands must be finite numbers, JavaScript `Date` values, or valid ISO
+date strings. Missing values, empty strings, booleans, and `NaN` do not match a
+range. The operator is `equal`, not `equals`.
+
+#### Comparison expression
+
+A string selector contains exactly one comparison. Supported symbols are
+`===`, `==`, `!==`, `!=`, `>`, `>=`, `<`, and `<=`.
+
+```js
+"datum.sales >= 10"
+"datum.region === 'North'"
+"datum.active != false"
+"datum.cancelledAt == null"
+"datum.date < '2027-01-01'"
+```
+
+The left side must be `datum.<field>`. The right side must be a finite number,
+boolean, `null`, or quoted string. Selectors do not evaluate arbitrary
+JavaScript: callbacks, regular expressions, method calls, arithmetic, and
+cross-field expressions are rejected. Use `oneOf` for OR within one field;
+cross-field OR is not currently part of the selector grammar.
+
+#### Composition and transform order
+
+All conditions within a selector and all repeated calls to the same method are
+joined with AND. Each call narrows the previous immutable state; it does not
+replace the earlier condition.
+
+```js
+const olderNorth = base
+  .where({ region: ["North", "South"] })
+  .where({ region: "North" })
+  .where({ age: { gt: 80 } });
+```
+
+`where()` keeps its position in the transform pipeline. Filtering source rows
+before an aggregate is different from filtering aggregate rows after it:
+
+```js
+base.where({ region: "North" }).rollup();
+base.rollup().where({ sales: { gt: 100 } });
+```
+
+The selector's fields must exist at that point in the current state. An
+aggregate can remove source fields that are not part of its output grain.
+
+### `where(selector)`
+
+`where()` changes data membership. Matching rows stay; non-matching rows exit.
+It adds filter transforms to the returned state, so `state.rows()` also returns
+only matching rows. The source state is unchanged.
+
+```js
+const all = bar(rows).x("country").y("sites").key("country");
+const nordic = all.where({ country: ["Norway", "Sweden"] });
+
+all.rows();    // every row
+nordic.rows(); // Norway and Sweden only
+```
+
+Calling `where()` repeatedly narrows membership further. Use the earlier state,
+or `.reset()` when the intended next state should start from the original
+declaration instead of the already-filtered result.
+
+### `highlight(selector, options?)`
+
+`highlight()` changes attention without changing rows, identity, layout, axes,
+or scale domains. Matching marks retain full opacity; non-matching marks use the
+chart style's `--vd-dim-opacity` value.
+
+```js
+base.highlight({ country: "Norway" });
+base.highlight({ sites: { gte: 10 } }, { opacity: 0.08 });
+```
+
+The only option is:
+
+| Option | Type | Meaning |
+| --- | --- | --- |
+| `opacity` | `number` | Opacity applied to non-matching marks; normally use a value from `0` to `1` |
+
+`highlight()` has its own scope. It can coexist with `where()` and `focus()`,
+and repeated highlights are joined with AND. It does not change the result of
+`state.rows()`.
+
+### `focus(selector)`
+
+`focus()` changes only the view camera. Core finds the matching marks' rendered
+bounds, then applies one aspect-preserving two-dimensional pan and zoom to the
+chart. All rows and mark identities remain present. The selected subset does
+not recompute the underlying data domain; the visible scales and axes follow
+the camera.
+
+```js
+base.focus({ country: "Norway" });
+base.focus({ year: 2022, sites: { gte: 10 } });
+```
+
+There are no additional options. When no mark matches, the camera remains at
+the complete-chart view. Focus never zooms farther out than that view. Repeated
+focus calls are joined with AND, so use the earlier state or `.reset()` to
+replace an existing focus condition.
+
+The three scopes remain independent:
+
+```js
+const next = base
+  .where({ year: 2022 })
+  .highlight({ country: "Sweden" }, { opacity: 0.1 })
+  .focus({ country: ["Denmark", "Sweden"] });
+```
+
+Here `where()` determines membership, `highlight()` determines emphasis, and
+`focus()` determines the camera. `reset()` returns a new visualization equal to
 the declaration before the chain's first semantic operation.
 
 ### Lineage-aware delta
@@ -202,8 +374,6 @@ change.hasDelta("encoding.y");
 ```js
 const change = await transition(from, to, {
   target: "#chart",
-  d3,
-  aq,
   data,
   height,
   chartStyle
@@ -227,7 +397,7 @@ state positions, so `1.5` is halfway from the second state to the third.
 ```js
 import { sequence } from "visdelta/transition";
 
-const story = await sequence([revenue, profit, ranked], { target: "#chart", d3 });
+const story = await sequence([revenue, profit, ranked], { target: "#chart" });
 
 story.progress(1.5);              // halfway through profit → ranked
 story.play({ duration: 900 });    // 900ms for each adjacent leg
@@ -249,7 +419,7 @@ grammar calls still return a new immutable state; `play()` promotes it.
 ```js
 import * as vd from "visdelta";
 
-await vd.mount(salesByRegion, { target: "#chart", d3 });
+await vd.mount(salesByRegion, { target: "#chart" });
 
 await vd.select("#chart")
   .update(view => view.focus({ region: "North" }))

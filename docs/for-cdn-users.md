@@ -15,7 +15,6 @@ transition controlled by a slider.
     <input id="progress" type="range" min="0" max="1" step="0.01" value="0">
 
     <script type="module">
-      import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
       import { bar } from "https://cdn.jsdelivr.net/npm/visdelta@0.2.0/dist/bar.js";
       import { transition } from "https://cdn.jsdelivr.net/npm/visdelta@0.2.0/dist/transition-entry.js";
 
@@ -27,7 +26,7 @@ transition controlled by a slider.
 
       const from = bar(rows).x("category").y("revenue").key("category");
       const to = from.y("profit");
-      const change = await transition(from, to, { target: "#chart", d3 });
+      const change = await transition(from, to, { target: "#chart" });
 
       progress.addEventListener("input", event => {
         change.progress(event.currentTarget.valueAsNumber);
@@ -40,9 +39,9 @@ transition controlled by a slider.
 Pin exact versions for durable pages. The `0.2.0` URLs describe this release
 candidate and become available only after publication.
 
-Arquero is needed only for current transform-backed declarations. Import it and
-pass `{ aq }` when using `.where()`, `.sort()`, `.breakdown()`, `.rollup()`, or
-another operation that produces transforms.
+VisDelta includes its shared D3 and Arquero runtime. Use chart operations such
+as `.where()`, `.sort()`, `.breakdown()`, and `.rollup()` directly; authors do
+not import or pass either dependency.
 
 The browser-global build exposes the same chart and transition API as
 `window.VisDelta`.

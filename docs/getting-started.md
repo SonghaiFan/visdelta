@@ -6,23 +6,18 @@ between two states of the same chart type. The application supplies progress.
 ## Install
 
 ```sh
-npm install visdelta@0.2.0 d3
+npm install visdelta@0.2.0
 ```
 
 The new package identity is currently a `0.2.0` release candidate in this
 checkout; the command becomes valid after publication.
 
-Install Arquero as well only while using the current transform-backed methods
-such as `.where()`, `.sort()`, `.breakdown()`, or `.rollup()`:
-
-```sh
-npm install arquero@8
-```
+VisDelta includes the D3 and Arquero runtime used by rendering and transforms,
+so chart code does not install, import, or pass either dependency separately.
 
 ## Declare two states
 
 ```js
-import * as d3 from "d3";
 import { bar } from "visdelta/bar";
 import { transition } from "visdelta/transition";
 import "visdelta/style.css";
@@ -47,8 +42,7 @@ The second declaration branches from the first. It does not mutate `revenue`.
 
 ```js
 const change = await transition(revenue, profit, {
-  target: "#chart",
-  d3
+  target: "#chart"
 });
 
 change.progress(0.42);

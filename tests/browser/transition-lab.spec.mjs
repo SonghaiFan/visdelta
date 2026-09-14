@@ -84,11 +84,12 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
     } : null;
     });
   };
-  const earlyDivider = await readDivider(0.02);
-  const splitDivider = await readDivider(0.06);
-  expect(earlyDivider?.length).toBeGreaterThan(0);
-  expect(earlyDivider?.length).toBeLessThan(splitDivider?.length);
-  expect(splitDivider?.opacity).toBeGreaterThan(0.5);
+  const sourceDivider = await readDivider(0.05);
+  const targetDivider = await readDivider(0.95);
+  expect(sourceDivider?.length).toBeGreaterThan(0);
+  expect(targetDivider?.length).toBeGreaterThan(0);
+  expect(sourceDivider?.opacity).toBeCloseTo(targetDivider?.opacity, 5);
+  expect(sourceDivider?.length).toBeCloseTo(targetDivider?.length, 5);
   await page.locator('#progress').fill('0.5');
   await expect(page.locator('#chart rect.vd-bar')).toHaveCount(4);
   await expect(page.locator('#chart rect.vd-bar').first()).toBeVisible();

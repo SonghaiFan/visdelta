@@ -156,7 +156,7 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
   const total = detailed.rollup().toSpec();
   assert.equal(detailSpec.encoding.y.format, '~s');
   assert.equal(detailSpec.encoding.x.title, 'Region');
-  assert.equal(detailSpec.encoding.y.title, 'Residents');
+  assert.equal(detailSpec.encoding.y.title, 'Sum of Residents');
   assert.deepEqual(total.transform, [{
     aggregate: {
       groupby: ['state'],
@@ -165,6 +165,37 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
   }]);
   assert.equal(total.encoding.color, undefined);
   assert.equal(total.encoding.y.field, 'population');
+  assert.equal(total.encoding.y.title, 'Sum of Residents');
+});
+
+test('bar aggregate axes describe the default operation', () => {
+  const rows = [
+    { quarter: 'Q1', region: 'North', revenue: 12 },
+    { quarter: 'Q1', region: 'South', revenue: 8 }
+  ];
+  const base = bar(rows).x('quarter').y('revenue', { title: 'Revenue' });
+
+  assert.equal(base.rollup().toSpec().encoding.y.title, 'Sum of Revenue');
+  assert.equal(base.rollup({ op: 'count' }).toSpec().encoding.y.title, 'Count of Revenue');
+  assert.equal(base.rollup({ title: 'Quarter total' }).toSpec().encoding.y.title, 'Quarter total');
+  assert.equal(
+    base.breakdown('region').rollup().toSpec().encoding.y.title,
+    'Sum of Revenue'
+  );
+});
+
+test('chart rows materializes the current tidy state without runtime dependencies', () => {
+  const rows = [
+    { year: 2004, country: 'Norway', sites: 5 },
+    { year: 2004, country: 'Denmark', sites: 4 },
+    { year: 2022, country: 'Norway', sites: 8 }
+  ];
+  const chart = bar(rows).x('year').y('sites').rollup();
+
+  assert.deepEqual(chart.rows(), [
+    { year: 2004, sites: 9 },
+    { year: 2022, sites: 8 }
+  ]);
 });
 
 test('where changes rows while focus keeps rows and changes the view', () => {

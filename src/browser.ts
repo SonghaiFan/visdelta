@@ -5,26 +5,19 @@ export { area, availableChartTypes, bar, buildGroupingTree, compileLineage, corr
   chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, line, paperChartStyle, point, registerChartType, registerChartModule, unit,
   resolveEncodingTypes, select, UNIT_LAYOUTS, viewLineageCorrespondence, visualizationSpec } from './index.js';
 
-type BrowserOptions = Record<string, unknown>;
-function dependencies(options: BrowserOptions): BrowserOptions {
-  const globals = globalThis as unknown as Record<string, unknown>;
-  return { ...options, d3: options.d3 ?? globals['d3'],
-    aq: options.aq ?? globals['aq'] };
-}
-
 export function transition(from: Visualization, to: Visualization, options: Partial<TransitionOptions> = {}) {
-  return core.transition(from, to, { ...options, ...dependencies(options) } as TransitionOptions);
+  return core.transition(from, to, options);
 }
 
 export function sequence(states: readonly Visualization[], options: Partial<TransitionOptions> = {}) {
-  return core.sequence(states, { ...options, ...dependencies(options) } as TransitionOptions);
+  return core.sequence(states, options);
 }
 
 export function mount(visualization: Visualization, options: Partial<TransitionOptions> = {}) {
-  return core.mount(visualization, { ...options, ...dependencies(options) } as TransitionOptions);
+  return core.mount(visualization, options);
 }
 
-// Only dependency lookup and global installation differ from the ESM entry.
+// Only global installation differs from the ESM entry.
 const browserApi = { ...core, transition, sequence, mount };
 (globalThis as unknown as Record<string, unknown>)['VisDelta'] = browserApi;
 (globalThis as unknown as Record<string, unknown>)['vd'] = browserApi;

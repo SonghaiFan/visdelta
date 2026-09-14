@@ -28,3 +28,19 @@ export function labelFromValue(value: unknown): string {
   const text = String(value ?? '');
   return text.includes('_') || text.includes('-') ? titleize(text) : text;
 }
+
+export function aggregateTitle(op: unknown, valueTitle: unknown): string {
+  const operation = titleize(op);
+  const rawValue = String(valueTitle ?? '').trim();
+  const value = rawValue.includes('_') || rawValue.includes('-')
+    ? titleize(rawValue)
+    : rawValue.replace(/^\w/, (letter) => letter.toUpperCase());
+  if (!operation) return value;
+  if (!value || operation.toLowerCase() === value.toLowerCase()) return operation;
+  if (new RegExp(`^${escapeRegExp(operation)}(?:\\s+of)?\\s+`, 'i').test(value)) return value;
+  return `${operation} of ${value}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

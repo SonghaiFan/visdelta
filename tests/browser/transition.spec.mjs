@@ -284,6 +284,7 @@ test('additive reaggregation bridges the grouped common grain through stacked to
     const layouts = phases.map(phase =>
       phase.spec.meta?.state?.sceneState?.detail?.layout ?? null
     );
+    const reverses = phases.map(phase => phase.reverse ?? false);
     const rendered = phases.map((phase) => {
       change.progress((phase.start + phase.end) / 2);
       const bars = [...change.view.querySelectorAll('rect.vd-bar')]
@@ -293,23 +294,37 @@ test('additive reaggregation bridges the grouped common grain through stacked to
         grouped: bars.some(node => node.classList.contains('vd-bar-grouped'))
       };
     });
-    const dividers = [phases[0], phases.at(-1)].map((phase) => {
-      change.progress(phase.start + (phase.end - phase.start) * 0.1);
-      return [...change.view.querySelectorAll('path.vd-bar-seam')].some(node =>
-        Number(getComputedStyle(node).opacity) > 0.001 && node.getTotalLength() > 0
-      );
-    });
-    return { layouts, rendered, dividers };
+    const dividerFrame = (phase, localProgress) => {
+      change.progress(phase.start + (phase.end - phase.start) * localProgress);
+      const seam = [...change.view.querySelectorAll('path.vd-bar-seam')]
+        .find(node => Number(getComputedStyle(node).opacity) > 0.001);
+      const widths = [...change.view.querySelectorAll('rect.vd-bar')]
+        .filter(node => Number(getComputedStyle(node).opacity) > 0.001)
+        .map(node => Number(node.getAttribute('width')) || 0);
+      return seam ? {
+        opacity: Number(getComputedStyle(seam).opacity),
+        relativeLength: seam.getTotalLength() / Math.max(...widths, 1)
+      } : null;
+    };
+    const dividerFrames = [
+      dividerFrame(phases[0], 0.1),
+      dividerFrame(phases.at(-1), 0.9)
+    ];
+    return { layouts, reverses, rendered, dividerFrames };
   });
 
-  expect(result.layouts).toEqual(['stacked', 'grouped', 'grouped', 'stacked', null]);
+  expect(result.layouts).toEqual(['stacked', 'grouped', 'grouped', 'stacked', 'stacked']);
+  expect(result.reverses).toEqual([false, false, false, false, true]);
   expect(result.rendered.slice(0, 4)).toEqual([
     { stacked: true, grouped: false },
     { stacked: false, grouped: true },
     { stacked: false, grouped: true },
     { stacked: true, grouped: false }
   ]);
-  expect(result.dividers).toEqual([true, true]);
+  expect(result.dividerFrames.every(Boolean)).toBe(true);
+  expect(result.dividerFrames[0].opacity).toBeCloseTo(result.dividerFrames[1].opacity, 5);
+  expect(result.dividerFrames[0].relativeLength)
+    .toBeCloseTo(result.dividerFrames[1].relativeLength, 5);
 });
 
 test('reaggregation uses the same lineage motion in reverse', async ({ page }) => {

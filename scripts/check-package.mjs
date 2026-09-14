@@ -100,7 +100,6 @@ const forbiddenDistPatterns = [
   /\.DS_Store$/
 ];
 const forbiddenSourceText = [
-  "?v=",
   "globalThis.d3",
   "globalThis.aq",
   "configureRuntimeDependencies",

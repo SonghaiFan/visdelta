@@ -14,7 +14,6 @@ import { paperChartStyle } from "visdelta/chart-style";
 
 const change = await transition(from, to, {
   target: "#chart",
-  d3,
   chartStyle: paperChartStyle
 });
 ```
