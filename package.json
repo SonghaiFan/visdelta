@@ -128,8 +128,8 @@
     "@playwright/test": "^1.63.0",
     "arquero": "^8.0.0",
     "d3": "^7.0.0",
-    "esbuild": "^0.28.0",
+    "esbuild": "0.28.2",
     "typescript": "^5.9.3",
-    "vitepress": "^1.6.4"
+    "vitepress": "2.0.0-alpha.20"
   }
 }

@@ -6,7 +6,8 @@ the same semantic concept.
 
 ## Local checks
 
-Use Node 20+ for development tooling. The package supports Node 18 consumers.
+Use Node 20.19+ or 22.12+ for development tooling. The package supports Node 18
+consumers.
 
 ```sh
 npm ci
