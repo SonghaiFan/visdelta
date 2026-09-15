@@ -244,13 +244,29 @@ function rowMatchesScene(row: DataRow | null, selector: SceneSelector = {}, sele
     if ('equal' in selector) return value === selector.equal;
     if ('value' in selector) return value === selector.value;
     if ('oneOf' in selector) return Boolean(selector.oneOf?.includes(value));
-    if ('gte' in selector && (value as any) < (selector.gte as any)) return false;
-    if ('gt' in selector && (value as any) <= (selector.gt as any)) return false;
-    if ('lte' in selector && (value as any) > (selector.lte as any)) return false;
-    if ('lt' in selector && (value as any) >= (selector.lt as any)) return false;
+    if ('gte' in selector && compareValues(value, selector.gte) < 0) return false;
+    if ('gt' in selector && compareValues(value, selector.gt) <= 0) return false;
+    if ('lte' in selector && compareValues(value, selector.lte) > 0) return false;
+    if ('lt' in selector && compareValues(value, selector.lt) >= 0) return false;
     return Boolean(value);
   }
   return selectedRow ? row === selectedRow : false;
+}
+
+/**
+ * JavaScript's relational rule, spelled out: two strings compare lexically,
+ * anything else numerically (Dates by their time). NaN never orders.
+ */
+function compareValues(a: unknown, b: unknown): number {
+  const left = a instanceof Date ? a.getTime() : a;
+  const right = b instanceof Date ? b.getTime() : b;
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+  const x = Number(left);
+  const y = Number(right);
+  if (Number.isNaN(x) || Number.isNaN(y)) return NaN;
+  return x < y ? -1 : x > y ? 1 : 0;
 }
 
 function sceneRowKey(row: DataRow | null, spec: ViewSpec = {}): string {

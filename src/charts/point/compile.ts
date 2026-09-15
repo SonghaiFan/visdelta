@@ -78,7 +78,7 @@ function compilePointAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _cont
         y: { ...y, field: yAs, title: (detailSpec['y'] as ChannelSpec & { title?: string })?.title || aggregateTitle(yAggregate.op, y.title || y.field!) },
         ...(size ? { size: size.channel } : {})
       }
-    }, { key: (detailSpec['key'] as string) || groupby as unknown as string }), {
+    }, { key: (detailSpec['key'] as string | string[] | undefined) || groupby }), {
       detail: { mode, groupby, ...(size ? { size: size.aggregate } : {}) }
     });
   }

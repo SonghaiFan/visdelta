@@ -59,20 +59,20 @@ export class UnitState extends ChartState<UnitViewState> {
 
   columns(value: number): this {
     assertPositiveInteger(value, 'Unit columns');
-    return withUnitAxis(this, { columns: value }) as unknown as this;
+    return withUnitAxis(this, { columns: value });
   }
 
   radius(value: number): this {
     if (!Number.isFinite(value) || value <= 0) {
       throw new Error('Unit radius must be a positive finite number.');
     }
-    return withUnitAxis(this, { radius: value }) as unknown as this;
+    return withUnitAxis(this, { radius: value });
   }
 
   /** Declare categorical membership without silently choosing a layout or color. */
   group(field: string): this {
     if (!field) throw new Error('Unit group requires a field name.');
-    return withUnitAxis(this, { group: field }) as unknown as this;
+    return withUnitAxis(this, { group: field });
   }
 
   /** Choose how the same keyed units are arranged. */
@@ -88,12 +88,12 @@ export class UnitState extends ChartState<UnitViewState> {
       layout: name,
       ...(options.columns != null ? { columns: options.columns } : {}),
       ...(options.radius != null ? { radius: options.radius } : {})
-    }) as unknown as this;
+    });
   }
 }
 
-function withUnitAxis(state: UnitState, axis: Record<string, unknown>): UnitState {
-  return state.axis(axis) as unknown as UnitState;
+function withUnitAxis<T extends UnitState>(state: T, axis: Record<string, unknown>): T {
+  return state.axis(axis);
 }
 
 function assertPositiveInteger(value: number, label: string): void {

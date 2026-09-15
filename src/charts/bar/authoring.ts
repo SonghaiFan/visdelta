@@ -133,12 +133,12 @@ export class BarState extends ChartState<BarViewState> {
       layout: options.layout ?? 'stacked',
       op
     });
-    return (options.title === false
+    return options.title === false
       ? next
       : next.y(value, {
           title: nextTitle,
           format: currentY?.format
-        })) as unknown as this;
+        });
   }
 
   rollup(
@@ -211,16 +211,16 @@ export class BarState extends ChartState<BarViewState> {
       const colorFields = channelFields(next.encoding?.color);
       if (colorFields.some((field) => !fields.includes(field))) {
         delete next.encoding?.color;
-        nextState = new BarState(next);
+        nextState = nextState.derive(next);
       }
     }
     const currentY = (this.state as BarViewState).encoding?.y;
     nextState = nextState.y(value, {
       title: title ?? aggregateTitle(op, currentY?.title ?? value),
       format: currentY?.format
-    }) as BarState;
-    if (color) nextState = nextState.color(color as string | ChannelSpec) as BarState;
-    return nextState as unknown as this;
+    });
+    if (color) nextState = nextState.color(color as string | ChannelSpec);
+    return nextState;
   }
 
   segment(
@@ -310,8 +310,8 @@ function channelFields(channel: ChannelSpec | undefined): string[] {
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-function aggregateBarState(
-  view: BarState,
+function aggregateBarState<T extends BarState>(
+  view: T,
   config: {
     by?: string | string[];
     groupby?: string | string[];
@@ -331,7 +331,7 @@ function aggregateBarState(
     semanticKey?: SemanticKey;
     [key: string]: unknown;
   }
-): BarState {
+): T {
   const normalized = normalizeAggregation(config, view.state as BarViewState);
   const { groupby, segment } = normalized;
 

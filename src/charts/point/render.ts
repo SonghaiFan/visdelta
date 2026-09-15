@@ -1,6 +1,7 @@
 import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds, viewHighlight, viewSelection } from '../../focus.js';
 import { applyTransforms } from '../../data/transforms.js';
+import type { Arquero } from '../../data/transforms.js';
 import { drawPointAxes } from './axes.js';
 import { applyPointIdentity, pointKeyAccessor, pointStoredKey } from './keys.js';
 import { defaultPointRadius, parentAnchors, parentKey, pointState, radiusScale } from './state.js';
@@ -79,8 +80,10 @@ class PointChart extends BaseChart<PointViewState> {
     const viewEnc = state.view?.encoding || enc;
     const viewXField = viewEnc.x?.field ?? '';
     const viewYField = viewEnc.y?.field ?? '';
+    // The runtime threads its Arquero instance onto the chart; it is not part of the public context.
+    const runtimeAq = (chart as ChartContext & { aq?: Arquero }).aq;
     const viewRows = state.view
-      ? applyTransforms(chart.sourceRows ?? [], state.view.transform || [], chart.aq)
+      ? applyTransforms(chart.sourceRows ?? [], state.view.transform || [], runtimeAq)
       : rows;
     const connector = resolvePointConnector(spec, viewEnc);
     const selection = viewSelection(spec);

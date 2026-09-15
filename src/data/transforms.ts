@@ -1,32 +1,16 @@
+// Declared transforms.
+//
+// A chart state carries its transforms as data — `{ aggregate: { groupby,
+// fields } }` and friends — so specs stay serializable and diffable. This file
+// is the executor for that grammar: six row operations plus `limit`, run in
+// declaration order over plain records. It has no dependencies; the operations
+// are small enough that a table library would cost more than it saves.
+
 import type { FilterSpec, TransformSpec } from '../types/index.js';
 import { filterPredicate } from './filter.js';
 import { validateTransforms } from './validate.js';
-import { runtimeAq } from '../runtime/dependencies.js';
 
-interface ArqueroTable {
-  objects(): Record<string, unknown>[];
-  filter(fn: unknown): ArqueroTable;
-  derive(spec: Record<string, unknown>): ArqueroTable;
-  fold(fields: string[], options: Record<string, unknown>): ArqueroTable;
-  orderby(...fields: unknown[]): ArqueroTable;
-  slice(start: number, end?: number): ArqueroTable;
-  groupby(...fields: string[]): ArqueroTable;
-  rollup(spec: Record<string, unknown>): ArqueroTable;
-}
-
-interface Arquero {
-  from(data: Record<string, unknown>[]): ArqueroTable;
-  escape<T>(fn: (row: T) => unknown): unknown;
-  desc(field: string): unknown;
-  op: {
-    count(): unknown;
-    mean(field: string): unknown;
-    min(field: string): unknown;
-    max(field: string): unknown;
-    median(field: string): unknown;
-    sum(field: string): unknown;
-  };
-}
+type Row = Record<string, unknown>;
 
 interface FoldTransform {
   fields?: string[];
@@ -66,35 +50,33 @@ interface AggregateTransform {
   fields?: AggregateFieldSpec[];
 }
 
-export function applyTransforms(
-  source: Record<string, unknown>[],
-  transforms: TransformSpec[] = [],
-  aq: Arquero = runtimeAq as unknown as Arquero
-): Record<string, unknown>[] {
+export function applyTransforms(source: Row[], transforms: TransformSpec[] = []): Row[] {
   validateTransforms(transforms);
   if (!transforms.length) return source.map((row) => ({ ...row }));
-  const fields = [...new Set(source.flatMap(row => Object.keys(row)))];
-  let table = aq.from(source.map(row => Object.fromEntries(fields.map(field => [field, row[field]]))));
+  // Every row carries every field, so later steps see one consistent shape.
+  const fields = [...new Set(source.flatMap((row) => Object.keys(row)))];
+  let rows = source.map((row) => Object.fromEntries(fields.map((field) => [field, row[field]])));
 
-  transforms.forEach((transform) => {
+  for (const transform of transforms) {
     const t = transform as Record<string, unknown>;
-    if (t['filter']) table = filterRows(table, t['filter'] as FilterSpec, aq);
-    if (t['timeUnit']) table = timeUnitRows(table, t['timeUnit'] as TimeUnitTransform, aq);
-    if (t['fold']) table = foldRows(table, t['fold'] as FoldTransform, aq);
-    if (t['bin']) table = binRows(table, t['bin'] as BinTransform, aq);
-    if (t['aggregate']) table = aggregateRows(table, t['aggregate'] as AggregateTransform, aq);
-    if (t['sort']) table = sortRows(table, t['sort'] as SortTransformSpec, aq);
-    if ('limit' in t) table = table.slice(0, t['limit'] as number);
-  });
-
-  return table.objects();
+    if (t['filter']) rows = filterRows(rows, t['filter'] as FilterSpec);
+    if (t['timeUnit']) rows = timeUnitRows(rows, t['timeUnit'] as TimeUnitTransform);
+    if (t['fold']) rows = foldRows(rows, t['fold'] as FoldTransform);
+    if (t['bin']) rows = binRows(rows, t['bin'] as BinTransform);
+    if (t['aggregate']) rows = aggregateRows(rows, t['aggregate'] as AggregateTransform);
+    if (t['sort']) rows = sortRows(rows, t['sort'] as SortTransformSpec);
+    if ('limit' in t) rows = rows.slice(0, t['limit'] as number);
+  }
+  return rows;
 }
 
-function timeUnitRows(table: ArqueroTable, timeUnit: TimeUnitTransform, aq: Arquero): ArqueroTable {
+function filterRows(rows: Row[], filter: FilterSpec): Row[] {
+  return rows.filter(filterPredicate(filter));
+}
+
+function timeUnitRows(rows: Row[], timeUnit: TimeUnitTransform): Row[] {
   const as = timeUnit.as || `${timeUnit.field}_${timeUnit.unit}`;
-  return table.derive({
-    [as]: aq.escape((row: Record<string, unknown>) => monthLabel(row[timeUnit.field]))
-  });
+  return rows.map((row) => ({ ...row, [as]: monthLabel(row[timeUnit.field]) }));
 }
 
 function monthLabel(value: unknown): string {
@@ -103,92 +85,118 @@ function monthLabel(value: unknown): string {
   return date.toLocaleString('en', { month: 'short' });
 }
 
-function filterRows(table: ArqueroTable, filter: FilterSpec, aq: Arquero): ArqueroTable {
-  return table.filter(aq.escape(filterPredicate(filter)));
-}
-
-function foldRows(table: ArqueroTable, fold: FoldTransform, aq: Arquero): ArqueroTable {
+/** One output row per folded field, keeping the other columns; folded columns are dropped. */
+function foldRows(rows: Row[], fold: FoldTransform): Row[] {
   const fields = fold.fields || [];
   const [keyAs = 'key', valueAs = 'value'] = fold.as || [];
   const sourceAs = fold.sourceAs || '__foldField';
   const labelAs = fold.labelAs || keyAs;
-
-  let folded = table.fold(fields, { as: [sourceAs, valueAs] });
-
-  if (sourceAs !== keyAs || fold.labels) {
-    const labels = fold.labels || {};
-    folded = folded.derive({
-      [labelAs]: aq.escape((row: Record<string, unknown>) => labels[row[sourceAs] as string] ?? row[sourceAs])
-    });
+  const relabel = sourceAs !== keyAs || fold.labels;
+  const labels = fold.labels || {};
+  const folded: Row[] = [];
+  for (const row of rows) {
+    const kept: Row = {};
+    for (const [field, value] of Object.entries(row)) if (!fields.includes(field)) kept[field] = value;
+    for (const field of fields) {
+      const out: Row = { ...kept, [sourceAs]: field, [valueAs]: row[field] };
+      if (relabel) out[labelAs] = labels[field] ?? field;
+      folded.push(out);
+    }
   }
-
   return folded;
 }
 
-function binRows(table: ArqueroTable, bin: BinTransform, aq: Arquero): ArqueroTable {
+function binRows(rows: Row[], bin: BinTransform): Row[] {
   const as = bin.as || `${bin.field}_bin`;
   const startAs = `${as}_start`;
   const endAs = `${as}_end`;
-  const rows = table.objects();
-  const numeric = (value: unknown) => value == null || value === '' || typeof value === 'boolean' ? NaN : Number(value);
   const values = rows.map((row) => numeric(row[bin.field])).filter(Number.isFinite);
-  const min = values.length ? values.reduce((a, b) => Math.min(a, b)) : 0;
-  const max = values.length ? values.reduce((a, b) => Math.max(a, b)) : 0;
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 0;
   const step = bin.step ?? Math.max(1, Math.ceil((max - min) / (bin.maxbins ?? 10)));
-
-  return table.derive({
-    [startAs]: aq.escape((row: Record<string, unknown>) => {
-      const value = numeric(row[bin.field]);
-      if (!Number.isFinite(value)) return null;
-      return Math.floor((value - min) / step) * step + min;
-    }),
-    [endAs]: aq.escape((row: Record<string, unknown>) => {
-      const value = numeric(row[bin.field]);
-      if (!Number.isFinite(value)) return null;
-      return Math.floor((value - min) / step) * step + min + step;
-    }),
-    [as]: aq.escape((row: Record<string, unknown>) => {
-      const value = numeric(row[bin.field]);
-      if (!Number.isFinite(value)) return null;
-      const start = Math.floor((value - min) / step) * step + min;
-      return `${start}-${start + step}`;
-    })
+  return rows.map((row) => {
+    const value = numeric(row[bin.field]);
+    if (!Number.isFinite(value)) return { ...row, [startAs]: null, [endAs]: null, [as]: null };
+    const start = Math.floor((value - min) / step) * step + min;
+    return { ...row, [startAs]: start, [endAs]: start + step, [as]: `${start}-${start + step}` };
   });
 }
 
-function aggregateRows(table: ArqueroTable, aggregate: AggregateTransform, aq: Arquero): ArqueroTable {
-  const groupby = aggregate.groupby || [];
-  const fields = aggregate.fields || [{ op: 'count', as: 'count' }];
-  const values = Object.fromEntries(
-    fields.map((fieldSpec) => [
-      fieldSpec.as || `${fieldSpec.op || 'count'}_${fieldSpec.field || 'rows'}`,
-      aggregateExpression(fieldSpec, aq)
-    ])
-  );
-  return table.groupby(...groupby).rollup(values);
+function numeric(value: unknown): number {
+  return value == null || value === '' || typeof value === 'boolean' ? NaN : Number(value);
 }
 
-function aggregateExpression(fieldSpec: AggregateFieldSpec, aq: Arquero): unknown {
+/** Groups keep first-appearance order; output columns are the group keys then the aggregates. */
+function aggregateRows(rows: Row[], aggregate: AggregateTransform): Row[] {
+  const groupby = aggregate.groupby || [];
+  const fields = aggregate.fields || [{ op: 'count', as: 'count' }];
+  const groups = new Map<string, { keys: Row; rows: Row[] }>();
+  for (const row of rows) {
+    const keys = Object.fromEntries(groupby.map((field) => [field, row[field]]));
+    const id = JSON.stringify(groupby.map((field) => keyToken(row[field])));
+    let group = groups.get(id);
+    if (!group) { group = { keys, rows: [] }; groups.set(id, group); }
+    group.rows.push(row);
+  }
+  return [...groups.values()].map(({ keys, rows: members }) => {
+    const out: Row = { ...keys };
+    for (const fieldSpec of fields) {
+      const name = fieldSpec.as || `${fieldSpec.op || 'count'}_${fieldSpec.field || 'rows'}`;
+      out[name] = aggregateValue(members, fieldSpec);
+    }
+    return out;
+  });
+}
+
+function keyToken(value: unknown): unknown {
+  return value instanceof Date ? `date:${value.getTime()}` : value === undefined ? '__undefined' : value;
+}
+
+/** Missing values (null, undefined, NaN) are skipped by every operator except count, which counts rows. */
+function aggregateValue(rows: Row[], fieldSpec: AggregateFieldSpec): number | null {
   const op = fieldSpec.op || 'count';
-  const field = fieldSpec.field || '';
-  if (op === 'count') return aq.op.count();
-  if (op === 'mean') return aq.op.mean(field);
-  if (op === 'min') return aq.op.min(field);
-  if (op === 'max') return aq.op.max(field);
-  if (op === 'median') return aq.op.median(field);
-  if (op === 'sum') return aq.op.sum(field);
+  if (op === 'count') return rows.length;
+  const values = rows
+    .map((row) => row[fieldSpec.field || ''])
+    .filter((value) => value != null && !Number.isNaN(value as number))
+    .map((value) => Number(value));
+  if (!values.length) return op === 'sum' ? 0 : null;
+  if (op === 'sum') return values.reduce((a, b) => a + b, 0);
+  if (op === 'mean') return values.reduce((a, b) => a + b, 0) / values.length;
+  if (op === 'min') return Math.min(...values);
+  if (op === 'max') return Math.max(...values);
+  if (op === 'median') {
+    const sorted = [...values].sort((a, b) => a - b);
+    const position = (sorted.length - 1) / 2;
+    const lower = sorted[Math.floor(position)];
+    const upper = sorted[Math.ceil(position)];
+    return lower + (upper - lower) * (position - Math.floor(position));
+  }
   throw new Error(`Unsupported aggregate operator: ${op}`);
 }
 
-function sortRows(table: ArqueroTable, sort: SortTransformSpec, aq: Arquero): ArqueroTable {
-  if (Array.isArray(sort.fields)) {
-    return table.orderby(...sort.fields.map((field) => sortField(field, aq)));
-  }
-  return table.orderby(sortField(sort, aq));
+function sortRows(rows: Row[], sort: SortTransformSpec): Row[] {
+  const keys = (Array.isArray(sort.fields) ? sort.fields : [sort]).map(sortKey);
+  // Stable sort: rows that compare equal keep their declaration order.
+  return [...rows].sort((a, b) => {
+    for (const { field, direction } of keys) {
+      const order = compareValues(a[field], b[field]) * direction;
+      if (order) return order;
+    }
+    return 0;
+  });
 }
 
-function sortField(sort: string | { field?: string; order?: string }, aq: Arquero): unknown {
-  if (typeof sort === 'string') return sort;
-  if (sort.order === 'descending') return aq.desc(sort.field || '');
-  return sort.field;
+function sortKey(sort: string | { field?: string; order?: string }): { field: string; direction: 1 | -1 } {
+  if (typeof sort === 'string') return { field: sort, direction: 1 };
+  if (!sort.field) throw new Error('Sort transform needs a field.');
+  return { field: sort.field, direction: sort.order === 'descending' ? -1 : 1 };
+}
+
+/** Missing values sort first ascending; otherwise the language's own `<` ordering. */
+function compareValues(a: unknown, b: unknown): number {
+  const missingA = a == null || (typeof a === 'number' && Number.isNaN(a));
+  const missingB = b == null || (typeof b === 'number' && Number.isNaN(b));
+  if (missingA || missingB) return missingA === missingB ? 0 : missingA ? -1 : 1;
+  return (a as number) < (b as number) ? -1 : (a as number) > (b as number) ? 1 : 0;
 }

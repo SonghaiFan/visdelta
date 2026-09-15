@@ -14,13 +14,12 @@ import { clearSceneTransitionProgress } from '../transition-progress.js';
 import type { SceneHostElement } from './scene.js';
 import type { FrameEvaluator } from './tracks.js';
 import type { ChartType, D3Lib, MarginSpec, RuntimeOptions } from '../types/index.js';
+import type { Arquero } from '../data/transforms.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
-import type { applyTransforms } from '../data/transforms.js';
 
-type ArqueroRuntime = NonNullable<Parameters<typeof applyTransforms>[2]>;
-
-export interface TransitionSurfaceOptions extends RuntimeOptions {
+export interface TransitionSurfaceOptions extends Omit<RuntimeOptions, 'aq'> {
   d3: D3Lib;
+  aq: Arquero;
   height?: number;
   /** Force the reconstruction bridge even for chart types that allow cached frames. */
   reconstruct?: boolean;
@@ -50,9 +49,7 @@ export function createTransitionSurface(
   options: TransitionSurfaceOptions,
   chartTypes: ChartTypeRegistry
 ): TransitionSurface {
-  const { d3 } = options;
-  // The public option is an opaque runtime bag; the resolved runtime always supplies Arquero.
-  const aq = options.aq as unknown as ArqueroRuntime;
+  const { d3, aq } = options;
   const { drawView, prepareSeekSourceState, compileTransitionSource,
     renderSeekPhase, applySeekSequence } = createViewRenderer(chartTypes);
   const chartType = chartTypes.get(from);

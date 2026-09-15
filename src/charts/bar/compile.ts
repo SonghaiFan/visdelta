@@ -1,4 +1,4 @@
-import type { BarOrientation, ChannelSpec, SpecCompiler, ViewSpec } from '../../types/index.js';
+import type { BarOrientation, ChannelSpec, SemanticKey, SemanticKeyPart, SpecCompiler, ViewSpec } from '../../types/index.js';
 import {
   specObjectKey,
   specSemanticKey,
@@ -182,10 +182,10 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
     transform,
     encoding: newEncoding as ViewSpec['encoding']
   }, {
-    key: (detailSpec['key'] as string) || [categoryField, segmentField] as unknown as string,
-    semantic: (detailSpec['semantic'] as AnyRecord) ||
-      (detailSpec['semanticKey'] as AnyRecord) ||
-      semanticKeyFromParts({ field: categoryField }, { field: sourceField }) as unknown
+    key: (detailSpec['key'] as string | string[] | undefined) || [categoryField, segmentField],
+    semantic: (detailSpec['semantic'] as SemanticKey | undefined) ||
+      (detailSpec['semanticKey'] as SemanticKey | undefined) ||
+      semanticKeyFromParts({ field: categoryField }, { field: sourceField })
   }), {
     detail: {
       layout,
@@ -228,7 +228,7 @@ function explicitDetailColor(
 function withDefaultBarSemanticKey(spec: ViewSpec): ViewSpec {
   if (specSemanticKey(spec)) return spec;
   const semanticKey = semanticKeyFromEncoding(spec.encoding as Encoding || {});
-  return semanticKey ? withObject(spec, { semantic: semanticKey as unknown as import('../../types/index.js').SemanticKey }) : spec;
+  return semanticKey ? withObject(spec, { semantic: semanticKey }) : spec;
 }
 
 function encodingWithBarLayout(
@@ -249,17 +249,17 @@ function encodingWithBarLayout(
   return next;
 }
 
-function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: AnyRecord | null = null): AnyRecord | null {
+function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: SemanticKey | null = null): SemanticKey | null {
   const cat = categoryChannel(encoding);
   const meas = measureChannel(encoding);
   if (!cat?.field || !meas?.field) return previousSemanticKey;
   return semanticKeyFromParts(
-    (previousSemanticKey?.['entity'] || previousSemanticKey?.['entities'] || { field: cat.field }) as AnyRecord,
+    previousSemanticKey?.entity || previousSemanticKey?.entities || { field: cat.field },
     { value: meas.field }
   );
 }
 
-function semanticKeyFromParts(entity: AnyRecord, measure: AnyRecord): AnyRecord {
+function semanticKeyFromParts(entity: SemanticKey['entity'], measure: SemanticKeyPart): SemanticKey {
   return { entity, measure };
 }
 

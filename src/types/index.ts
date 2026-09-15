@@ -501,8 +501,6 @@ export interface ChartContext {
   domainRows?: DataRow[];
   /** Focus camera the chart resolved for this render; the runtime mirrors it on the scene. */
   camera?: import('../focus.js').FocusCamera | null;
-  /** Arquero runtime for charts that apply a view-level transform while rendering. */
-  aq?: NonNullable<Parameters<typeof import('../data/transforms.js').applyTransforms>[2]>;
   [key: string]: unknown;
 }
 
@@ -594,7 +592,11 @@ export interface RuntimeOptions {
   target?: Target;
   /** Uses VisDelta's bundled runtime unless an embedding host overrides it. */
   d3?: D3Lib;
-  aq?: Record<string, unknown>;
+  /**
+   * An Arquero module to use instead of the bundled one. Opaque on purpose:
+   * VisDelta's public types must not depend on Arquero's declarations.
+   */
+  aq?: object;
   debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;

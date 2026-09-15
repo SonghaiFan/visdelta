@@ -43,17 +43,14 @@ export class ViewState<S extends object = Record<string, unknown>> {
       } as GrammarMeta;
     }
 
-    const Ctor = this.constructor as new (s: S) => this;
-    return new Ctor(next as S);
+    return this.derive(next as S);
   }
 
   /** Return a new state equal to the declaration before its first semantic operation. */
   reset(): this {
     const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
     const initial = cloneState((grammar?.initialState ?? withoutGrammar(this.state)) as S);
-    const Ctor = this.constructor as new (s: S) => this;
-    const next = new Ctor(initial);
-    return next.with({} as Partial<StateWithMeta<S>>, {
+    return this.derive(initial).with({} as Partial<StateWithMeta<S>>, {
       name: 'reset'
     });
   }
@@ -62,8 +59,13 @@ export class ViewState<S extends object = Record<string, unknown>> {
   protected replaceState<K extends keyof S>(key: K, value: S[K], operation?: string): this {
     const next = cloneState(this.state) as StateWithMeta<S>;
     (next as Record<string, unknown>)[key as string] = cloneState(value);
+    return this.derive(next as S).with({} as Partial<StateWithMeta<S>>, operation);
+  }
+
+  /** A new instance of this exact subclass holding `state`, so derived states keep their builder type. */
+  protected derive(state: S): this {
     const Ctor = this.constructor as new (s: S) => this;
-    return new Ctor(next as S).with({} as Partial<StateWithMeta<S>>, operation);
+    return new Ctor(state);
   }
 
   toSpec(): Omit<S, '__grammar'> {
