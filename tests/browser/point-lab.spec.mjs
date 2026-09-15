@@ -227,7 +227,7 @@ test('opposite point flip endpoints use the same transition in reverse', async (
     ];
     const base = point(rows).x('income').y('health').key('id');
     const flipped = base.flip({ order: ['y', 'x'] });
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const forward = await transition(base, flipped, options('#forward'));
     const reverse = await transition(flipped, base, options('#reverse'));
     const geometry = selector => [...document.querySelectorAll(`${selector} circle.vd-point`)]
@@ -265,7 +265,7 @@ test('point rollup and breakdown are the same transition in reverse', async ({ p
       key: 'region',
       size: { op: 'count', range: [10, 22] }
     });
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const split = await transition(summary, detailed, options('#split'));
     const merge = await transition(detailed, summary, options('#merge'));
     const geometry = selector => [...document.querySelectorAll(`${selector} circle.vd-point`)]
@@ -326,7 +326,7 @@ test('point detail sets the view before summary points spread', async ({ page })
       .key('id').color('region');
     const summary = detail.rollup('region', { key: 'region' });
     const change = await transition(summary, detail, {
-      target: '#chart', d3, aq, height: 360
+      target: '#chart', height: 360
     });
     const snapshot = () => ({
       points: [...document.querySelectorAll('#chart circle.vd-point')]
@@ -508,8 +508,8 @@ test('point connector renders lollipop stems and ordered dumbbell links behind d
       .key(['country', 'year'])
       .connector({ by: 'country', orderBy: 'year' });
 
-    await mount(lollipop, { target: '#lollipop', d3, aq, height: 320 });
-    await mount(dumbbell, { target: '#dumbbell', d3, aq, height: 320 });
+    await mount(lollipop, { target: '#lollipop', height: 320 });
+    await mount(dumbbell, { target: '#dumbbell', height: 320 });
 
     const geometry = (selector) => {
       const root = document.querySelector(selector);
@@ -572,7 +572,7 @@ test('adding and removing a point connector are the same motion in reverse', asy
     ];
     const dots = point(rows).x('region').y('sales').key('region');
     const lollipop = dots.connector({ from: 0 });
-    const options = target => ({ target, d3, aq, height: 320 });
+    const options = target => ({ target, height: 320 });
     const forward = await transition(dots, lollipop, options('#forward'));
     const reverse = await transition(lollipop, dots, options('#reverse'));
     const geometry = selector => [...document.querySelectorAll(`${selector} .vd-point-connector`)]
@@ -607,7 +607,7 @@ test('a constant connector needs an explicit channel when both axes are quantita
       .key('id')
       .connector({ from: 0 });
     try {
-      await mount(state, { target: '#ambiguous', d3, aq, height: 320 });
+      await mount(state, { target: '#ambiguous', height: 320 });
       return '';
     } catch (error) {
       return error.message;

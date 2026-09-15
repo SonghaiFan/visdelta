@@ -68,8 +68,8 @@ try {
   run(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
     "--noEmit", "--strict", "--target", "ES2022", "--module", "NodeNext",
     "--lib", "ES2022,DOM", "consumer.ts"], consumerDir);
-  // A normal consumer gets VisDelta's complete shared runtime: neither D3 nor
-  // Arquero is an authoring concern or a peer-installation obligation.
+  // A normal consumer gets VisDelta's D3 runtime and declared transforms:
+  // neither requires a separate authoring or peer installation.
   run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumerDir);
   run(process.execPath, ["--input-type=module", "--eval", `
     import { bar, delta } from 'visdelta';
@@ -158,8 +158,7 @@ async function assertFile(path, label) {
 }
 
 async function assertGlobalScript(path) {
-  // A bare context plus the text-encoding globals every browser guarantees:
-  // the bundled Arquero constructs a TextDecoder while loading.
+  // A bare context plus the text-encoding globals every browser guarantees.
   const context = { console, TextDecoder, TextEncoder };
   context.globalThis = context;
   vm.createContext(context);

@@ -10,7 +10,7 @@ Start with one visualization, derive another, and return both endpoints. Try cha
 
 ## Filtering with `.where()`
 
-Edit the selector or combine constraints. This example also exercises the real Arquero transform path.
+Edit the selector or combine constraints. This example also exercises VisDelta's declared transform path.
 
 Adjacent calls are conjunctive: `.where(a).where(b)` retains rows matching both
 selectors. Their position in the transform pipeline is preserved, so filtering

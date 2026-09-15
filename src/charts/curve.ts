@@ -1,4 +1,5 @@
 import type { CurveFactory } from 'd3-shape';
+import type { D3Runtime } from '../types/d3-runtime.js';
 /** Exact curve factory names exported by D3 7. */
 export const D3_CURVE_NAMES = [
   'curveBasis',
@@ -45,7 +46,7 @@ export function isD3AreaCurveName(value: unknown): value is D3AreaCurveName {
 /** Resolve a serializable D3 export name without translating its meaning. */
 export function d3Curve(
   name: D3CurveName | D3AreaCurveName | undefined,
-  d3: Record<string, unknown>
+  d3: Pick<D3Runtime, D3CurveName>
 ): CurveFactory {
   const curveName = name ?? 'curveLinear';
   const curve = d3[curveName];

@@ -3,7 +3,8 @@ import { diffViewStates, sameValue } from './diff.js';
 
 type SpecLike = ViewSpec | { toSpec(): ViewSpec } | null | undefined;
 
-/** Classify endpoint semantics only; builder provenance is not animation input. */
+/** Derive renderer scene hints from endpoint differences, not a complete
+ * ontology or phase order. Builder provenance is not animation input. */
 export function inferTransition(previous: SpecLike, next: SpecLike): string[] {
   if (!previous || !next) return [];
   const diff = diffViewStates(previous, next);

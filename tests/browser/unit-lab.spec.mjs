@@ -201,7 +201,7 @@ test('Unit force accepts simultaneous explicit x and y targets', async ({ page }
       .y('score', { type: 'quantitative', title: 'Score' })
       .layout('force', { radius: 7 });
     const change = await transition(source, target, {
-      target: '#chart', d3, aq, height: 320
+      target: '#chart', height: 320
     });
     change.progress(1);
     return true;
@@ -248,7 +248,7 @@ test('Unit force endpoints preserve update identity and support enter and exit',
     const source = unit(sourceRows).key('id').layout('force', { radius: 7 });
     const target = unit(targetRows).key('id').layout('force', { radius: 7 });
     const change = await transition(source, target, {
-      target: '#chart', d3, aq, height: 320
+      target: '#chart', height: 320
     });
     window.forceChange = change;
     return { source: sourceRows.map(row => row.id), target: targetRows.map(row => row.id) };
@@ -388,7 +388,7 @@ test('zero count renders zero units and group does not silently choose layout or
     const grouped = unit(rows).value('count').key('id').group('category');
     const change = await transition(grouped, grouped, {
       target: document.body.appendChild(document.createElement('div')),
-      d3, aq, height: 320
+      height: 320
     });
     change.progress(1);
     const spec = grouped.toSpec();
@@ -430,7 +430,7 @@ test('a Unit transition does not import another chart module', async ({ page }) 
     ];
     const from = unit(rows).value('count').key('id');
     const to = from.group('team').layout('bar', { columns: 2 });
-    const pair = await transition(from, to, { target: '#chart', d3, aq, height: 240 });
+    const pair = await transition(from, to, { target: '#chart', height: 240 });
     pair.progress(0.5);
   });
 
@@ -453,8 +453,8 @@ test('changing unitValue morphs each coarse interval through the Point-style ble
     const detail = summary.value('sites', { unitValue: 1 });
     const forwardHost = document.querySelector('#chart');
     const reverseHost = document.body.appendChild(document.createElement('div'));
-    const split = await transition(summary, detail, { target: forwardHost, d3, aq, height: 260 });
-    const merge = await transition(detail, summary, { target: reverseHost, d3, aq, height: 260 });
+    const split = await transition(summary, detail, { target: forwardHost, height: 260 });
+    const merge = await transition(detail, summary, { target: reverseHost, height: 260 });
     const geometry = (host) => [...host.querySelectorAll('circle.vd-unit, circle.vd-unit-blend')]
       .map((node) => [
         node.dataset.key || node.parentElement?.dataset.parentUnitKey,
@@ -524,8 +524,8 @@ test('grid reflow stages the view, preserves keyed identity, and uses the same p
     const wide = narrow.layout('grid', { columns: 4, radius: 8 });
     const forwardHost = document.querySelector('#chart');
     const reverseHost = document.body.appendChild(document.createElement('div'));
-    const forward = await transition(narrow, wide, { target: forwardHost, d3, aq, height: 320 });
-    const reverse = await transition(wide, narrow, { target: reverseHost, d3, aq, height: 320 });
+    const forward = await transition(narrow, wide, { target: forwardHost, height: 320 });
+    const reverse = await transition(wide, narrow, { target: reverseHost, height: 320 });
 
     const geometry = host => [...host.querySelectorAll('circle.vd-unit')]
       .map(node => [
@@ -582,8 +582,8 @@ test('Unit regroup preserves keyed identity and endpoints in both authored direc
     const byRegion = base.group('region').layout('bar', { columns: 3 }).color('region');
     const forwardHost = document.querySelector('#chart');
     const reverseHost = document.body.appendChild(document.createElement('div'));
-    const forward = await transition(byTeam, byRegion, { target: forwardHost, d3, aq, height: 320 });
-    const reverse = await transition(byRegion, byTeam, { target: reverseHost, d3, aq, height: 320 });
+    const forward = await transition(byTeam, byRegion, { target: forwardHost, height: 320 });
+    const reverse = await transition(byRegion, byTeam, { target: reverseHost, height: 320 });
     const frame = host => [...host.querySelectorAll('circle.vd-unit')].map(node => ({
       key: node.dataset.key,
       sourceKey: node.dataset.sourceKey,

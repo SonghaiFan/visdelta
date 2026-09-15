@@ -424,6 +424,8 @@ export interface TransitionPlanDiffEntry {
   next: unknown;
 }
 
+/** Execution decisions for one adjacent pair, not the complete waypoint route.
+ * Difference and lineage are evidence; steps and timing are chart-owned choices. */
 export interface TransitionPlan {
   diff?: TransitionPlanDiffEntry[];
   reason?: string;
@@ -436,7 +438,7 @@ export interface TransitionPlan {
   steps?: TransitionStep[];
   timing?: TransitionSpec;
   totalDuration?: number;
-  /** Datum-provenance correspondence shared by planning and rendering. */
+  /** Datum-provenance evidence, not an instruction to use a particular motion. */
   lineage?: import('../data/lineage.js').LineageCorrespondence;
 }
 
@@ -504,21 +506,25 @@ export interface ChartContext {
   [key: string]: unknown;
 }
 
-export type D3Lib = typeof import('d3');
+export type { D3Runtime } from './d3-runtime.js';
+/** Existing chart modules can keep this alias while migrating their imports. */
+export type D3Lib = import('./d3-runtime.js').D3Runtime;
 
 export type Renderer<S extends ViewSpec = ViewSpec> = (
   chart: ChartContext,
   rows: DataRow[],
   spec: S,
   tooltip: HTMLElement,
-  d3: D3Lib
+  d3: import('./d3-runtime.js').D3Runtime
 ) => void;
 
 export type StateOperations = Record<string, string>;
 
 export interface IntermediateSpec<S extends ViewSpec = ViewSpec> {
+  /** A complete chart state between the authored endpoints, not a partial patch. */
   spec: S;
-  scene: string;
+  /** Optional renderer hint; every adjacent pair still derives its own difference. */
+  scene?: string;
 }
 
 export interface CanonicalTransitionPair<S extends ViewSpec = ViewSpec> {
@@ -553,19 +559,30 @@ export type ChartDeps = Pick<
   | 'bindTooltip' | 'staggerDelay' | 'themeValue' | 'easeFor'
 >;
 
-export interface ChartType<S extends ViewSpec = ViewSpec> {
-  key: string;
-  /** Opt in only when all animated SVG properties can be captured and sought. */
-  transitionEvaluation?: 'cached' | 'reconstruct';
-  renderer: Renderer<S>;
-  prepareSpec(spec: S): S;
+/** Pure endpoint-based policy. Source identity and lineage constrain choices;
+ * neither builder history nor a correspondence operation prescribes a route.
+ * Hooks must not mutate their inputs. Author-supplied sequence states are fixed
+ * boundaries: intermediateSpecs only adds states inside an adjacent pair. */
+export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
+  /** Plan motion and timing for one adjacent pair, not all generated waypoints. */
   resolveTransitionPlan(prev: S | null, next: S | null): TransitionPlan;
   /**
    * Optionally compile opposite authored directions as one reversible path.
    * The public transition still exposes the endpoints in authored order.
    */
   canonicalTransitionPair?(prev: S, next: S): CanonicalTransitionPair<S>;
+  /** Choose a valid default route in authored order, excluding both endpoints.
+   * An empty list keeps the ordinary direct route; it does not mean no motion.
+   * Generated waypoints are not recursively sent back to this hook. */
   intermediateSpecs?(prev: S, next: S): IntermediateSpec<S>[];
+}
+
+export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitionPolicy<S> {
+  key: string;
+  /** Opt in only when all animated SVG properties can be captured and sought. */
+  transitionEvaluation?: 'cached' | 'reconstruct';
+  renderer: Renderer<S>;
+  prepareSpec(spec: S): S;
   defaultMargin(spec: S): Partial<MarginSpec>;
   readonly scenes: readonly string[];
   readonly stateOperations: StateOperations;
@@ -590,13 +607,6 @@ export type AnyRecord = Record<string, any>;
 
 export interface RuntimeOptions {
   target?: Target;
-  /** Uses VisDelta's bundled runtime unless an embedding host overrides it. */
-  d3?: D3Lib;
-  /**
-   * An Arquero module to use instead of the bundled one. Opaque on purpose:
-   * VisDelta's public types must not depend on Arquero's declarations.
-   */
-  aq?: object;
   debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;

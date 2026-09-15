@@ -41,6 +41,8 @@ interface Segment {
  * A sequence owns every adjacent pair (`A → B`, `B → C`, …) and swaps a
  * prepared surface only at shared endpoints. That keeps the chart host mounted
  * throughout a handoff instead of briefly clearing it between pairwise calls.
+ * Authored states are fixed route boundaries. Each pair may add automatic
+ * waypoints, but those waypoints never replace a state in this timeline.
  */
 export async function sequence(states: readonly Visualization[], options: SequenceOptions): Promise<VisualizationSequence> {
   if (states.length < 2) throw new Error('sequence() requires at least two visualization states.');

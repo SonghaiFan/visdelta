@@ -16,8 +16,6 @@ const change = await transition(from, to, {
 | Option | Meaning |
 | --- | --- |
 | `target` | CSS selector or element; defaults to `#app` |
-| `d3` | Optional embedding override; VisDelta uses its shared D3 runtime by default |
-| `aq` | Optional embedding override; VisDelta uses its shared Arquero runtime by default |
 | `data` | Named tidy datasets used by either state |
 | `height` | Explicit chart height |
 | `chartStyle` | One structural style shared by both endpoints |
@@ -40,8 +38,11 @@ the previous target contents are restored.
 | `destroy()` | Stop playback and remove the mounted transition |
 
 Finite progress is clamped to `[0, 1]`; non-finite values are rejected.
-Arbitrary seek order is supported. For fixed data, size, style, and chart module,
-directly seeking to a progress value returns the same frame.
+Arbitrary seek order is supported. For fixed data, size, style, and a
+direction-independent motion profile, directly seeking to a progress value
+returns the same frame. Opt-in `directionalEase()` profiles, including Unit's
+directional bounce, also depend on seek direction; they preserve endpoints and
+matching but are not strict frame reversal.
 
 ```js
 slider.addEventListener("input", event => {
@@ -61,6 +62,11 @@ Call `destroy()` when the host component unmounts.
 Use `sequence()` when a chart has more than two authored states. It creates a
 timeline of adjacent transitions rather than asking application code to tear
 down and recreate one pair at a time.
+
+Endpoint states do not determine a unique route. Automatic intermediate states
+are the chart's constrained default choice; use `sequence()` to require
+particular waypoints. Those authored states are fixed boundaries, not hints the
+planner may discard. A leg may still contain additional inferred states.
 
 ```js
 import { sequence } from "visdelta/transition";
@@ -83,6 +89,12 @@ journey.play({ duration: 850 }); // duration per adjacent leg
 
 All adjacent states must still use the same chart type. Repeat the first state
 at the end when a sequence should return to its starting visual state.
+
+Each adjacent transition may include automatically inferred intermediate
+states. For example, additive Bar detail can merge while retaining its focus,
+then return the camera to the complete chart. These generated steps occupy
+the existing leg: they do not add entries to `states`, move authored integer
+positions, or increase the leg duration passed to `play()`.
 
 ## `mount(view, options)` and `select(target)`
 

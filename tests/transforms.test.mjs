@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as aq from 'arquero';
 import { applyTransforms } from '../dist/data/transforms.js';
 import { domainTransforms } from '../dist/runtime/data.js';
 import { bar, line, point, unit } from '../dist/index.js';
 
 const rows = [{ id: 'A', value: 0 }, { id: 'B', value: 2 }, { id: 'C', value: 4 }];
-const run = (transforms, source = rows) => applyTransforms(source, transforms, aq);
+const run = (transforms, source = rows) => applyTransforms(source, transforms);
 
 test('domain inference ignores display order and subsets while mark rows still sort', () => {
   const source = [
@@ -72,7 +71,7 @@ test('filters compare Date values and ISO date strings by time', () => {
   ];
   const filtered = applyTransforms(rows, [{
     filter: { field: 'date', gte: '2026-02-01', lt: new Date('2026-04-01') }
-  }], aq);
+  }]);
   assert.deepEqual(filtered.map(row => row.id), ['b', 'c']);
 });
 

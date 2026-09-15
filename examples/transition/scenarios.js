@@ -57,8 +57,7 @@ const lineageReaggregation = `const cases = [
 
 const base = bar(cases)
   .datumKey("id")
-  .y("cases", { title: "Cases" })
-  .color("#1c6ae4");
+  .y("cases", { title: "Cases" });
 
 const byYear = base
   .x("year", { title: "Year" })

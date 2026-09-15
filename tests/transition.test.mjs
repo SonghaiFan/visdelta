@@ -44,15 +44,15 @@ test('same result has the same delta independent of derivation and property orde
 test('pair validation runs before DOM access', async () => {
   await assert.rejects(() => transition(bar('a'), line('a'), {}), /same chart type/);
   await assert.rejects(() => transition(bar('a'), bar('a'), {}), /missing dataset/);
-  await assert.rejects(() => transition(bar('a'), bar('a'), { d3: {}, aq: {} }), /missing dataset/);
+  await assert.rejects(() => transition(bar('a'), bar('a'), {}), /missing dataset/);
   const a = { mark: 'bar', data: [{ category: 'A', value: 1 }] };
-  await assert.rejects(() => transition(a, { ...a, transform: [null] }, { d3: {} }), /transform\[0\]/);
-  await assert.rejects(() => transition(a, { ...a, transform: [{ limit: -1 }] }, { d3: {} }), /transform\[0\]/);
+  await assert.rejects(() => transition(a, { ...a, transform: [null] }, {}), /transform\[0\]/);
+  await assert.rejects(() => transition(a, { ...a, transform: [{ limit: -1 }] }, {}), /transform\[0\]/);
 });
 
 test('sequence validates its minimum authored timeline before DOM access', async () => {
   await assert.rejects(
-    () => sequence([bar('rows')], { target: '#chart', d3: {} }),
+    () => sequence([bar('rows')], { target: '#chart' }),
     /at least two visualization states/
   );
 });

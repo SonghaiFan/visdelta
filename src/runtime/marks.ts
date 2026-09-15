@@ -468,11 +468,11 @@ function channelDomain(rows: RenderDatum[], channel: RenderChannel = {}): unknow
 
 function colorScale(rows: RenderDatum[], channel: RenderChannel | undefined, d3: D3Lib): (row: RenderDatum) => string {
   const resolved = resolveColorChannel(rows, channel);
-  if (!resolved) return () => themeColor(DEFAULT_LUMINANCE_BASE);
+  if (!resolved) return () => '#000000';
   const activeChannel = resolved;
   if (activeChannel.value) return () => cssColor(activeChannel.value, '#4e79a7');
   if (activeChannel.hue || activeChannel.luminance) return compositeColorScale(activeChannel, d3);
-  if (!activeChannel.field) return () => themeColor(DEFAULT_LUMINANCE_BASE);
+  if (!activeChannel.field) return () => '#000000';
   if (activeChannel.type === 'quantitative') return luminanceColorScale(rows, activeChannel, d3);
   // Use the transition registry for consistent key→color mapping across frames.
   const field = activeChannel.field;
@@ -1032,7 +1032,8 @@ function resolveColorChannel(
 ): RenderChannel | null {
   if (channel === false) return null;
   // Color is a data encoding only when the author declares one. With no
-  // channel, renderers use the single theme accent and draw no legend.
+  // channel, renderers use neutral black and draw no legend. Theme accents
+  // and categorical palettes only apply to explicitly declared color channels.
   if (!channel) return null;
   if (channel?.value) return channel;
   if (channel?.hue || channel?.luminance) {

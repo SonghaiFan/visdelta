@@ -39,9 +39,9 @@ transition controlled by a slider.
 Pin exact versions for durable pages. The `0.2.0` URLs describe this release
 candidate and become available only after publication.
 
-VisDelta includes its shared D3 and Arquero runtime. Use chart operations such
-as `.where()`, `.sort()`, `.breakdown()`, and `.rollup()` directly; authors do
-not import or pass either dependency.
+VisDelta includes its D3 runtime and executes declared transforms itself. Use
+`.where()`, `.sort()`, `.breakdown()`, and `.rollup()` directly; authors do not
+import or pass another runtime.
 
 The browser-global build exposes the same chart and transition API as
 `window.VisDelta`.

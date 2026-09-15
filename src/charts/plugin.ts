@@ -2,9 +2,8 @@ import type {
   ChartDeps,
   ChartType,
   ChartPlugin,
-  CanonicalTransitionPair,
+  ChartTransitionPolicy,
   CompilerContext,
-  IntermediateSpec,
   MarginSpec,
   Renderer,
   SpecCompiler,
@@ -33,9 +32,9 @@ export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   defaults?: { margin?: (spec: S, deps: ChartDeps) => Partial<MarginSpec> };
   inspect?: Record<string, unknown>;
   transition?: {
-    plan?: (prev: S | null, next: S | null) => TransitionPlan;
-    canonicalPair?: (prev: S, next: S) => CanonicalTransitionPair<S>;
-    intermediateSpecs?: (prev: S, next: S) => IntermediateSpec<S>[];
+    plan?: ChartTransitionPolicy<S>['resolveTransitionPlan'];
+    canonicalPair?: ChartTransitionPolicy<S>['canonicalTransitionPair'];
+    intermediateSpecs?: ChartTransitionPolicy<S>['intermediateSpecs'];
   };
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;
 }

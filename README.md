@@ -35,13 +35,9 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 npm install visdelta@0.2.0
 ```
 
-`0.2.0` is the first-release candidate in this checkout. Arquero is an optional
-peer used only when a chart declares a transform such as `.where()`, `.sort()`,
-`.breakdown()`, or `.rollup()`:
-
-```sh
-npm install arquero@8
-```
+`0.2.0` is the first-release candidate in this checkout. VisDelta includes its
+D3 runtime. Declared transforms such as `.where()`, `.sort()`, `.breakdown()`,
+and `.rollup()` need no extra package.
 
 VisDelta expects tidy input. Data cleaning and reshaping belong before the
 library.
@@ -85,7 +81,7 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 
 - Every frame is true: marks, scales, ticks, grid lines, and titles agree.
 - Exit marks before changing the scale; change the scale before entering marks.
-- Reverse playback uses the same frames backward.
+- Canonical reversible paths use the same frames backward; explicit directional easing profiles are an exception (see [design rules](docs/language-framework.md#reverse-means-the-same-frames-backward)).
 - `focus()` is a camera move, never a data filter.
 - Core stays chart-agnostic; chart-specific behavior stays in its module.
 - Public terminology uses plain English and has no greenfield compatibility aliases.

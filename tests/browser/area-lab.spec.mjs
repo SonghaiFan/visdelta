@@ -71,7 +71,7 @@ test('area split and merge are the same cached transition in reverse', async ({ 
     const detail = area(rows).x('period').y('value').key(['period', 'region'])
       .breakdown('region', { color: ['#1c6ae4', '#fa4d1d'] });
     const total = detail.rollup();
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const split = await transition(total, detail, options('#split'));
     const merge = await transition(detail, total, options('#merge'));
     const geometry = selector => [...document.querySelectorAll(
@@ -119,7 +119,7 @@ test('area custom stream offset and order move the same boundaries in exact reve
       .breakdown('industry', { color: ['#d73027', '#fee08b', '#1a9850'] });
     const sourceStream = stacked.layout('stream', { offset: 'wiggle', order: 'insideOut' });
     const targetStream = stacked.layout('stream', { offset: 'silhouette', order: 'appearance' });
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const forward = await transition(sourceStream, targetStream, options('#forward'));
     const reverse = await transition(targetStream, sourceStream, options('#reverse'));
     const geometry = selector => [...document.querySelectorAll(`${selector} path.vd-area`)]
@@ -286,7 +286,7 @@ test('area divider marks only internal same-direction stack boundaries', async (
       .breakdown('region', { color: ['#1c6ae4', '#888', '#fa4d1d'] });
     const change = await transition(detail.rollup(), detail, {
       target: document.body.appendChild(document.createElement('div')),
-      d3, aq, height: 360
+      height: 360
     });
     change.progress(0.5);
     return [...document.querySelectorAll('path.vd-area-divider')]
@@ -318,7 +318,7 @@ test('area restore, prepend, and append keep both boundaries in observation orde
     const filtered = base.where({ field: 'id', oneOf: ['Q1', 'Q2', 'Q5', 'Q6'] });
     const prepended = base.data([{ id: 'Q0', period: 'Q0', sales: 19 }, ...rows]);
     const appended = base.data([...rows, { id: 'Q7', period: 'Q7', sales: 88 }]);
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const transitions = [
       await transition(filtered, base, options('#restore')),
       await transition(base, prepended, options('#prepend')),
@@ -373,7 +373,7 @@ test('area add/remove and restore/filter reuse the same frames backward', async 
     const base = area(rows).x('period').y('sales').key('id');
     const withQ7 = base.data([...rows, { id: 'Q7', period: 'Q7', sales: 88 }]);
     const filtered = base.where({ field: 'id', oneOf: ['Q1', 'Q2', 'Q5', 'Q6'] });
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const add = await transition(base, withQ7, options('#add'));
     const remove = await transition(withQ7, base, options('#remove'));
     const restore = await transition(filtered, base, options('#restore'));
@@ -432,7 +432,7 @@ test('area filter preserves connected cells, gaps, and the no-isolated-area rule
     ];
     const base = area(rows).x('period').y('sales').key('id');
     const selector = { field: 'id', oneOf: ['Q1', 'Q2', 'Q5', 'Q6'] };
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const adjacent = await transition(base, base.where(selector), options('#adjacent'));
     const across = await transition(base, base.where(selector).connect('across'), options('#across'));
     const isolated = await transition(
@@ -519,7 +519,7 @@ test('every D3 Area curve renders and curve changes interpolate from the real pa
     for (const name of D3_AREA_CURVE_NAMES) {
       document.body.innerHTML = '<div id="target"></div>';
       const change = await transition(base, base.curve(name), {
-        target: '#target', d3, aq, height: 360
+        target: '#target', height: 360
       });
       const geometry = () => [...document.querySelectorAll('#target path.vd-area-cell')]
         .map(node => node.getAttribute('d') || '');

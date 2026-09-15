@@ -6,7 +6,22 @@
     <title>VisDelta browser test fixture</title>
     <link rel="stylesheet" href="/dist/visdelta.css">
     <script type="importmap">
-      { "imports": { "d3": "/tests/fixtures/d3-global.js", "arquero": "/tests/fixtures/arquero-global.js" } }
+      { "imports": {
+        "d3-array": "/tests/fixtures/d3-array-global.js",
+        "d3-axis": "/tests/fixtures/d3-axis-global.js",
+        "d3-color": "/tests/fixtures/d3-color-global.js",
+        "d3-dsv": "/tests/fixtures/d3-dsv-global.js",
+        "d3-ease": "/tests/fixtures/d3-ease-global.js",
+        "d3-fetch": "/tests/fixtures/d3-fetch-global.js",
+        "d3-force": "/tests/fixtures/d3-force-global.js",
+        "d3-format": "/tests/fixtures/d3-format-global.js",
+        "d3-interpolate": "/tests/fixtures/d3-interpolate-global.js",
+        "d3-scale": "/tests/fixtures/d3-scale-global.js",
+        "d3-selection": "/tests/fixtures/d3-selection-global.js",
+        "d3-shape": "/tests/fixtures/d3-shape-global.js",
+        "d3-timer": "/tests/fixtures/d3-timer-global.js",
+        "d3-transition": "/tests/fixtures/d3-transition-global.js"
+      } }
     </script>
   </head>
   <body>
@@ -15,7 +30,6 @@
     <label>Progress <input id="progress" type="range" min="0" max="1" step="0.01" value="0"></label>
     <output id="value">0.00</output>
     <script src="/node_modules/d3/dist/d3.min.js"></script>
-    <script src="/node_modules/arquero/dist/arquero.min.js"></script>
     <script src="/dist/visdelta.global.js"></script>
     <script>
       (async () => {
@@ -28,7 +42,7 @@
       ];
       const from = bar(rows).x('category').y('value').key('category');
       const change = await transition(from, from.y('other'), {
-        target: '#chart', d3, aq, height: 400
+        target: '#chart', height: 400
       });
       const progress = document.querySelector('#progress');
       const value = document.querySelector('#value');

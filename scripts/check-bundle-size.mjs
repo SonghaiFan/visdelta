@@ -95,6 +95,7 @@ for (const [path, output] of Object.entries(outputs)) {
 if (!loaded.size) throw new Error('Missing selected transition output.');
 const files = new Map(split.outputFiles.map(file => [file.path, file.contents]));
 let gzipBytes = 0;
+const maxSelectedTransitionGzipBytes = 90_000;
 for (const path of loaded) {
   gzipBytes += gzipSync(files.get(resolve(root, path))).byteLength;
   for (const source of Object.keys(outputs[path].inputs)) {
@@ -103,7 +104,10 @@ for (const path of loaded) {
     }
   }
 }
+if (gzipBytes > maxSelectedTransitionGzipBytes) {
+  throw new Error(`Selected bar transition grew to ${gzipBytes} bytes gzip; limit is ${maxSelectedTransitionGzipBytes}.`);
+}
 // Includes seekable semantic bar splits plus the chart-owned responsive axis,
 // title, number-format retention, legend, axis-system timing, and the shared
 // field-type detection plus the chart-agnostic 2D camera used by focus.
-console.log(`bar + transition (entry, shared chunks, bar plugin): ${gzipBytes} bytes gzip (includes VisDelta's D3 and Arquero runtime, excludes CSS).`);
+console.log(`bar + transition (entry, shared chunks, bar plugin): ${gzipBytes} bytes gzip (includes VisDelta's D3 runtime, excludes CSS).`);

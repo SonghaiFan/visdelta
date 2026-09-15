@@ -28,7 +28,7 @@ export interface SceneHostElement extends HTMLElement {
 
 export interface RuntimeScene extends ChartSceneContext {
   node: SceneHostElement;
-  /** The injected D3 instance; motion() reads it through the mount element. */
+  /** The library-owned D3 runtime; motion() reads it through the mount element. */
   d3: D3Lib;
   frame: ChartSelection<SVGGElement>;
   detailLayer: ChartSelection<SVGGElement>;

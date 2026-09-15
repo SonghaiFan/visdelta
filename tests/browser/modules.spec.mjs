@@ -7,7 +7,7 @@ test('a builder-carried chart module works without global registration', async (
     const { dot, moduleLoads } = await import('/tests/fixtures/dot-chart.js');
     const rows = [{ id: 'A', before: 2, after: 8 }];
     const from = dot(rows).x('before').key('id');
-    const change = await transition(from, from.x('after'), { target: '#chart', d3, height: 160 });
+    const change = await transition(from, from.x('after'), { target: '#chart', height: 160 });
     change.progress(1);
     return {
       loads: moduleLoads(),
@@ -24,7 +24,7 @@ test('selected bar transition loads no unrelated chart types', async ({ page }) 
     const url = new URL(request.url());
     if (url.pathname.startsWith('/dist/')) modules.push(url.pathname);
   });
-  // The isolated fixture loads only the D3/Arquero globals and the stylesheet;
+  // The isolated fixture loads only the D3 global and the stylesheet;
   // the chart comes in through the focused ESM entries, like a bundler would.
   await page.goto('/tests/fixtures/isolated.html');
   const count = await page.evaluate(async () => {
@@ -71,7 +71,7 @@ test('custom chart compiler runs and an existing pair keeps its renderer after r
       })
     }) });
     const a = { mark: 'custom-bar', key: 'id', measure: 'a', data: [{ id: 'A', a: 2, b: 7 }] };
-    const pair = await transition(a, { ...a, measure: 'b' }, { target: host, d3 });
+    const pair = await transition(a, { ...a, measure: 'b' }, { target: host });
     pair.progress(0.4);
     const before = host.querySelector('rect.vd-bar')?.getAttribute('height');
     registerChartModule({ plugin: defineChartType({ key: 'custom-bar', renderer() { throw new Error('replacement must not run'); } }) });
@@ -99,7 +99,7 @@ test('the root entry does not overwrite a selected built-in registration', async
     const host = document.createElement('div');
     document.body.append(host);
     const a = bar([{ key: 'A', value: 2, other: 4 }]).x('key').y('value');
-    const pair = await transition(a, a.y('other'), { target: host, d3 });
+    const pair = await transition(a, a.y('other'), { target: host });
     pair.destroy(); host.remove();
     return calls;
   });

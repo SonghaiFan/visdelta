@@ -26,7 +26,7 @@ export const customModule = defineChartModule({
 ```
 
 `customRenderer` and `customCompiler` are implementations supplied by the chart
-package. Renderer helpers and D3 are injected; the module must not reach into
+package. Renderer helpers and VisDelta's D3Runtime are supplied; the module must not reach into
 another built-in chart.
 
 ## Renderer motion contract
@@ -101,16 +101,42 @@ plain object cannot carry a module reference.
 
 ## Runtime object
 
-`defineChartType()` accepts the chart-owned runtime hooks:
+Chart plugins follow the [three governing contracts](./language-framework.md#three-governing-contracts):
+states are facts, correspondence is evidence, and paths are chart-owned default
+choices constrained by that evidence and the authored endpoints.
+
+The `ChartTransitionPolicy` type groups the three existing transition hooks;
+it does not add a second plugin API. `defineChartType()` takes them under
+`transition`, while a `createChart()` runtime object exposes these names:
+
+| `defineChartType` configuration | Runtime policy hook | Responsibility |
+| --- | --- | --- |
+| `transition.intermediateSpecs` | `intermediateSpecs(from, to)` | Choose complete waypoints in authored order, excluding endpoints |
+| `transition.canonicalPair` | `canonicalTransitionPair(from, to)` | Select the shared evaluation direction for a pair |
+| `transition.plan` | `resolveTransitionPlan(from, to)` | Choose motion steps and timing for one adjacent pair |
+
+These hooks consume states without mutating them. They must not use builder
+history as an animation script. Lineage describes correspondence; each chart
+still checks whether the measure and layout support its chosen motion.
+
+`IntermediateSpec.scene` is an optional execution hint. Omitting it lets each
+leg's own difference supply the scene labels. Returning `[]` retains ordinary
+direct motion. Generated waypoints are expanded once, not recursively planned;
+an authored `sequence([A, B, C])` preserves B even if A-to-B gains waypoints.
+
+The internal `TransitionRoute` assembles the chosen waypoints into adjacent
+pairs and their canonical directions. It is DOM-free and does not choose
+chart-specific geometry or timing. `TransitionPlan` remains the per-leg
+execution decision, not the complete multi-state route. Explicit sequence
+continues to own authored boundaries and delegates each pair to `transition()`.
+
+Other runtime hooks retain their existing responsibilities:
 
 | Hook | Responsibility |
 | --- | --- |
 | `createRenderer(deps)` | Draw marks and chart-owned axes |
 | `createSpecCompiler(context)` | Compile authoring state into a view spec |
 | `prepareSpec(spec)` | Normalize chart-specific defaults |
-| `resolveTransitionPlan(from, to)` | Match items and define ordered steps |
-| `canonicalTransitionPair(from, to)` | Reuse one deterministic reversible path |
-| `intermediateSpecs(from, to)` | Add meaningful intermediate chart states |
 | `defaultMargin(spec)` | Reserve chart-owned space |
 | `transitionEvaluation` | Opt into cached frame evaluation; safe whenever the renderer animates only through `motion()` |
 

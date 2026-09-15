@@ -36,7 +36,7 @@ test('line infers an ISO date x field and places every mark on its time scale', 
     ];
     const from = line(rows).x('date').y('value').key('id');
     const to = from.y('value');
-    const controller = await transition(from, to, { target: '#chart', d3, aq, height: 360 });
+    const controller = await transition(from, to, { target: '#chart', height: 360 });
     controller.progress(1);
     const path = document.querySelector('path.vd-line')?.getAttribute('d') || '';
     return {
@@ -236,7 +236,7 @@ test('all exact D3 curve names render through the Line module', async ({ page })
     for (const name of D3_CURVE_NAMES) {
       const target = document.createElement('div');
       document.body.append(target);
-      const change = await transition(base, base.curve(name), { target, d3, aq, height: 320 });
+      const change = await transition(base, base.curve(name), { target, height: 320 });
       change.progress(0.5);
       const path = target.querySelector('path.vd-line');
       output.push({
@@ -356,7 +356,7 @@ test('opposite time-window endpoints use the same add-and-remove frames in rever
     const first = line(rows.slice(0, 6)).x('period').y('sales', { domain: [0, 100] })
       .key('id').curve('curveMonotoneX').transition({ duration: 900, ease: 'linear' });
     const next = first.data(rows.slice(1));
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const forward = await transition(first, next, options('#forward'));
     const reverse = await transition(next, first, options('#reverse'));
     const number = value => value == null ? null : value.replace(
@@ -406,7 +406,7 @@ test('line add and remove are the same transition in reverse', async ({ page }) 
     ];
     const base = line(rows).x('period').y('sales').key('id');
     const withQ7 = base.data([...rows, { id: 'Q7', period: 'Q7', sales: 88 }]);
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const add = await transition(base, withQ7, options('#add'));
     const remove = await transition(withQ7, base, options('#remove'));
     const geometryNumber = value => value == null ? null : value.replace(
@@ -479,7 +479,7 @@ test('line filter and restore are the same transition in reverse', async ({ page
     const filtered = base
       .where({ field: 'id', oneOf: ['Q1', 'Q2', 'Q5', 'Q6'] })
       .connect('adjacent');
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const filter = await transition(base, filtered, options('#filter'));
     const restore = await transition(filtered, base, options('#restore'));
     const isolated = await transition(
@@ -556,7 +556,7 @@ test('line split and merge are one transition in reverse', async ({ page }) => {
     const detailed = line(rows).x('period').y('sales').key(['period', 'region'])
       .breakdown('region', { color: ['#1c6ae4', '#fa4d1d'] });
     const total = detailed.rollup({ op: 'sum' });
-    const options = target => ({ target, d3, aq, height: 360 });
+    const options = target => ({ target, height: 360 });
     const split = await transition(total, detailed, options('#split'));
     const merge = await transition(detailed, total, options('#merge'));
     const geometry = selector => [...document.querySelectorAll(

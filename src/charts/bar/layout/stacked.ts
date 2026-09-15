@@ -50,7 +50,9 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     const stateSegments = (state.sceneState?.detail?.segments || state.detail?.segments) as unknown[] | undefined;
     const selection = viewSelection(spec);
     const categories = channelDomain(rows, categoryChannel) as string[];
-    const segments = channelDomain(rows, { field: segmentField, domain: stateSegments });
+    // A display sort may reorder categories, but must not silently reorder the
+    // stack's segment meaning. Domain rows deliberately exclude sort/filter.
+    const segments = channelDomain(domainRows, { field: segmentField, domain: stateSegments });
     const color = colorScale(domainRows, enc.color, d3);
     const key = barKeyAccessor(chart, spec, [categoryField, segmentField]);
     const splitLineage = kit.splitLineage(chart);

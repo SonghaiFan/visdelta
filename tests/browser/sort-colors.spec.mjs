@@ -5,6 +5,92 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('#status')).toHaveText('Ready');
 });
 
+for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
+  test(`${kind}: undeclared marks are black and explicit color remains authored`, async ({ page }) => {
+    const samples = await page.evaluate(async kind => {
+      const vd = await import('/dist/visdelta.esm.js');
+      const rows = [
+        { id: 'a', x: 1, y: 3, group: 'one' }, { id: 'b', x: 2, y: 5, group: 'one' },
+        { id: 'c', x: 1, y: 4, group: 'two' }, { id: 'd', x: 2, y: 7, group: 'two' }
+      ];
+      let base = vd[kind](rows).datumKey('id').key('id');
+      base = kind === 'unit' ? base.group('group')
+        : base.x(kind === 'bar' ? 'group' : 'x').y('y');
+      const selector = { bar: 'rect.vd-bar', line: 'path.vd-line', area: 'path.vd-area',
+        point: 'circle.vd-point', unit: 'circle.vd-unit' }[kind];
+      const host = document.createElement('div');
+      host.style.width = '800px';
+      host.style.setProperty('--vd-accent', '#00ff00');
+      document.body.append(host);
+      const samples = [];
+      for (const [mode, view] of [['none', base], ['constant', base.color('#cc3366')], ['field', base.color('group')]]) {
+        const change = await vd.transition(view, view, { target: host, height: 400 });
+        for (const p of [0, 0.43, 1, 0.79, 0]) {
+          change.progress(p);
+          samples.push({ mode,
+            colors: [...host.querySelectorAll(selector)].map(node => d3.color(
+              getComputedStyle(node)[kind === 'line' ? 'stroke' : 'fill']).formatHex()),
+            legends: host.querySelectorAll('.vd-legend-item').length });
+        }
+        change.destroy();
+      }
+      host.remove();
+      return samples;
+    }, kind);
+    for (const sample of samples) {
+      expect(sample.colors.length).toBeGreaterThan(0);
+      if (sample.mode === 'none') {
+        expect([...new Set(sample.colors)]).toEqual(['#000000']);
+        expect(sample.legends).toBe(0);
+      } else if (sample.mode === 'constant') {
+        expect([...new Set(sample.colors)]).toEqual(['#cc3366']);
+        expect(sample.legends).toBe(0);
+      } else {
+        expect(new Set(sample.colors).size).toBe(2);
+        expect(sample.legends).toBe(2);
+      }
+    }
+  });
+}
+
+test('reaggregation never invents color meaning across phases or reverse seeks', async ({ page }) => {
+  const samples = await page.evaluate(async () => {
+    const vd = await import('/dist/visdelta.esm.js');
+    const base = vd.bar([
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ]).datumKey('id').y('cases');
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const samples = [];
+    for (const colored of [false, true]) {
+      const source = colored ? base.color('#cc3366') : base;
+      const from = source.x('year').rollup('year');
+      const to = source.x('location').rollup('location');
+      for (const [a, b] of [[from, to], [to, from]]) {
+        const change = await vd.transition(a, b, { target: host, height: 400 });
+        for (const p of [0, 0.05, 0.2, 0.43, 0.5, 0.79, 0.95, 1, 0.43, 0]) {
+          change.progress(p);
+          samples.push({ colored,
+            colors: [...host.querySelectorAll('rect.vd-bar')].map(node => d3.color(getComputedStyle(node).fill).formatHex()),
+            legends: host.querySelectorAll('.vd-legend-item').length });
+        }
+        change.destroy();
+      }
+    }
+    host.remove();
+    return samples;
+  });
+  for (const sample of samples) {
+    expect(sample.colors.length).toBeGreaterThan(0);
+    expect([...new Set(sample.colors)]).toEqual([sample.colored ? '#cc3366' : '#000000']);
+    expect(sample.legends).toBe(0);
+  }
+});
+
 for (const mode of ['undeclared', 'field', 'range', 'domain', 'stacked', 'grouped', 'reconstruct']) {
   test(`sort preserves keyed colors and legend: ${mode}`, async ({ page }) => {
     const result = await page.evaluate(async mode => {
@@ -30,7 +116,7 @@ for (const mode of ['undeclared', 'field', 'range', 'domain', 'stacked', 'groupe
       host.style.width = '800px';
       document.body.append(host);
       const change = await transition(from, from.sort('value', 'descending'), {
-        target: host, d3, aq, height: 400, reconstruct: mode === 'reconstruct'
+        target: host, height: 400, reconstruct: mode === 'reconstruct'
       });
       const read = () => {
         const nodes = [...host.querySelectorAll('rect.vd-bar')];
@@ -94,7 +180,7 @@ test('explicit color changes are still allowed during sorting', async ({ page })
       .color('type', { domain: ['one', 'two'], range: ['#cc6633', '#336699'] });
     const host = document.createElement('div');
     document.body.append(host);
-    const change = await transition(from, to, { target: host, d3, aq, height: 400 });
+    const change = await transition(from, to, { target: host, height: 400 });
     const read = () => Object.fromEntries([...host.querySelectorAll('rect.vd-bar')]
       .map(node => [node.dataset.category, d3.color(node.getAttribute('fill')).formatHex()]));
     const start = read();
@@ -133,7 +219,7 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
     const host = document.createElement('div');
     document.body.append(host);
     const plain = bar(rows).x('category').y('value').key('category');
-    const change = await transition(plain, plain.sort('value', 'descending'), { target: host, d3, aq, height: 400 });
+    const change = await transition(plain, plain.sort('value', 'descending'), { target: host, height: 400 });
     const fills = [...host.querySelectorAll('rect.vd-bar')]
       .map(node => d3.color(getComputedStyle(node).fill).formatHex());
     const legends = host.querySelectorAll('.vd-legend-item').length;
@@ -145,7 +231,7 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
       { category: 'B', value: 30, type: 'one' },
       { category: 'B', value: 15, type: 'two' }
     ]).x('category').y('value').key('category').breakdown('type');
-    const split = await transition(detailed.rollup(), detailed, { target: host, d3, aq, height: 400 });
+    const split = await transition(detailed.rollup(), detailed, { target: host, height: 400 });
     split.progress(1);
     const splitFills = [...host.querySelectorAll('rect.vd-bar')]
       .map(node => d3.color(getComputedStyle(node).fill).formatHex());
@@ -155,10 +241,10 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
     return { fills, legends, splitFills, splitLegends, segments };
   });
   expect(new Set(result.fills).size).toBe(1);
-  expect(result.fills[0]).toBe('#4e79a7');
+  expect(result.fills[0]).toBe('#000000');
   expect(result.legends).toBe(0);
   expect(new Set(result.splitFills).size).toBe(1);
-  expect(result.splitFills[0]).toBe('#4e79a7');
+  expect(result.splitFills[0]).toBe('#000000');
   expect(result.splitLegends).toBe(0);
   expect(result.segments).toBe(4);
 
@@ -191,7 +277,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
       domain: ['one', 'two'],
       range: ['#336699', '#ee8822']
     });
-    const change = await transition(colored.rollup(), colored, { target: host, d3, aq, height: 400 });
+    const change = await transition(colored.rollup(), colored, { target: host, height: 400 });
 
     const readSegments = () => [...host.querySelectorAll('rect.vd-bar-segment')]
       .map(node => {
@@ -236,7 +322,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
     const endSeamCount = host.querySelectorAll('path.vd-bar-seam').length;
     change.destroy();
 
-    const monochrome = await transition(plain.rollup(), plain, { target: host, d3, aq, height: 400 });
+    const monochrome = await transition(plain.rollup(), plain, { target: host, height: 400 });
     monochrome.progress(0.5);
     const noColor = [...host.querySelectorAll('rect.vd-bar-segment')].map(node => {
       const style = getComputedStyle(node);
@@ -270,7 +356,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
   // divider's draw/fade handoff can land a fraction beside authored 0.32.
   expect(result.fullSeam.every(line => line.opacity > 0.99)).toBe(true);
   expect(result.endSeamCount).toBe(0);
-  expect(result.noColor.every(mark => mark.fill === '#4e79a7')).toBe(true);
+  expect(result.noColor.every(mark => mark.fill === '#000000')).toBe(true);
   expect(result.noColorSeams).toHaveLength(1);
   expect(result.noColorSeams.every(opacity => opacity > 0 && opacity < 1)).toBe(true);
 });

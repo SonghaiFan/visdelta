@@ -13,6 +13,27 @@ import {
   registerChartModule
 } from 'visdelta/plugins';
 import * as browser from 'visdelta/browser';
+import type { D3Runtime, ChartTransitionPolicy, IntermediateSpec } from 'visdelta/plugins';
+
+const waypoint: IntermediateSpec = { spec: { mark: 'custom' } };
+const policy: ChartTransitionPolicy = {
+  resolveTransitionPlan: () => ({}),
+  intermediateSpecs: () => [waypoint],
+  canonicalTransitionPair: (from, to) => ({ from, to, reverse: false })
+};
+defineChartType({
+  key: 'policy-consumer', renderer() {},
+  transition: {
+    plan: policy.resolveTransitionPlan,
+    intermediateSpecs: policy.intermediateSpecs,
+    canonicalPair: policy.canonicalTransitionPair
+  }
+});
+
+declare const pluginD3: D3Runtime;
+pluginD3.scaleLinear().domain([0, 1]);
+// @ts-expect-error The renderer capability boundary does not expose all of D3.
+pluginD3.geoMercator();
 
 const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
@@ -57,8 +78,10 @@ registerChartModule(lineModule);
 registerChartModule(unitModule);
 // @ts-expect-error Pair progress accepts only a number.
 pair.progress('0.5');
-// The bundled runtime supplies D3 and Arquero; no runtime option is required.
+// The bundled runtime supplies D3 and executes transforms; no runtime option is required.
 await transition(a, b, { target: '#chart' });
+// @ts-expect-error D3 is library-owned, not a public injection option.
+await transition(a, b, { target: '#chart', d3: {} });
 await browser.transition(a, b);
 const customPlugin = defineChartType({ key: 'custom', renderer() {} });
 registerChartModule({ plugin: customPlugin });

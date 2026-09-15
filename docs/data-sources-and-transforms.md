@@ -35,7 +35,7 @@ numeric strings are quantitative. Mixed or unknown fields stay nominal.
 ## Transform contract
 
 Transforms are part of a chart state, not a general data-wrangling API. They
-run in declaration order and require Arquero at runtime.
+run in declaration order without another runtime dependency.
 
 | Operation | Supported form |
 | --- | --- |

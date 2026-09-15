@@ -104,7 +104,7 @@ type AnyRecord = Record<string, unknown>;
 /**
  * Execute a supported transform pipeline while retaining datum provenance.
  * This is deliberately separate from rendering: motion planning consumes the
- * result, while chart renderers remain free to use Arquero for ordinary rows.
+ * result, while chart renderers remain free to transform ordinary rows.
  */
 export function compileLineage(
   source: DataRow[],

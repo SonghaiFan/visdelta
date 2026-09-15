@@ -12,8 +12,8 @@ npm install visdelta@0.2.0
 The new package identity is currently a `0.2.0` release candidate in this
 checkout; the command becomes valid after publication.
 
-VisDelta includes the D3 and Arquero runtime used by rendering and transforms,
-so chart code does not install, import, or pass either dependency separately.
+VisDelta includes the D3 runtime used by rendering. Declared transforms run
+within VisDelta; chart code does not install or pass another dependency.
 
 ## Declare two states
 

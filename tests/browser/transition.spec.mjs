@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
       { category: 'C', value: 20, other: 15, type: 'one' }
     ];
     window.base = sl.bar().data(rows).x('category').y('value').key('category');
-    window.opts = target => ({ target, d3, aq, height: 400 });
+    window.opts = target => ({ target, height: 400 });
     // Clip IDs are unique per SVG by design; compare geometry and visible content.
     window.snapshot = selector => Array.from(document.querySelector(selector).querySelectorAll('svg *'))
       .filter(node => !node.closest('defs'))
@@ -98,6 +98,109 @@ test('selected update and sequence controllers unregister their adopted mount on
   });
 });
 
+for (const op of ['sum', 'count']) {
+  for (const [presentation, layout] of [
+    ['focus', 'stacked'], ['focus', 'grouped'], ['sort', 'stacked'], ['sort', 'grouped'],
+    ['detail-sort', 'stacked'], ['detail-sort', 'grouped']
+  ]) {
+    test(`${op} ${layout} ${presentation} merge: inferred route matches authored sequence and reverse seeks`, async ({ page }) => {
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      const result = await page.evaluate(async ({ op, presentation, layout }) => {
+        const detailed = sl.bar([
+          { state: 'AL', age: 'young', value: 3 },
+          { state: 'AL', age: 'old', value: 5 },
+          { state: 'CA', age: 'young', value: 17 },
+          { state: 'CA', age: 'old', value: 11 },
+          { state: 'CA', age: 'old', value: 7 }
+        ]).x('state').y('value').key(['state', 'age'])
+          .breakdown('age', { op, layout }).color('age');
+        const total = detailed.rollup({ op });
+        // Give all independently mounted references the same plot viewport.
+        const spec = view => ({ ...view.toSpec(), margin: { top: 80, right: 30, bottom: 55, left: 60 } });
+        const from = spec(presentation === 'focus' ? detailed.focus({ state: 'AL' })
+          : presentation === 'detail-sort' ? detailed.sort('value', 'descending') : detailed);
+        const middle = spec(presentation === 'focus' ? total.focus({ state: 'AL' })
+          : presentation === 'detail-sort' ? detailed : total);
+        const to = spec(presentation === 'sort' ? total.sort('value', 'descending') : total);
+        const auto = await sl.transition(from, to, opts('#a'));
+        const manual = await sl.sequence([from, middle, to], opts('#b'));
+        auto.progress(0.01);
+        const phases = auto.view.__visDeltaScene.seekSequence.phases;
+        const boundary = presentation === 'detail-sort'
+          ? 1 - phases.at(-1).start : 1 - phases[0].end; // merge reverses the canonical split
+        const visible = selector => [...document.querySelector(selector).querySelectorAll('rect.vd-bar, .tick, .vd-legend-item')]
+          .filter(node => {
+            for (let n = node; n && n.tagName !== 'svg'; n = n.parentElement) {
+              if (Number(getComputedStyle(n).opacity) < 1e-6) return false;
+            }
+            return true;
+          }).map(node => ({
+            tag: node.tagName, key: node.dataset.key, text: node.textContent,
+            attrs: ['x', 'y', 'width', 'height', 'transform', 'fill'].map(name => [name,
+              (node.getAttribute(name) ?? '').replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi,
+                value => String(Math.round(Number(value) * 1e3) / 1e3)).replace(/\s/g, '')])
+          })).sort((a, b) => `${a.tag}:${a.key ?? a.text}`.localeCompare(`${b.tag}:${b.key ?? b.text}`));
+        const frames = [0.15, boundary - 0.0001, boundary, boundary + 0.0001, 0.85].map(p => {
+          auto.progress(p);
+          manual.progress(p <= boundary ? p / boundary : 1 + (p - boundary) / (1 - boundary));
+          return { p, auto: visible('#a'), manual: visible('#b') };
+        });
+        manual.destroy();
+        const reverse = await sl.transition(to, from, opts('#b'));
+        const reversed = [0.07, 0.37, boundary, 0.73, 0.97].map(p => {
+          auto.progress(p);
+          reverse.progress(1 - p);
+          return { forward: reversibleSnapshot('#a'), backward: reversibleSnapshot('#b') };
+        });
+        auto.progress(0.37);
+        const direct = reversibleSnapshot('#a');
+        for (const p of [1, 0.02, 0.9, 0, 0.37]) auto.progress(p);
+        const history = reversibleSnapshot('#a');
+        auto.resize();
+        const resized = reversibleSnapshot('#a');
+        return { frames, reversed, direct, history, resized,
+          phaseCount: phases.length, boundary,
+          scenes: phases.map(phase => phase.sceneTransition.scene) };
+      }, { op, presentation, layout });
+      expect(result.phaseCount).toBe(layout === 'grouped' ? 3 : 2);
+      expect(result.boundary).toBeGreaterThan(0.1);
+      expect(result.boundary).toBeLessThan(0.9);
+      for (const frame of result.frames) expect(frame.auto, `progress ${frame.p}`).toEqual(frame.manual);
+      for (const frame of result.reversed) expect(frame.forward).toEqual(frame.backward);
+      expect(result.history).toEqual(result.direct);
+      expect(result.resized).toEqual(result.direct);
+      if (presentation === 'focus') expect(result.scenes[0]).toEqual(['selection']);
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test('authored sequence keeps its B endpoint when A to B gains inferred phases', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const detailed = sl.bar([
+      { state: 'AL', age: 'a', value: 3 }, { state: 'AL', age: 'b', value: 5 },
+      { state: 'CA', age: 'a', value: 13 }, { state: 'CA', age: 'b', value: 7 }
+    ]).x('state').y('value').breakdown('age');
+    const a = detailed.focus({ state: 'AL' });
+    const b = detailed.rollup();
+    const c = b.sort('value', 'descending');
+    const journey = await sl.sequence([a, b, c], opts('#a'));
+    journey.progress(1);
+    const expected = await sl.transition(b, c, opts('#b'));
+    const endpoint = reversibleSnapshot('#a');
+    const reference = reversibleSnapshot('#b');
+    const boundaries = [0.99999, 1, 1.00001].map(p => {
+      journey.progress(p);
+      return document.querySelectorAll('#a rect.vd-bar').length;
+    });
+    return { endpoint, reference, boundaries, states: journey.states.length };
+  });
+  expect(result.endpoint).toEqual(result.reference);
+  expect(result.states).toBe(3);
+  expect(result.boundaries.every(count => count > 0)).toBe(true);
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
   test(`${scenario}: direct seek equals history, endpoints restore, frame stays still`, async ({ page }) => {
     const errors = [];
@@ -158,6 +261,7 @@ for (const layout of ['stacked', 'grouped']) {
       const aggregate = detailed.rollup();
       const split = await sl.transition(aggregate, detailed, opts('#a'));
       const merge = await sl.transition(detailed, aggregate, opts('#b'));
+      const splitPhases = split.view.__visDeltaScene.seekSequence?.phases ?? [];
       const frames = [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1].map(progress => {
         split.progress(progress);
         merge.progress(1 - progress);
@@ -165,12 +269,18 @@ for (const layout of ['stacked', 'grouped']) {
       });
       return {
         frames,
+        phaseLayouts: splitPhases.map(phase =>
+          phase.spec.meta?.state?.sceneState?.detail?.layout ?? null
+        ),
         authoredEndpointsPreserved:
           JSON.stringify(merge.from) === JSON.stringify(detailed.toSpec()) &&
           JSON.stringify(merge.to) === JSON.stringify(aggregate.toSpec())
       };
     }, layout);
     expect(result.authoredEndpointsPreserved).toBe(true);
+    expect(result.phaseLayouts).toEqual(layout === 'grouped'
+      ? ['stacked', null]
+      : []);
     for (const frame of result.frames) expect(frame.merge).toEqual(frame.split);
   });
 }
@@ -241,11 +351,10 @@ test('play uses seek frames; pause, replay, resize and destruction', async ({ pa
   expect(result).toEqual({ fits: true, reversed: 0, rejects: true, empty: true });
 });
 
-test('inline data without transforms does not require Arquero', async ({ page }) => {
+test('inline data without transforms needs no table-library runtime', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const change = await sl.transition(base, base.y('other'), {
       target: '#a',
-      d3,
       height: 400
     });
     change.progress(0.5);

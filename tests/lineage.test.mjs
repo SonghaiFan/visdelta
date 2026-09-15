@@ -86,6 +86,7 @@ test('bar reaggregation plans split, update, and merge through one stable refine
   const phases = barReaggregationIntermediateSpecs(byYear, byLocation);
 
   assert.equal(phases.length, 4);
+  assert.ok(phases.every(phase => phase.spec.encoding.color === undefined));
   assert.deepEqual(phases.map(phase => phase.scene), ['detail', 'axis', 'axis', 'axis']);
   assert.deepEqual(phases.map(phase => phase.spec.meta.object.key), [
     ['location', 'year'],
@@ -120,12 +121,39 @@ test('bar reaggregation plans split, update, and merge through one stable refine
   ]);
 });
 
-test('direct split follows the authored target layout without a synthetic route', () => {
+test('additive grouped split first reaches detail grain as a stack', () => {
   const base = bar(cases).datumKey('id').x('year').y('case');
   const total = base.rollup('year').toSpec();
   const grouped = base.breakdown('location').layout('grouped').toSpec();
+  const phases = barIntermediateSpecs(total, grouped);
 
-  assert.deepEqual(barIntermediateSpecs(total, grouped), []);
+  assert.equal(phases.length, 1);
+  assert.equal(phases[0].scene, 'detail');
+  assert.equal(phases[0].spec.meta.state.sceneState.detail.layout, 'stacked');
+  assert.equal(phases[0].spec.meta.state.sceneState.axis.layout, 'stacked');
+  assert.deepEqual(phases[0].spec.meta.object.key, grouped.meta.object.key);
+  assert.deepEqual(phases[0].spec.transform, grouped.transform);
+  assert.equal(phases[0].spec.encoding.xOffset, undefined);
+  assert.equal(grouped.encoding.xOffset.field, 'location');
+});
+
+test('grouped split bridge is limited to conserved sum/count from the same rows', () => {
+  const base = bar(cases).x('year').y('case');
+  for (const op of ['sum', 'count']) {
+    const total = base.rollup('year', { op }).toSpec();
+    const grouped = base.breakdown('location', { op }).layout('grouped').toSpec();
+    assert.equal(barIntermediateSpecs(total, grouped).length, 1);
+  }
+  const meanTotal = base.rollup('year', { op: 'mean' }).toSpec();
+  const meanGrouped = base.breakdown('location', { op: 'mean' }).layout('grouped').toSpec();
+  assert.deepEqual(barIntermediateSpecs(meanTotal, meanGrouped), []);
+  const changedRows = base.data(cases.map((row) => ({ ...row, case: row.case + 1 })))
+    .breakdown('location').layout('grouped').toSpec();
+  assert.deepEqual(barIntermediateSpecs(base.rollup('year').toSpec(), changedRows), []);
+  assert.deepEqual(
+    barIntermediateSpecs(base.rollup('year').toSpec(), base.breakdown('location').toSpec()),
+    []
+  );
 });
 
 test('delta exposes lineage correspondence for immutable inline chart endpoints', () => {

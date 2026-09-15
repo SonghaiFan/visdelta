@@ -66,7 +66,7 @@ an authored type always wins.
 ```
 
 `rows()` returns the current state’s tidy rows after all declared transforms.
-VisDelta owns the D3 and Arquero runtime, so no runtime object is required.
+VisDelta owns its D3 runtime and executes transforms itself, so no runtime object is required.
 Inline data is read directly; pass source rows only when the state uses a named
 dataset.
 
@@ -489,6 +489,6 @@ carry that reference.
 
 - Endpoint chart types must match; Bar-to-Line is rejected.
 - D3 is required for rendering.
-- Arquero is required only when transforms execute.
+- Declared transforms execute within VisDelta; no table-library installation is required.
 - Data cleaning is outside the library.
 - Controls call `progress()` from outside the library.

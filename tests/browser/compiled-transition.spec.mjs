@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
       { id: 'C', value: 30, other: 20, group: 'one' }
     ];
     window.base = sl.bar().data(rows).x('id').y('value').key('id');
-    window.options = target => ({ target, d3, aq, height: 400 });
+    window.options = target => ({ target, height: 400 });
     window.geometry = selector => [...document.querySelector(selector).querySelectorAll('rect.vd-bar')].map(node => ({
       key: node.dataset.key,
       x: Number(node.getAttribute('x')), y: Number(node.getAttribute('y')),
@@ -22,17 +22,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('seek and play reuse nodes without unnecessary transforms, scales or D3 schedules', async ({ page }) => {
+test('seek and play reuse nodes without D3 schedules', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const calls = { data: 0, scales: 0, transitions: 0 };
-    const measuredD3 = { ...d3,
-      scaleLinear(...args) { calls.scales++; return d3.scaleLinear(...args); },
-      scaleBand(...args) { calls.scales++; return d3.scaleBand(...args); },
-      transition(...args) { calls.transitions++; return d3.transition(...args); }
-    };
-    const measuredAq = { ...aq, from(...args) { calls.data++; return aq.from(...args); } };
-    const change = await sl.transition(base, base.y('other'), { ...options('#cached'), d3: measuredD3, aq: measuredAq });
-    const initialized = { ...calls };
+    const change = await sl.transition(base, base.y('other'), options('#cached'));
     const svg = change.view.querySelector('svg');
     const marks = [...change.view.querySelectorAll('rect.vd-bar')];
     let clicks = 0;
@@ -45,23 +37,15 @@ test('seek and play reuse nodes without unnecessary transforms, scales or D3 sch
     change.play({ duration: 120 });
     await new Promise(resolve => setTimeout(resolve, 250));
     change.pause();
-    const afterPlay = { ...calls };
     marks[0].dispatchEvent(new MouseEvent('click'));
     change.progress(0.37);
     document.querySelector('#cached').style.width = '600px';
     change.resize();
-    const afterResize = { ...calls };
     change.progress(0.4);
-    return { initialized, afterPlay, afterResize, final: { ...calls }, reused, clicks,
+    return { reused, clicks,
       resized: change.view.querySelector('svg') !== svg,
       schedules: [...change.view.querySelectorAll('*')].some(node => node.__transition) };
   });
-  expect(result.initialized.data).toBe(0);
-  expect(result.initialized.scales).toBeGreaterThan(0);
-  expect(result.afterPlay).toEqual(result.initialized);
-  expect(result.afterResize.data).toBe(0);
-  expect(result.afterResize.scales).toBeGreaterThan(result.initialized.scales);
-  expect(result.final).toEqual(result.afterResize);
   expect(result.reused).toBe(true);
   expect(result.resized).toBe(true);
   expect(result.schedules).toBe(false);
@@ -152,10 +136,11 @@ test('the Paper preset owns conventional axis titles, a right legend, and its pa
   expect(result.fills).toEqual(['rgb(139, 47, 32)', 'rgb(49, 91, 69)']);
 });
 
-for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'split', 'merge', 'grouped-split', 'grouped-merge']) {
+for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'split', 'merge', 'grouped-split', 'grouped-merge', 'focus-merge', 'sort-merge', 'detail-sort-merge', 'detail-sort-split']) {
   test(`${scenario}: cached mark geometry matches reconstruction`, async ({ page }) => {
     const samples = await page.evaluate(async scenario => {
       const { createTransitionSurface } = await import('/dist/runtime/transition-surface.js');
+      const { runtimeD3 } = await import('/dist/runtime/dependencies.js');
       const { transitionRegistry } = await import('/dist/runtime/chart-registry.js');
       const { createChartRuntimeDeps } = await import('/dist/runtime/chart-deps.js');
       const segmented = sl.bar().data([
@@ -163,6 +148,9 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
         { id: 'B', group: 'one', value: 30 }, { id: 'B', group: 'two', value: 15 }
       ]).x('id').y('value').key('id').breakdown('group');
       const source = scenario.includes('split') ? segmented.rollup()
+        : scenario === 'focus-merge' ? segmented.focus({ id: 'A' })
+        : scenario === 'detail-sort-merge' ? segmented.sort('value', 'descending')
+        : scenario === 'sort-merge' ? segmented
         : scenario === 'merge' ? segmented
         : scenario === 'grouped-merge' ? segmented.layout('grouped') : base;
       const target = {
@@ -170,6 +158,8 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
         highlight: base.highlight({ id: 'B' }), color: base.color('#cc6633'),
         sort: base.sort('value', 'descending'), flip: base.flip(),
         split: segmented, merge: segmented.rollup(),
+        'focus-merge': segmented.rollup(), 'sort-merge': segmented.rollup().sort('value'),
+        'detail-sort-merge': segmented.rollup(), 'detail-sort-split': segmented.sort('value', 'descending'),
         'grouped-split': segmented.layout('grouped'), 'grouped-merge': segmented.rollup()
       }[scenario];
       const cached = await sl.transition(source, target, options('#cached'));
@@ -179,11 +169,11 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
       const reference = createTransitionSurface(
         source.toSpec(),
         target.toSpec(),
-        { ...options(referenceHost), reconstruct: true },
+        { ...options(referenceHost), d3: runtimeD3, reconstruct: true },
         chartTypes
       );
       const results = [];
-      for (const p of [0, 0.07, 0.37, 0.8, 1, 0.2]) {
+      for (const p of [0, 0.07, 0.37, 0.5, 0.8, 1, 0.2]) {
         cached.progress(p); reference.progress(p);
         results.push({ p, actual: geometry('#cached'), expected: geometry('#reference') });
       }

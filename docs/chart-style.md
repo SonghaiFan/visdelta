@@ -52,6 +52,10 @@ Every visual encoding remains explicit in the chart state. A style can change a
 palette for an already-declared color mapping; it cannot decide to map a field
 to color.
 
+Without a color declaration, all chart marks use black (`#000000`) and no
+color legend, regardless of the theme accent. Declare `.color(...)` explicitly
+when a colored mark or a different contrast on a dark background is intended.
+
 The standalone theme CSS entries—`default.css`, `dark.css`, and `paper.css`—are
 token presets for pages that prefer CSS selection. They do not add chart
 grammar.

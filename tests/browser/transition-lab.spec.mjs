@@ -74,6 +74,13 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
   await ready(page);
   await expect(page.locator('#scenario')).toHaveValue('reaggregate');
   await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
+  for (const p of [0, 0.43, 0.79, 1, 0.43, 0]) {
+    await page.locator('#progress').fill(String(p));
+    await expect(page.locator('#chart .vd-legend-item')).toHaveCount(0);
+    const fills = await page.locator('#chart rect.vd-bar').evaluateAll(nodes =>
+      nodes.map(node => getComputedStyle(node).fill));
+    expect([...new Set(fills)]).toEqual(['rgb(0, 0, 0)']);
+  }
   const readDivider = async progress => {
     await page.locator('#progress').fill(String(progress));
     return page.locator('#chart').evaluate(chart => {
@@ -217,6 +224,28 @@ test('grouped split keeps aggregate bars on the visible baseline while the legen
   }
 });
 
+test('additive grouped split reaches stacked detail before opening into grouped bars', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/transition-lab.html#grouped-split');
+  await ready(page);
+  const visibleLayouts = async progress => {
+    await page.locator('#progress').fill(String(progress));
+    return page.locator('#chart').evaluate(chart =>
+      [...chart.querySelectorAll('rect.vd-bar')]
+        .filter(mark => Number(getComputedStyle(mark).opacity) > 0.001)
+        .map(mark => mark.classList.contains('vd-bar-stacked') ? 'stacked'
+          : mark.classList.contains('vd-bar-grouped') ? 'grouped' : 'simple')
+    );
+  };
+  const first = await visibleLayouts(0.25);
+  const second = await visibleLayouts(0.75);
+  expect(first.length).toBeGreaterThan(0);
+  expect(first).toContain('stacked');
+  expect(first).not.toContain('grouped');
+  expect(second.length).toBeGreaterThan(0);
+  expect(second).toContain('grouped');
+  expect(second).not.toContain('stacked');
+});
+
 test('manual run, drafts, switching and playback controls', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/transition-lab.html');
   await ready(page);
@@ -283,6 +312,82 @@ test('bar lab loads tidy population observations with ordered age detail', async
   expect(requests).toHaveLength(1);
   expect(new URL(requests[0]).pathname).toBe('/docs/.vitepress/dist/data/us-population-state-age-tidy.csv');
 });
+
+for (const op of ['sum', 'count']) {
+  test(`real population ${op}: sorted detail restores detail order before rollup`, async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+    await ready(page);
+    const sample = scenarios.find(scenario => scenario.id === 'split');
+    const baseCode = sample.code
+      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
+      .replace('const from = detailed.rollup();', 'const from = detailed;')
+      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+    const geometry = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => nodes.map(node => ({
+      key: node.dataset.key,
+      attrs: ['x', 'y', 'width', 'height', 'fill'].map(name => node.getAttribute(name))
+    })).sort((a, b) => a.key.localeCompare(b.key)));
+    await page.locator('#editor').fill(baseCode);
+    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    await ready(page);
+    const detailFrame = await geometry();
+    await page.locator('#end').click();
+    const totalFrame = await geometry();
+    await page.locator('#editor').fill(baseCode.replace('const from = detailed;',
+      'const from = detailed.sort("population");'));
+    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    await ready(page);
+    // Editing preserves the slider's current value (the preceding endpoint).
+    await page.locator('#start').click();
+    const sortedFrame = await geometry();
+    expect(sortedFrame).not.toEqual(detailFrame);
+    await page.locator('#progress').fill('0.5');
+    await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
+    expect(await geometry()).toEqual(detailFrame);
+    await page.locator('#end').click();
+    expect(await geometry()).toEqual(totalFrame);
+    await page.locator('#progress').fill('0.5');
+    expect(await geometry()).toEqual(detailFrame);
+    await page.locator('#start').click();
+    expect(await geometry()).toEqual(sortedFrame);
+    expect(errors).toEqual([]);
+  });
+
+  test(`real population ${op}: focused detail merges before the camera returns`, async ({ page }, testInfo) => {
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+    await ready(page);
+    const sample = scenarios.find(scenario => scenario.id === 'split');
+    const code = sample.code
+      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
+      .replace('const from = detailed.rollup();', 'const from = detailed.focus({ state: "AL" });')
+      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+    await page.locator('#editor').fill(code);
+    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    await ready(page);
+    await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
+    await page.locator('#progress').fill('0.5');
+    await expect(page.locator('#chart rect.vd-bar')).toHaveCount(52);
+    const middle = await snapshot(page);
+    const camera = () => page.locator('#chart').evaluate(chart => {
+      const svg = chart.querySelector('svg');
+      return Object.fromEntries(['k', 'x', 'y'].map(key => [key, Number(svg.getAttribute(`data-camera-${key}`))]));
+    });
+    const focused = await camera();
+    expect(Math.abs(focused.x) + Math.abs(focused.y) + Math.abs(focused.k - 1)).toBeGreaterThan(1);
+    await page.locator('#chart').screenshot({ path: testInfo.outputPath('focused-rollup.png') });
+    await page.locator('#end').click();
+    await expect(page.locator('#chart rect.vd-bar')).toHaveCount(52);
+    expect(await camera()).toMatchObject({ k: 1, x: 0, y: 0 });
+    await page.locator('#progress').fill('0.5');
+    expect(await snapshot(page)).toEqual(middle);
+    await page.locator('#start').click();
+    await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
+    expect(errors).toEqual([]);
+  });
+}
 
 for (const [splitId, mergeId] of [['split', 'merge'], ['grouped-split', 'grouped-merge']]) {
   test(`real population ${splitId} and ${mergeId} use the same frames in reverse`, async ({ page }) => {

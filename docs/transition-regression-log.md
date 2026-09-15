@@ -13,6 +13,62 @@ that replaced it, and the regression evidence that must remain true.
 - **Resolution:** Where the model was corrected.
 - **Regression evidence:** Automated and manual paths that protect the rule.
 
+## 2026-09-15 — Reaggregation invented and reassigned color meaning
+
+- **Observed:** An uncolored year-to-location sum transition used blue for
+  endpoint totals, then location A, then year 2020 in generated detail states.
+- **Root cause:** The refinement builder unconditionally mapped its temporary
+  segment field to color; undeclared marks also inherited the theme accent.
+- **Invariant:** A route may refine grouping and layout, but must not invent
+  color semantics. Absent a color declaration, marks are black without a color
+  legend. Explicit color declarations keep their authored meaning.
+- **Resolution:** Preserve endpoint color channels when constructing refinement
+  states and use black in the shared undeclared-color fallback for all charts.
+- **Regression evidence:** Intermediate specs preserve declared constants;
+  five-chart tests cover absent, constant and field colors; year/location
+  regression checks endpoints, intermediate phases, reverse seeks and the lab.
+
+## 2026-09-15 — Sorted detail to rollup missed the input-sort leg
+
+- **Observed:** `detailed.sort("population") -> detailed.rollup()` skipped
+  the intermediate available through a hand-authored sequence.
+- **Root cause:** Deferred detail compilation places the sort before its
+  aggregate. The planner only recognized trailing aggregate-output sorts.
+- **Invariant:** An input sort belongs to its endpoint grain. Sorting raw
+  detail values is not equivalent to sorting totals by the same field name.
+- **Resolution:** Isolate adjacent input sorts around a single sum/count
+  aggregate, giving `sorted detail -> detail -> total` and the exact reverse.
+  Keep other preparation unchanged and retain grouped's stacked bridge.
+  Do not isolate sorts across intervening transforms or non-additive measures.
+- **Regression evidence:** Sum/count and stacked/grouped endpoint route tests;
+  comparison against authored sequences around phase boundaries, reverse
+  seeks, history and resize; real population CSV in Transition Lab.
+
+## 2026-09-15 — Combined focus or sort and rollup skipped readable intermediate states
+
+- **Observed:** Focused detail to an unfocused rollup, or detail to a sorted
+  rollup, lacked the readable route available by writing two transitions.
+- **Wrong model:** Recognizing multiple differences was assumed to imply an
+  ordered sequence of complete states.
+- **Root cause:** Bar only generated structural intermediates. The runtime
+  carried scene labels from the complete pair into individual legs; unspecified
+  plan durations could also become one millisecond through `Number(null)`.
+- **Invariant:** For compatible sum/count grains, preserve presentation through
+  the grain change and express remaining presentation changes as separate
+  states. Split and merge reuse one complete route in reverse. A shared
+  endpoint is a clean chart state, just as in an authored sequence.
+- **Resolution:** Bar first plans focus/trailing-sort waypoints, then expands
+  each structural leg once using its existing stacked and common-grain bridges.
+  The runtime derives every leg's own difference, distinguishes absent duration
+  from zero, and restores clean internal endpoints in cached and reconstructed
+  playback. Additive Bar presentation-only legs also use a canonical direction,
+  keeping their tick text consistent when embedded or authored independently.
+- **Regression evidence:** `bar-routes.test.mjs` covers sum/count, grouped
+  composition, rollup-to-rollup sorting, reverse routes, immutable inputs and
+  unsafe fallbacks. Browser tests compare inferred and authored routes, cached
+  and reconstructed frames, progress history, resize, authored sequence
+  boundaries, and the real population CSV in Transition Lab.
+
 ## 2026-09-14 — Reaggregation was treated as one opaque M-to-N morph
 
 - **Observed:** Changing the grouping field could not preserve a clear account
@@ -39,16 +95,21 @@ that replaced it, and the regression evidence that must remain true.
 - **Wrong model:** Treating stack as the default visual meaning of ungrouping.
 - **Root cause:** A direct split already has an authored target layout, while a
   synthetic common-grain stage has no endpoint layout to follow. These are
-  different planning cases.
-- **Invariant:** A direct split follows the target layout. A synthetic
-  reaggregation stage uses grouped marks as Bar's common visual presentation.
-  Stacked marks come only from an explicit layout or the additive `sum`/`count`
-  bridge between a total and grouped common-grain marks.
-- **Resolution:** Bar's additive route is `total A -> stacked A -> grouped A ->
-  grouped B -> stacked B -> total B`. Other aggregate operators use the ordinary
+  different planning cases. An additive total going directly to grouped detail
+  also skips the conserved, readable stack at the target grain.
+- **Invariant:** A direct split normally follows the target layout. A Bar
+  `sum`/`count` total going to grouped detail first splits into a stack at
+  that same grain, then changes layout. A synthetic reaggregation stage uses
+  grouped marks as Bar's common visual presentation. Other operators and
+  changed source rows do not claim an additive bridge.
+- **Resolution:** A direct additive grouped split uses `total -> stacked detail
+  -> grouped detail`; its reverse merge uses those frames backward. Bar's
+  reaggregation route remains `total A -> stacked A -> grouped A -> grouped B
+  -> stacked B -> total B`. Other aggregate operators use the ordinary
   fallback until they have an explicitly designed semantic route.
 - **Regression evidence:** Unit and browser tests distinguish direct split from
-  synthetic reaggregation and verify the stacked/grouped phase sequence.
+  the additive grouped bridge and synthetic reaggregation, verify the
+  stacked/grouped phase sequence, and compare reverse frames.
 
 ## 2026-09-14 — Divider timing differed between split and reverse merge
 
