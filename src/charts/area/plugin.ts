@@ -7,6 +7,12 @@ import { createAreaRenderer } from './render.js';
 import { areaObservationChange, areaState, canonicalAreaTransitionPair } from './state.js';
 import { chartStyle } from '../style.js';
 
+/** Area-specific plan fields read by the renderer. */
+export interface AreaTransitionPlanExtension {
+  observation?: { mode: string; addedKeys: string[]; removedKeys: string[]; reason: string };
+  detailChange?: { mode: 'split'; reason: string };
+}
+
 export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>({
   key: 'area',
   transitionEvaluation: 'cached',
@@ -21,15 +27,12 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
     plan: (previousSpec, nextSpec) => {
       const plan = createDefaultTransitionPlan(previousSpec, nextSpec, {
         reason: 'area-default-plan'
-      }) as ReturnType<typeof createDefaultTransitionPlan> & {
-        observation?: { mode: string; addedKeys: string[]; removedKeys: string[]; reason: string };
-        detailChange?: { mode: 'split'; reason: string };
-      };
+      }) as ReturnType<typeof createDefaultTransitionPlan> & AreaTransitionPlanExtension;
       const previous = previousSpec
-        ? areaState(previousSpec, previousSpec.encoding as Record<string, ChannelSpec>)
+        ? areaState(previousSpec, previousSpec.encoding)
         : null;
       const next = nextSpec
-        ? areaState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>)
+        ? areaState(nextSpec, nextSpec.encoding)
         : null;
       if (previous?.mode === 'single' && next?.mode === 'stacked') {
         plan.detailChange = {

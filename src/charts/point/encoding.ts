@@ -1,9 +1,9 @@
-import type { ChannelSpec } from '../../types/index.js';
+import type { ChannelSpec, EncodingSpec } from '../../types/index.js';
 
 type AnyRecord = Record<string, unknown>;
 
-export function colorField(encoding: Record<string, ChannelSpec | ChannelSpec[]> = {}): string | null {
-  return channelField(encoding['color'] as ChannelSpec | null);
+export function colorField(encoding: EncodingSpec = {}): string | null {
+  return channelField(encoding.color ?? null);
 }
 
 export function channelField(channel: ChannelSpec | null = null): string | null {

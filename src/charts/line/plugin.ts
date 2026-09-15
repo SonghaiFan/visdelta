@@ -8,7 +8,7 @@ import { canonicalLineTransitionPair, lineIntermediateSpecs, lineObservationChan
 import { specState } from '../../spec-meta.js';
 import { chartStyle } from '../style.js';
 
-interface LineTransitionPlanExtension {
+export interface LineTransitionPlanExtension {
   observation?: {
     mode: 'add' | 'add-and-remove';
     addedKeys: string[];

@@ -1,4 +1,4 @@
-import type { CanonicalTransitionPair, ChannelSpec, IntermediateSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
+import type { CanonicalTransitionPair, EncodingSpec, IntermediateSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
@@ -6,7 +6,7 @@ import { connectedStretches } from '../continuity.js';
 import { linePointKeyAccessor } from './keys.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
 
-interface LineState {
+export interface LineState {
   selection: SelectionSpec | null;
   highlight: SelectionSpec | null;
   filtersRows: boolean;
@@ -19,12 +19,12 @@ interface LineState {
   connect: 'adjacent' | 'across';
 }
 
-interface LineSeries {
+export interface LineSeries {
   key: string;
   rows: Record<string, unknown>[];
 }
 
-export function lineState(spec: ViewSpec = {}, enc: Record<string, ChannelSpec> = {}): LineState {
+export function lineState(spec: ViewSpec = {}, enc: EncodingSpec = {}): LineState {
   const state = specState(spec);
   const detail = (state.sceneState as Record<string, unknown> | undefined)?.['detail'] as Record<string, unknown> | undefined ?? {};
   const axis = (state.sceneState as Record<string, unknown> | undefined)?.['axis'] as Record<string, unknown> | undefined ?? {};
@@ -47,8 +47,8 @@ export function canonicalLineTransitionPair<S extends ViewSpec>(
   previousSpec: S,
   nextSpec: S
 ): CanonicalTransitionPair<S> {
-  const previous = lineState(previousSpec, previousSpec.encoding as Record<string, ChannelSpec>);
-  const next = lineState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>);
+  const previous = lineState(previousSpec, previousSpec.encoding);
+  const next = lineState(nextSpec, nextSpec.encoding);
   const previousSeries = previous.detailMode === 'series' ||
     (previous.detailMode !== 'single' && Boolean(previous.seriesField));
   const nextSeries = next.detailMode === 'series' ||
@@ -134,7 +134,7 @@ export function lineIntermediateSpecs<S extends ViewSpec>(
   const detail = lineDetailIntermediateSpecs(previousSpec, nextSpec);
   if (detail.length) return detail;
 
-  const next = lineState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>);
+  const next = lineState(nextSpec, nextSpec.encoding);
   if (!next.flipped) return [];
   const previousEncoding = previousSpec.encoding || {};
   const nextEncoding = nextSpec.encoding || {};
@@ -168,8 +168,8 @@ function lineDetailIntermediateSpecs<S extends ViewSpec>(
   previousSpec: S,
   nextSpec: S
 ): IntermediateSpec<S>[] {
-  const previous = lineState(previousSpec, previousSpec.encoding as Record<string, ChannelSpec>);
-  const next = lineState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>);
+  const previous = lineState(previousSpec, previousSpec.encoding);
+  const next = lineState(nextSpec, nextSpec.encoding);
   if (previous.detailMode !== 'single' || next.detailMode !== 'series') return [];
 
   return [

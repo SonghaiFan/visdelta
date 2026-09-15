@@ -1,17 +1,17 @@
-import type { CanonicalTransitionPair, ChannelSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
+import type { CanonicalTransitionPair, ChannelSpec, D3Lib, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
 import { colorField } from './encoding.js';
 
-interface PointState {
+export interface PointState {
   parentField: string | string[] | null;
   detailMode: string | null;
   effect: string | null;
   view: PointScaleView | null;
 }
 
-interface PointScaleView {
-  encoding?: Record<string, ChannelSpec>;
+export interface PointScaleView {
+  encoding?: EncodingSpec;
   transform?: ViewSpec['transform'];
 }
 
@@ -27,7 +27,7 @@ interface DodgeCircle {
   next?: DodgeCircle;
 }
 
-export function pointState(spec: ViewSpec = {}, enc: Record<string, ChannelSpec> = {}): PointState {
+export function pointState(spec: ViewSpec = {}, enc: EncodingSpec = {}): PointState {
   const state = specState(spec);
   const detail = ((state.sceneState as Record<string, unknown> | undefined)?.['detail'] as Record<string, unknown> | undefined)
     || (state.detail as Record<string, unknown> | undefined)
@@ -161,18 +161,14 @@ export function radiusScale(
   rows: Record<string, unknown>[],
   channel: ChannelSpec | null | undefined,
   fallback: number,
-  d3: unknown,
-  quantitativeDomain: (rows: unknown[], channel: unknown, floor?: number) => [number, number]
+  d3: D3Lib,
+  quantitativeDomain: (rows: Record<string, unknown>[], channel: ChannelSpec, floor?: number) => number[]
 ): (row: Record<string, unknown>) => number {
-  if (!channel?.field) return () => fallback;
+  const field = channel?.field;
+  if (!field) return () => fallback;
   const range = (channel as Record<string, unknown>)['range'] as [number, number] || defaultRadiusRange(rows.length);
-  const d3Obj = d3 as Record<string, unknown>;
-  const scale = (d3Obj['scaleSqrt'] as () => unknown)() as {
-    domain(d: [number, number]): { range(r: [number, number]): (v: number) => number };
-    range(r: [number, number]): (v: number) => number;
-  };
-  const scaleWithDomain = scale.domain(quantitativeDomain(rows, channel, 0)).range(range) as (v: number) => number;
-  return (row: Record<string, unknown>) => scaleWithDomain(Number(row[channel.field!]) || 0);
+  const scale = d3.scaleSqrt().domain(quantitativeDomain(rows, channel, 0)).range(range);
+  return (row: Record<string, unknown>) => scale(Number(row[field]) || 0);
 }
 
 export function defaultPointRadius(count: number): number {

@@ -771,14 +771,15 @@ function drawLegend(
   motion(items.exit<unknown>(), chart.transition.base).style('opacity', 0).remove();
 }
 
-function bindTooltip<E extends Element, D extends RenderDatum, P extends BaseType, PD>(
+function bindTooltip<E extends Element, D extends object, P extends BaseType, PD>(
   selection: Selection<E, D, P, PD>,
   spec: ViewSpec,
   tooltip: HTMLElement
 ): void {
-  // d3 types the generic element's pointer events as CustomEvent | MouseEvent.
+  // Any bound datum is read as a row: its `__row` when present, else its own
+  // plain fields. d3 types the generic element's pointer events as CustomEvent | MouseEvent.
   selection
-    .on('mouseenter', (event, row) => { const html = tooltipHtml(row, spec.encoding?.tooltip); if (html) showTooltip(tooltip, event as MouseEvent, html); })
+    .on('mouseenter', (event, row) => { const html = tooltipHtml(row as RenderDatum, spec.encoding?.tooltip); if (html) showTooltip(tooltip, event as MouseEvent, html); })
     .on('mousemove', (event) => moveTooltip(tooltip, event as MouseEvent))
     .on('mouseleave', () => hideTooltip(tooltip));
 }

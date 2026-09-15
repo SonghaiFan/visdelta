@@ -501,6 +501,8 @@ export interface ChartContext {
   domainRows?: DataRow[];
   /** Focus camera the chart resolved for this render; the runtime mirrors it on the scene. */
   camera?: import('../focus.js').FocusCamera | null;
+  /** Arquero runtime for charts that apply a view-level transform while rendering. */
+  aq?: NonNullable<Parameters<typeof import('../data/transforms.js').applyTransforms>[2]>;
   [key: string]: unknown;
 }
 

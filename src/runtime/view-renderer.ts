@@ -32,12 +32,12 @@ type ArqueroRuntime = NonNullable<Parameters<typeof applyTransforms>[2]>;
 type DatasetMap = Record<string, DataRow[]>;
 type SceneTransition = CompileResult['sceneTransition'];
 
-interface ViewConfig {
+export interface ViewConfig {
   height?: number;
   margin?: Partial<MarginSpec>;
 }
 
-interface ViewLayoutSpec extends ViewSpec {
+export interface ViewLayoutSpec extends ViewSpec {
   height?: number;
   margin?: Partial<MarginSpec>;
 }
@@ -114,17 +114,17 @@ interface RenderPhaseContext {
   transitionSource: CompileResult;
 }
 
-interface SeekPhase extends RenderPhaseConfig {
+export interface SeekPhase extends RenderPhaseConfig {
   start: number;
   end: number;
 }
 
-interface SeekSequence {
+export interface SeekSequence {
   phase: number | null;
   phases: SeekPhase[];
 }
 
-interface ViewRuntimeScene extends RuntimeScene {
+export interface ViewRuntimeScene extends RuntimeScene {
   seekSequence?: SeekSequence | null;
 }
 

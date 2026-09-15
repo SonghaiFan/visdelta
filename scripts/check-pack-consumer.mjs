@@ -158,7 +158,9 @@ async function assertFile(path, label) {
 }
 
 async function assertGlobalScript(path) {
-  const context = { console };
+  // A bare context plus the text-encoding globals every browser guarantees:
+  // the bundled Arquero constructs a TextDecoder while loading.
+  const context = { console, TextDecoder, TextEncoder };
   context.globalThis = context;
   vm.createContext(context);
   vm.runInContext(await readFile(path, "utf8"), context);

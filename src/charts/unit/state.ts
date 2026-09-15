@@ -1,8 +1,17 @@
-// @ts-nocheck — complex layout algorithms with D3-style scale patterns
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
 import { specObjectKey, specState, specTransition, specUnit } from '../../spec-meta.js';
 import { defaultTransition } from '../../timing.js';
+import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import type {
+  CanonicalTransitionPair,
+  ChannelSpec,
+  ChartContext,
+  D3Lib,
+  TransitionPlan,
+  ViewSpec
+} from '../../types/index.js';
 
 const UNIT_LAYOUT_ORDER = ['grid', 'force', 'bar', 'beeswarm'];
 const VIEW_STAGE_RATIO = 0.28;
@@ -14,13 +23,150 @@ const FORCE_TICK_COUNT = 180;
 const FORCE_ALPHA_START = 0.4;
 const FORCE_ALPHA_MIN = 0.1;
 
-export function expandUnits(rows, spec, d3) {
-  const unit = specUnit(spec) || {};
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/** One countable circle expanded from a source row. */
+export interface UnitDatum extends RenderDatum {
+  __row: RenderDatum;
+  __unitIndex: number;
+  __rowIndex: number;
+  __parentKey: string;
+  __unitValue: number;
+  __valueStart: number;
+  __valueEnd: number;
+  __unitKey: string;
+  /** Filled in by matching. */
+  __semanticUnitKey?: string;
+  __joinKey?: string;
+  __sourceUnitKey?: string | null;
+  __travelDistance?: number;
+  __matchedBy?: string;
+  /** Filled in by a unit-value split. */
+  __targetIndex?: number;
+  __lineageSourceKey?: string;
+  __lineageAnchor?: Point;
+}
+
+export interface UnitAxis {
+  scale: RuntimeScale;
+  channel: ChannelSpec;
+}
+
+export type UnitLayoutName = 'grid' | 'bar' | 'beeswarm' | 'force';
+
+/** Where every unit sits, plus the axes the layout owns. */
+export interface UnitLayoutResult {
+  name: UnitLayoutName;
+  /** Force layouts expose both anchor axes; others expose at most one. */
+  axes: boolean | { x: UnitAxis | null; y: UnitAxis | null };
+  axis: UnitAxis | null;
+  r: number;
+  groupField?: string | null;
+  x(unit: UnitDatum, index: number): number;
+  y(unit: UnitDatum, index: number): number;
+  /** Force layouts record the simulated path of each unit. */
+  trajectory?(unit: UnitDatum): Point[] | undefined;
+  trajectoryTimeline?: number[];
+}
+
+export interface UnitLayoutDeps {
+  bandOrLinear: ChartRuntimeDeps['bandOrLinear'];
+  d3: D3Lib;
+  position: ChartRuntimeDeps['position'];
+}
+
+export interface TravelPair {
+  sourceIndex: number;
+  targetIndex: number;
+  distance: number;
+  matchedBy?: 'key' | 'travel';
+}
+
+interface TravelSlot {
+  key?: string | number | null;
+  x: number;
+  y: number;
+}
+
+export interface UnitMatchResult {
+  units: UnitDatum[];
+  maxDistance: number;
+  totalDistance: number;
+}
+
+export interface UnitStageTiming {
+  viewDuration: number;
+  travelDelay: number;
+  markDuration: number;
+  moveAcrossDuration?: number;
+}
+
+/** Unit-specific plan fields read by the renderer. */
+export interface UnitTransitionPlanExtension {
+  detailChange?: {
+    mode: 'split';
+    parent: string;
+    summaryUnitValue: number;
+    detailUnitValue: number;
+  };
+}
+
+export type UnitTransitionPlan = TransitionPlan & UnitTransitionPlanExtension;
+
+interface UnitSpecMeta {
+  value?: string;
+  key?: string;
+  unitValue?: number;
+  maxUnits?: number;
+  layout?: string;
+  columns?: number;
+  radius?: number;
+  group?: string;
+}
+
+interface UnitNode extends Element {
+  __data__?: Partial<UnitDatum>;
+  dataset: DOMStringMap;
+}
+
+interface ForceNode extends Point {
+  unit: UnitDatum;
+  vx: number;
+  vy: number;
+}
+
+interface ForceResolution {
+  nodes: ForceNode[];
+  trajectories: Map<string, Point[]>;
+  cumulativeMotion: number[];
+}
+
+interface DodgeCircle {
+  x: number;
+  y: number;
+  data: UnitDatum;
+  next: DodgeCircle | null;
+}
+
+// ─── Units and layouts ───────────────────────────────────────────────────────
+
+function unitMeta(spec: ViewSpec): UnitSpecMeta {
+  return (specUnit(spec) || {}) as UnitSpecMeta;
+}
+
+export function expandUnits(rows: RenderDatum[], spec: ViewSpec, _d3?: D3Lib): UnitDatum[] {
+  const unit = unitMeta(spec);
   const valueKey = unit.value;
-  const rowKey = unit.key || specObjectKey(spec) || 'id';
+  // An array object key reads as its joined string, exactly as a JS property lookup would.
+  const rowKey = String(unit.key || specObjectKey(spec) || 'id');
   const unitValue = positiveNumber(unit.unitValue, 1);
   const maxUnits = positiveInteger(unit.maxUnits, 240);
-  const units = [];
+  const units: UnitDatum[] = [];
 
   rows.forEach((row, rowIndex) => {
     const rawCount = valueKey ? Number(row[valueKey]) : 1;
@@ -28,27 +174,28 @@ export function expandUnits(rows, spec, d3) {
     // A positive remainder receives a circle so the displayed units never
     // understate the source quantity (e.g. 51 at 10 per circle becomes 6).
     const count = Math.ceil(quantity / unitValue);
-    Array.from({ length: count }, (_, unitIndex) => {
+    const parentKey = String(row[rowKey] ?? rowIndex);
+    for (let unitIndex = 0; unitIndex < count; unitIndex++) {
       units.push({
         ...row,
         __row: row,
         __unitIndex: unitIndex,
         __rowIndex: rowIndex,
-        __parentKey: String(row[rowKey] ?? rowIndex),
+        __parentKey: parentKey,
         __unitValue: unitValue,
         __valueStart: unitIndex * unitValue,
         __valueEnd: Math.min(quantity, (unitIndex + 1) * unitValue),
-        __unitKey: `${String(row[rowKey] ?? rowIndex)}\u0000${unitIndex}`
+        __unitKey: `${parentKey}\u0000${unitIndex}`
       });
-    });
+    }
   });
 
   return units.slice(0, maxUnits);
 }
 
-export function unitLayout(units, chart, spec, deps) {
+export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec, deps: UnitLayoutDeps): UnitLayoutResult {
   const { bandOrLinear, d3, position } = deps;
-  const unit = specUnit(spec) || {};
+  const unit = unitMeta(spec);
   const layout = unit.layout || 'grid';
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
   const requestedRadius = positiveNumber(unit.radius, 12);
@@ -64,36 +211,37 @@ export function unitLayout(units, chart, spec, deps) {
   }
 
   if (layout === 'beeswarm') {
-    if (!xKey) throw new Error('Unit beeswarm layout requires an x field.');
+    if (!xKey || !xChannel) throw new Error('Unit beeswarm layout requires an x field.');
     let radius = fitRadius(chart, requestedRadius, {
       columns: Math.max(uniqueCount(units, (d) => d.__row[xKey]), 1), rows: 1
     });
     const x = unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 });
-    let placed = dodgeForHeight(units, radius, chart.innerHeight, (d) => position(x, d.__row[xKey]));
+    const placed = dodgeForHeight(units, radius, chart.innerHeight, (d) => position(x, d.__row[xKey]));
     radius = placed.radius;
-    const yByKey = new Map(placed.map((circle) => [circle.data.__unitKey, circle.y]));
+    const yByKey = new Map(placed.circles.map((circle) => [circle.data.__unitKey, circle.y] as const));
     return {
       name: 'beeswarm', axes: true, r: radius,
       axis: { scale: x, channel: { ...xChannel, title: xChannel.title || xKey } },
       x: (d) => position(x, d.__row[xKey]),
-      y: (d) => chart.innerHeight - radius - yByKey.get(d.__unitKey)
+      y: (d) => chart.innerHeight - radius - (yByKey.get(d.__unitKey) ?? 0)
     };
   }
 
   if (layout === 'bar') {
     if (!groupKey) throw new Error('Unit bar layout requires .group("field").');
-    const groups = Array.from(new Set(units.map((d) => d.__row[groupKey])));
-    const groupScale = d3.scaleBand().domain(groups).range([0, chart.innerWidth]).padding(0.18);
+    const groups = Array.from(new Set(units.map((d) => d.__row[groupKey]))) as string[];
+    const groupBand = d3.scaleBand().domain(groups).range([0, chart.innerWidth]).padding(0.18);
+    const groupScale = groupBand as unknown as RuntimeScale;
     const groupCounts = countBy(units, (d) => d.__row[groupKey]);
-    const radius = fitGroupedRadius(chart, requestedRadius, groupScale.bandwidth(), d3.max(groupCounts.values()) || 1, columns);
+    const radius = fitGroupedRadius(chart, requestedRadius, groupBand.bandwidth(), d3.max(groupCounts.values()) || 1, columns);
     const cell = radius * 2.45;
-    const groupColumns = Math.max(1, Math.min(columns, Math.floor(groupScale.bandwidth() / cell) || 1));
+    const groupColumns = Math.max(1, Math.min(columns, Math.floor(groupBand.bandwidth() / cell) || 1));
     const stackByGroup = stackIndex(units, (d) => d.__row[groupKey]);
-    const groupStart = (group) => {
+    const groupStart = (group: unknown) => {
       const count = groupCounts.get(group) || 1;
       const usedColumns = Math.min(groupColumns, count);
       const usedWidth = (usedColumns - 1) * cell;
-      return groupScale(group) + (groupScale.bandwidth() - usedWidth) / 2;
+      return (groupBand(group as string) ?? 0) + (groupBand.bandwidth() - usedWidth) / 2;
     };
     return {
       name: 'bar', axes: true, r: radius, groupField: groupKey,
@@ -117,7 +265,7 @@ export function unitLayout(units, chart, spec, deps) {
   };
 }
 
-export function unitSelectionOpacity(unit, spec, dimOpacity = 0.22) {
+export function unitSelectionOpacity(unit: UnitDatum, spec: ViewSpec, dimOpacity = 0.22): number {
   const selection = viewHighlight(spec);
   if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
   return matchesSelection(unit.__row || unit, selection)
@@ -125,8 +273,10 @@ export function unitSelectionOpacity(unit, spec, dimOpacity = 0.22) {
     : Number(selection.opacity ?? dimOpacity);
 }
 
+// ─── Matching ────────────────────────────────────────────────────────────────
+
 /** Match the remaining identity-free units by the smallest total travel. */
-export function minimumTravelMatching(sources, targets) {
+export function minimumTravelMatching(sources: TravelSlot[], targets: TravelSlot[]): TravelPair[] {
   if (!sources.length || !targets.length) return [];
   const sourceIsRows = sources.length <= targets.length;
   const rows = sourceIsRows ? sources : targets;
@@ -149,11 +299,11 @@ export function minimumTravelMatching(sources, targets) {
  * Identity is the first constraint; distance is only the fallback. A source
  * and target with the same key stay paired even when another unit is closer.
  */
-export function keyFirstTravelMatching(sources, targets) {
-  const pairs = [];
-  const usedSources = new Set();
-  const usedTargets = new Set();
-  const sourceByKey = new Map();
+export function keyFirstTravelMatching(sources: TravelSlot[], targets: TravelSlot[]): TravelPair[] {
+  const pairs: TravelPair[] = [];
+  const usedSources = new Set<number>();
+  const usedTargets = new Set<number>();
+  const sourceByKey = new Map<string, number>();
 
   sources.forEach((source, sourceIndex) => {
     if (source.key != null && !sourceByKey.has(String(source.key))) {
@@ -191,11 +341,11 @@ export function keyFirstTravelMatching(sources, targets) {
   return pairs.sort((a, b) => a.targetIndex - b.targetIndex);
 }
 
-export function matchUnitSlotsByIdentityAndTravel(chart, units, layout) {
+export function matchUnitSlotsByIdentityAndTravel(chart: ChartContext, units: UnitDatum[], layout: UnitLayoutResult): UnitMatchResult {
   if (chart.transitionPlan?.match?.mode !== 'key-first-travel') {
     return { units, maxDistance: 0, totalDistance: 0 };
   }
-  const sourceNodes = chart.g.selectAll('circle.vd-unit').nodes();
+  const sourceNodes = chart.g.selectAll<UnitNode, unknown>('circle.vd-unit').nodes();
   const sources = sourceNodes.map((node, index) => ({
     index,
     key: String(node.dataset.key ?? node.__data__?.__semanticUnitKey ?? node.__data__?.__unitKey ?? index),
@@ -210,9 +360,9 @@ export function matchUnitSlotsByIdentityAndTravel(chart, units, layout) {
     y: finiteNumber(layout.y(unit, index))
   }));
   const pairs = keyFirstTravelMatching(sources, targets);
-  const pairByTarget = new Map(pairs.map((pair) => [pair.targetIndex, pair]));
+  const pairByTarget = new Map(pairs.map((pair) => [pair.targetIndex, pair] as const));
   const matchedSourceKeys = new Set(pairs.map((pair) => sources[pair.sourceIndex].joinKey));
-  const rematched = units.map((unit, targetIndex) => {
+  const rematched = units.map((unit, targetIndex): UnitDatum => {
     const pair = pairByTarget.get(targetIndex);
     const source = pair ? sources[pair.sourceIndex] : null;
     const semanticKey = String(unit.__semanticUnitKey ?? unit.__unitKey);
@@ -234,7 +384,9 @@ export function matchUnitSlotsByIdentityAndTravel(chart, units, layout) {
   };
 }
 
-export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
+// ─── Transition planning ─────────────────────────────────────────────────────
+
+export function resolveUnitTransitionPlan(previousSpec: ViewSpec | null, nextSpec: ViewSpec | null): UnitTransitionPlan {
   if (!previousSpec || !nextSpec) return {};
   const diff = diffViewStates(previousSpec, nextSpec);
   const unitValueChanged = unitValueForSpec(previousSpec) !== unitValueForSpec(nextSpec);
@@ -244,21 +396,21 @@ export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
     ...specTransition(previousSpec),
     ...specTransition(nextSpec)
   });
-  const plan = {
+  const plan: UnitTransitionPlan = {
     diff: diff.deltas.map(({ type, action, previous, next }) => ({ type, action, previous, next })),
     reason: unitValueChanged ? 'unit-value-split' : positionChanged ? 'unit-key-first-layout' : 'unit-default-plan',
     timing,
     totalDuration: timing.duration
   };
   if (!positionChanged) return plan;
-  const nextLayout = specUnit(nextSpec)?.layout || 'grid';
+  const nextLayout = unitMeta(nextSpec).layout || 'grid';
   const fallsToAxis = ['bar', 'beeswarm'].includes(nextLayout);
   return {
     ...plan,
     match: { mode: 'key-first-travel', reason: 'same-key-first-then-closest-unmatched-unit' },
     ...(unitValueChanged ? {
       detailChange: {
-        mode: 'split',
+        mode: 'split' as const,
         parent: 'source-row',
         summaryUnitValue: unitValueForSpec(previousSpec),
         detailUnitValue: unitValueForSpec(nextSpec)
@@ -279,7 +431,7 @@ export function resolveUnitTransitionPlan(previousSpec, nextSpec) {
 }
 
 /** Evaluate either authored direction on one deterministic cached path. */
-export function canonicalUnitTransitionPair(previousSpec, nextSpec) {
+export function canonicalUnitTransitionPair<S extends ViewSpec>(previousSpec: S, nextSpec: S): CanonicalTransitionPair<S> {
   const previousUnitValue = unitValueForSpec(previousSpec);
   const nextUnitValue = unitValueForSpec(nextSpec);
   // A larger value-per-circle is the summary. Always render summary -> detail
@@ -296,7 +448,7 @@ export function canonicalUnitTransitionPair(previousSpec, nextSpec) {
   return { from: nextSpec, to: previousSpec, reverse: true };
 }
 
-export function unitStageTiming(chart) {
+export function unitStageTiming(chart: ChartContext): UnitStageTiming | null {
   if (chart.transitionPlan?.match?.mode !== 'key-first-travel') return null;
   const total = Math.max(1, Number(chart.transition.duration) || 900);
   if (chart.transitionPlan?.motion?.mode === 'move-across-then-fall') {
@@ -314,15 +466,23 @@ export function unitStageTiming(chart) {
   };
 }
 
-function unitXScale(units, channel, range, deps, options = {}) {
+// ─── Layout helpers ──────────────────────────────────────────────────────────
+
+function unitXScale(
+  units: UnitDatum[],
+  channel: ChannelSpec,
+  range: [number, number],
+  deps: Pick<UnitLayoutDeps, 'bandOrLinear' | 'd3'>,
+  options: { anchors?: boolean } = {}
+): RuntimeScale {
   const rows = units.map((d) => d.__row);
   // Force positions are collection anchors. Beeswarm remains a quantitative
   // positional distribution and therefore retains its authored scale type.
-  const resolved = options.anchors ? { ...channel, type: 'nominal' } : channel;
+  const resolved: RenderChannel = options.anchors ? { ...channel, type: 'nominal' } : channel;
   return deps.bandOrLinear(rows, resolved, range, deps.d3);
 }
 
-function fitRadius(chart, requestedRadius, { columns = 1, rows = 1 } = {}) {
+function fitRadius(chart: ChartContext, requestedRadius: number, { columns = 1, rows = 1 }: { columns?: number; rows?: number } = {}): number {
   return Math.max(2, Math.min(requestedRadius,
     chart.innerWidth / Math.max(columns * 2.45, 1),
     chart.innerHeight / Math.max(rows * 2.45, 1)
@@ -330,7 +490,14 @@ function fitRadius(chart, requestedRadius, { columns = 1, rows = 1 } = {}) {
 }
 
 /** Record a deterministic D3 force trajectory from the current mark positions. */
-function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
+function forceLayout(
+  units: UnitDatum[],
+  chart: ChartContext,
+  requestedRadius: number,
+  xChannel: ChannelSpec | null,
+  yChannel: ChannelSpec | null,
+  deps: UnitLayoutDeps
+): UnitLayoutResult {
   const { bandOrLinear, d3, position } = deps;
   if (!units.length) {
     return {
@@ -345,24 +512,26 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
   const radius = fitForceRadius(chart, requestedRadius, units.length);
   const centerX = chart.innerWidth / 2;
   const centerY = chart.innerHeight / 2;
-  const xScale = xChannel?.field
+  const xField = xChannel?.field;
+  const yField = yChannel?.field;
+  const xScale = xChannel && xField
     ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 }, { anchors: true })
     : null;
-  const yScale = yChannel?.field
+  const yScale = yChannel && yField
     ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear, d3 }, { anchors: true })
     : null;
   const axes = {
     x: forceAxis(xScale, xChannel),
     y: forceAxis(yScale, yChannel)
   };
-  const existing = new Map(chart.g.selectAll('circle.vd-unit').nodes().map((node) => [
+  const existing = new Map(chart.g.selectAll<UnitNode, unknown>('circle.vd-unit').nodes().map((node) => [
     String(node.dataset.key ?? node.__data__?.__semanticUnitKey ?? node.__data__?.__unitKey),
     { x: finiteNumber(node.getAttribute('cx')), y: finiteNumber(node.getAttribute('cy')) }
-  ]));
+  ] as const));
   const existingEndpoint = units.map((unit) => [
     unit.__unitKey,
     existing.get(String(unit.__semanticUnitKey ?? unit.__unitKey))
-  ]);
+  ] as const);
   const isTransitionTarget = chart.transitionPlan?.match?.mode === 'key-first-travel';
 
   // The cached transition surface renders the clean target once more at
@@ -370,12 +539,13 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
   // reheating it and producing a last-frame jump.
   if (!isTransitionTarget && existingEndpoint.every(([, point]) =>
     point && Number.isFinite(point.x) && Number.isFinite(point.y))) {
-    const endpoints = new Map(existingEndpoint);
+    const endpoints = new Map(existingEndpoint.map(([key, point]) => [key, point as Point] as const));
+    const endpoint = (unit: UnitDatum) => endpoints.get(unit.__unitKey) ?? { x: centerX, y: centerY };
     return {
       name: 'force', axes, axis: axes.x, r: radius,
-      x: (unit) => endpoints.get(unit.__unitKey).x,
-      y: (unit) => endpoints.get(unit.__unitKey).y,
-      trajectory: (unit) => [endpoints.get(unit.__unitKey)],
+      x: (unit) => endpoint(unit).x,
+      y: (unit) => endpoint(unit).y,
+      trajectory: (unit) => [endpoint(unit)],
       trajectoryTimeline: [0]
     };
   }
@@ -387,31 +557,32 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
   const seeds = new Map(units.map((unit, index) => {
     const current = existing.get(String(unit.__semanticUnitKey ?? unit.__unitKey));
     const validCurrent = current && Number.isFinite(current.x) && Number.isFinite(current.y);
-    return [unit.__unitKey, validCurrent ? current : {
+    const seed: Point = validCurrent ? current : {
       x: startX + (index % columns) * cell,
       y: startY + Math.floor(index / columns) * cell
-    }];
+    };
+    return [unit.__unitKey, seed] as const;
   }));
   const orderedUnits = [...units]
     .sort((a, b) => String(a.__unitKey).localeCompare(String(b.__unitKey)));
-  const resolveForce = () => {
-    const nodes = orderedUnits.map((unit) => ({
-      unit, ...seeds.get(unit.__unitKey), vx: 0, vy: 0
+  const resolveForce = (): ForceResolution => {
+    const nodes: ForceNode[] = orderedUnits.map((unit) => ({
+      unit, ...(seeds.get(unit.__unitKey) ?? { x: centerX, y: centerY }), vx: 0, vy: 0
     }));
-    const trajectories = new Map(nodes.map((node) => [
+    const trajectories = new Map<string, Point[]>(nodes.map((node) => [
       node.unit.__unitKey,
       [{ x: node.x, y: node.y }]
     ]));
-    const targetX = xScale
-      ? (node) => position(xScale, node.unit.__row[xChannel.field])
+    const targetX = xScale && xField
+      ? (node: ForceNode) => position(xScale, node.unit.__row[xField])
       : centerX;
-    const targetY = yScale
-      ? (node) => position(yScale, node.unit.__row[yChannel.field])
+    const targetY = yScale && yField
+      ? (node: ForceNode) => position(yScale, node.unit.__row[yField])
       : centerY;
-    const simulation = d3.forceSimulation(nodes)
-      .force('x', d3.forceX(targetX).strength(0.2))
-      .force('y', d3.forceY(targetY).strength(0.2))
-      .force('collide', d3.forceCollide(radius * 1.12).strength(1).iterations(10))
+    const simulation = d3.forceSimulation<ForceNode>(nodes)
+      .force('x', d3.forceX<ForceNode>(targetX).strength(0.2))
+      .force('y', d3.forceY<ForceNode>(targetY).strength(0.2))
+      .force('collide', d3.forceCollide<ForceNode>(radius * 1.12).strength(1).iterations(10))
       .alpha(FORCE_ALPHA_START)
       .alphaMin(FORCE_ALPHA_MIN)
       .alphaDecay(1 - Math.pow(
@@ -425,7 +596,7 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
       simulation.tick();
       let squaredMotion = 0;
       for (const node of nodes) {
-        trajectories.get(node.unit.__unitKey).push({ x: node.x, y: node.y });
+        trajectories.get(node.unit.__unitKey)?.push({ x: node.x, y: node.y });
       }
       nodes.forEach((node, index) => {
         squaredMotion += (node.x - previous[index].x) ** 2 + (node.y - previous[index].y) ** 2;
@@ -441,9 +612,9 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
   // The force result is the geometry ground truth. If a cluster crosses the
   // plot, move its discrete anchor range inward and resolve again; never scale
   // the circles or infer padding from row counts.
-  let resolved;
+  let resolved = resolveForce();
   for (let pass = 0; pass < 4; pass++) {
-    resolved = resolveForce();
+    if (pass > 0) resolved = resolveForce();
     const overflow = forceOverflow(
       resolved.nodes, radius, chart.innerWidth, chart.innerHeight
     );
@@ -452,7 +623,8 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
     if (!changedX && !changedY) break;
   }
   const { nodes, trajectories, cumulativeMotion } = resolved;
-  const endpoints = new Map(nodes.map((node) => [node.unit.__unitKey, { x: node.x, y: node.y }]));
+  const endpoints = new Map(nodes.map((node) => [node.unit.__unitKey, { x: node.x, y: node.y }] as const));
+  const endpoint = (unit: UnitDatum) => endpoints.get(unit.__unitKey) ?? { x: centerX, y: centerY };
   const totalMotion = cumulativeMotion[cumulativeMotion.length - 1];
   const trajectoryTimeline = totalMotion > Number.EPSILON
     ? cumulativeMotion.map((motion) => motion / totalMotion)
@@ -460,14 +632,14 @@ function forceLayout(units, chart, requestedRadius, xChannel, yChannel, deps) {
 
   return {
     name: 'force', axes, axis: axes.x, r: radius,
-    x: (unit) => endpoints.get(unit.__unitKey).x,
-    y: (unit) => endpoints.get(unit.__unitKey).y,
+    x: (unit) => endpoint(unit).x,
+    y: (unit) => endpoint(unit).y,
     trajectory: (unit) => trajectories.get(unit.__unitKey),
     trajectoryTimeline
   };
 }
 
-function forceOverflow(nodes, radius, width, height) {
+function forceOverflow(nodes: Point[], radius: number, width: number, height: number) {
   return {
     left: Math.max(0, -Math.min(...nodes.map((node) => node.x - radius))),
     right: Math.max(0, Math.max(...nodes.map((node) => node.x + radius)) - width),
@@ -476,7 +648,7 @@ function forceOverflow(nodes, radius, width, height) {
   };
 }
 
-function insetScaleRange(scale, lowOverflow, highOverflow) {
+function insetScaleRange(scale: RuntimeScale, lowOverflow: number, highOverflow: number): boolean {
   const low = Math.max(0, Number(lowOverflow) || 0);
   const high = Math.max(0, Number(highOverflow) || 0);
   if (low < 0.01 && high < 0.01) return false;
@@ -488,7 +660,7 @@ function insetScaleRange(scale, lowOverflow, highOverflow) {
   return true;
 }
 
-function forceAxis(scale, channel) {
+function forceAxis(scale: RuntimeScale | null, channel: ChannelSpec | null): UnitAxis | null {
   if (!scale || !channel?.field) return null;
   return {
     scale,
@@ -496,14 +668,14 @@ function forceAxis(scale, channel) {
   };
 }
 
-function fitForceRadius(chart, requestedRadius, count) {
+function fitForceRadius(chart: ChartContext, requestedRadius: number, count: number): number {
   const areaRadius = Math.sqrt(
     (chart.innerWidth * chart.innerHeight * 0.62) / Math.max(count * Math.PI, 1)
   );
   return Math.max(2, Math.min(requestedRadius, areaRadius));
 }
 
-function fitGroupedRadius(chart, requestedRadius, groupWidth, maxGroupCount, columns) {
+function fitGroupedRadius(chart: ChartContext, requestedRadius: number, groupWidth: number, maxGroupCount: number, columns: number): number {
   let radius = Math.min(requestedRadius, groupWidth / 3 / 2.45);
   for (let i = 0; i < 5; i++) {
     const groupColumns = Math.max(1, columns);
@@ -515,19 +687,19 @@ function fitGroupedRadius(chart, requestedRadius, groupWidth, maxGroupCount, col
   return Math.max(2, radius);
 }
 
-function positiveInteger(value, fallback) {
+function positiveInteger(value: unknown, fallback: number): number {
   const number = Number(value);
   return Number.isInteger(number) && number > 0 ? number : fallback;
 }
 
-function positiveNumber(value, fallback) {
+function positiveNumber(value: unknown, fallback: number): number {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
-function stackIndex(values, group) {
-  const counts = new Map();
-  const indexes = new Map();
+function stackIndex(values: UnitDatum[], group: (value: UnitDatum) => unknown): (value: UnitDatum) => number {
+  const counts = new Map<unknown, number>();
+  const indexes = new Map<string, number>();
   values.forEach((value) => {
     const key = group(value);
     const index = counts.get(key) || 0;
@@ -537,12 +709,12 @@ function stackIndex(values, group) {
   return (value) => indexes.get(value.__unitKey) || 0;
 }
 
-function uniqueCount(values, key) {
+function uniqueCount(values: UnitDatum[], key: (value: UnitDatum) => unknown): number {
   return new Set(values.map(key)).size;
 }
 
-function countBy(values, key) {
-  const counts = new Map();
+function countBy(values: UnitDatum[], key: (value: UnitDatum) => unknown): Map<unknown, number> {
+  const counts = new Map<unknown, number>();
   values.forEach((value) => {
     const group = key(value);
     counts.set(group, (counts.get(group) || 0) + 1);
@@ -550,18 +722,19 @@ function countBy(values, key) {
   return counts;
 }
 
-function hungarian(costs) {
+/** Minimum-cost assignment of rows to columns (rows ≤ columns). Returns a column index per row. */
+function hungarian(costs: number[][]): number[] {
   const rowCount = costs.length;
   const columnCount = costs[0]?.length || 0;
-  const u = Array(rowCount + 1).fill(0);
-  const v = Array(columnCount + 1).fill(0);
-  const matchedRow = Array(columnCount + 1).fill(0);
-  const path = Array(columnCount + 1).fill(0);
+  const u: number[] = Array(rowCount + 1).fill(0);
+  const v: number[] = Array(columnCount + 1).fill(0);
+  const matchedRow: number[] = Array(columnCount + 1).fill(0);
+  const path: number[] = Array(columnCount + 1).fill(0);
 
   for (let row = 1; row <= rowCount; row++) {
     matchedRow[0] = row;
-    const minCost = Array(columnCount + 1).fill(Infinity);
-    const used = Array(columnCount + 1).fill(false);
+    const minCost: number[] = Array(columnCount + 1).fill(Infinity);
+    const used: boolean[] = Array(columnCount + 1).fill(false);
     let column0 = 0;
     do {
       used[column0] = true;
@@ -598,35 +771,35 @@ function hungarian(costs) {
     } while (column0 !== 0);
   }
 
-  const assignment = Array(rowCount).fill(-1);
+  const assignment: number[] = Array(rowCount).fill(-1);
   for (let column = 1; column <= columnCount; column++) {
     if (matchedRow[column]) assignment[matchedRow[column] - 1] = column - 1;
   }
   return assignment;
 }
 
-function travelDistance(source, target) {
+function travelDistance(source: Point, target: Point): number {
   return Math.hypot(Number(source.x) - Number(target.x), Number(source.y) - Number(target.y));
 }
 
-function finiteNumber(value) {
+function finiteNumber(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) ? number : NaN;
 }
 
-function unitJoinKey(unit) {
+function unitJoinKey(unit: Partial<UnitDatum> | undefined): string | undefined {
   return unit?.__joinKey ?? unit?.__unitKey;
 }
 
-function uniqueEnterKey(semanticKey, targetIndex, used) {
+function uniqueEnterKey(semanticKey: string, targetIndex: number, used: Set<string>): string {
   let key = `\u0001enter\u0000${semanticKey}\u0000${targetIndex}`;
   while (used.has(key)) key += '\u0000';
   used.add(key);
   return key;
 }
 
-function unitPositionSignature(spec) {
-  const unit = specUnit(spec) || {};
+function unitPositionSignature(spec: ViewSpec): string {
+  const unit = unitMeta(spec);
   return stableStringify({
     layout: unit.layout || 'grid',
     columns: unit.columns ?? null,
@@ -638,46 +811,52 @@ function unitPositionSignature(spec) {
   });
 }
 
-function unitValueForSpec(spec) {
-  return positiveNumber(specUnit(spec)?.unitValue, 1);
+function unitValueForSpec(spec: ViewSpec): number {
+  return positiveNumber(unitMeta(spec).unitValue, 1);
 }
 
-function canonicalUnitOrder(spec) {
-  const unit = specUnit(spec) || {};
+function canonicalUnitOrder(spec: ViewSpec): string {
+  const unit = unitMeta(spec);
   const layoutRank = UNIT_LAYOUT_ORDER.indexOf(unit.layout || 'grid');
   return `${String(layoutRank < 0 ? UNIT_LAYOUT_ORDER.length : layoutRank).padStart(2, '0')}|${stableStringify(spec)}`;
 }
 
-function stableStringify(value) {
+function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (!value || typeof value !== 'object') return JSON.stringify(value);
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
 }
 
-function dodgeForHeight(units, radius, height, x) {
+function dodgeForHeight(
+  units: UnitDatum[],
+  radius: number,
+  height: number,
+  x: (d: UnitDatum) => number
+): { circles: DodgeCircle[]; radius: number } {
   let fittedRadius = radius;
   let placed = dodge(units, { radius: fittedRadius * 2.15, x });
   while (fittedRadius > 2 && maxPlacedY(placed) > height - fittedRadius * 2) {
     fittedRadius -= 0.75;
     placed = dodge(units, { radius: fittedRadius * 2.15, x });
   }
-  placed.radius = Math.max(2, fittedRadius);
-  return placed;
+  return { circles: placed, radius: Math.max(2, fittedRadius) };
 }
 
-function maxPlacedY(placed) {
+function maxPlacedY(placed: DodgeCircle[]): number {
   return placed.reduce((max, circle) => Math.max(max, circle.y || 0), 0);
 }
 
-function dodge(data, { radius = 1, x = (d) => d } = {}) {
+function dodge(data: UnitDatum[], { radius = 1, x }: { radius?: number; x: (d: UnitDatum) => number }): DodgeCircle[] {
   const radius2 = radius ** 2;
-  const circles = data.map((datum, index, values) => ({ x: +x(datum, index, values), data: datum }))
+  const circles: DodgeCircle[] = data
+    .map((datum) => ({ x: +x(datum), y: 0, data: datum, next: null }))
     .sort((a, b) => a.x - b.x);
   const epsilon = 1e-3;
-  let head = null;
-  let tail = null;
+  let head: DodgeCircle | null = null;
+  let tail: DodgeCircle | null = null;
 
-  function intersects(x, y) {
+  function intersects(x: number, y: number): boolean {
     let a = head;
     while (a) {
       if (radius2 - epsilon > (a.x - x) ** 2 + (a.y - y) ** 2) return true;
@@ -692,14 +871,19 @@ function dodge(data, { radius = 1, x = (d) => d } = {}) {
       let a = head;
       b.y = Infinity;
       do {
+        if (!a) break;
         const y = a.y + Math.sqrt(radius2 - (a.x - b.x) ** 2);
         if (y < b.y && !intersects(b.x, y)) b.y = y;
         a = a.next;
       } while (a);
     }
     b.next = null;
-    if (head === null) head = tail = b;
-    else tail = tail.next = b;
+    if (head === null || tail === null) {
+      head = tail = b;
+    } else {
+      tail.next = b;
+      tail = b;
+    }
   }
 
   return circles;

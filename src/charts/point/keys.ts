@@ -21,18 +21,19 @@ export function pointStoredKey(
   return (datum['__visDeltaPointJoinKey'] as string | number) || key(datum, index);
 }
 
-export function applyPointIdentity(
-  selection: unknown,
+/** A selection whose datum-valued attrs and each() identify a point. */
+interface IdentityTarget<D extends Record<string, unknown>> {
+  each(fn: (this: Element, d: D, i: number) => void): this;
+  attr(name: string, value: (this: Element, d: D, i: number) => string | number): this;
+}
+
+export function applyPointIdentity<D extends Record<string, unknown>, T extends IdentityTarget<D>>(
+  selection: T,
   key: KeyFn
-): unknown {
-  type Sel = {
-    each(fn: (this: unknown, d: Record<string, unknown>, i: number) => void): Sel;
-    attr(name: string, fn: (d: Record<string, unknown>, i: number) => unknown): Sel;
-  };
-  const sel = selection as Sel;
-  return sel
-    .each(function(this: unknown, d: Record<string, unknown>, i: number) {
-      d['__visDeltaPointJoinKey'] = key(d, i);
+): T {
+  return selection
+    .each(function(d, i) {
+      (d as Record<string, unknown>)['__visDeltaPointJoinKey'] = key(d, i);
     })
-    .attr('data-key', (d: Record<string, unknown>, i: number) => key(d, i));
+    .attr('data-key', (d, i) => key(d, i));
 }

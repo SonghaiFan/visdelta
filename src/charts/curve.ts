@@ -1,3 +1,4 @@
+import type { CurveFactory } from 'd3-shape';
 /** Exact curve factory names exported by D3 7. */
 export const D3_CURVE_NAMES = [
   'curveBasis',
@@ -45,11 +46,12 @@ export function isD3AreaCurveName(value: unknown): value is D3AreaCurveName {
 export function d3Curve(
   name: D3CurveName | D3AreaCurveName | undefined,
   d3: Record<string, unknown>
-): unknown {
+): CurveFactory {
   const curveName = name ?? 'curveLinear';
   const curve = d3[curveName];
   if (typeof curve !== 'function') {
     throw new Error(`The supplied D3 build does not export "${curveName}".`);
   }
-  return curve;
+  // Every listed name is a d3-shape curve factory; the registry is checked above.
+  return curve as CurveFactory;
 }

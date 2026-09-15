@@ -1,4 +1,4 @@
-import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
+import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec, EncodingSpec } from '../../types/index.js';
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
@@ -46,7 +46,7 @@ export interface AreaCell {
   right: AreaPoint | null;
 }
 
-export function areaState(spec: ViewSpec, enc: Record<string, ChannelSpec> = {}): AreaSceneState {
+export function areaState(spec: ViewSpec, enc: EncodingSpec = {}): AreaSceneState {
   const state = specState(spec);
   const scene = state.sceneState as Record<string, unknown> | undefined;
   const detail = scene?.['detail'] as Record<string, unknown> | undefined;

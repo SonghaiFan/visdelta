@@ -1,18 +1,59 @@
-// @ts-nocheck — D3 rendering code; typed via deps injection
 import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds, viewHighlight, viewSelection } from '../../focus.js';
 import { applyTransforms } from '../../data/transforms.js';
 import { drawPointAxes } from './axes.js';
 import { applyPointIdentity, pointKeyAccessor, pointStoredKey } from './keys.js';
 import { defaultPointRadius, parentAnchors, parentKey, pointState, radiusScale } from './state.js';
+import type { PointState } from './state.js';
 import { motion } from '../../runtime/recorder.js';
+import type { MotionTiming } from '../../runtime/recorder.js';
+import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChannelSpec, ChartContext, ChartDeps, ChartSceneContext, ChartSelection, ConnectorSpec, D3Lib, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
+import type { PointViewState } from './authoring.js';
 
-export function createPointRenderer(deps) {
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** Cluster centroids remembered on the scene between detail transitions. */
+interface PointAnchorMemory {
+  byKey?: Map<string, Point>;
+  byParent: Map<string, Point>;
+}
+
+type ResolvedConnector =
+  | { mode: 'baseline'; channel: 'x' | 'y'; from: number }
+  | { mode: 'group'; by: string[]; orderBy: string | null };
+
+interface ConnectorSegment {
+  key: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+interface BlendChild {
+  start: Point;
+  end: Point;
+  radius: number;
+}
+
+interface BlendMotion {
+  parentRadiusTween(this: Element, row: RenderDatum): (progress: number) => string;
+}
+
+type KeyFn = (d: RenderDatum, i: number) => string | number;
+type PositionOf = (row: RenderDatum) => Point;
+
+export function createPointRenderer(deps: ChartDeps): Renderer<PointViewState> {
   return new PointChart(deps).renderer();
 }
 
-class PointChart extends BaseChart {
-  render(chart, rows, spec, tooltip, d3) {
+class PointChart extends BaseChart<PointViewState> {
+  render(chart: ChartContext, rows: RenderDatum[], spec: PointViewState, tooltip: HTMLElement, d3: D3Lib): void {
     const {
       bindTooltip,
       chartStyle,
@@ -31,11 +72,15 @@ class PointChart extends BaseChart {
     } = this.deps;
 
     const enc = spec.encoding || {};
+    const xField = enc.x?.field ?? '';
+    const yField = enc.y?.field ?? '';
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const state = pointState(spec, enc);
     const viewEnc = state.view?.encoding || enc;
+    const viewXField = viewEnc.x?.field ?? '';
+    const viewYField = viewEnc.y?.field ?? '';
     const viewRows = state.view
-      ? applyTransforms(chart.sourceRows, state.view.transform || [], chart.aq)
+      ? applyTransforms(chart.sourceRows ?? [], state.view.transform || [], chart.aq)
       : rows;
     const connector = resolvePointConnector(spec, viewEnc);
     const selection = viewSelection(spec);
@@ -69,8 +114,8 @@ class PointChart extends BaseChart {
       viewRows.map((row) => ({
         datum: row,
         bounds: pointBounds(
-          position(baseX, row[viewEnc.x?.field]),
-          position(baseY, row[viewEnc.y?.field]),
+          position(baseX, row[viewXField]),
+          position(baseY, row[viewYField]),
           baseRadius(row)
         )
       })),
@@ -79,36 +124,37 @@ class PointChart extends BaseChart {
     );
     const x = cameraScale(baseX, camera, 'x');
     const y = cameraScale(baseY, camera, 'y');
-    const radius = (row) => cameraSize(baseRadius(row), camera);
+    const radius = (row: RenderDatum) => cameraSize(baseRadius(row), camera);
     chart.camera = camera;
     const markDelay = camera.bounds
       ? () => 0
-      : (row, index) => staggerDelay(spec, row, index);
-    const scaleMarkDelay = (row, index) =>
+      : (row: RenderDatum, index: number) => staggerDelay(spec, row, index);
+    const scaleMarkDelay = (row: RenderDatum, index: number) =>
       (chart.transition.exitDuration || 0) + markDelay(row, index);
-    const opacity = (row) => pointSelectionOpacity(row, spec, themeValue('--vd-dim-opacity', 0.22));
-    const key = pointKeyAccessor(spec, enc.x?.field || enc.y?.field);
+    const opacity = (row: RenderDatum) => pointSelectionOpacity(row, spec, themeValue('--vd-dim-opacity', 0.22));
+    const key: KeyFn = pointKeyAccessor(spec, xField || yField);
 
     // Anchor tracking for gather/scatter animation across detail transitions.
     // When rolling up (detail → aggregate), exiting points fly to the next cluster centroid.
     // When breaking down (aggregate → detail), entering points start at the previous cluster centroid.
-    const previousAnchors = chart.scene.pointAnchors || { byParent: new Map() };
+    const scene = chart.scene as ChartSceneContext & { pointAnchors?: PointAnchorMemory };
+    const previousAnchors: PointAnchorMemory = scene.pointAnchors || { byParent: new Map() };
 
-    function chartPosition(row) {
+    function chartPosition(row: RenderDatum): Point {
       return {
-        x: position(x, row[enc.x?.field]),
-        y: position(y, row[enc.y?.field])
+        x: position(x, row[xField]),
+        y: position(y, row[yField])
       };
     }
 
     const nextParentAnchors = parentAnchors(rows, state.parentField, chartPosition);
 
-    function enterAnchor(row) {
+    function enterAnchor(row: RenderDatum): Point {
       const parent = parentKey(row, state.parentField);
       return previousAnchors.byParent?.get(parent) || chartPosition(row);
     }
 
-    function pointEnterPosition(row) {
+    function pointEnterPosition(row: RenderDatum): Point {
       // An added observation has no meaningful journey from another datum:
       // it is born at its target and grows there. A summary/detail change is
       // different—the parent centroid is meaningful data, so children may
@@ -116,17 +162,17 @@ class PointChart extends BaseChart {
       return movesPoints ? enterAnchor(row) : chartPosition(row);
     }
 
-    function exitAnchor(row) {
+    function exitAnchor(row: RenderDatum): Point {
       const parent = parentKey(row, state.parentField);
       return nextParentAnchors.get(parent) || chartPosition(row);
     }
 
     fadeNonPointShapes(chart);
     this.setCartesianState(chart, viewEnc, { x, y, color }, {
-      x: (d) => position(x, d[enc.x?.field]),
-      y: (d) => position(y, d[enc.y?.field])
+      x: (d) => position(x, d[xField]),
+      y: (d) => position(y, d[yField])
     });
-    drawPointAxes(chart, x, y, viewEnc, d3, { chartStyle, drawGrid, drawXAxis, drawYAxis });
+    drawPointAxes(chart, x, y, viewEnc, d3, this.deps);
     drawLegend(chart, rows, enc.color, d3);
     drawPointConnectors({
       chart,
@@ -135,7 +181,7 @@ class PointChart extends BaseChart {
       themeValue
     });
 
-    const crispLayer = chart.g.selectAll('g.vd-point-crisp-layer')
+    const crispLayer = chart.g.selectAll<SVGGElement, null>('g.vd-point-crisp-layer')
       .data([null])
       .join('g')
       .attr('class', 'vd-point-crisp-layer');
@@ -147,7 +193,7 @@ class PointChart extends BaseChart {
       chartPosition, crispLayer, blendMotion, movesPoints, transition: t, d3
     });
 
-    crispLayer.selectAll('circle.vd-point')
+    crispLayer.selectAll<SVGCircleElement, RenderDatum>('circle.vd-point')
       .data(rows, (d, i) => pointStoredKey(d, i, key))
       .join(
         (enter) => {
@@ -202,24 +248,24 @@ class PointChart extends BaseChart {
       );
 
     // Persist per-step anchor positions for the next transition.
-    chart.scene.pointAnchors = {
-      byKey: new Map(rows.map((row, index) => [String(key(row, index)), chartPosition(row)])),
+    scene.pointAnchors = {
+      byKey: new Map(rows.map((row, index) => [String(key(row, index)), chartPosition(row)] as const)),
       byParent: nextParentAnchors
     };
 
     // Clean up any stale parent-centroid markers from previous renders.
-    motion(chart.g.selectAll('circle.vd-point-parent'), t)
+    motion(chart.g.selectAll<SVGCircleElement, unknown>('circle.vd-point-parent'), t)
       .attr('r', 0)
       .style('opacity', 0)
       .remove();
   }
 }
 
-function resolvePointConnector(spec, encoding) {
-  const connector = spec.connector;
+function resolvePointConnector(spec: PointViewState, encoding: EncodingSpec): ResolvedConnector | null {
+  const connector: ConnectorSpec | null | undefined = spec.connector;
   if (!connector) return null;
   if (Number.isFinite(connector.from)) {
-    const candidates = ['x', 'y'].filter((channel) =>
+    const candidates = (['x', 'y'] as const).filter((channel) =>
       encoding[channel]?.field && encoding[channel]?.type === 'quantitative');
     const channel = connector.channel || (candidates.length === 1 ? candidates[0] : null);
     if (!channel) {
@@ -235,12 +281,19 @@ function resolvePointConnector(spec, encoding) {
   return { mode: 'group', by, orderBy: connector.orderBy ? String(connector.orderBy) : null };
 }
 
-function rowsIncludingBaseline(rows, channel, baseline) {
+function rowsIncludingBaseline(rows: RenderDatum[], channel: ChannelSpec | undefined, baseline: number): RenderDatum[] {
   if (!channel?.field || Array.isArray(channel.domain)) return rows;
   return [...rows, { [channel.field]: baseline }];
 }
 
-function pointConnectorSegments(rows, connector, chartPosition, scales, position, key) {
+function pointConnectorSegments(
+  rows: RenderDatum[],
+  connector: ResolvedConnector | null,
+  chartPosition: PositionOf,
+  scales: { x: RuntimeScale; y: RuntimeScale },
+  position: ChartRuntimeDeps['position'],
+  key: KeyFn
+): ConnectorSegment[] {
   if (!connector) return [];
   if (connector.mode === 'baseline') {
     const scale = scales[connector.channel];
@@ -257,23 +310,23 @@ function pointConnectorSegments(rows, connector, chartPosition, scales, position
     });
   }
 
-  for (const field of [...connector.by, connector.orderBy].filter(Boolean)) {
-    if (rows.length && !rows.some((row) => Object.hasOwn(row, field))) {
+  const orderBy = connector.orderBy;
+  for (const field of [...connector.by, orderBy].filter((name): name is string => Boolean(name))) {
+    if (rows.length && !rows.some((row) => Object.prototype.hasOwnProperty.call(row, field))) {
       throw new Error(`Point connector references missing field "${field}".`);
     }
   }
 
-  const groups = new Map();
+  const groups = new Map<string, Array<{ row: RenderDatum; index: number }>>();
   rows.forEach((row, index) => {
     const groupKey = connector.by.map((field) => String(row[field])).join('\u0000');
-    if (!groups.has(groupKey)) groups.set(groupKey, []);
-    groups.get(groupKey).push({ row, index });
+    const members = groups.get(groupKey) ?? [];
+    members.push({ row, index });
+    groups.set(groupKey, members);
   });
   return Array.from(groups, ([groupKey, members]) => {
-    const ordered = connector.orderBy
-      ? [...members].sort((a, b) => compareConnectorValues(
-          a.row[connector.orderBy], b.row[connector.orderBy]
-        ))
+    const ordered = orderBy
+      ? [...members].sort((a, b) => compareConnectorValues(a.row[orderBy], b.row[orderBy]))
       : members;
     return ordered.slice(0, -1).map((member, index) => {
       const next = ordered[index + 1];
@@ -290,21 +343,26 @@ function pointConnectorSegments(rows, connector, chartPosition, scales, position
   }).flat();
 }
 
-function compareConnectorValues(a, b) {
-  const left = a instanceof Date ? a.getTime() : a;
-  const right = b instanceof Date ? b.getTime() : b;
+function compareConnectorValues(a: unknown, b: unknown): number {
+  const left = (a instanceof Date ? a.getTime() : a) as number | string;
+  const right = (b instanceof Date ? b.getTime() : b) as number | string;
   if (left === right) return 0;
   return left < right ? -1 : 1;
 }
 
-function drawPointConnectors({ chart, connectors, transition, themeValue }) {
+function drawPointConnectors({ chart, connectors, transition, themeValue }: {
+  chart: ChartContext;
+  connectors: ConnectorSegment[];
+  transition: MotionTiming;
+  themeValue: ChartRuntimeDeps['themeValue'];
+}): void {
   const layer = chart.g.selectAll('g.vd-point-connector-layer')
     .data([null])
     .join('g')
     .attr('class', 'vd-point-connector-layer')
     .style('pointer-events', 'none')
     .lower();
-  layer.selectAll('line.vd-point-connector')
+  layer.selectAll<SVGLineElement, ConnectorSegment>('line.vd-point-connector')
     .data(connectors, (connector) => connector.key)
     .join(
       (enter) => {
@@ -350,10 +408,25 @@ function drawPointConnectors({ chart, connectors, transition, themeValue }) {
 function drawPointBlend({
   chart, rows, state, key, radius, color, enterAnchor, exitAnchor,
   chartPosition, crispLayer, blendMotion, movesPoints, transition, d3
-}) {
+}: {
+  chart: ChartContext;
+  rows: RenderDatum[];
+  state: PointState;
+  key: KeyFn;
+  radius: (row: RenderDatum) => number;
+  color: (row: RenderDatum) => string;
+  enterAnchor: PositionOf;
+  exitAnchor: PositionOf;
+  chartPosition: PositionOf;
+  crispLayer: ChartSelection<SVGGElement, null>;
+  blendMotion: BlendMotion | null;
+  movesPoints: boolean;
+  transition: MotionTiming;
+  d3: D3Lib;
+}): void {
   const enabled = state.effect === 'blend';
   crispLayer.interrupt().style('visibility', 'visible');
-  const layer = chart.g.selectAll('g.vd-point-blend-layer')
+  const layer = chart.g.selectAll<SVGGElement, null>('g.vd-point-blend-layer')
     .data(enabled ? [null] : [])
     .join(
       (enter) => enter.append('g')
@@ -371,7 +444,7 @@ function drawPointBlend({
     d3.group(rows, (row) => parentKey(row, state.parentField)),
     ([parent, values]) => ({ parent, values })
   );
-  const group = layer.selectAll('g.vd-point-blend-group')
+  const group = layer.selectAll<SVGGElement, { parent: string; values: RenderDatum[] }>('g.vd-point-blend-group')
     .data(groups, (entry) => entry.parent)
     .join(
       (enter) => enter.append('g').attr('class', 'vd-point-blend-group'),
@@ -381,7 +454,7 @@ function drawPointBlend({
     .attr('filter', `url(#${filterId})`);
 
   group.each(function(entry) {
-    d3.select(this).selectAll('circle.vd-point-blend')
+    d3.select(this).selectAll<SVGCircleElement, RenderDatum>('circle.vd-point-blend')
       .data(entry.values, (row, index) => pointStoredKey(row, index, key))
       .join(
         (enter) => {
@@ -430,11 +503,11 @@ function drawPointBlend({
   }
 }
 
-function pointBlendVisibility(progress) {
+function pointBlendVisibility(progress: number): string {
   return progress > 0 && progress < 1 ? 'visible' : 'hidden';
 }
 
-function pointCrispVisibility(progress) {
+function pointCrispVisibility(progress: number): string {
   return progress > 0 && progress < 1 ? 'hidden' : 'visible';
 }
 
@@ -448,10 +521,17 @@ const POINT_BLEND_REACH = POINT_BLEND_BLUR * 2;
  */
 function pointBlendMotion({
   rows, state, radius, enterAnchor, exitAnchor, chartPosition
-}) {
+}: {
+  rows: RenderDatum[];
+  state: PointState;
+  radius: (row: RenderDatum) => number;
+  enterAnchor: PositionOf;
+  exitAnchor: PositionOf;
+  chartPosition: PositionOf;
+}): BlendMotion | null {
   if (state.effect !== 'blend' || state.detailMode !== 'detail' || state.view) return null;
 
-  const childrenByParent = new Map();
+  const childrenByParent = new Map<string, BlendChild[]>();
   rows.forEach((row) => {
     const parent = parentKey(row, state.parentField);
     const children = childrenByParent.get(parent) || [];
@@ -464,7 +544,7 @@ function pointBlendMotion({
   });
 
   return {
-    parentRadiusTween: function parentRadiusTween(row) {
+    parentRadiusTween: function parentRadiusTween(this: Element, row: RenderDatum) {
       const startRadius = Math.max(0, Number(this.getAttribute('r')) || 0);
       const parentStart = {
         x: Number(this.getAttribute('cx')) || 0,
@@ -472,7 +552,7 @@ function pointBlendMotion({
       };
       const parentEnd = exitAnchor(row);
       const children = childrenByParent.get(parentKey(row, state.parentField)) || [];
-      return (progress) => String(pointBlendParentRadius({
+      return (progress: number) => String(pointBlendParentRadius({
         progress, startRadius, parentStart, parentEnd, children
       }));
     }
@@ -481,7 +561,13 @@ function pointBlendMotion({
 
 function pointBlendParentRadius({
   progress, startRadius, parentStart, parentEnd, children
-}) {
+}: {
+  progress: number;
+  startRadius: number;
+  parentStart: Point;
+  parentEnd: Point;
+  children: BlendChild[];
+}): number {
   const parent = interpolatePoint(parentStart, parentEnd, progress);
   const connectionTotal = children.reduce((total, child) => {
     const point = interpolatePoint(child.start, child.end, progress);
@@ -506,28 +592,29 @@ function pointBlendParentRadius({
   return startRadius * Math.min(connectedShare, endpoint);
 }
 
-function interpolatePoint(from, to, progress) {
+function interpolatePoint(from: Point, to: Point, progress: number): Point {
   return {
     x: from.x + (to.x - from.x) * progress,
     y: from.y + (to.y - from.y) * progress
   };
 }
 
-function smoothStep(from, to, value) {
+function smoothStep(from: number, to: number, value: number): number {
   const progress = Math.max(0, Math.min(1, (value - from) / Math.max(Number.EPSILON, to - from)));
   return progress * progress * (3 - 2 * progress);
 }
 
-function ensurePointBlendFilter(scene, d3) {
+function ensurePointBlendFilter(scene: ChartSceneContext, d3: D3Lib): string {
+  void d3;
   const id = `vd-point-blend-${scene.clipIdentity}`;
-  const defs = scene.svg.selectAll('defs.vd-point-blend-defs')
+  const defs = scene.svg.selectAll<SVGDefsElement, null>('defs.vd-point-blend-defs')
     .data([null])
     .join('defs')
     .attr('class', 'vd-point-blend-defs');
-  let filter = defs.select(`#${id}`);
-  if (!filter.empty()) return id;
+  const existing = defs.select(`#${id}`);
+  if (!existing.empty()) return id;
 
-  filter = defs.append('filter')
+  const filter = defs.append('filter')
     .attr('id', id)
     .attr('x', '-60%')
     .attr('y', '-60%')
@@ -545,10 +632,10 @@ function ensurePointBlendFilter(scene, d3) {
   return id;
 }
 
-export function pointSelectionOpacity(row, spec = {}, dimOpacity = 0.22) {
+export function pointSelectionOpacity(row: RenderDatum, spec: ViewSpec = {}, dimOpacity = 0.22): number {
   const selection = viewHighlight(spec);
   if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
-  return matchesSelection(row?.__row || row, selection)
+  return matchesSelection(row.__row || row, selection)
     ? 1
     : Number(selection.opacity ?? dimOpacity);
 }

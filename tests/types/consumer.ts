@@ -57,7 +57,7 @@ registerChartModule(lineModule);
 registerChartModule(unitModule);
 // @ts-expect-error Pair progress accepts only a number.
 pair.progress('0.5');
-// @ts-expect-error ESM dependencies are explicit.
+// The bundled runtime supplies D3 and Arquero; no runtime option is required.
 await transition(a, b, { target: '#chart' });
 await browser.transition(a, b);
 const customPlugin = defineChartType({ key: 'custom', renderer() {} });

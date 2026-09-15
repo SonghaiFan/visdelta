@@ -24,13 +24,25 @@ test('selected bar transition loads no unrelated chart types', async ({ page }) 
     const url = new URL(request.url());
     if (url.pathname.startsWith('/dist/')) modules.push(url.pathname);
   });
-  await page.goto('/tests/fixtures/runtime.html');
-  await expect(page.locator('#status')).toHaveText('Ready');
-  // This isolated fixture intentionally stays tiny; the docs lab uses the
-  // bundled population CSV.
-  await expect(page.locator('#chart rect.vd-bar')).toHaveCount(3);
-  await page.locator('#progress').fill('0.37');
-  await expect(page.locator('#value')).toHaveText('0.37');
+  // The isolated fixture loads only the D3/Arquero globals and the stylesheet;
+  // the chart comes in through the focused ESM entries, like a bundler would.
+  await page.goto('/tests/fixtures/isolated.html');
+  const count = await page.evaluate(async () => {
+    const [{ bar }, { transition }] = await Promise.all([
+      import('/dist/bar.js'),
+      import('/dist/transition-entry.js')
+    ]);
+    const rows = [
+      { category: 'A', value: 10, other: 35 },
+      { category: 'B', value: 30, other: 5 },
+      { category: 'C', value: 20, other: 15 }
+    ];
+    const from = bar(rows).x('category').y('value').key('category');
+    const change = await transition(from, from.y('other'), { target: '#chart', height: 400 });
+    change.progress(0.37);
+    return document.querySelectorAll('#chart rect.vd-bar').length;
+  });
+  expect(count).toBe(3);
   expect(modules).toContain('/dist/charts/bar/plugin.js');
   expect(modules.filter(path => /\/charts\/(area|line|point|unit)\//.test(path))).toEqual([]);
   expect(modules.filter(path => /\/(visdelta|story|seq|manifest)\.js$/.test(path))).toEqual([]);
@@ -97,22 +109,24 @@ test('the root entry does not overwrite a selected built-in registration', async
 test('initial rendering failure restores the original target and listeners', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   const result = await page.evaluate(async () => {
-    const { bar } = await import('/dist/bar.js');
+    const { unit } = await import('/dist/unit.js');
     const { transition } = await import('/dist/transition-entry.js');
     const host = document.createElement('div');
     const original = document.createElement('button');
     let clicks = 0;
     original.onclick = () => clicks++;
     host.append(original); document.body.append(host);
-    const a = bar([{ key: 'A', value: 2 }]).x('key').y('value');
+    // A beeswarm without an x field fails inside the unit layout, i.e. while
+    // the first frame renders, after the host has already been taken over.
+    const a = unit([{ key: 'A', value: 2 }]).key('key').layout('beeswarm');
     let error;
-    try { await transition(a, a.where({ key: 'A' }), { target: host, d3 }); }
+    try { await transition(a, a.data([{ key: 'A', value: 3 }]), { target: host }); }
     catch (cause) { error = cause.message; }
     const restored = host.firstChild === original;
     original.click(); host.remove();
     return { error, restored, clicks };
   });
-  expect(result.error).toContain('Arquero');
+  expect(result.error).toContain('beeswarm');
   expect(result.restored).toBe(true);
   expect(result.clicks).toBe(1);
 });
