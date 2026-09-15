@@ -1,8 +1,7 @@
 import { chartStyle, responsiveTickCount } from '../style.js';
-import { motion } from '../../runtime/recorder.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RuntimeScale } from '../../runtime/marks.js';
-import type { ChartContext, D3Lib, EncodingSpec } from '../../types/index.js';
+import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
 export interface UnitAxisScales {
   x?: RuntimeScale | null;
@@ -21,7 +20,6 @@ export function drawUnitAxes(
   chart: ChartContext,
   scales: UnitAxisScales,
   channels: EncodingSpec,
-  d3: D3Lib,
   deps: ChartRuntimeDeps,
   options: UnitAxisOptions = {}
 ): void {
@@ -32,25 +30,21 @@ export function drawUnitAxes(
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
   const { x = null, y = null } = scales;
   const anchorsOnly = Boolean(options.anchorsOnly);
-  if (rule.grid === 'both') deps.drawGrid(chart, y, d3, transition, { x, xTickCount, yTickCount });
-  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, d3, transition, { x, xTickCount });
-  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, d3, transition, { yTickCount });
-  else deps.updateGrid(chart, null, d3, transition);
-  deps.drawXAxis(
-    chart,
-    x,
-    anchorsOnly ? undefined : style.axisTitle(channels.x, 'right'),
-    d3,
-    transition,
-    {
-      tickCount: xTickCount,
-      tickFormat: channels.x?.format,
-      position: options.position
-    }
-  );
-  deps.drawYAxis(chart, y, anchorsOnly ? undefined : style.axisTitle(channels.y, 'up'), d3, transition, {
+  if (rule.grid === 'both') deps.drawGrid(chart, y, transition, { x, xTickCount, yTickCount });
+  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, transition, { x, xTickCount });
+  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, transition, { yTickCount });
+  else deps.updateGrid(chart, null, transition);
+  const edgeTitleInset = rule.edgeTitles && !anchorsOnly ? style.edgeTitleInset : undefined;
+  deps.drawXAxis(chart, x, anchorsOnly ? undefined : style.axisTitle(channels.x, 'right'), transition, {
+    tickCount: xTickCount,
+    tickFormat: channels.x?.format,
+    position: options.position,
+    edgeTitleInset
+  });
+  deps.drawYAxis(chart, y, anchorsOnly ? undefined : style.axisTitle(channels.y, 'up'), transition, {
     tickCount: yTickCount,
-    tickFormat: channels.y?.format
+    tickFormat: channels.y?.format,
+    edgeTitleInset
   });
   if (anchorsOnly) {
     // Force exposes collection anchors, not Cartesian continua. Keep the
@@ -60,26 +54,12 @@ export function drawUnitAxes(
   } else {
     chart.scene.xAxis.select('.domain').style('opacity', rule.openXDomain ? 0 : 1);
     chart.scene.yAxis.select('.domain').style('opacity', rule.openYDomain ? 0 : 1);
-    if (rule.edgeTitles && channels.x?.title) {
-      motion(chart.scene.xLabel.attr('text-anchor', 'end'), transition)
-        .attr('text-anchor', 'end')
-        .attr('x', chart.margin.left + chart.innerWidth - style.edgeTitleInset.right)
-        .attr('y', chart.height - style.edgeTitleInset.bottom)
-        .attr('transform', null);
-    }
-    if (rule.edgeTitles && channels.y?.title) {
-      motion(chart.scene.yLabel.attr('text-anchor', 'start'), transition)
-        .attr('text-anchor', 'start')
-        .attr('x', chart.margin.left + style.edgeTitleInset.left)
-        .attr('y', chart.margin.top - style.edgeTitleInset.top)
-        .attr('transform', null);
-    }
   }
 }
 
-export function clearUnitAxes(chart: ChartContext, d3: D3Lib, deps: ChartRuntimeDeps): void {
+export function clearUnitAxes(chart: ChartContext, deps: ChartRuntimeDeps): void {
   const transition = chart.transition.base;
-  deps.updateGrid(chart, null, d3, transition);
-  deps.drawXAxis(chart, null, undefined, d3, transition);
-  deps.drawYAxis(chart, null, undefined, d3, transition);
+  deps.updateGrid(chart, null, transition);
+  deps.drawXAxis(chart, null, undefined, transition);
+  deps.drawYAxis(chart, null, undefined, transition);
 }

@@ -2,7 +2,7 @@
 const population = `const DATA_URL = "./data/us-population-state-age-tidy.csv";
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
 
-const population = bar(DATA_URL)
+const population = bar({ url: DATA_URL })
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"]);
@@ -30,7 +30,7 @@ const AGE_COLORS = ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f
 
 const segmentedOverview = `${ageConstants}
 
-const detailed = bar(DATA_URL)
+const detailed = bar({ url: DATA_URL })
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
@@ -40,7 +40,7 @@ const detailed = bar(DATA_URL)
 const segmentedFeatured = `${ageConstants}
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
 
-const detailed = bar(DATA_URL)
+const detailed = bar({ url: DATA_URL })
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])

@@ -9,8 +9,11 @@ import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
-import type { ChannelSpec, ChartContext, ChartDeps, ChartSceneContext, ChartSelection, ConnectorSpec, D3Lib, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
+import type { ChannelSpec, ChartContext, ChartDeps, ChartSceneContext, ChartSelection, ConnectorSpec, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
 import type { PointViewState } from './authoring.js';
+import { group as groupBy } from 'd3-array';
+import { easeCubicOut } from 'd3-ease';
+import { select } from 'd3-selection';
 
 interface Point {
   x: number;
@@ -53,7 +56,7 @@ export function createPointRenderer(deps: ChartDeps): Renderer<PointViewState> {
 }
 
 class PointChart extends BaseChart<PointViewState> {
-  render(chart: ChartContext, rows: RenderDatum[], spec: PointViewState, tooltip: HTMLElement, d3: D3Lib): void {
+  render(chart: ChartContext, rows: RenderDatum[], spec: PointViewState, tooltip: HTMLElement): void {
     const {
       bindTooltip,
       chartStyle,
@@ -86,7 +89,7 @@ class PointChart extends BaseChart<PointViewState> {
     const selection = viewSelection(spec);
     const movesPoints = state.detailMode === 'detail' && !state.view;
     // Scatter and gather use the shared base timing (ease-in-out by default).
-    // An earlier `base.ease(d3.easeCubicOut)` here never took effect: D3
+    // An earlier `base.ease(easeCubicOut)` here never took effect: D3
     // transitions inherit timing from the nearest scheduled ancestor, and the
     // frame had already been scheduled on the unmodified base. Recorded tracks
     // read the base directly, so a per-chart ease must be declared before the
@@ -95,7 +98,7 @@ class PointChart extends BaseChart<PointViewState> {
     const fallbackRadius = Number.isFinite(Number(spec.size))
       ? Number(spec.size)
       : defaultPointRadius(rows.length);
-    const baseRadius = radiusScale(domainRows, enc.size, fallbackRadius, d3, quantitativeDomain);
+    const baseRadius = radiusScale(domainRows, enc.size, fallbackRadius, quantitativeDomain);
     const largestRadius = domainRows.reduce(
       (largest, row) => Math.max(largest, baseRadius(row)),
       fallbackRadius
@@ -107,9 +110,9 @@ class PointChart extends BaseChart<PointViewState> {
     const yDomainRows = connector?.mode === 'baseline' && connector.channel === 'y'
       ? rowsIncludingBaseline(viewRows, viewEnc.y, connector.from)
       : viewRows;
-    const baseX = bandOrLinear(xDomainRows, viewEnc.x, [0, chart.innerWidth], d3, { domainPadding: markPadding });
-    const baseY = bandOrLinear(yDomainRows, viewEnc.y, [chart.innerHeight, 0], d3, { domainPadding: markPadding });
-    const color = colorScale(domainRows, enc.color, d3);
+    const baseX = bandOrLinear(xDomainRows, viewEnc.x, [0, chart.innerWidth], { domainPadding: markPadding });
+    const baseY = bandOrLinear(yDomainRows, viewEnc.y, [chart.innerHeight, 0], { domainPadding: markPadding });
+    const color = colorScale(domainRows, enc.color);
     const camera = focusCamera(
       viewRows.map((row) => ({
         datum: row,
@@ -172,8 +175,8 @@ class PointChart extends BaseChart<PointViewState> {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });
-    drawPointAxes(chart, x, y, viewEnc, d3, this.deps);
-    drawLegend(chart, rows, enc.color, d3);
+    drawPointAxes(chart, x, y, viewEnc, this.deps);
+    drawLegend(chart, rows, enc.color);
     drawPointConnectors({
       chart,
       connectors: pointConnectorSegments(rows, connector, chartPosition, { x, y }, position, key),
@@ -190,7 +193,7 @@ class PointChart extends BaseChart<PointViewState> {
     });
     drawPointBlend({
       chart, rows, state, key, radius, color, enterAnchor, exitAnchor,
-      chartPosition, crispLayer, blendMotion, movesPoints, transition: t, d3
+      chartPosition, crispLayer, blendMotion, movesPoints, transition: t
     });
 
     crispLayer.selectAll<SVGCircleElement, RenderDatum>('circle.vd-point')
@@ -407,7 +410,7 @@ function drawPointConnectors({ chart, connectors, transition, themeValue }: {
 /** A deterministic, decorative layer for summary/detail movement. */
 function drawPointBlend({
   chart, rows, state, key, radius, color, enterAnchor, exitAnchor,
-  chartPosition, crispLayer, blendMotion, movesPoints, transition, d3
+  chartPosition, crispLayer, blendMotion, movesPoints, transition
 }: {
   chart: ChartContext;
   rows: RenderDatum[];
@@ -422,10 +425,9 @@ function drawPointBlend({
   blendMotion: BlendMotion | null;
   movesPoints: boolean;
   transition: MotionTiming;
-  d3: D3Lib;
 }): void {
   const enabled = state.effect === 'blend';
-  crispLayer.interrupt().style('visibility', 'visible');
+  crispLayer.style('visibility', 'visible');
   const layer = chart.g.selectAll<SVGGElement, null>('g.vd-point-blend-layer')
     .data(enabled ? [null] : [])
     .join(
@@ -439,9 +441,9 @@ function drawPointBlend({
     );
   if (!enabled) return;
 
-  const filterId = ensurePointBlendFilter(chart.scene, d3);
+  const filterId = ensurePointBlendFilter(chart.scene);
   const groups = Array.from(
-    d3.group(rows, (row) => parentKey(row, state.parentField)),
+    groupBy(rows, (row) => parentKey(row, state.parentField)),
     ([parent, values]) => ({ parent, values })
   );
   const group = layer.selectAll<SVGGElement, { parent: string; values: RenderDatum[] }>('g.vd-point-blend-group')
@@ -454,7 +456,7 @@ function drawPointBlend({
     .attr('filter', `url(#${filterId})`);
 
   group.each(function(entry) {
-    d3.select(this).selectAll<SVGCircleElement, RenderDatum>('circle.vd-point-blend')
+    select(this).selectAll<SVGCircleElement, RenderDatum>('circle.vd-point-blend')
       .data(entry.values, (row, index) => pointStoredKey(row, index, key))
       .join(
         (enter) => {
@@ -492,7 +494,7 @@ function drawPointBlend({
       );
   });
 
-  layer.interrupt().style('visibility', 'hidden');
+  layer.style('visibility', 'hidden');
   if (movesPoints) {
     motion(layer, transition)
       .styleTween('visibility', () => (progress) =>
@@ -604,8 +606,7 @@ function smoothStep(from: number, to: number, value: number): number {
   return progress * progress * (3 - 2 * progress);
 }
 
-function ensurePointBlendFilter(scene: ChartSceneContext, d3: D3Lib): string {
-  void d3;
+function ensurePointBlendFilter(scene: ChartSceneContext): string {
   const id = `vd-point-blend-${scene.clipIdentity}`;
   const defs = scene.svg.selectAll<SVGDefsElement, null>('defs.vd-point-blend-defs')
     .data([null])

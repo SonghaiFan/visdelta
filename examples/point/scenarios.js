@@ -1,7 +1,7 @@
 // Keep these pairs aligned with tests/browser/point-lab.spec.mjs.
 const base = `const DATA_URL = "./data/mtcars.csv";
 
-const cars = point(DATA_URL)
+const cars = point({ url: DATA_URL })
   .x("wt", { title: "Weight (1,000 lb)" })
   .y("mpg", { title: "Fuel economy (mpg)" })
   .key("name")

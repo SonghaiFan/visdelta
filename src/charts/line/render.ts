@@ -8,12 +8,14 @@ import { drawLineAxes } from './axes.js';
 import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, D3Lib, Renderer, SelectionSpec } from '../../types/index.js';
+import type { ChartContext, ChartDeps, Renderer, SelectionSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { LineViewState } from './authoring.js';
 import type { LinePathFrame, LinePathPoint } from './path.js';
 import type { LineSeries } from './state.js';
 import type { LineTransitionPlanExtension } from './plugin.js';
+import { select } from 'd3-selection';
+import { line as shapeLine } from 'd3-shape';
 
 /** A rendered series path remembers the keyed frame it was last drawn from. */
 interface LinePathElement extends SVGPathElement {
@@ -32,7 +34,7 @@ export function createLineRenderer(deps: ChartDeps): Renderer<LineViewState> {
 }
 
 class LineChart extends BaseChart<LineViewState> {
-  render(chart: ChartContext, rows: RenderDatum[], spec: LineViewState, tooltip: HTMLElement, d3: D3Lib): void {
+  render(chart: ChartContext, rows: RenderDatum[], spec: LineViewState, tooltip: HTMLElement): void {
     const {
       bandOrLinear,
       bindTooltip,
@@ -87,8 +89,8 @@ class LineChart extends BaseChart<LineViewState> {
     const pointPadding = pointsAreExplicit
       ? authoredPointRadius + themeValue('--vd-point-stroke-width', 1.5) / 2
       : 0;
-    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], d3, { domainPadding: pointPadding });
-    const baseY = bandOrLinear(scaleRows, enc.y, [chart.innerHeight, 0], d3, { domainPadding: pointPadding });
+    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], { domainPadding: pointPadding });
+    const baseY = bandOrLinear(scaleRows, enc.y, [chart.innerHeight, 0], { domainPadding: pointPadding });
     const camera = focusCamera(
       plottedRows.map((row) => ({
         datum: row,
@@ -104,7 +106,7 @@ class LineChart extends BaseChart<LineViewState> {
     const x = cameraScale(baseX, camera, 'x');
     const y = cameraScale(baseY, camera, 'y');
     chart.camera = camera;
-    const color = colorScale(domainRows, enc.color, d3);
+    const color = colorScale(domainRows, enc.color);
     const key = linePointKeyAccessor(spec, xField);
     const series = connectedLineStretches(
       plottedRows,
@@ -115,16 +117,14 @@ class LineChart extends BaseChart<LineViewState> {
       state.connect,
       state.filtersRows
     );
-    const line = d3
-      .line<RenderDatum>()
+    const line = shapeLine<RenderDatum>()
       .x((d) => position(x, d[xField]))
       .y((d) => position(y, d[yField]))
-      .curve(d3Curve(spec.curve, d3));
-    const pointLine = d3
-      .line<LinePathPoint>()
+      .curve(d3Curve(spec.curve));
+    const pointLine = shapeLine<LinePathPoint>()
       .x((d) => d.x)
       .y((d) => d.y)
-      .curve(d3Curve(spec.curve, d3));
+      .curve(d3Curve(spec.curve));
     const pathFrame = (entry: LineSeries): LinePathFrame => ({
       path: line(entry.rows) || '',
       curve: spec.curve || 'curveLinear',
@@ -158,7 +158,7 @@ class LineChart extends BaseChart<LineViewState> {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });
-    drawLineAxes(chart, x, y, enc, d3, this.deps, { duration: lineDuration });
+    drawLineAxes(chart, x, y, enc, this.deps, { duration: lineDuration });
 
     chart.g.selectAll<LinePathElement, LineSeries>('path.vd-line')
       .data(series, lineSeriesKey)
@@ -278,7 +278,7 @@ class LineChart extends BaseChart<LineViewState> {
         (exit) => {
           const retracting = exit.each(function() {
             const length = Math.max(0, this.getTotalLength());
-            d3.select(this)
+            select(this)
               .attr('stroke-dasharray', `${length} ${length}`)
               .attr('stroke-dashoffset', 0);
           });
@@ -374,7 +374,7 @@ class LineChart extends BaseChart<LineViewState> {
         }
       );
 
-    drawLegend(chart, rows, enc.color, d3);
+    drawLegend(chart, rows, enc.color);
   }
 }
 

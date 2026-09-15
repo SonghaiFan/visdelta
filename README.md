@@ -35,9 +35,9 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 npm install visdelta@0.2.0
 ```
 
-`0.2.0` is the first-release candidate in this checkout. VisDelta includes its
-D3 runtime. Declared transforms such as `.where()`, `.sort()`, `.breakdown()`,
-and `.rollup()` need no extra package.
+VisDelta depends only on the `d3-*` modules it renders with. Declared transforms
+such as `.where()`, `.sort()`, `.breakdown()`, and `.rollup()` run without any
+extra package. The package is ESM-only.
 
 VisDelta expects tidy input. Data cleaning and reshaping belong before the
 library.
@@ -84,7 +84,6 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 - Canonical reversible paths use the same frames backward; explicit directional easing profiles are an exception (see [design rules](docs/language-framework.md#reverse-means-the-same-frames-backward)).
 - `focus()` is a camera move, never a data filter.
 - Core stays chart-agnostic; chart-specific behavior stays in its module.
-- Public terminology uses plain English and has no greenfield compatibility aliases.
 
 See the [design principles](docs/language-framework.md), [API
 reference](docs/reference.md), and the [five live labs](docs/examples.md).

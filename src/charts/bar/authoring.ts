@@ -81,7 +81,7 @@ export class BarState extends ChartState<BarViewState> {
     } as Partial<BarViewState>);
   }
 
-  override where(selector: string | Record<string, unknown> | FilterSpec): this {
+  override where(selector: Record<string, unknown> | FilterSpec): this {
     return super.where(selector);
   }
 

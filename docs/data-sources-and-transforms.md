@@ -10,13 +10,14 @@ Supported sources are:
 ```js
 bar(rows)
 bar({ values: rows })
-bar("./data.csv")
+bar({ url: "./data.csv" })                 // type inferred from the extension
 bar({ url: "./data.json", type: "json" })
-bar("sales") // resolved from transition(..., { data: { sales: rows } })
+bar({ name: "sales" })                      // resolved from transition(..., { data: { sales: rows } })
 ```
 
-CSV and JSON URLs are loaded through the D3 instance passed to `transition()`.
-The same source used by both endpoints is loaded once per transition.
+A bare string is rejected: whether `"sales.csv"` names a file or a dataset is
+not something the library guesses. URLs are loaded by `transition()`; the same
+source used by both endpoints is loaded once per transition.
 
 ## Field types
 
@@ -39,7 +40,7 @@ run in declaration order without another runtime dependency.
 
 | Operation | Supported form |
 | --- | --- |
-| `filter` | One strict field comparison or one safe `datum.field` comparison |
+| `filter` | One structured field comparison: `{ field, equal | notEqual | oneOf | gt | gte | lt | lte }` |
 | `timeUnit` | `month` |
 | `fold` | Explicit fields and output names |
 | `bin` | Positive `step` or positive integer `maxbins` |

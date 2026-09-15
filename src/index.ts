@@ -24,7 +24,6 @@ export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, pape
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from "./charts/style.js";
 export { transition } from "./transition.js";
 export { sequence } from "./sequence.js";
-export { mount, select } from "./select.js";
 export { buildGroupingTree, compileLineage, correspondLineage, delta, diffViewStates, lineageMarkKey, viewLineageCorrespondence, visualizationSpec } from "./core.js";
 export { detectDataTypes, resolveEncodingTypes } from "./data/types.js";
 export type { Visualization } from "./core.js";
@@ -32,4 +31,3 @@ export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, L
 export type { ChannelType, ConnectorSpec } from "./types/index.js";
 export type { TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";
 export type { SequenceOptions, SequencePlayOptions, VisualizationSequence } from "./sequence.js";
-export type { LiveChart, LiveMotion, LiveSequenceMotion, PendingSequence, PendingUpdate } from "./select.js";

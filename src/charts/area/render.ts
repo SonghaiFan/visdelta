@@ -14,12 +14,14 @@ import {
 import { drawAreaAxes } from './axes.js';
 import { motion } from '../../runtime/recorder.js';
 import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, D3Lib, Renderer } from '../../types/index.js';
+import type { ChartContext, ChartDeps, Renderer } from '../../types/index.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { Area, Line } from 'd3-shape';
 import type { AreaViewState } from './authoring.js';
 import type { AreaTransitionPlanExtension } from './plugin.js';
 import type { AreaCell, AreaLayer, AreaPoint } from './state.js';
+import { interpolateNumber } from 'd3-interpolate';
+import { area as shapeArea, line as shapeLine } from 'd3-shape';
 
 /** One boundary sample in pixel space. */
 export interface AreaBoundaryPoint {
@@ -60,7 +62,7 @@ export function createAreaRenderer(deps: ChartDeps): Renderer<AreaViewState> {
 }
 
 class AreaChart extends BaseChart<AreaViewState> {
-  render(chart: ChartContext, rows: RenderDatum[], spec: AreaViewState, tooltip: HTMLElement, d3: D3Lib): void {
+  render(chart: ChartContext, rows: RenderDatum[], spec: AreaViewState, tooltip: HTMLElement): void {
     const {
       bandOrLinear, bindTooltip, colorScale, drawLegend,
       position, themeValue
@@ -82,12 +84,12 @@ class AreaChart extends BaseChart<AreaViewState> {
     const cells = areaCells(layers, lineageLayers);
     const plan = chart.transitionPlan as (typeof chart.transitionPlan & AreaTransitionPlanExtension) | undefined;
     const splitDetail = plan?.detailChange?.mode === 'split';
-    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth], d3);
+    const baseX = bandOrLinear(scaleRows, enc.x, [0, chart.innerWidth]);
     const boundaryRows: AreaBoundaryRow[] = domainLayers.flatMap((layer) => layer.points.flatMap((point) => [
       { __areaValue: point.y0 }, { __areaValue: point.y1 }
     ]));
     const yChannel = { ...enc.y, field: '__areaValue' };
-    const baseY = bandOrLinear(boundaryRows, yChannel, [chart.innerHeight, 0], d3);
+    const baseY = bandOrLinear(boundaryRows, yChannel, [chart.innerHeight, 0]);
     const camera = focusCamera(
       cells.map((cell) => ({
         datum: cell.row,
@@ -99,15 +101,15 @@ class AreaChart extends BaseChart<AreaViewState> {
     const x = cameraScale(baseX, camera, 'x');
     const y = cameraScale(baseY, camera, 'y');
     chart.camera = camera;
-    const color = colorScale(domainRows, enc.color, d3);
+    const color = colorScale(domainRows, enc.color);
     const curveName = spec.curve || 'curveLinear';
-    const curve = d3Curve(spec.curve, d3);
-    const shape: AreaShape = d3.area<AreaBoundaryPoint>()
+    const curve = d3Curve(spec.curve);
+    const shape: AreaShape = shapeArea<AreaBoundaryPoint>()
       .x((point) => point.x)
       .y0((point) => point.y0)
       .y1((point) => point.y1)
       .curve(curve);
-    const edge: AreaEdge = d3.line<AreaBoundaryPoint>()
+    const edge: AreaEdge = shapeLine<AreaBoundaryPoint>()
       .x((point) => point.x)
       .y((point) => point.y1)
       .curve(curve);
@@ -150,11 +152,11 @@ class AreaChart extends BaseChart<AreaViewState> {
       if (previousCurve !== curveName) {
         node.setAttribute('data-area-transition', 'change-curve');
         return interpolateAreaCurveFrames(
-          node, from, to, previousCurve, curveName, generator, d3
+          node, from, to, previousCurve, curveName, generator
         );
       }
       node.setAttribute('data-area-transition', 'move-boundaries');
-      return interpolateAreaCellFrames(from, to, generator, d3);
+      return interpolateAreaCellFrames(from, to, generator);
     };
 
     // Area owns this cleanup locally; Core does not need to know the chart type.
@@ -164,7 +166,7 @@ class AreaChart extends BaseChart<AreaViewState> {
       x: (row) => position(x, row[xField]),
       y: (row) => position(y, row[yField])
     });
-    drawAreaAxes(chart, x, y, enc, d3, this.deps);
+    drawAreaAxes(chart, x, y, enc, this.deps);
 
     chart.g.selectAll<AreaPathElement, AreaCell>('path.vd-area')
       .data(cells, (cell) => cell.key)
@@ -256,7 +258,7 @@ class AreaChart extends BaseChart<AreaViewState> {
       .style('opacity', 0)
       .remove();
 
-    drawLegend(chart, rows, enc.color, d3);
+    drawLegend(chart, rows, enc.color);
   }
 }
 
@@ -353,16 +355,15 @@ function stackDirection(point: { y0: number; y1: number }): -1 | 0 | 1 {
 export function interpolateAreaCellFrames(
   from: AreaCellFrame | null | undefined,
   to: AreaCellFrame,
-  shape: AreaShape,
-  d3: D3Lib
+  shape: AreaShape
 ): (progress: number) => string {
   const source = normalizeAreaCellFrame(from, to);
   const target = normalizeAreaCellFrame(to, from);
   return (progress) => shape(source.map((point, index) => ({
     ...target[index],
-    x: safeInterpolate(point.x, target[index].x, progress, d3),
-    y0: safeInterpolate(point.y0, target[index].y0, progress, d3),
-    y1: safeInterpolate(point.y1, target[index].y1, progress, d3)
+    x: safeInterpolate(point.x, target[index].x, progress),
+    y0: safeInterpolate(point.y0, target[index].y0, progress),
+    y1: safeInterpolate(point.y1, target[index].y1, progress)
   }))) || '';
 }
 
@@ -378,8 +379,7 @@ function interpolateAreaCurveFrames(
   to: AreaCellFrame,
   fromCurveName: string,
   toCurveName: string,
-  targetShape: AreaShape,
-  d3: D3Lib
+  targetShape: AreaShape
 ): (progress: number) => string {
   // Closed curve factories intentionally connect each boundary back to itself.
   // Keep the general path matcher for those uncommon shapes; the ordinary Area
@@ -393,10 +393,10 @@ function interpolateAreaCurveFrames(
 
   const boundary = (frame: AreaCellFrame, curveName: string, channel: 'y0' | 'y1', reverse = false) => {
     const points = reverse ? [...frame].reverse() : frame;
-    return d3.line<AreaBoundaryPoint>()
+    return shapeLine<AreaBoundaryPoint>()
       .x((point) => point.x)
       .y((point) => point[channel])
-      .curve(d3Curve(curveName as D3AreaCurveName, d3))(points) || '';
+      .curve(d3Curve(curveName as D3AreaCurveName))(points) || '';
   };
   const top = matchPathStrings(
     node,
@@ -444,15 +444,14 @@ function flattenAreaFrame(frame: AreaCellFrame): AreaCellFrame {
 export function interpolateAreaFrames(
   from: AreaFramePoint[],
   to: AreaFramePoint[],
-  shape: AreaShape,
-  d3: D3Lib
+  shape: AreaShape
 ): (progress: number) => string {
   const pairs = matchAreaFramePoints(from, to);
   return (progress) => shape(pairs.map((pair) => ({
     key: pair.key,
-    x: safeInterpolate(pair.from.x, pair.to.x, progress, d3),
-    y0: safeInterpolate(pair.from.y0, pair.to.y0, progress, d3),
-    y1: safeInterpolate(pair.from.y1, pair.to.y1, progress, d3)
+    x: safeInterpolate(pair.from.x, pair.to.x, progress),
+    y0: safeInterpolate(pair.from.y0, pair.to.y0, progress),
+    y1: safeInterpolate(pair.from.y1, pair.to.y1, progress)
   }))) || '';
 }
 
@@ -520,10 +519,10 @@ function sameKeysInOrder(from: string[], to: string[]): boolean {
   return from.length === to.length && from.every((key, index) => key === to[index]);
 }
 
-function safeInterpolate(from: number, to: number, progress: number, d3: D3Lib): number {
+function safeInterpolate(from: number, to: number, progress: number): number {
   const a = Number(from);
   const b = Number(to);
   const safeA = Number.isFinite(a) ? a : Number.isFinite(b) ? b : 0;
   const safeB = Number.isFinite(b) ? b : safeA;
-  return d3.interpolateNumber(safeA, safeB)(progress);
+  return interpolateNumber(safeA, safeB)(progress);
 }

@@ -22,29 +22,31 @@ test('data is replaced, including URL and inline source metadata', () => {
   const first = bar().data({ url: './before.json', type: 'json' }).x('category').y('value');
   assert.deepEqual(first.data([{ category: 'A', value: 1 }]).toSpec().data, [{ category: 'A', value: 1 }]);
   assert.deepEqual(first.data({ values: [] }).toSpec().data, { values: [] });
-  assert.deepEqual(first.data('./after.csv').toSpec().data, { url: './after.csv' });
+  assert.deepEqual(first.data({ url: './after.csv' }).toSpec().data, { url: './after.csv' });
+  assert.throws(() => first.data('./after.csv'), /ambiguous/);
 });
 
 test('diff detects data and every bound encoding channel', () => {
-  const a = point().data('one').x('x').y('y');
-  assert.equal(diffViewStates(a, a.data('two')).hasDelta('data'), true);
+  const a = point().data({ name: 'one' }).x('x').y('y');
+  assert.equal(diffViewStates(a, a.data({ name: 'two' })).hasDelta('data'), true);
   assert.equal(diffViewStates(a, a.channel('size', 'count')).hasDelta('encoding.size'), true);
   assert.equal(diffViewStates(a, a.tooltip('x')).hasDelta('encoding.tooltip'), true);
 });
 
 test('same result has the same delta independent of derivation and property order', () => {
-  const a = bar('rows').x('category').y('value');
+  const a = bar({ name: 'rows' }).x('category').y('value');
   const b = a.y('other');
-  const c = bar('rows').x('category').y('other');
+  const c = bar({ name: 'rows' }).x('category').y('other');
   assert.deepEqual(diffViewStates(a, b).deltas, diffViewStates(a, c).deltas);
   assert.equal(sameValue({ a: 1, b: [2, 3] }, { b: [2, 3], a: 1 }), true);
   assert.equal(sameValue([2, 3], [3, 2]), false);
 });
 
 test('pair validation runs before DOM access', async () => {
-  await assert.rejects(() => transition(bar('a'), line('a'), {}), /same chart type/);
-  await assert.rejects(() => transition(bar('a'), bar('a'), {}), /missing dataset/);
-  await assert.rejects(() => transition(bar('a'), bar('a'), {}), /missing dataset/);
+  const named = { name: 'a' };
+  await assert.rejects(() => transition(bar(named), line(named), { target: '#x' }), /same chart type/);
+  await assert.rejects(() => transition(bar(named), bar(named), { target: '#x' }), /missing dataset/);
+  assert.throws(() => bar('a'), /ambiguous/);
   const a = { mark: 'bar', data: [{ category: 'A', value: 1 }] };
   await assert.rejects(() => transition(a, { ...a, transform: [null] }, {}), /transform\[0\]/);
   await assert.rejects(() => transition(a, { ...a, transform: [{ limit: -1 }] }, {}), /transform\[0\]/);
@@ -52,7 +54,7 @@ test('pair validation runs before DOM access', async () => {
 
 test('sequence validates its minimum authored timeline before DOM access', async () => {
   await assert.rejects(
-    () => sequence([bar('rows')], { target: '#chart' }),
+    () => sequence([bar({ name: 'rows' })], { target: '#chart' }),
     /at least two visualization states/
   );
 });

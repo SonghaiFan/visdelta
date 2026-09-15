@@ -14,8 +14,10 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
         { id: 'c', x: 1, y: 4, group: 'two' }, { id: 'd', x: 2, y: 7, group: 'two' }
       ];
       let base = vd[kind](rows).datumKey('id').key('id');
+      // Bar needs one row per category; the others read x from the rows directly.
       base = kind === 'unit' ? base.group('group')
-        : base.x(kind === 'bar' ? 'group' : 'x').y('y');
+        : kind === 'bar' ? base.x('id').y('y')
+        : base.x('x').y('y');
       const selector = { bar: 'rect.vd-bar', line: 'path.vd-line', area: 'path.vd-area',
         point: 'circle.vd-point', unit: 'circle.vd-unit' }[kind];
       const host = document.createElement('div');

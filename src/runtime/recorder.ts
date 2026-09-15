@@ -7,12 +7,14 @@
 // exit code the D3 way; the runtime gets typed, timer-free tracks.
 //
 // Interpolation matches d3-transition's public behavior: `attr("transform")`
-// uses interpolateTransformSvg, everything else uses d3.interpolate, and start
+// uses interpolateTransformSvg, everything else uses interpolateValue, and start
 // values are read from the DOM when the item initializes (not when recorded).
 
 import type { BaseType, Selection } from 'd3-selection';
-import type { D3Lib } from '../types/index.js';
 import type { Ease, TrackItem, Tween } from './tracks.js';
+import { interpolate as interpolateValue, interpolateTransformSvg } from 'd3-interpolate';
+import { namespace } from 'd3-selection';
+import { now } from 'd3-timer';
 
 type ValueFn<Datum, Result> = (this: Element, datum: Datum, index: number, group: Element[]) => Result;
 type Value<Datum, Result> = Result | ValueFn<Datum, Result>;
@@ -76,16 +78,16 @@ export interface MotionTiming {
   ease: Ease;
 }
 
-/** The mount element of a rendered scene carries the scene; the scene carries its D3. */
+/** The mount element of a rendered scene carries the scene. */
 interface SceneHost extends Node {
-  __visDeltaScene?: { d3: D3Lib } & SceneWithTracks;
+  __visDeltaScene?: SceneWithTracks;
 }
 
 /**
  * Record seekable motion for `selection` with `timing`. Every selection a
  * renderer touches lives under a VisDelta mount, whose scene supplies the track
- * sink and the D3 instance; a selection outside any scene is a programming
- * error and throws rather than silently animating on D3's timer.
+ * sink; a selection outside any scene is a programming error and throws rather
+ * than silently animating on D3's timer.
  */
 export function motion<Element_ extends BaseType, Datum>(
   selection: Selection<Element_, Datum, any, any>,
@@ -93,14 +95,13 @@ export function motion<Element_ extends BaseType, Datum>(
 ): Motion<Element_, Datum> {
   const node = selection.node() as Node | null;
   // An empty selection (nothing entered, nothing exited) records nothing.
-  if (!node) return new Recorder(selection, [], { time: 0, ...timing }, null);
+  if (!node) return new Recorder(selection, [], { time: 0, ...timing });
   const scene = sceneOf(node);
   if (!scene) throw new Error('motion() needs a selection inside a mounted VisDelta chart.');
-  const d3 = scene.d3;
-  return record(selection, recordedTracks(scene), { time: d3.now(), ...timing }, d3);
+  return record(selection, recordedTracks(scene), { time: now(), ...timing });
 }
 
-function sceneOf(node: Node): ({ d3: D3Lib } & SceneWithTracks) | null {
+function sceneOf(node: Node): SceneWithTracks | null {
   for (let current: Node | null = node; current; current = current.parentNode) {
     const scene = (current as SceneHost).__visDeltaScene;
     if (scene) return scene;
@@ -126,21 +127,12 @@ export function drainRecordedTracks(scene: SceneWithTracks): TrackItem[] {
 
 export class Recorder<Element_ extends BaseType, Datum> implements Motion<Element_, Datum> {
   private readonly entries: Entry<Datum>[];
-  private readonly lib: D3Lib | null;
-
-  /** D3 is only needed to build interpolators, i.e. only when there are nodes. */
-  private get d3(): D3Lib {
-    if (!this.lib) throw new Error('Recorder: no D3 instance for a selection with nodes.');
-    return this.lib;
-  }
 
   constructor(
     private readonly source: Selection<Element_, Datum, any, any>,
     private readonly sink: TrackItem[],
-    timing: Timing,
-    d3: D3Lib | null
+    timing: Timing
   ) {
-    this.lib = d3;
     const entries: Entry<Datum>[] = [];
     source.each(function (datum, index, group) {
       // d3 visits only non-null nodes; BaseType admits null/Window in the type only.
@@ -204,9 +196,8 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
 
   attr(name: string, value: Value<Datum, string | number | boolean | null>): this {
     if (!this.entries.length) return this;
-    const d3 = this.d3;
-    const fullname = d3.namespace(name);
-    const interpolate = name === 'transform' ? d3.interpolateTransformSvg : d3.interpolate;
+    const fullname = namespace(name);
+    const interpolate = name === 'transform' ? interpolateTransformSvg : interpolateValue;
     return this.record(name, (entry) => {
       const target = resolve(entry, value);
       const node = entry.node;
@@ -229,8 +220,7 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
 
   attrTween(name: string, factory: TweenFactory<Datum> | ((this: Element, datum: Datum, index: number, group: Element[]) => Interpolator | null | undefined)): this {
     if (!this.entries.length) return this;
-    const d3 = this.d3;
-    const fullname = d3.namespace(name);
+    const fullname = namespace(name);
     return this.record(name, (entry) => {
       const i = (factory as TweenFactory<Datum>).call(entry.node, entry.datum, entry.index, entry.group) as unknown as Interpolator | null | undefined;
       if (!i) return null;
@@ -244,7 +234,6 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
 
   style(name: string, value: Value<Datum, string | number | null>, priority: 'important' | null = null): this {
     if (!this.entries.length) return this;
-    const d3 = this.d3;
     return this.record(`style.${name}`, (entry) => {
       const target = resolve(entry, value);
       const node = entry.node as HTMLElement | SVGElement;
@@ -252,7 +241,7 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
       const value1 = String(target);
       const value0 = styleValue(node, name);
       if (value0 === value1) return () => node.style.setProperty(name, value1, priority ?? '');
-      const i = d3.interpolate(value0, value1) as Interpolator;
+      const i = interpolateValue(value0, value1) as Interpolator;
       return (t) => node.style.setProperty(name, String(i(t)), priority ?? '');
     });
   }
@@ -294,7 +283,7 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
       delay: 0,
       duration: first?.duration ?? 0,
       ease: first?.ease ?? ((t) => t)
-    }, this.lib);
+    });
     // Per-node timing: each chained entry follows its own parent entry.
     next.entries.forEach((entry, index) => {
       const parent = this.entries[index]?.timing;
@@ -319,7 +308,7 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
   filter(predicate: string | ValueFn<Datum, boolean>): Recorder<Element_, Datum> {
     const filtered = this.source.filter(predicate as string) as Selection<Element_, Datum, any, any>;
     const first = this.entries[0]?.timing ?? { time: 0, delay: 0, duration: 0, ease: (t: number) => t };
-    return new Recorder(filtered, this.sink, first, this.lib);
+    return new Recorder(filtered, this.sink, first);
   }
 
   empty(): boolean { return this.entries.length === 0; }
@@ -342,10 +331,9 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
 export function record<Element_ extends BaseType, Datum>(
   selection: Selection<Element_, Datum, any, any>,
   sink: TrackItem[],
-  timing: Timing,
-  d3: D3Lib | null
+  timing: Timing
 ): Recorder<Element_, Datum> {
-  return new Recorder(selection, sink, timing, d3);
+  return new Recorder(selection, sink, timing);
 }
 
 function createItem<Datum>(entry: Entry<Datum>): TrackItem {

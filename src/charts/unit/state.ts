@@ -4,11 +4,13 @@ import { specObjectKey, specState, specTransition, specUnit } from '../../spec-m
 import { defaultTransition } from '../../timing.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import { max } from 'd3-array';
+import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force';
+import { scaleBand } from 'd3-scale';
 import type {
   CanonicalTransitionPair,
   ChannelSpec,
   ChartContext,
-  D3Lib,
   TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
@@ -76,7 +78,6 @@ export interface UnitLayoutResult {
 
 export interface UnitLayoutDeps {
   bandOrLinear: ChartRuntimeDeps['bandOrLinear'];
-  d3: D3Lib;
   position: ChartRuntimeDeps['position'];
 }
 
@@ -159,7 +160,7 @@ function unitMeta(spec: ViewSpec): UnitSpecMeta {
   return (specUnit(spec) || {}) as UnitSpecMeta;
 }
 
-export function expandUnits(rows: RenderDatum[], spec: ViewSpec, _d3?: D3Lib): UnitDatum[] {
+export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
   const unit = unitMeta(spec);
   const valueKey = unit.value;
   // An array object key reads as its joined string, exactly as a JS property lookup would.
@@ -194,7 +195,7 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec, _d3?: D3Lib): U
 }
 
 export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec, deps: UnitLayoutDeps): UnitLayoutResult {
-  const { bandOrLinear, d3, position } = deps;
+  const { bandOrLinear, position } = deps;
   const unit = unitMeta(spec);
   const layout = unit.layout || 'grid';
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
@@ -206,7 +207,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
 
   if (layout === 'force') {
     return forceLayout(units, chart, requestedRadius, xChannel, yChannel, {
-      bandOrLinear, d3, position
+      bandOrLinear, position
     });
   }
 
@@ -215,7 +216,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
     let radius = fitRadius(chart, requestedRadius, {
       columns: Math.max(uniqueCount(units, (d) => d.__row[xKey]), 1), rows: 1
     });
-    const x = unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 });
+    const x = unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear });
     const placed = dodgeForHeight(units, radius, chart.innerHeight, (d) => position(x, d.__row[xKey]));
     radius = placed.radius;
     const yByKey = new Map(placed.circles.map((circle) => [circle.data.__unitKey, circle.y] as const));
@@ -230,10 +231,10 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
   if (layout === 'bar') {
     if (!groupKey) throw new Error('Unit bar layout requires .group("field").');
     const groups = Array.from(new Set(units.map((d) => d.__row[groupKey]))) as string[];
-    const groupBand = d3.scaleBand().domain(groups).range([0, chart.innerWidth]).padding(0.18);
+    const groupBand = scaleBand().domain(groups).range([0, chart.innerWidth]).padding(0.18);
     const groupScale = groupBand as unknown as RuntimeScale;
     const groupCounts = countBy(units, (d) => d.__row[groupKey]);
-    const radius = fitGroupedRadius(chart, requestedRadius, groupBand.bandwidth(), d3.max(groupCounts.values()) || 1, columns);
+    const radius = fitGroupedRadius(chart, requestedRadius, groupBand.bandwidth(), max(groupCounts.values()) || 1, columns);
     const cell = radius * 2.45;
     const groupColumns = Math.max(1, Math.min(columns, Math.floor(groupBand.bandwidth() / cell) || 1));
     const stackByGroup = stackIndex(units, (d) => d.__row[groupKey]);
@@ -472,14 +473,14 @@ function unitXScale(
   units: UnitDatum[],
   channel: ChannelSpec,
   range: [number, number],
-  deps: Pick<UnitLayoutDeps, 'bandOrLinear' | 'd3'>,
+  deps: Pick<UnitLayoutDeps, 'bandOrLinear'>,
   options: { anchors?: boolean } = {}
 ): RuntimeScale {
   const rows = units.map((d) => d.__row);
   // Force positions are collection anchors. Beeswarm remains a quantitative
   // positional distribution and therefore retains its authored scale type.
   const resolved: RenderChannel = options.anchors ? { ...channel, type: 'nominal' } : channel;
-  return deps.bandOrLinear(rows, resolved, range, deps.d3);
+  return deps.bandOrLinear(rows, resolved, range);
 }
 
 function fitRadius(chart: ChartContext, requestedRadius: number, { columns = 1, rows = 1 }: { columns?: number; rows?: number } = {}): number {
@@ -498,7 +499,7 @@ function forceLayout(
   yChannel: ChannelSpec | null,
   deps: UnitLayoutDeps
 ): UnitLayoutResult {
-  const { bandOrLinear, d3, position } = deps;
+  const { bandOrLinear, position } = deps;
   if (!units.length) {
     return {
       name: 'force', axes: false, axis: null, r: requestedRadius,
@@ -515,10 +516,10 @@ function forceLayout(
   const xField = xChannel?.field;
   const yField = yChannel?.field;
   const xScale = xChannel && xField
-    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear, d3 }, { anchors: true })
+    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear }, { anchors: true })
     : null;
   const yScale = yChannel && yField
-    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear, d3 }, { anchors: true })
+    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear }, { anchors: true })
     : null;
   const axes = {
     x: forceAxis(xScale, xChannel),
@@ -579,10 +580,10 @@ function forceLayout(
     const targetY = yScale && yField
       ? (node: ForceNode) => position(yScale, node.unit.__row[yField])
       : centerY;
-    const simulation = d3.forceSimulation<ForceNode>(nodes)
-      .force('x', d3.forceX<ForceNode>(targetX).strength(0.2))
-      .force('y', d3.forceY<ForceNode>(targetY).strength(0.2))
-      .force('collide', d3.forceCollide<ForceNode>(radius * 1.12).strength(1).iterations(10))
+    const simulation = forceSimulation<ForceNode>(nodes)
+      .force('x', forceX<ForceNode>(targetX).strength(0.2))
+      .force('y', forceY<ForceNode>(targetY).strength(0.2))
+      .force('collide', forceCollide<ForceNode>(radius * 1.12).strength(1).iterations(10))
       .alpha(FORCE_ALPHA_START)
       .alphaMin(FORCE_ALPHA_MIN)
       .alphaDecay(1 - Math.pow(

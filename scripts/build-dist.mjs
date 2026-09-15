@@ -39,7 +39,7 @@ await esbuild.build({
   entryPoints: [fileURLToPath(new URL("../src/browser.ts", import.meta.url))],
   format: "iife",
   globalName: "VisDelta",
-  footer: { js: "globalThis.VisDelta = VisDelta; globalThis.vd = VisDelta;" },
+  footer: { js: "globalThis.VisDelta = VisDelta;" },
   legalComments: "none",
   minify: true,
   outfile: fileURLToPath(new URL("../dist/visdelta.global.js", import.meta.url)),

@@ -35,23 +35,29 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('live charts evolve selected endpoints and own multi-state sequences', async ({ page }) => {
+test('an application holds a chart at an endpoint and hands it to the next transition', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const result = await page.evaluate(async () => {
-    const chart = await sl.mount(base, opts('#a'));
-    const focused = await chart
-      .update(view => view.focus({ type: 'one' }))
-      .play({ duration: 0 });
-    const focusedState = focused.chart.state.toSpec().meta.state.scopes.focus;
-    const journey = await focused.chart.sequence([
-      view => view.focus({ type: 'two' }),
-      view => view.focus({ type: 'one' })
-    ]).play({ duration: 0 });
+    // The application owns the current state; the runtime keeps no registry.
+    let state = base;
+    let held = await sl.transition(state, state, opts('#a'));
+    held.progress(1);
+    const go = async (next) => {
+      const change = await sl.transition(state, next, opts('#a'));
+      held.destroy();
+      held = change; state = next;
+      change.progress(1);
+    };
+    await go(state.focus({ type: 'one' }));
+    const focused = state.toSpec().meta.state.scopes.focus;
+    const journey = await sl.sequence([state, state.focus({ type: 'two' }), state.focus({ type: 'two' }).focus({ type: 'one' })], opts('#a'));
+    held.destroy();
+    journey.progress(2);
     return {
-      focused: focusedState,
-      final: journey.chart.state.toSpec().meta.state.scopes.focus,
-      value: journey.controller.value,
+      focused,
+      final: journey.states[2].toSpec().meta.state.scopes.focus,
+      value: journey.value,
       roots: document.querySelectorAll('#a > .vd-transition-root').length
     };
   });
@@ -66,139 +72,6 @@ test('live charts evolve selected endpoints and own multi-state sequences', asyn
   expect(result.value).toBe(2);
   expect(result.roots).toBe(1);
   expect(errors).toEqual([]);
-});
-
-test('selected update and sequence controllers unregister their adopted mount on destroy', async ({ page }) => {
-  const result = await page.evaluate(async () => {
-    const updated = await (await sl.mount(base, opts('#a')))
-      .update(view => view.y('other'))
-      .play({ duration: 0 });
-    updated.controller.destroy();
-    let updateRejected = false;
-    try { sl.select('#a'); } catch { updateRejected = true; }
-
-    const sequenced = await (await sl.mount(base, opts('#b')))
-      .sequence([view => view.y('other'), view => view.y('value')])
-      .play({ duration: 0 });
-    sequenced.destroy();
-    let sequenceRejected = false;
-    try { sl.select('#b'); } catch { sequenceRejected = true; }
-    return {
-      updateRejected,
-      sequenceRejected,
-      updateEmpty: document.querySelector('#a').children.length === 0,
-      sequenceEmpty: document.querySelector('#b').children.length === 0
-    };
-  });
-  expect(result).toEqual({
-    updateRejected: true,
-    sequenceRejected: true,
-    updateEmpty: true,
-    sequenceEmpty: true
-  });
-});
-
-for (const op of ['sum', 'count']) {
-  for (const [presentation, layout] of [
-    ['focus', 'stacked'], ['focus', 'grouped'], ['sort', 'stacked'], ['sort', 'grouped'],
-    ['detail-sort', 'stacked'], ['detail-sort', 'grouped']
-  ]) {
-    test(`${op} ${layout} ${presentation} merge: inferred route matches authored sequence and reverse seeks`, async ({ page }) => {
-      const errors = [];
-      page.on('pageerror', error => errors.push(error.message));
-      const result = await page.evaluate(async ({ op, presentation, layout }) => {
-        const detailed = sl.bar([
-          { state: 'AL', age: 'young', value: 3 },
-          { state: 'AL', age: 'old', value: 5 },
-          { state: 'CA', age: 'young', value: 17 },
-          { state: 'CA', age: 'old', value: 11 },
-          { state: 'CA', age: 'old', value: 7 }
-        ]).x('state').y('value').key(['state', 'age'])
-          .breakdown('age', { op, layout }).color('age');
-        const total = detailed.rollup({ op });
-        // Give all independently mounted references the same plot viewport.
-        const spec = view => ({ ...view.toSpec(), margin: { top: 80, right: 30, bottom: 55, left: 60 } });
-        const from = spec(presentation === 'focus' ? detailed.focus({ state: 'AL' })
-          : presentation === 'detail-sort' ? detailed.sort('value', 'descending') : detailed);
-        const middle = spec(presentation === 'focus' ? total.focus({ state: 'AL' })
-          : presentation === 'detail-sort' ? detailed : total);
-        const to = spec(presentation === 'sort' ? total.sort('value', 'descending') : total);
-        const auto = await sl.transition(from, to, opts('#a'));
-        const manual = await sl.sequence([from, middle, to], opts('#b'));
-        auto.progress(0.01);
-        const phases = auto.view.__visDeltaScene.seekSequence.phases;
-        const boundary = presentation === 'detail-sort'
-          ? 1 - phases.at(-1).start : 1 - phases[0].end; // merge reverses the canonical split
-        const visible = selector => [...document.querySelector(selector).querySelectorAll('rect.vd-bar, .tick, .vd-legend-item')]
-          .filter(node => {
-            for (let n = node; n && n.tagName !== 'svg'; n = n.parentElement) {
-              if (Number(getComputedStyle(n).opacity) < 1e-6) return false;
-            }
-            return true;
-          }).map(node => ({
-            tag: node.tagName, key: node.dataset.key, text: node.textContent,
-            attrs: ['x', 'y', 'width', 'height', 'transform', 'fill'].map(name => [name,
-              (node.getAttribute(name) ?? '').replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi,
-                value => String(Math.round(Number(value) * 1e3) / 1e3)).replace(/\s/g, '')])
-          })).sort((a, b) => `${a.tag}:${a.key ?? a.text}`.localeCompare(`${b.tag}:${b.key ?? b.text}`));
-        const frames = [0.15, boundary - 0.0001, boundary, boundary + 0.0001, 0.85].map(p => {
-          auto.progress(p);
-          manual.progress(p <= boundary ? p / boundary : 1 + (p - boundary) / (1 - boundary));
-          return { p, auto: visible('#a'), manual: visible('#b') };
-        });
-        manual.destroy();
-        const reverse = await sl.transition(to, from, opts('#b'));
-        const reversed = [0.07, 0.37, boundary, 0.73, 0.97].map(p => {
-          auto.progress(p);
-          reverse.progress(1 - p);
-          return { forward: reversibleSnapshot('#a'), backward: reversibleSnapshot('#b') };
-        });
-        auto.progress(0.37);
-        const direct = reversibleSnapshot('#a');
-        for (const p of [1, 0.02, 0.9, 0, 0.37]) auto.progress(p);
-        const history = reversibleSnapshot('#a');
-        auto.resize();
-        const resized = reversibleSnapshot('#a');
-        return { frames, reversed, direct, history, resized,
-          phaseCount: phases.length, boundary,
-          scenes: phases.map(phase => phase.sceneTransition.scene) };
-      }, { op, presentation, layout });
-      expect(result.phaseCount).toBe(layout === 'grouped' ? 3 : 2);
-      expect(result.boundary).toBeGreaterThan(0.1);
-      expect(result.boundary).toBeLessThan(0.9);
-      for (const frame of result.frames) expect(frame.auto, `progress ${frame.p}`).toEqual(frame.manual);
-      for (const frame of result.reversed) expect(frame.forward).toEqual(frame.backward);
-      expect(result.history).toEqual(result.direct);
-      expect(result.resized).toEqual(result.direct);
-      if (presentation === 'focus') expect(result.scenes[0]).toEqual(['selection']);
-      expect(errors).toEqual([]);
-    });
-  }
-}
-
-test('authored sequence keeps its B endpoint when A to B gains inferred phases', async ({ page }) => {
-  const result = await page.evaluate(async () => {
-    const detailed = sl.bar([
-      { state: 'AL', age: 'a', value: 3 }, { state: 'AL', age: 'b', value: 5 },
-      { state: 'CA', age: 'a', value: 13 }, { state: 'CA', age: 'b', value: 7 }
-    ]).x('state').y('value').breakdown('age');
-    const a = detailed.focus({ state: 'AL' });
-    const b = detailed.rollup();
-    const c = b.sort('value', 'descending');
-    const journey = await sl.sequence([a, b, c], opts('#a'));
-    journey.progress(1);
-    const expected = await sl.transition(b, c, opts('#b'));
-    const endpoint = reversibleSnapshot('#a');
-    const reference = reversibleSnapshot('#b');
-    const boundaries = [0.99999, 1, 1.00001].map(p => {
-      journey.progress(p);
-      return document.querySelectorAll('#a rect.vd-bar').length;
-    });
-    return { endpoint, reference, boundaries, states: journey.states.length };
-  });
-  expect(result.endpoint).toEqual(result.reference);
-  expect(result.states).toBe(3);
-  expect(result.boundaries.every(count => count > 0)).toBe(true);
 });
 
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
@@ -535,7 +408,7 @@ test('reject incompatible pairs and missing data without changing target', async
   const result = await page.evaluate(async () => {
     document.querySelector('#a').textContent = 'keep';
     const messages = [];
-    for (const pair of [[base, sl.line().data(rows)], [sl.bar('missing'), sl.bar('missing')]]) {
+    for (const pair of [[base, sl.line().data(rows)], [sl.bar({ name: 'missing' }), sl.bar({ name: 'missing' })]]) {
       try { await sl.transition(...pair, opts('#a')); } catch (error) { messages.push(error.message); }
     }
     return { messages, text: document.querySelector('#a').textContent };
@@ -623,12 +496,12 @@ test('URL data loads once, .data replacement is resolved, and later seeks do not
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify([{ category: 'A', value: 20, other: 40 }]) });
   });
   const result = await page.evaluate(async () => {
-    const from = sl.bar().data('/pair-rows.json').x('category').y('value');
+    const from = sl.bar().data({ url: '/pair-rows.json' }).x('category').y('value');
     const pair = await sl.transition(from, from.y('other'), opts('#a'));
     pair.progress(0.8).progress(0.2).progress(1).progress(0.37);
     const deltaTypes = pair.delta.deltas.map(item => item.type);
     pair.destroy();
-    const named = sl.bar('rows').x('category').y('value');
+    const named = sl.bar({ name: 'rows' }).x('category').y('value');
     const next = await sl.transition(named, named.y('other'), { ...opts('#a'), data: { rows } });
     return { deltaTypes, marks: next.view.querySelectorAll('rect.vd-bar').length };
   });

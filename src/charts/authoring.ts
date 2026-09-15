@@ -20,33 +20,24 @@ import type {
 
 export { titleize };
 
-// ─── Data source normalisation ────────────────────────────────────────────────
+// ─── Data sources ─────────────────────────────────────────────────────────────
 //
-// Observable-Plot style: pass a URL (string or { url }) directly to bar() etc.
+// A chart state names its data explicitly, so the spec stays unambiguous data:
 //
-//   bar('/data/weather.csv').x('decade').y('count')
-//   bar({ url: '/data/weather.csv', type: 'csv' }).x(...).y(...)
+//   bar(rows)                                   inline records
+//   bar({ values: rows })
+//   bar({ url: '/data/weather.csv' })           loaded by transition(); type from the extension
+//   bar({ url: '/data/weather.json', type: 'json' })
+//   bar({ name: 'sales' })                      resolved from transition(..., { data: { sales } })
 //
-// A plain non-URL string is treated as a named dataset reference (existing
-// behavior). Standalone transition() resolves inline URLs directly; a driver
-// may additionally provide named sources through its own data map.
+// A bare string is rejected: whether "sales.csv" is a file or a dataset name
+// is not something a library should guess.
 
 export function normalizeDataSource(data: unknown): unknown {
-  if (typeof data === 'string' && isDataUrl(data)) {
-    return { url: data };
+  if (typeof data === 'string') {
+    throw new Error(`VisDelta data source "${data}" is ambiguous. Use { url: "${data}" } for a file or { name: "${data}" } for a named dataset.`);
   }
   return data;
-}
-
-function isDataUrl(s: string): boolean {
-  return (
-    s.startsWith('http://') ||
-    s.startsWith('https://') ||
-    s.startsWith('./') ||
-    s.startsWith('../') ||
-    s.startsWith('/') ||
-    /\.(csv|json|tsv|arrow)(\?.*)?$/i.test(s)
-  );
 }
 
 // ─── ChartState ───────────────────────────────────────────────────────────────
@@ -139,7 +130,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     return this.with({ transition: timing } as Partial<S>);
   }
 
-  where(selector: string | Record<string, unknown> | FilterSpec): this {
+  where(selector: Record<string, unknown> | FilterSpec): this {
     return this.with({
       transform: appendConjunctiveFilters(
         (this.state as ViewSpec).transform ?? [],
@@ -149,7 +140,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   }
 
   /** Fit one camera around selected marks without changing rows or mark identity. */
-  focus(selector: string | Record<string, unknown> | FilterSpec): this {
+  focus(selector: Record<string, unknown> | FilterSpec): this {
     const scopes = ((this.state as ViewSpec).scopes ?? {}) as ViewScopes;
     return this.with({
       scopes: {
@@ -160,7 +151,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   }
 
   highlight(
-    selector: string | Record<string, unknown> | FilterSpec,
+    selector: Record<string, unknown> | FilterSpec,
     options: { opacity?: number } = {}
   ): this {
     const scopes = ((this.state as ViewSpec).scopes ?? {}) as ViewScopes;
@@ -230,9 +221,9 @@ export function colorFrom(
 }
 
 export function selectorFrom(
-  selector: string | Record<string, unknown> | FilterSpec = {}
+  selector: Record<string, unknown> | FilterSpec = {}
 ): SelectionSpec {
-  if (typeof selector === 'string') return normalizeFilter(selector);
+  if (typeof selector === 'string') return normalizeFilter(selector); // throws: strings are not selectors
   const sel = selector as Record<string, unknown>;
   if (sel.field) return cloneState(normalizeFilter(sel));
   const entries = Object.entries(sel);
@@ -244,9 +235,9 @@ export function selectorFrom(
 }
 
 export function selectorsFrom(
-  selector: string | Record<string, unknown> | FilterSpec = {}
+  selector: Record<string, unknown> | FilterSpec = {}
 ): FilterSpec[] {
-  if (typeof selector === 'string') return [normalizeFilter(selector)];
+  if (typeof selector === 'string') return [normalizeFilter(selector)]; // throws: strings are not selectors
   const sel = selector as Record<string, unknown>;
   if (sel.field) return [cloneState(normalizeFilter(sel))];
   const entries = Object.entries(sel);

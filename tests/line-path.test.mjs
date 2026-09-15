@@ -16,8 +16,8 @@ const frame = (points, curve = 'curveLinear') => ({
 
 test('every supported curve name resolves directly to the same D3 export', () => {
   assert.equal(D3_CURVE_NAMES.length, 20);
-  assert.equal(d3Curve(undefined, d3), d3.curveLinear);
-  for (const name of D3_CURVE_NAMES) assert.equal(d3Curve(name, d3), d3[name]);
+  assert.equal(d3Curve(undefined), d3.curveLinear);
+  for (const name of D3_CURVE_NAMES) assert.equal(d3Curve(name), d3[name]);
 });
 
 test('matched line points move without reversing their x order', () => {

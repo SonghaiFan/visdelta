@@ -1,7 +1,8 @@
-import type { CanonicalTransitionPair, ChannelSpec, D3Lib, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
+import type { CanonicalTransitionPair, ChannelSpec, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
 import { colorField } from './encoding.js';
+import { scaleSqrt } from 'd3-scale';
 
 export interface PointState {
   parentField: string | string[] | null;
@@ -161,13 +162,12 @@ export function radiusScale(
   rows: Record<string, unknown>[],
   channel: ChannelSpec | null | undefined,
   fallback: number,
-  d3: D3Lib,
   quantitativeDomain: (rows: Record<string, unknown>[], channel: ChannelSpec, floor?: number) => number[]
 ): (row: Record<string, unknown>) => number {
   const field = channel?.field;
   if (!field) return () => fallback;
   const range = (channel as Record<string, unknown>)['range'] as [number, number] || defaultRadiusRange(rows.length);
-  const scale = d3.scaleSqrt().domain(quantitativeDomain(rows, channel, 0)).range(range);
+  const scale = scaleSqrt().domain(quantitativeDomain(rows, channel, 0)).range(range);
   return (row: Record<string, unknown>) => scale(Number(row[field]) || 0);
 }
 

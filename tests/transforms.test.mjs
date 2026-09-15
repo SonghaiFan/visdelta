@@ -58,9 +58,9 @@ test('constant, empty and nonnumeric bins do not divide by zero or emit NaN labe
 test('filters use conjunction and exclude missing numeric values', () => {
   assert.deepEqual(run([{ filter: { field: 'value', oneOf: [0, 2, 4], gt: 0, lt: 4 } }]), [rows[1]]);
   assert.deepEqual(run([{ filter: { field: 'value', gte: 0 } }], [{}, { value: NaN }, { value: null }, { value: false }, { value: 0 }]), [{ value: 0 }]);
-  assert.deepEqual(run([{ filter: 'datum.value >= 2' }]), rows.slice(1));
-  assert.deepEqual(run([{ filter: 'datum.id === "B"' }]), [rows[1]]);
-  assert.deepEqual(run([{ filter: 'datum.active === true' }], [{ active: true }, { active: false }]), [{ active: true }]);
+  assert.deepEqual(run([{ filter: { field: 'value', gte: 2 } }]), rows.slice(1));
+  assert.deepEqual(run([{ filter: { field: 'id', equal: 'B' } }]), [rows[1]]);
+  assert.deepEqual(run([{ filter: { field: 'active', equal: true } }], [{ active: true }, { active: false }]), [{ active: true }]);
 });
 
 test('filters compare Date values and ISO date strings by time', () => {
@@ -75,12 +75,12 @@ test('filters compare Date values and ISO date strings by time', () => {
   assert.deepEqual(filtered.map(row => row.id), ['b', 'c']);
 });
 
-test('string selectors compile to real filters on all built-in chart types', () => {
+test('object selectors compile to real filters on all built-in chart types; strings are rejected', () => {
   for (const factory of [bar, line, point, unit]) {
-    const view = factory(rows).x('id').y('value').where('datum.value >= 2');
+    const view = factory(rows).x('id').y('value').where({ field: 'value', gte: 2 });
     const spec = view.toSpec();
     assert.deepEqual(run(spec.transform), rows.slice(1));
-    assert.throws(() => factory(rows).where('datum.value + 1'), /filter expression/);
+    assert.throws(() => factory(rows).where('datum.value >= 2'), /string expressions are not supported/);
     assert.throws(() => factory(rows).where({ field: 'value', equals: 2 }), /Unsupported filter/);
   }
 });
@@ -91,8 +91,8 @@ test('malformed transforms reject even when the input is empty', () => {
     { bin: { field: 'value', maxbins: 0 } }, { bin: { field: 'value', maxBins: 4 } },
     { aggregate: { fields: [{ op: 'average', field: 'value' }] } },
     { timeUnit: { field: 'date', unit: 'year' } }, { fold: { fields: [] } },
-    { filter: { field: 'value', equals: 2 } }, { filter: 'datum.value === 2 || true' },
-    { filter: 'datum.id == B' }, { filter: { field: 'id' } }, { filter: { field: 'id', oneOf: 'B' } },
+    { filter: { field: 'value', equals: 2 } }, { filter: 'datum.value === 2' },
+    { filter: { field: 'id' } }, { filter: { field: 'id', oneOf: 'B' } },
     { limit: 1, sort: { field: 'id' } }];
   for (const transform of invalid) assert.throws(() => run([transform], []), /transform\[0\]/, JSON.stringify(transform));
   assert.throws(() => run(null), /must be an array/);

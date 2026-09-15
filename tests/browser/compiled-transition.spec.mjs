@@ -140,7 +140,6 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
   test(`${scenario}: cached mark geometry matches reconstruction`, async ({ page }) => {
     const samples = await page.evaluate(async scenario => {
       const { createTransitionSurface } = await import('/dist/runtime/transition-surface.js');
-      const { runtimeD3 } = await import('/dist/runtime/dependencies.js');
       const { transitionRegistry } = await import('/dist/runtime/chart-registry.js');
       const { createChartRuntimeDeps } = await import('/dist/runtime/chart-deps.js');
       const segmented = sl.bar().data([
@@ -169,7 +168,7 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
       const reference = createTransitionSurface(
         source.toSpec(),
         target.toSpec(),
-        { ...options(referenceHost), d3: runtimeD3, reconstruct: true },
+        { ...options(referenceHost), reconstruct: true },
         chartTypes
       );
       const results = [];
@@ -253,7 +252,7 @@ test('successive steps on the same property initialize from preceding endpoints'
     const root = d3.select('#cached').append('svg');
     const rect = root.append('rect').attr('x', 0);
     const tracks = [];
-    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear }, d3).attr('x', 10)
+    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear }).attr('x', 10)
       .transition().duration(100).ease(d3.easeLinear).attr('x', 30);
     const schedules = createProgressController(tracks);
     const plan = schedules.compile();
@@ -273,7 +272,7 @@ test('compiled property tracks can use a direction-aware ease', async ({ page })
     const root = d3.select('#cached').append('svg');
     const rect = root.append('rect').attr('x', 0);
     const tracks = [];
-    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear }, d3)
+    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear })
       .easeVarying(() => directionalEase(d3.easeLinear, value => value * value))
       .attr('x', 100);
     const schedules = createProgressController(tracks);

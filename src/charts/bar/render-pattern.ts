@@ -5,9 +5,9 @@ import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RenderDatum } from '../../runtime/marks.js';
 import { motion } from '../../runtime/recorder.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
+import { select } from 'd3-selection';
 import type {
   ChartContext,
-  D3Lib,
   StaggerSpec,
   TransitionItemAction,
   TransitionStep,
@@ -84,7 +84,6 @@ export interface BarJoinOptions {
   rows: BarDatum[];
   spec: ViewSpec;
   tooltip: HTMLElement;
-  d3: D3Lib;
   bindTooltip: ChartRuntimeDeps['bindTooltip'];
   key: BarKey;
   category: (d: BarDatum) => unknown;
@@ -99,7 +98,6 @@ export interface BarJoinOptions {
 
 export interface BarSeamOptions {
   chart: ChartContext;
-  d3: D3Lib;
   path?: string;
   startPath?: string;
   draw?: boolean;
@@ -112,7 +110,7 @@ type MarkGeometry = { x: BarGeometryContract['applyX']; y: BarGeometryContract['
 export function createBarRenderKit(deps: ChartRuntimeDeps) {
   const { easeFor, staggerDelay, themeValue } = deps;
 
-  function steps(chart: ChartContext, rendererOrientation: string, d3: D3Lib): BarSteps | null {
+  function steps(chart: ChartContext, rendererOrientation: string): BarSteps | null {
     const plan = chart.transitionPlan;
     if (!plan?.steps?.length) return null;
     if (plan.target?.renderer !== rendererOrientation) return null;
@@ -122,7 +120,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
     if (!ordered.length) return null;
     const timing = plan.timing || {};
     const duration = chart.transition.scaleDuration || timing.duration || chart.transition.duration || 0;
-    const ease = easeFor(timing.ease || chart.transition.ease, d3);
+    const ease = easeFor(timing.ease || chart.transition.ease);
     return {
       chart,
       ordered,
@@ -182,7 +180,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
 
   function renderBarJoin(options: BarJoinOptions): void {
     const {
-      chart, rows, spec, tooltip, d3, bindTooltip, key, category, className, orientation,
+      chart, rows, spec, tooltip, bindTooltip, key, category, className, orientation,
       rx = 3, fill, geometry, steps
     } = options;
     const startGeometry = geometry.start;
@@ -211,7 +209,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
             .attr('fill', fill)
             .style('opacity', 0)
             .call(bindTooltip, spec, tooltip)
-            .each(function(d) { setRectGeometry(d3.select(this), startGeometry(d)); });
+            .each(function(d) { setRectGeometry(select(this), startGeometry(d)); });
           motion(entered, chart.transition.enter || chart.transition.base)
             .delay((d, i) => (chart.transition.enterDelay || 0) + delay(d, i))
             .style('opacity', (d) => barSelectionOpacity(d, spec, dimOpacity))

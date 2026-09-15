@@ -18,4 +18,4 @@ export { registerChartType, registerChartModule, availableChartTypes } from './r
 export type { ChartTypeConfig } from './charts/plugin.js';
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from './charts/style.js';
 export type { ChartModule, LoadedChartModule } from './charts/module.js';
-export type { ChartPlugin, ChartType, ChartTransitionPolicy, IntermediateSpec, CanonicalTransitionPair, TransitionPlan, ChartDeps, D3Runtime, ViewSpec, Renderer, SpecCompiler } from './types/index.js';
+export type { ChartPlugin, ChartType, ChartTransitionPolicy, IntermediateSpec, CanonicalTransitionPair, TransitionPlan, ChartDeps, ViewSpec, Renderer, SpecCompiler } from './types/index.js';

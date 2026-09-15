@@ -1,6 +1,5 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import * as d3 from 'd3';
 
 const props = defineProps({
   variant: { type: String, default: 'showcase' }
@@ -31,13 +30,11 @@ let stagingHost = null;
 
 onMounted(async () => {
   try {
-    const [{ bar }, transitionModule, aq] = await Promise.all([
+    const [{ bar }, transitionModule] = await Promise.all([
       import('../../../dist/bar.js'),
-      import('../../../dist/transition-entry.js'),
-      import('arquero')
+      import('../../../dist/transition-entry.js')
     ]);
     createTransition = transitionModule.transition;
-    runtimeAq = aq;
 
     const base = bar(rows)
       .datumKey('id')
@@ -62,7 +59,7 @@ onMounted(async () => {
     });
     resizeObserver.observe(target.value);
     status.value = 'Auto-playing live transition';
-    await moveTo(0, 1, false, aq);
+    await moveTo(0, 1, false);
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       running.value = false;
       status.value = 'Motion paused by system preference';
@@ -94,14 +91,13 @@ function queueNext(delay = 1000) {
   const next = chooseNext();
   nextLabel.value = states[next].label;
   timeout = window.setTimeout(async () => {
-    await moveTo(current, next, true, runtimeAq);
+    await moveTo(current, next, true);
     queueNext(2350);
   }, delay);
 }
 
-let runtimeAq = null;
 
-async function moveTo(fromIndex, toIndex, animate, aq = runtimeAq) {
+async function moveTo(fromIndex, toIndex, animate) {
   if (destroyed || !states.length || !createTransition) return;
   const previous = transition;
   const host = target.value;
@@ -114,8 +110,6 @@ async function moveTo(fromIndex, toIndex, animate, aq = runtimeAq) {
   try {
     next = await createTransition(states[fromIndex].chart, states[toIndex].chart, {
       target: candidate,
-      d3,
-      aq,
       height: 300
     });
     if (destroyed) {

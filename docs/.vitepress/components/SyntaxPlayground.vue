@@ -209,7 +209,6 @@ const deltaText = ref('Waiting for a valid state pair.');
 const lineTransition = ref('');
 
 let api = null;
-let aq = null;
 let change = null;
 let debounceTimer = 0;
 let runVersion = 0;
@@ -243,14 +242,9 @@ onMounted(() => {
 
 async function initialize() {
   try {
-    const [runtime, arquero] = await Promise.all([
-      isLabMode.value
-        ? import('../../../dist/transition-entry.js')
-        : import('../../../dist/visdelta.esm.js'),
-      import('arquero')
-    ]);
-    api = runtime;
-    aq = arquero;
+    api = isLabMode.value
+      ? await import('../../../dist/transition-entry.js')
+      : await import('../../../dist/visdelta.esm.js');
     await nextTick();
     resizeObserver = new ResizeObserver(() => change?.resize());
     resizeObserver.observe(chartTarget.value);
@@ -331,8 +325,6 @@ async function runCode() {
     chartTarget.value.append(candidate);
     nextChange = await api.transition(result.from, result.to, {
       target: candidate,
-      d3,
-      aq,
       height: isLab ? 400 : 300
     });
     if (version !== runVersion) {

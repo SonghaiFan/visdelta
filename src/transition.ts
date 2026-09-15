@@ -12,8 +12,6 @@ import { createChartRuntimeDeps } from './runtime/chart-deps.js';
 import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
-import { registerMounted, unregisterMounted } from './runtime/mounted.js';
-import { resolveRuntime } from './runtime/dependencies.js';
 
 export type { Visualization } from './core.js';
 
@@ -50,9 +48,8 @@ export interface VisualizationTransition {
 export async function transition(
   from: Visualization,
   to: Visualization,
-  options: TransitionOptions = {}
+  options: TransitionOptions
 ): Promise<VisualizationTransition> {
-  const runtime = resolveRuntime(options);
   const localModules = [visualizationChartModule(from), visualizationChartModule(to)]
     .filter((module): module is ChartModule => module !== null);
   const source = visualizationSpec(from);
@@ -71,8 +68,8 @@ export async function transition(
   const sourceCache = new Map<string, Promise<unknown[]>>();
   const resolveData = async (spec: ViewSpec): Promise<ViewSpec> => {
     let data = normalizeDataSource(spec.data);
-    if (typeof data === 'string' || (data && typeof data === 'object' && 'name' in data && !('url' in data))) {
-      const name = typeof data === 'string' ? data : String((data as { name: string }).name);
+    if (data && typeof data === 'object' && 'name' in data && !('url' in data)) {
+      const name = String((data as { name: string }).name);
       if (!(name in declared)) throw new Error(`transition(): missing dataset "${name}". Pass options.data or bind inline data.`);
       data = normalizeDataSource(declared[name]);
     }
@@ -87,17 +84,17 @@ export async function transition(
     const cacheKey = JSON.stringify(data);
     let pending = sourceCache.get(cacheKey);
     if (!pending) {
-      pending = loadData({ rows: data }, runtime.d3).then(result => cloneState(result.rows));
+      pending = loadData({ rows: data }).then(result => cloneState(result.rows));
       sourceCache.set(cacheKey, pending);
     }
     const rows = await pending;
     return resolveSpecDataTypes({ ...spec, data: { values: rows } }, rows);
   };
   const [resolvedFrom, resolvedTo] = await Promise.all([resolveData(source), resolveData(target)]);
-  const host = resolveTarget(options.target ?? '#app');
+  const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntimeDeps({ root: host, chartStyle }), localModules);
-  const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...runtime, chartStyle }, chartTypes);
+  const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...options, chartStyle }, chartTypes);
   let value = 0;
   let lastDirection = 1;
   let animation: number | null = null;
@@ -157,13 +154,11 @@ export async function transition(
       stop();
       surface.destroy();
       destroyed = true;
-      unregisterMounted(host, controller);
     }
   };
   try {
     show(0);
     surface.commitMount();
-    registerMounted(host, to, options, controller);
   } catch (error) {
     surface.rollbackMount();
     controller.destroy();

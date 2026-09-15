@@ -17,7 +17,6 @@ import type {
   ChartContext,
   ChartType,
   ChartTransitionContext,
-  D3Lib,
   DataRow,
   IntermediateSpec,
   MarginSpec,
@@ -87,7 +86,6 @@ interface RenderPhaseConfig {
   viewConfig: ViewConfig;
   datasets: DatasetMap;
   tooltip: HTMLElement;
-  d3: D3Lib;
   seekable: boolean;
   sceneTransition: SceneTransition;
   transitionSource: CompileResult;
@@ -102,7 +100,6 @@ interface RenderPhaseContext {
   viewConfig: ViewConfig;
   datasets: DatasetMap;
   tooltip: HTMLElement;
-  d3: D3Lib;
   seekable: boolean;
   transitionSource: CompileResult;
 }
@@ -126,12 +123,12 @@ export function createViewRenderer(chartTypes: ChartTypeRegistry) {
 const { compileEffectiveView, compileTransitionSource } = createViewCompiler(chartTypes);
 return { drawView, prepareSeekSourceState, compileTransitionSource,
   renderSeekPhase, applySeekSequence };
-function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, d3: D3Lib, stepTransition: StepTransition = {}, options: DrawViewOptions = {}): void {
-  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
+function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, stepTransition: StepTransition = {}, options: DrawViewOptions = {}): void {
+  const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   if (!viewSpec || !viewSpec.mark) {
     clearSeekSequence(scene);
     scene.empty.style("display", "grid").text("No view for this step.");
-    fadeLayers(scene, '', null, d3);
+    fadeLayers(scene, '', null);
     return;
   }
 
@@ -141,7 +138,7 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
   if (!effectiveViewSpec) {
     clearSeekSequence(scene);
     scene.empty.style("display", "grid").text("No view for this step.");
-    fadeLayers(scene, '', null, d3);
+    fadeLayers(scene, '', null);
     return;
   }
   const transitionSource = compileTransitionSource(
@@ -170,7 +167,7 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
       viewConfig,
       datasets,
       tooltip,
-      d3,
+      
       seekable: seekableStep,
       transitionSource
     });
@@ -187,14 +184,14 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
   }
 
   clearSeekSequence(scene);
-  renderCompiledView(node, effectiveViewSpec, viewConfig, datasets, tooltip, d3, sceneTransition, {
+  renderCompiledView(node, effectiveViewSpec, viewConfig, datasets, tooltip, sceneTransition, {
     transitionSource,
     seekable: seekableStep
   });
 }
 
-function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, d3: D3Lib, sceneTransition: SceneTransition = { scene: [] }, renderOptions: RenderOptions = {}): void {
-  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
+function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, sceneTransition: SceneTransition = { scene: [] }, renderOptions: RenderOptions = {}): void {
+  const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   const seekable = Boolean(renderOptions.seekable);
   if (seekable && !renderOptions.skipSourcePrep) {
     prepareSeekSourceState(
@@ -202,7 +199,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
       viewConfig,
       datasets,
       tooltip,
-      d3,
+      
       renderOptions.transitionSource ?? undefined
     );
   }
@@ -221,10 +218,10 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const rows = applyTransforms(source, renderSpec.transform || []);
   const domainRows = applyTransforms(source, domainTransforms(renderSpec.transform || []));
   if (!rows.length) {
-    const emptyTransition = transitionSpec(renderSpec, previousSpec, { seekable, d3 });
+    const emptyTransition = transitionSpec(renderSpec, previousSpec);
     motion(scene.empty.style("display", "grid").style('opacity', 0).text("No rows after transforms."), emptyTransition.base)
       .style('opacity', 1);
-    fadeLayers(scene, '', emptyTransition, d3);
+    fadeLayers(scene, '', emptyTransition);
     // d3 Selection is invariant in its element type, so fade each layer through one generic call.
     const fade = <E extends BaseType>(layer: Selection<E, unknown, any, any>) => motion(layer, emptyTransition.base).style('opacity', 0);
     fade(scene.grid); fade(scene.xAxis); fade(scene.yAxis); fade(scene.xLabel); fade(scene.yLabel); fade(scene.legend);
@@ -259,9 +256,9 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
     : [];
   const observationChange = observationMembershipChange(previousSpec, renderSpec, previousRows, rows);
   const chartTransition = observationTransition(
-    transitionSpec(renderSpec, previousSpec, { seekable, d3 } as AnyRecord),
+    transitionSpec(renderSpec, previousSpec),
     observationChange,
-    { d3, seekable }
+    { seekable }
   );
   // Keep chart-owned decisions separate from shared correspondence evidence;
   // attaching evidence must not mutate a plan object retained by a plugin.
@@ -295,7 +292,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   applyPlotClip(chart, true);
 
   const renderer = chartType?.renderer;
-  if (renderer) renderer(chart, rows, renderSpec, tooltip, d3);
+  if (renderer) renderer(chart, rows, renderSpec, tooltip);
   else drawUnsupported(chart, renderSpec, chartTypes.types());
   reflectCamera(scene, chart.camera);
 
@@ -335,7 +332,7 @@ function observationMembershipChange(
 function observationTransition(
   transition: RuntimeTransition,
   change: MembershipChange,
-  { d3, seekable }: { d3: D3Lib; seekable: boolean }
+  { seekable }: { seekable: boolean }
 ): RuntimeTransition {
   if (!change.exit && !change.enter) return transition;
   const totalDuration = Math.max(1, Number(transition.duration) || 900);
@@ -429,7 +426,6 @@ function renderPhaseConfigs(
       viewConfig: context.viewConfig,
       datasets: context.datasets,
       tooltip: context.tooltip,
-      d3: context.d3,
       seekable: context.seekable,
       sceneTransition: canonicalTarget.sceneTransition,
       transitionSource: {
@@ -464,10 +460,9 @@ function prepareSeekSourceState(
   viewConfig: ViewConfig,
   datasets: DatasetMap,
   tooltip: HTMLElement,
-  d3: D3Lib,
   transitionSource: CompileResult = { effectiveViewSpec: null, sceneTransition: { scene: [] } }
 ): void {
-  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
+  const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   const sourceSpec = transitionSource?.effectiveViewSpec || null;
   if (!sourceSpec) {
     resetSceneToEmptySource(scene);
@@ -480,7 +475,7 @@ function prepareSeekSourceState(
     viewConfig,
     datasets,
     tooltip,
-    d3,
+    
     transitionSource.sceneTransition || {},
     {
       seekable: true,
@@ -546,7 +541,7 @@ function renderPhaseSequence(scene: ViewRuntimeScene, phases: RenderPhaseConfig[
     config.viewConfig,
     config.datasets,
     config.tooltip,
-    config.d3,
+    
     config.sceneTransition,
     {
       transitionSource: config.transitionSource,
@@ -573,7 +568,7 @@ function renderSeekPhase(scene: ViewRuntimeScene, phaseIndex: number): void {
     config.viewConfig,
     config.datasets,
     config.tooltip,
-    config.d3,
+    
     config.sceneTransition,
     {
       transitionSource: config.transitionSource,
@@ -599,7 +594,7 @@ function applySeekSequence(scene: ViewRuntimeScene, progress: number, direction 
   if (Math.abs(bounded - phase.end) < 1e-12) {
     const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
     prepareSeekSourceState(phase.node, phase.viewConfig, phase.datasets, phase.tooltip,
-      phase.d3, compileTransitionSource(endpoint));
+      compileTransitionSource(endpoint));
     sequence.phase = null;
     return true;
   }

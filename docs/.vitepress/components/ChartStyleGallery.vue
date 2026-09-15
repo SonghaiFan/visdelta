@@ -1,6 +1,5 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import * as d3 from 'd3';
 
 const presetCopy = {
   d3: {
@@ -132,7 +131,6 @@ import { ${active.value.importName}, transition } from "visdelta";
 
 const change = await transition(from, to, {
   target: "#chart",
-  d3,
   chartStyle: ${active.value.importName}
 });`);
 
@@ -186,7 +184,6 @@ async function render() {
       const [from, to] = demo.states(api);
       const next = await api.transition(from, to, {
         target: candidate,
-        d3,
         height: 250,
         chartStyle: api.chartStylePresets[selected.value]
       });

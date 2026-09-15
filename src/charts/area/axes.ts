@@ -1,8 +1,7 @@
 import { chartStyle, responsiveTickCount } from '../style.js';
-import { motion } from '../../runtime/recorder.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RuntimeScale } from '../../runtime/marks.js';
-import type { ChartContext, D3Lib, EncodingSpec } from '../../types/index.js';
+import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
 /** Area-owned presentation: Line-like axes with a quiet horizontal reading grid. */
 export function drawAreaAxes(
@@ -10,7 +9,6 @@ export function drawAreaAxes(
   x: RuntimeScale,
   y: RuntimeScale,
   enc: EncodingSpec,
-  d3: D3Lib,
   deps: ChartRuntimeDeps
 ): void {
   const transition = chart.transition.base;
@@ -18,33 +16,22 @@ export function drawAreaAxes(
   const rule = style.charts.area;
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
-  if (rule.grid === 'both') deps.drawGrid(chart, y, d3, transition, { x, xTickCount, yTickCount });
-  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, d3, transition, { x, xTickCount });
-  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, d3, transition, { yTickCount });
-  else deps.updateGrid(chart, null, d3, transition);
-  deps.drawXAxis(chart, x, style.axisTitle(enc.x, 'right'), d3, transition, {
+  if (rule.grid === 'both') deps.drawGrid(chart, y, transition, { x, xTickCount, yTickCount });
+  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, transition, { x, xTickCount });
+  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, transition, { yTickCount });
+  else deps.updateGrid(chart, null, transition);
+  const edgeTitleInset = rule.edgeTitles ? style.edgeTitleInset : undefined;
+  deps.drawXAxis(chart, x, style.axisTitle(enc.x, 'right'), transition, {
     tickCount: xTickCount,
-    tickFormat: enc.x?.format
+    tickFormat: enc.x?.format,
+    edgeTitleInset
   });
-  deps.drawYAxis(chart, y, style.axisTitle(enc.y, 'up'), d3, transition, {
+  deps.drawYAxis(chart, y, style.axisTitle(enc.y, 'up'), transition, {
     tickCount: yTickCount,
-    tickFormat: enc.y?.format
+    tickFormat: enc.y?.format,
+    edgeTitleInset
   });
   if (rule.openXDomain) chart.scene.xAxis.select('.domain').style('opacity', 0);
   if (rule.openYDomain) chart.scene.yAxis.select('.domain').style('opacity', 0);
 
-  if (rule.edgeTitles && enc.x?.title) {
-    motion(chart.scene.xLabel.attr('text-anchor', 'end'), transition)
-      .attr('text-anchor', 'end')
-      .attr('x', chart.margin.left + chart.innerWidth - style.edgeTitleInset.right)
-      .attr('y', chart.height - style.edgeTitleInset.bottom)
-      .attr('transform', null);
-  }
-  if (rule.edgeTitles && enc.y?.title) {
-    motion(chart.scene.yLabel.attr('text-anchor', 'start'), transition)
-      .attr('text-anchor', 'start')
-      .attr('x', chart.margin.left + style.edgeTitleInset.left)
-      .attr('y', chart.margin.top - style.edgeTitleInset.top)
-      .attr('transform', null);
-  }
 }

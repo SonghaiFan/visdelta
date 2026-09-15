@@ -71,7 +71,7 @@ export interface TimeUnitTransform {
 }
 
 export type TransformSpec =
-  | { filter: FilterSpec | string; [key: string]: unknown }
+  | { filter: FilterSpec; [key: string]: unknown }
   | { aggregate: AggregateTransform; [key: string]: unknown }
   | { sort: SortSpec & { field: string }; [key: string]: unknown }
   | { timeUnit: TimeUnitTransform; [key: string]: unknown }
@@ -506,16 +506,13 @@ export interface ChartContext {
   [key: string]: unknown;
 }
 
-export type { D3Runtime } from './d3-runtime.js';
 /** Existing chart modules can keep this alias while migrating their imports. */
-export type D3Lib = import('./d3-runtime.js').D3Runtime;
 
 export type Renderer<S extends ViewSpec = ViewSpec> = (
   chart: ChartContext,
   rows: DataRow[],
   spec: S,
-  tooltip: HTMLElement,
-  d3: import('./d3-runtime.js').D3Runtime
+  tooltip: HTMLElement
 ) => void;
 
 export type StateOperations = Record<string, string>;
@@ -606,7 +603,8 @@ export type Target = string | Element;
 export type AnyRecord = Record<string, any>;
 
 export interface RuntimeOptions {
-  target?: Target;
+  /** Where the chart renders. Required: the library never guesses a host element. */
+  target: Target;
   debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;

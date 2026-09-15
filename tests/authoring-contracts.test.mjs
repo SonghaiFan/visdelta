@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as d3 from 'd3';
-import { area, bar, chartStylePresets, darkChartStyle, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
+import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
+import { applyTransforms } from '../dist/data/transforms.js';
 import { areaCells, areaLayers } from '../dist/charts/area/state.js';
 import { matchAreaFramePoints } from '../dist/charts/area/render.js';
 import { connectedLineStretches, lineRowsAtTotal } from '../dist/charts/line/state.js';
@@ -26,7 +27,8 @@ test('documented filtering uses where, not a nonexistent filter method', () => {
   for (const factory of [area, bar, line, point, unit]) {
     const declaration = factory([{ x: 'A', y: 2 }, { x: 'B', y: 3 }]).x('x').y('y');
     assert.equal(typeof declaration.filter, 'undefined');
-    assert.doesNotThrow(() => declaration.where('datum.y >= 2').toSpec());
+    assert.doesNotThrow(() => declaration.where({ field: 'y', gte: 2 }).toSpec());
+    assert.throws(() => declaration.where('datum.y >= 2'), /string expressions are not supported/);
   }
 });
 
@@ -108,7 +110,7 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
 
 test('wide bar segments preserve their fold when rolling up to totals', () => {
   const ageBands = ['<10', '10-19', '≥80'];
-  const detailed = bar('./population.csv')
+  const detailed = bar({ url: './population.csv' })
     .x('name')
     .y('population')
     .segment({
@@ -732,4 +734,36 @@ test('line filters keep gaps unless the author connects across them', () => {
     connectedLineStretches([lineage[2]], lineage, null, key, selection, 'adjacent'),
     []
   );
+});
+
+test('a JSON-safe chart state survives JSON round-tripping with identical meaning', () => {
+  const rows = [
+    { id: 'a', region: 'North', date: '2026-01-01', sales: 10 },
+    { id: 'b', region: 'South', date: '2026-02-01', sales: 20 },
+    { id: 'c', region: 'North', date: '2026-03-01', sales: 30 }
+  ];
+  const state = line(rows)
+    .x('date').y('sales').key('id').color('region')
+    .where({ field: 'date', gte: '2026-02-01' })
+    .highlight({ region: 'North' })
+    .sort('sales', 'descending')
+    .transition({ duration: 500 });
+  const spec = state.toSpec();
+  const revived = JSON.parse(JSON.stringify(spec));
+  assert.deepEqual(revived, spec, 'the serialized spec is the spec');
+  // Plain JSON specs are accepted wherever a state is, with the same delta and the same rows.
+  const other = state.y('sales', { title: 'Sales' });
+  assert.deepEqual(delta(revived, other.toSpec()).changes, delta(state, other).changes);
+  assert.deepEqual(applyTransforms(rows, revived.transform), state.rows());
+  // Temporal fields are ISO strings in JSON and detected as temporal after revival.
+  assert.equal(detectDataTypes(rows).date, 'temporal');
+});
+
+test('toSpec() serializes Date objects to ISO strings, so every chart state is JSON-safe by construction', () => {
+  const rows = [{ id: 'a', date: new Date('2026-01-01'), sales: 1 }];
+  const spec = line(rows).x('date').y('sales').key('id').toSpec();
+  assert.equal(typeof spec.data[0].date, 'string');
+  assert.deepEqual(JSON.parse(JSON.stringify(spec)), spec);
+  assert.equal(detectDataTypes(spec.data).date, 'temporal');
+  assert.equal(new Date(spec.data[0].date).getTime(), rows[0].date.getTime());
 });

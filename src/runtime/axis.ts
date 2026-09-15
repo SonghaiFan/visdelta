@@ -7,11 +7,12 @@
 // a caller-supplied motion factory, so ticks become tracks like any mark.
 //
 // The axis *configuration* still comes from a d3 Axis object, read through its
-// public getters, so call sites keep building axes with d3.axisBottom(...).
+// public getters, so call sites keep building axes with axisBottom(...).
 
 import type { Axis, AxisDomain } from 'd3-axis';
 import type { BaseType, Selection } from 'd3-selection';
 import type { Motion } from './recorder.js';
+import { axisBottom } from 'd3-axis';
 
 export type AxisOrient = 'top' | 'right' | 'bottom' | 'left';
 

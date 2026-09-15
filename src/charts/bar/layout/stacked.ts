@@ -8,7 +8,7 @@ import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
 import type { RuntimeScale } from '../../../runtime/marks.js';
-import type { ChannelSpec, ChartContext, D3Lib, TransitionItemAction } from '../../../types/index.js';
+import type { ChannelSpec, ChartContext, TransitionItemAction } from '../../../types/index.js';
 import type {
   BarDatum,
   BarGeometryContract,
@@ -19,6 +19,8 @@ import type {
   TargetGeometry
 } from '../render-pattern.js';
 import type { BarLayoutRenderer } from './simple.js';
+import { max as maxOf, min as minOf } from 'd3-array';
+import { scaleBand, scaleLinear } from 'd3-scale';
 
 interface StackedGeom {
   x: RuntimeScale;
@@ -35,7 +37,7 @@ type StackedDatum = BarDatum & { __stack0: number; __stack1: number };
 export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
   const { bindTooltip, channelDomain, colorScale, position, themeValue } = deps;
 
-  return function renderStackedBar(chart, rows, spec, tooltip, d3, segmentFieldName) {
+  return function renderStackedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const orientation = barOrientationFromEncoding(enc);
@@ -53,7 +55,7 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     // A display sort may reorder categories, but must not silently reorder the
     // stack's segment meaning. Domain rows deliberately exclude sort/filter.
     const segments = channelDomain(domainRows, { field: segmentField, domain: stateSegments });
-    const color = colorScale(domainRows, enc.color, d3);
+    const color = colorScale(domainRows, enc.color);
     const key = barKeyAccessor(chart, spec, [categoryField, segmentField]);
     const splitLineage = kit.splitLineage(chart);
     const stackBaseEnter = kit.baselineEnterPlan(chart, 'stack-base');
@@ -62,9 +64,9 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     const categoryRange: [number, number] = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
     const stackedRows = stackBarRows(rows, categoryField, segmentField, valueField, segments);
     const domainStackedRows = stackBarRows(domainRows, categoryField, segmentField, valueField, segments);
-    const stackDomain = stackedValueDomain(domainStackedRows, measureChannel, d3);
-    const baseCategoryScale = asRuntimeScale(d3.scaleBand().domain(categories).range(categoryRange).padding(0.24));
-    const baseMeasureScale = asRuntimeScale(d3.scaleLinear().domain(stackDomain)
+    const stackDomain = stackedValueDomain(domainStackedRows, measureChannel);
+    const baseCategoryScale = asRuntimeScale(scaleBand().domain(categories).range(categoryRange).padding(0.24));
+    const baseMeasureScale = asRuntimeScale(scaleLinear().domain(stackDomain)
       .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
@@ -80,7 +82,7 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     const x = horizontal ? measureScale : categoryScale;
     const y = horizontal ? categoryScale : measureScale;
     const geom: StackedGeom = { x, y, categoryField, valueField, chart, horizontal };
-    const steps = kit.steps(chart, rendererOrientation, d3);
+    const steps = kit.steps(chart, rendererOrientation);
     const xAxisTransition = kit.axisTransition(steps, 'x') || chart.transition.base;
     const yAxisTransition = kit.axisTransition(steps, 'y') || chart.transition.base;
     const geometry = stackedSegmentGeometryContract(geom, splitLineage, stackBaseEnter, stackBaseExit, kit.sourceBaselineExit);
@@ -93,13 +95,13 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       y: (d: BarDatum) => horizontal ? position(y, d[categoryField]) : scaled(y, stackMidpoint(d))
     };
 
-    drawBarAxes(chart, x, y, enc, d3, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, deps, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });
 
     kit.renderBarJoin({
-      chart, rows: stackedRows, spec, tooltip, d3, bindTooltip, key,
+      chart, rows: stackedRows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
       className: 'vd-bar vd-bar-segment vd-bar-stacked',
       orientation: rendererOrientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),
@@ -110,7 +112,7 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     const seamRows = stackedInternalSeams(stackedRows, categoryField);
     kit.renderBarSeams({
       chart,
-      d3,
+      
       path: splitLineage ? stackedSeamPath(seamRows, geom) : '',
       startPath: stackedSeamPath(seamRows, geom, true),
       draw: Boolean(splitLineage)
@@ -284,10 +286,10 @@ function stackedSeamPath(rows: StackedDatum[], geom: StackedGeom, collapsed = fa
   }).join('');
 }
 
-function stackedValueDomain(rows: StackedDatum[], measureChannel: ChannelSpec, d3: D3Lib): number[] {
+function stackedValueDomain(rows: StackedDatum[], measureChannel: ChannelSpec): number[] {
   if (Array.isArray(measureChannel.domain)) return measureChannel.domain as number[];
   const values = rows.flatMap((row) => [row.__stack0, row.__stack1]);
-  const min = Math.min(0, d3.min(values) ?? 0);
-  const max = Math.max(0, d3.max(values) ?? 1);
+  const min = Math.min(0, minOf(values) ?? 0);
+  const max = Math.max(0, maxOf(values) ?? 1);
   return min === max ? [0, max || 1] : [min, max];
 }

@@ -15,9 +15,12 @@ import {
 import type { Point, UnitAxis, UnitDatum, UnitLayoutResult, UnitTransitionPlan } from './state.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, ChartSceneContext, ChartSelection, D3Lib, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
+import type { ChartContext, ChartDeps, ChartSceneContext, ChartSelection, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { UnitViewState } from './authoring.js';
+import { group as groupBy } from 'd3-array';
+import { easeBounceIn, easeBounceOut, easeExpIn, easeExpOut, easeSinInOut } from 'd3-ease';
+import { select } from 'd3-selection';
 
 /** A source circle read back from the DOM before a unit-value split. */
 interface UnitLineageSource {
@@ -47,7 +50,7 @@ export function createUnitRenderer(deps: ChartDeps): Renderer<UnitViewState> {
 }
 
 class UnitChart extends BaseChart<UnitViewState> {
-  render(chart: ChartContext, rows: RenderDatum[], spec: UnitViewState, tooltip: HTMLElement, d3: D3Lib): void {
+  render(chart: ChartContext, rows: RenderDatum[], spec: UnitViewState, tooltip: HTMLElement): void {
     const {
       bandOrLinear,
       bindTooltip,
@@ -61,8 +64,8 @@ class UnitChart extends BaseChart<UnitViewState> {
 
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
-    let units = expandUnits(rows, spec, d3);
-    const color = colorScale(domainRows, enc.color, d3);
+    let units = expandUnits(rows, spec);
+    const color = colorScale(domainRows, enc.color);
     const plan = chart.transitionPlan as UnitTransitionPlan | undefined;
     const isUnitValueSplit = plan?.detailChange?.mode === 'split';
     const sourceLineage = isUnitValueSplit
@@ -74,8 +77,8 @@ class UnitChart extends BaseChart<UnitViewState> {
     // keeps the shared base timing.
     const grainTransition = originalTransition;
     const stage = isUnitValueSplit ? null : unitStageTiming(chart);
-    if (stage) chart.transition.base = transitionFor(chart, d3, stage.viewDuration);
-    const baseLayout = unitLayout(units, chart, spec, { bandOrLinear, d3, position });
+    if (stage) chart.transition.base = transitionFor(chart, stage.viewDuration);
+    const baseLayout = unitLayout(units, chart, spec, { bandOrLinear, position });
     if (baseLayout.trajectory && stage) chart.transition.base = originalTransition;
     const camera = focusCamera(
       units.map((unit, index) => ({
@@ -115,12 +118,12 @@ class UnitChart extends BaseChart<UnitViewState> {
       drawUnitAxes(chart, { x: xScale, y: yScale }, {
         x: baseAxes.x?.channel,
         y: baseAxes.y?.channel
-      }, d3, this.deps, {
+      }, this.deps, {
         position: cameraPosition(chart.innerHeight, camera, 'y'),
         anchorsOnly: layout.name === 'force'
       });
     } else {
-      clearUnitAxes(chart, d3, this.deps);
+      clearUnitAxes(chart, this.deps);
     }
 
     fadeNonUnitShapes(chart);
@@ -132,7 +135,7 @@ class UnitChart extends BaseChart<UnitViewState> {
     };
     chart.channels = enc;
     chart.position = { x: layout.x, y: layout.y };
-    drawLegend(chart, rows, enc.color, d3);
+    drawLegend(chart, rows, enc.color);
     chart.transition.base = originalTransition;
 
     const match = matchUnitSlotsByIdentityAndTravel(chart, units, layout);
@@ -149,10 +152,10 @@ class UnitChart extends BaseChart<UnitViewState> {
       ? Math.max(1, totalDuration - (chart.transition.exitDuration || 0))
       : (fallsToAxis ? stage?.moveAcrossDuration ?? markDuration : markDuration);
     const enterTransition = stage
-      ? transitionFor(chart, d3, enterDuration)
+      ? transitionFor(chart, enterDuration)
       : (chart.transition.enter || originalTransition);
     const updateTransition = stage
-      ? transitionFor(chart, d3, updateDuration)
+      ? transitionFor(chart, updateDuration)
       : originalTransition;
     const transitionOptions = specTransition(spec);
     const hasStaggerOverride = Object.prototype.hasOwnProperty.call(transitionOptions, 'stagger');
@@ -197,7 +200,7 @@ class UnitChart extends BaseChart<UnitViewState> {
       .attr('class', 'vd-unit-crisp-layer');
     drawUnitValueBlend({
       chart, crispLayer, enabled: isUnitValueSplit, sourceLineage, units,
-      layout, color, transition: grainTransition, d3
+      layout, color, transition: grainTransition
     });
 
     crispLayer.selectAll<SVGCircleElement, UnitDatum>('circle.vd-unit')
@@ -224,7 +227,7 @@ class UnitChart extends BaseChart<UnitViewState> {
             .delay(enterMarkDelay)
             .attr('r', layout.r)
             .style('opacity', opacity);
-          if (layout.trajectory) applyForceTrajectory(entering, layout, d3, enterPosition);
+          if (layout.trajectory) applyForceTrajectory(entering, layout, enterPosition);
           return entered;
         },
         (update) => {
@@ -245,7 +248,7 @@ class UnitChart extends BaseChart<UnitViewState> {
             .attr('stroke-width', cameraSize(themeValue('--vd-unit-stroke-width', 0.5), camera))
             .style('opacity', opacity);
 
-          if (layout.trajectory) applyForceTrajectory(moveAcross, layout, d3);
+          if (layout.trajectory) applyForceTrajectory(moveAcross, layout);
           else if (!fallsToAxis || !stage) moveAcross.attr('cy', layout.y);
           else {
             moveAcross
@@ -258,8 +261,8 @@ class UnitChart extends BaseChart<UnitViewState> {
                 const fromY = Number((this as Element).getAttribute('cy'));
                 const toY = Number(layout.y(unit, index));
                 return toY > fromY
-                  ? directionalEase(d3.easeBounceOut, d3.easeExpIn)
-                  : directionalEase(d3.easeExpOut, d3.easeBounceIn);
+                  ? directionalEase(easeBounceOut, easeExpIn)
+                  : directionalEase(easeExpOut, easeBounceIn);
               })
               .attr('cy', layout.y);
           }
@@ -277,11 +280,11 @@ class UnitChart extends BaseChart<UnitViewState> {
   }
 }
 
-function applyForceTrajectory(transition: UnitMotion, layout: UnitLayoutResult, d3: D3Lib, entryPosition?: EntryPosition): UnitMotion {
+function applyForceTrajectory(transition: UnitMotion, layout: UnitLayoutResult, entryPosition?: EntryPosition): UnitMotion {
   return transition
     // Preserve the shared physical path, but distribute its aggregate motion
     // across progress so raw force cooling does not create long idle ranges.
-    .ease(d3.easeSinInOut)
+    .ease(easeSinInOut)
     .attrTween('cx', function(unit, index) {
       const start = entryPosition?.(unit, index);
       return (progress) => forceTrajectoryPosition(layout, unit, progress, start).x;
@@ -363,7 +366,7 @@ function assignUnitValueLineage(units: UnitDatum[], sources: UnitLineageSource[]
  * intervals, rather than collapsing an entire source row to one centroid.
  */
 function drawUnitValueBlend({
-  chart, crispLayer, enabled, sourceLineage, units, layout, color, transition, d3
+  chart, crispLayer, enabled, sourceLineage, units, layout, color, transition
 }: {
   chart: ChartContext;
   crispLayer: ChartSelection<SVGGElement, null>;
@@ -373,9 +376,8 @@ function drawUnitValueBlend({
   layout: UnitLayoutResult;
   color: (row: RenderDatum) => string;
   transition: MotionTiming;
-  d3: D3Lib;
 }): void {
-  crispLayer.interrupt().style('visibility', 'visible');
+  crispLayer.style('visibility', 'visible');
   chart.g.selectAll('g.vd-unit-blend-layer').remove();
   if (!enabled || !sourceLineage.length) return;
 
@@ -384,8 +386,8 @@ function drawUnitValueBlend({
     .style('pointer-events', 'none')
     .style('visibility', 'hidden')
     .raise();
-  const filterId = ensureUnitBlendFilter(chart.scene, d3);
-  const childrenBySource = d3.group(
+  const filterId = ensureUnitBlendFilter(chart.scene);
+  const childrenBySource = groupBy(
     units.filter((unit) => unit.__lineageSourceKey),
     (unit) => unit.__lineageSourceKey
   );
@@ -401,7 +403,7 @@ function drawUnitValueBlend({
     .attr('filter', `url(#${filterId})`);
 
   group.each(function(entry) {
-    const parent = d3.select(this).append('circle')
+    const parent = select(this).append('circle')
       .attr('class', 'vd-unit-blend')
       .attr('data-blend-role', 'parent')
       .attr('cx', entry.source.x)
@@ -423,7 +425,7 @@ function drawUnitValueBlend({
       })))
       .remove();
 
-    const children = d3.select(this).selectAll<SVGCircleElement, UnitDatum>('circle.vd-unit-blend-child')
+    const children = select(this).selectAll<SVGCircleElement, UnitDatum>('circle.vd-unit-blend-child')
       .data(entry.children, (unit) => unit.__unitKey)
       .join('circle')
       .attr('class', 'vd-unit-blend vd-unit-blend-child')
@@ -492,8 +494,7 @@ function smoothStep(from: number, to: number, value: number): number {
   return progress * progress * (3 - 2 * progress);
 }
 
-function ensureUnitBlendFilter(scene: ChartSceneContext, d3: D3Lib): string {
-  void d3;
+function ensureUnitBlendFilter(scene: ChartSceneContext): string {
   const id = `vd-unit-blend-${scene.clipIdentity}`;
   const defs = scene.svg.selectAll<SVGDefsElement, null>('defs.vd-unit-blend-defs')
     .data([null])
@@ -569,7 +570,6 @@ function travelDelay(unit: UnitDatum, maxDistance: number, travelWindow: number)
 }
 
 // Stage timings are plain descriptors sharing the chart's ease.
-function transitionFor(chart: ChartContext, d3: D3Lib, duration: number): MotionTiming {
-  void d3;
+function transitionFor(chart: ChartContext, duration: number): MotionTiming {
   return { delay: 0, duration: Math.max(1, duration), ease: chart.transition.base.ease };
 }

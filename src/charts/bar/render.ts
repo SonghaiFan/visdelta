@@ -9,7 +9,7 @@ import { semanticBarState } from './semantic.js';
 import { motion } from '../../runtime/recorder.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { BarLayout, ChannelSpec, ChartContext, ChartDeps, D3Lib, Renderer, ViewSpec } from '../../types/index.js';
+import type { BarLayout, ChannelSpec, ChartContext, ChartDeps, Renderer, ViewSpec } from '../../types/index.js';
 
 export function createBarRenderer(deps: ChartDeps): Renderer {
   return new BarChart(deps).renderer();
@@ -23,8 +23,8 @@ class BarChart extends BaseChart {
     this.drawBar = createBarDraw(this.deps);
   }
 
-  render(chart: ChartContext, rows: RenderDatum[], spec: ViewSpec, tooltip: HTMLElement, d3: D3Lib): void {
-    this.drawBar(chart, rows, spec, tooltip, d3);
+  render(chart: ChartContext, rows: RenderDatum[], spec: ViewSpec, tooltip: HTMLElement): void {
+    this.drawBar(chart, rows, spec, tooltip);
   }
 }
 
@@ -37,12 +37,12 @@ function createBarDraw(deps: ChartRuntimeDeps): BarLayoutRenderer {
     stacked: createStackedBarRenderer(deps, kit)
   };
 
-  return function drawBar(chart, rows, spec, tooltip, d3) {
+  return function drawBar(chart, rows, spec, tooltip) {
     const bar = semanticBarState(spec);
     const renderer = renderers[isSegmentedLayout(bar.layout, bar.segmentField) ? bar.layout : 'simple'];
 
     fadeNonBarShapes(chart);
-    if (renderer !== renderers.stacked) kit.renderBarSeams({ chart, d3 });
+    if (renderer !== renderers.stacked) kit.renderBarSeams({ chart });
 
     if (renderer === renderers.simple) {
       const duplicate = duplicateCategory(rows, barCategoryChannel(spec.encoding || {}));
@@ -55,8 +55,8 @@ function createBarDraw(deps: ChartRuntimeDeps): BarLayoutRenderer {
       }
     }
 
-    renderer(chart, rows, spec, tooltip, d3, bar.segmentField);
-    drawLegend(chart, rows, spec.encoding?.color, d3);
+    renderer(chart, rows, spec, tooltip, bar.segmentField);
+    drawLegend(chart, rows, spec.encoding?.color);
   };
 }
 

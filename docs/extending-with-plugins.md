@@ -26,8 +26,14 @@ export const customModule = defineChartModule({
 ```
 
 `customRenderer` and `customCompiler` are implementations supplied by the chart
-package. Renderer helpers and VisDelta's D3Runtime are supplied; the module must not reach into
-another built-in chart.
+package. Renderer helpers are supplied through `deps`; the module must not reach
+into another built-in chart.
+
+A renderer does not receive a D3 object. Import the `d3-*` modules the chart
+uses — `d3-selection`, `d3-scale`, `d3-shape`, … — exactly as any D3 code does.
+VisDelta's own `d3-*` dependencies are ordinary, stateless modules, so a second
+copy in a plugin bundle is harmless; `chart.g` is a plain `d3-selection`
+Selection and interoperates by structure, not by instance.
 
 ## Renderer motion contract
 
@@ -38,24 +44,25 @@ interrupted the moment the transition compiles.
 
 ```js
 import { motion } from "visdelta/plugins";
+import { scaleLinear } from "d3-scale";
 
 function customRenderer(chart, rows, spec) {
+  const x = scaleLinear().domain([0, 100]).range([0, chart.innerWidth]);
   const dots = chart.g.selectAll("circle.dot")
     .data(rows, row => row.id)
     .join("circle")
     .attr("class", "dot");
 
   motion(dots, chart.transition.base)
-    .attr("cx", row => chart.scales.x(row.value))
+    .attr("cx", row => x(row.value))
     .style("opacity", 1);
 }
 ```
 
 `motion(selection, base)` has the d3-transition authoring surface — `attr`,
 `style`, `attrTween`, `styleTween`, `tween`, `text`, `delay`, `duration`,
-`ease`, `easeVarying`, `remove`, chained `transition()` — and returns the same
-kind of object in both modes: a track recorder when the render is seekable, a
-timed D3 transition otherwise. Three rules follow from seeking:
+`ease`, `easeVarying`, `remove`, chained `transition()` — and records property
+tracks instead of scheduling anything. Three rules follow from seeking:
 
 - `on("start" | "end" | …)` is rejected. Side effects do not seek; compute the
   end state up front.

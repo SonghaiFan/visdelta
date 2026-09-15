@@ -73,11 +73,10 @@ dataset.
 ### Selectors
 
 `where()`, `highlight()`, and `focus()` accept the same `selector`. A selector
-can use any one of these three forms:
+is one of two object forms:
 
 ```ts
 type Selector =
-  | string
   | {
       field: string;
       equal?: unknown;
@@ -137,24 +136,8 @@ Range operands must be finite numbers, JavaScript `Date` values, or valid ISO
 date strings. Missing values, empty strings, booleans, and `NaN` do not match a
 range. The operator is `equal`, not `equals`.
 
-#### Comparison expression
-
-A string selector contains exactly one comparison. Supported symbols are
-`===`, `==`, `!==`, `!=`, `>`, `>=`, `<`, and `<=`.
-
-```js
-"datum.sales >= 10"
-"datum.region === 'North'"
-"datum.active != false"
-"datum.cancelledAt == null"
-"datum.date < '2027-01-01'"
-```
-
-The left side must be `datum.<field>`. The right side must be a finite number,
-boolean, `null`, or quoted string. Selectors do not evaluate arbitrary
-JavaScript: callbacks, regular expressions, method calls, arithmetic, and
-cross-field expressions are rejected. Use `oneOf` for OR within one field;
-cross-field OR is not currently part of the selector grammar.
+Selectors are always objects, never strings. A spec is data: it can be saved,
+sent, and compared, and an object selector needs no parser to stay that way.
 
 #### Composition and transform order
 
@@ -444,37 +427,39 @@ hands off directly—there is no empty chart frame between `A → B` and `B → 
 For a repeating story, include the starting state again at the end:
 `[revenue, profit, ranked, revenue]`.
 
-## `mount(view, options)` and `select(target)`
+## Keeping a chart on screen
 
-Mount a state once, then evolve the chart already at that DOM target. This is
-the D3-like imperative entry point: selection finds VisDelta's current endpoint;
-grammar calls still return a new immutable state; `play()` promotes it.
+There is no mounted-chart object. A chart that stays on screen is a transition
+held at an endpoint, and the application owns the current state:
 
 ```js
-import * as vd from "visdelta";
+let state = salesByRegion;
+let held = await transition(state, state, { target: "#chart" });
+held.progress(1);
 
-await vd.mount(salesByRegion, { target: "#chart" });
+async function go(next) {
+  const change = await transition(state, next, { target: "#chart" });
+  held.destroy();
+  held = change;
+  state = next;
+  change.play({ duration: 700 });
+}
 
-await vd.select("#chart")
-  .update(view => view.focus({ region: "North" }))
-  .play({ duration: 700 });
+await go(state.focus({ region: "North" }));
 ```
 
-The `update()` callback receives the current immutable builder, so it exposes
-the complete chart grammar without the runtime API having to mirror methods
-such as `focus`, `where`, `sort`, or future chart-specific operations.
-`select()` only addresses a target mounted by VisDelta. It preserves the
-existing chart's runtime dependencies and starts the new state at the current
-endpoint without clearing the host between frames.
+`transition()` resolves both states before touching the target, so the previous
+chart stays visible until the next one is ready. For several adjacent states,
+`sequence()` hands off at shared endpoints without an empty frame.
 
 ## Public modules
 
 | Entry | Exports |
 | --- | --- |
-| `visdelta` | All built-in charts, `delta`, `transition`, `sequence`, `mount`, `select`, data types, styles, and registration |
+| `visdelta` | All built-in charts, `delta`, `transition`, `sequence`, data types, styles, and registration |
 | `visdelta/core` | DOM-free state/difference helpers plus camera math |
 | `visdelta/area`, `/bar`, `/line`, `/point`, `/unit` | One focused chart builder and module |
-| `visdelta/transition` | Standalone pair, sequence, and mounted-selection controllers |
+| `visdelta/transition` | Pair and sequence controllers |
 | `visdelta/plugins` | Chart-module definition and registration |
 | `visdelta/chart-style` | Structural style definition and presets |
 | `visdelta/browser` | Browser-global dependency adapter |
@@ -488,7 +473,7 @@ carry that reference.
 ## Current boundary
 
 - Endpoint chart types must match; Bar-to-Line is rejected.
-- D3 is required for rendering.
+- VisDelta depends on the `d3-*` modules it renders with; nothing is injected or configurable.
 - Declared transforms execute within VisDelta; no table-library installation is required.
 - Data cleaning is outside the library.
 - Controls call `progress()` from outside the library.

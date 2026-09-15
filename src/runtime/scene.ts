@@ -7,11 +7,11 @@ import { motion } from './recorder.js';
 import type { ProgressController } from './tracks.js';
 import type { MotionTiming } from './recorder.js';
 import { clamp } from './utils.js';
+import { select } from 'd3-selection';
 import type {
   ChartContext,
   ChartSceneContext,
   ChartSelection,
-  D3Lib,
   DataRow,
   EncodingSpec,
   ViewSpec
@@ -29,7 +29,6 @@ export interface SceneHostElement extends HTMLElement {
 export interface RuntimeScene extends ChartSceneContext {
   node: SceneHostElement;
   /** The library-owned D3 runtime; motion() reads it through the mount element. */
-  d3: D3Lib;
   frame: ChartSelection<SVGGElement>;
   detailLayer: ChartSelection<SVGGElement>;
   axisLayer: ChartSelection<SVGGElement>;
@@ -81,12 +80,12 @@ interface SceneChart extends ChartContext {
 
 let sceneIdentity = 0;
 
-export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig, d3: D3Lib): RuntimeScene {
+export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig): RuntimeScene {
   if (node.__visDeltaScene) return node.__visDeltaScene;
   const width = Math.max(60, node.clientWidth || 720);
   const height = viewConfig.height || 500;
   node.innerHTML = '';
-  const svg = d3.select(node).append('svg')
+  const svg = select(node).append('svg')
     .attr('viewBox', `0 0 ${width} ${height}`)
     .attr('preserveAspectRatio', 'xMidYMid meet')
     .attr('role', 'img');
@@ -94,7 +93,7 @@ export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig, d3
   const grid = frame.append('g').attr('class', 'vd-grid');
   const markRoot = frame.append('g').attr('class', 'vd-mark-root');
   const scene: RuntimeScene = {
-    d3,
+    
     clipIdentity: ++sceneIdentity,
     node,
     svg: svg as ChartSelection<SVGSVGElement>,
@@ -112,7 +111,7 @@ export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig, d3
     height,
     detailLayer: markRoot.append('g').attr('class', 'vd-scene-layer vd-detail-layer') as ChartSelection<SVGGElement>,
     axisLayer: frame.append('g').attr('class', 'vd-scene-layer vd-axis-layer') as ChartSelection<SVGGElement>,
-    empty: d3.select(node).append('div').attr('class', 'vd-empty').style('display', 'none') as ChartSelection<HTMLDivElement>
+    empty: select(node).append('div').attr('class', 'vd-empty').style('display', 'none') as ChartSelection<HTMLDivElement>
   };
   node.__visDeltaScene = scene;
   return scene;
@@ -126,18 +125,18 @@ export function resizeScene(scene: RuntimeScene, width: number, height: number):
 
 export function resetSceneToEmptySource(scene: RuntimeScene): void {
   clearSceneTransitionProgress(scene, { finish: false });
-  scene.grid.interrupt().selectAll('*').remove();
-  scene.xAxis.interrupt().style('opacity', 0).selectAll('*').remove();
-  scene.yAxis.interrupt().style('opacity', 0).selectAll('*').remove();
+  scene.grid.selectAll('*').remove();
+  scene.xAxis.style('opacity', 0).selectAll('*').remove();
+  scene.yAxis.style('opacity', 0).selectAll('*').remove();
   markAxisInactive(scene.grid);
   markAxisInactive(scene.xAxis);
   markAxisInactive(scene.yAxis);
-  scene.xLabel.interrupt().style('opacity', 0).text('');
-  scene.yLabel.interrupt().style('opacity', 0).text('');
-  scene.legend.interrupt().style('opacity', 0).selectAll('*').remove();
-  scene.axisLayer?.interrupt().selectAll('*').remove();
-  scene.detailLayer?.interrupt().selectAll('*').remove();
-  scene.markLayers?.forEach((layer) => { layer.interrupt().selectAll('*').remove(); });
+  scene.xLabel.style('opacity', 0).text('');
+  scene.yLabel.style('opacity', 0).text('');
+  scene.legend.style('opacity', 0).selectAll('*').remove();
+  scene.axisLayer?.selectAll('*').remove();
+  scene.detailLayer?.selectAll('*').remove();
+  scene.markLayers?.forEach((layer) => { layer.selectAll('*').remove(); });
   scene.previousSpec = null;
 }
 
@@ -165,7 +164,7 @@ function applyAxisScene(chart: SceneChart, rows: DataRow[], spec: ViewSpec): voi
   const x = row ? chart.position.x(row) : NaN;
   const y = row ? chart.position.y(row) : NaN;
   const data: ScenePoint[] = row && Number.isFinite(x) && Number.isFinite(y) ? [{ row, x, y }] : [];
-  layer.raise().interrupt().style('opacity', 1);
+  layer.raise().style('opacity', 1);
   joinAxisLine(layer, 'vd-axis-rule-x', data, chart.transition.base, (d) => ({ x1: d.x, x2: d.x, y1: 0, y2: chart.innerHeight }));
   joinAxisLine(layer, 'vd-axis-rule-y', data, chart.transition.base, (d) => ({ x1: 0, x2: chart.innerWidth, y1: d.y, y2: d.y }));
   layer.selectAll<SVGCircleElement, ScenePoint>('circle.vd-axis-dot')
@@ -215,7 +214,7 @@ function joinAxisLine(
 }
 
 function clearSceneLayer(layer: ChartSelection<SVGGElement>, transition: RootTransition): void {
-  layer.interrupt().style('opacity', 1);
+  layer.style('opacity', 1);
   motion(layer.selectAll('*'), transition).style('opacity', 0).remove();
 }
 

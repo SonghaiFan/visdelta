@@ -96,42 +96,30 @@ then return the camera to the complete chart. These generated steps occupy
 the existing leg: they do not add entries to `states`, move authored integer
 positions, or increase the leg duration passed to `play()`.
 
-## `mount(view, options)` and `select(target)`
+## Keeping a chart on screen
 
-`mount()` establishes a VisDelta-owned chart at a target. `select()` retrieves
-that mounted endpoint later and applies a new grammar operation to it.
-
-```js
-await vd.mount(byRegion, { target: "#chart" });
-
-await vd.select("#chart")
-  .update(view => view.focus({ region: "North" }))
-  .play({ duration: 700 });
-```
-
-`update()` returns a pending immutable state; it has no visual effect until
-`play()`. The promise resolves to a motion object with its controller and live
-chart handle. Selecting the host again is equally valid:
+The runtime keeps no registry of mounted charts. Hold a transition at an
+endpoint and let the application own the current state:
 
 ```js
-await vd.select("#chart").update(view => view.focus({ region: "North" })).play();
-await vd.select("#chart").update(view => view.reset().focus({ region: "South" })).play();
+let state = byRegion;
+let held = await transition(state, state, { target: "#chart" });
+held.progress(1);
+
+async function go(next) {
+  const change = await transition(state, next, { target: "#chart" });
+  held.destroy();
+  held = change;
+  state = next;
+  change.play({ duration: 700 });
+}
 ```
 
-The explicit `reset()` matters here: a second `.focus()` narrows the existing
-camera scope, so `focus(North).focus(South)` means their intersection rather
-than “replace North with South.”
+Every grammar call returns a new immutable state, so `go(state.focus(...))` is
+the whole update. Note that a second `.focus()` narrows the existing camera
+scope: `state.focus(North).focus(South)` means their intersection, so use
+`state.reset().focus(South)` to replace North with South.
 
-The same live chart can create a sequence from grammar callbacks. Each callback
-receives the endpoint from the preceding step, so the path is authored as
-`A → B → C`, not as unrelated chart remounts.
-
-```js
-await vd.select("#chart")
-  .sequence([
-    view => view.focus({ region: "North" }),
-    view => view.highlight({ region: "North" }),
-    view => view.sort("sales", "descending")
-  ])
-  .play({ duration: 850 });
-```
+For a path through several states, build them up front and use `sequence()`;
+it hands off at shared endpoints, so `A → B → C` never shows an empty frame
+between legs.

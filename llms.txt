@@ -16,7 +16,7 @@ import { transition } from "visdelta/transition";
 
 const from = bar(rows).x("category").y("revenue").key("category");
 const to = from.y("profit");
-const change = await transition(from, to, { target: "#chart", d3 });
+const change = await transition(from, to, { target: "#chart" });
 change.progress(0.5);
 ```
 
@@ -50,8 +50,9 @@ Public package entries:
 - `visdelta/themes/dark.css`
 - `visdelta/themes/paper.css`
 
-D3 is required for rendering. Arquero is optional and only needed for a declared
-transform pipeline.
+VisDelta depends only on the `d3-*` modules it renders with; declared transforms
+run without any extra package. Chart states are JSON-safe; selectors and data
+sources are objects (`{ field, gte }`, `{ url }`, `{ name }`), never strings.
 
 Source-of-truth docs:
 

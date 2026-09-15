@@ -19,6 +19,7 @@ import type {
   TargetGeometry
 } from '../render-pattern.js';
 import type { BarLayoutRenderer } from './simple.js';
+import { scaleBand, scaleLinear } from 'd3-scale';
 
 interface GroupedGeom {
   x: RuntimeScale;
@@ -36,7 +37,7 @@ interface GroupedGeom {
 export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
   const { bindTooltip, channelDomain, colorScale, quantitativeDomain, themeValue } = deps;
 
-  return function renderGroupedBar(chart, rows, spec, tooltip, d3, segmentFieldName) {
+  return function renderGroupedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const orientation = barOrientationFromEncoding(enc);
@@ -52,18 +53,18 @@ export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     const selection = viewSelection(spec);
     const categories = channelDomain(rows, categoryChannel) as string[];
     const segments = channelDomain(rows, { field: segmentField, domain: stateSegments }) as string[];
-    const color = colorScale(domainRows, enc.color, d3);
+    const color = colorScale(domainRows, enc.color);
     const key = barKeyAccessor(chart, spec, [categoryField, segmentField]);
     const splitLineage = kit.splitLineage(chart);
     const zeroBaselineEnter = kit.baselineEnterPlan(chart, 'zero-baseline');
     const zeroBaselineExit = kit.baselineExitPlan(chart, 'zero-baseline');
 
     const categoryRange: [number, number] = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
-    const baseCategoryBand = d3.scaleBand().domain(categories).range(categoryRange).padding(0.24);
+    const baseCategoryBand = scaleBand().domain(categories).range(categoryRange).padding(0.24);
     const baseCategoryScale = asRuntimeScale(baseCategoryBand);
-    const baseSegmentScale = asRuntimeScale(d3.scaleBand().domain(segments)
+    const baseSegmentScale = asRuntimeScale(scaleBand().domain(segments)
       .range([0, baseCategoryBand.bandwidth()]).padding(0.08));
-    const baseMeasureScale = asRuntimeScale(d3.scaleLinear()
+    const baseMeasureScale = asRuntimeScale(scaleLinear()
       .domain(quantitativeDomain(domainRows, measureChannel, 0))
       .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
@@ -82,14 +83,14 @@ export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
     );
     const categoryScale = cameraScale(baseCategoryScale, camera, horizontal ? 'y' : 'x');
     const measureScale = cameraScale(baseMeasureScale, camera, horizontal ? 'x' : 'y');
-    const segmentScale = asRuntimeScale(d3.scaleBand().domain(segments)
+    const segmentScale = asRuntimeScale(scaleBand().domain(segments)
       .range([0, bandwidth(categoryScale)]).padding(0.08));
     const x = horizontal ? measureScale : categoryScale;
     const y = horizontal ? categoryScale : measureScale;
     const x1 = horizontal ? null : segmentScale;
     const y1 = horizontal ? segmentScale : null;
     const geom: GroupedGeom = { x, y, x1, y1, categoryField, segmentField, valueField, chart, horizontal };
-    const steps = kit.steps(chart, rendererOrientation, d3);
+    const steps = kit.steps(chart, rendererOrientation);
     const xAxisTransition = kit.axisTransition(steps, 'x') || chart.transition.base;
     const yAxisTransition = kit.axisTransition(steps, 'y') || chart.transition.base;
     const geometry = groupedSegmentGeometryContract(geom, splitLineage, zeroBaselineEnter, kit.sourceBaselineExit, zeroBaselineExit);
@@ -102,13 +103,13 @@ export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       y: (d: BarDatum) => horizontal ? segmentCenter(y, y1, d, geom) : scaled(y, d[valueField])
     };
 
-    drawBarAxes(chart, x, y, enc, d3, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, deps, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });
 
     kit.renderBarJoin({
-      chart, rows, spec, tooltip, d3, bindTooltip, key,
+      chart, rows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
       className: 'vd-bar vd-bar-segment vd-bar-grouped',
       orientation: rendererOrientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),

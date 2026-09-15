@@ -42,7 +42,7 @@ const x = (node) => Number(node.getAttribute('x'));
 test('attr interpolates from the DOM value present when the track initializes, not when recorded', () => {
   const node = fakeNode({ x: 0 });
   const sink = [];
-  record(fakeSelection([node]), sink, timing(), d3).attr('x', 100);
+  record(fakeSelection([node]), sink, timing()).attr('x', 100);
   node.setAttribute('x', 50); // a preceding write lands before compile
   const frame = createProgressController(sink).compile();
   frame.progress(0.5);
@@ -56,7 +56,7 @@ test('attr interpolates from the DOM value present when the track initializes, n
 test('chained transition() steps start where the previous one ends and take over the property', () => {
   const node = fakeNode({ x: 0 });
   const sink = [];
-  record(fakeSelection([node]), sink, timing(), d3)
+  record(fakeSelection([node]), sink, timing())
     .attr('x', 100)
     .transition()
     .attr('x', 0);
@@ -74,7 +74,7 @@ test('per-datum delay staggers nodes; a delayed property rewinds to its t=0 valu
   const a = fakeNode({ x: 0 });
   const b = fakeNode({ x: 0 });
   const sink = [];
-  record(fakeSelection([a, b]), sink, timing({ duration: 100 }), d3)
+  record(fakeSelection([a, b]), sink, timing({ duration: 100 }))
     .delay((d, i) => i * 100)
     .attr('x', 100);
   const frame = createProgressController(sink).compile();
@@ -91,7 +91,7 @@ test('per-datum delay staggers nodes; a delayed property rewinds to its t=0 valu
 test('remove() detaches only when the controller finishes, never while seeking', () => {
   const node = fakeNode({ x: 0 });
   const sink = [];
-  record(fakeSelection([node]), sink, timing(), d3).style('opacity', 0).remove();
+  record(fakeSelection([node]), sink, timing()).style('opacity', 0).remove();
   const controller = createProgressController(sink);
   controller.progress(1);
   assert.equal(node.parent.removed.length, 0);
@@ -100,7 +100,7 @@ test('remove() detaches only when the controller finishes, never while seeking',
 
   const other = fakeNode({ x: 0 });
   const sink2 = [];
-  record(fakeSelection([other]), sink2, timing(), d3).style('opacity', 0).remove();
+  record(fakeSelection([other]), sink2, timing()).style('opacity', 0).remove();
   createProgressController(sink2).destroy({ finish: true });
   assert.deepEqual(other.parent.removed, [other]);
   assert.equal(other.style.getPropertyValue('opacity'), '0');
@@ -110,7 +110,7 @@ test('direction-aware easing picks the reverse profile only when seeking backwar
   const node = fakeNode({ x: 0 });
   const sink = [];
   const ease = directionalEase((t) => t, (t) => t * t);
-  record(fakeSelection([node]), sink, timing({ ease }), d3).attr('x', 100);
+  record(fakeSelection([node]), sink, timing({ ease })).attr('x', 100);
   const frame = createProgressController(sink).compile();
   frame.progress(0.5, 1);
   assert.equal(x(node), 50);
@@ -122,14 +122,14 @@ test('style() reads the inline style as its start and writes through setProperty
   const node = fakeNode();
   node.style.setProperty('opacity', '1');
   const sink = [];
-  record(fakeSelection([node]), sink, timing(), d3).style('opacity', 0);
+  record(fakeSelection([node]), sink, timing()).style('opacity', 0);
   createProgressController(sink).compile().progress(0.5);
   assert.equal(node.style.getPropertyValue('opacity'), '0.5');
 });
 
 test('event handlers are rejected: side effects cannot be sought', () => {
   const sink = [];
-  const recorder = record(fakeSelection([fakeNode()]), sink, timing(), d3);
+  const recorder = record(fakeSelection([fakeNode()]), sink, timing());
   assert.throws(() => recorder.on('end', () => {}), /do not seek/);
   assert.doesNotThrow(() => recorder.on('end', null));
 });
@@ -138,8 +138,8 @@ test('a later recording of the same property at the same start overrides the ear
   // (transform is left out: interpolateTransformSvg needs a DOM to parse it.)
   const node = fakeNode({ x: 0, 'text-anchor': 'middle' });
   const sink = [];
-  record(fakeSelection([node]), sink, timing(), d3).attr('x', 100).attr('text-anchor', 'middle');
-  record(fakeSelection([node]), sink, timing(), d3).attr('x', 200).attr('text-anchor', null);
+  record(fakeSelection([node]), sink, timing()).attr('x', 100).attr('text-anchor', 'middle');
+  record(fakeSelection([node]), sink, timing()).attr('x', 200).attr('text-anchor', null);
   const frame = createProgressController(sink).compile();
   frame.progress(0.5);
   assert.equal(x(node), 100);                       // 0 → 200, not 0 → 100

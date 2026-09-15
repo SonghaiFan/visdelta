@@ -1,12 +1,10 @@
 import type { TransformSpec } from '../types/index.js';
-import type { D3Runtime } from '../types/d3-runtime.js';
 import { dataName } from '../spec-meta.js';
+import { autoType } from 'd3-dsv';
+import { csv, json } from 'd3-fetch';
 type AnyRecord = Record<string, unknown>;
 
-export async function loadData(dataSpec: Record<string, unknown>, d3: Pick<D3Runtime, 'csv' | 'json' | 'autoType'>): Promise<Record<string, unknown[]>> {
-  if (!d3) {
-    throw new Error('VisDelta data loading requires its D3 runtime.');
-  }
+export async function loadData(dataSpec: Record<string, unknown>): Promise<Record<string, unknown[]>> {
   const entries = await Promise.all(
     Object.entries(dataSpec).map(async ([name, source]) => {
       if (Array.isArray(source)) return [name, source];
@@ -15,12 +13,12 @@ export async function loadData(dataSpec: Record<string, unknown>, d3: Pick<D3Run
       if (!src['url']) return [name, []];
 
       if ((src['type'] || 'csv') === 'csv') {
-        const rows = await d3.csv(src['url'] as string, d3.autoType);
+        const rows = await csv(src['url'] as string, autoType);
         return [name, rows];
       }
 
       if (src['type'] === 'json') {
-        const rows = await d3.json(src['url'] as string);
+        const rows = await json(src['url'] as string);
         return [name, Array.isArray(rows) ? rows : (rows as AnyRecord)['values'] || []];
       }
 

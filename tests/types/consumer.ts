@@ -1,4 +1,4 @@
-import { bar, compileLineage, correspondLineage, delta, mount, select, sequence } from 'visdelta';
+import { bar, compileLineage, correspondLineage, delta, sequence } from 'visdelta';
 import { sequence as selectedSequence, transition } from 'visdelta/transition';
 import { delta as selectedDelta } from 'visdelta/core';
 import { bar as selectedBar, barModule } from 'visdelta/bar';
@@ -13,7 +13,7 @@ import {
   registerChartModule
 } from 'visdelta/plugins';
 import * as browser from 'visdelta/browser';
-import type { D3Runtime, ChartTransitionPolicy, IntermediateSpec } from 'visdelta/plugins';
+import type { ChartTransitionPolicy, IntermediateSpec, Renderer } from 'visdelta/plugins';
 
 const waypoint: IntermediateSpec = { spec: { mark: 'custom' } };
 const policy: ChartTransitionPolicy = {
@@ -30,10 +30,11 @@ defineChartType({
   }
 });
 
-declare const pluginD3: D3Runtime;
-pluginD3.scaleLinear().domain([0, 1]);
-// @ts-expect-error The renderer capability boundary does not expose all of D3.
-pluginD3.geoMercator();
+// A renderer receives no D3 object: plugins import the d3-* modules they use.
+const rendererShape: Renderer = (chart, rows, spec, tooltip) => { void [chart, rows, spec, tooltip]; };
+// @ts-expect-error There is no fifth (d3) parameter any more.
+const legacyRenderer: Renderer = (chart, rows, spec, tooltip, d3) => { void [chart, rows, spec, tooltip, d3]; };
+void [rendererShape, legacyRenderer];
 
 const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
@@ -46,12 +47,11 @@ const journey = await sequence([a, b, a], { target: '#chart' });
 journey.progress(1.5).play({ duration: 300 }).pause().resize();
 journey.destroy();
 await selectedSequence([a, b], { target: '#chart' });
-await mount(a, { target: '#chart' });
-await select<typeof a>('#chart').update(view => view.focus({ key: 'A' })).play({ duration: 300 });
-await select<typeof a>('#chart').sequence([
-  view => view.focus({ key: 'A' }),
-  view => view.highlight({ key: 'A' })
-]).play({ duration: 300 });
+// A chart that stays on screen is a transition held at an endpoint; the
+// application owns the current state.
+const held = await transition(a, a, { target: '#chart' });
+held.progress(1);
+held.destroy();
 delta(a, b).hasDelta('encoding.y');
 const trackedA = compileLineage([{ id: 'A', group: 'x', value: 1 }], [], { key: 'id', grain: ['group'] });
 const trackedB = compileLineage([{ id: 'A', group: 'y', value: 1 }], [], { key: 'id', grain: ['group'] });
@@ -82,6 +82,8 @@ pair.progress('0.5');
 await transition(a, b, { target: '#chart' });
 // @ts-expect-error D3 is library-owned, not a public injection option.
 await transition(a, b, { target: '#chart', d3: {} });
+await browser.transition(a, b, { target: '#chart' });
+// @ts-expect-error A target is required.
 await browser.transition(a, b);
 const customPlugin = defineChartType({ key: 'custom', renderer() {} });
 registerChartModule({ plugin: customPlugin });

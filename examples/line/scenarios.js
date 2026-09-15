@@ -51,7 +51,7 @@ const average = detailed.rollup({ op: "mean" });`;
 const filtered = `${base}
 
 const filtered = base
-  .where("datum.volume < 70000000")
+  .where({ field: "volume", lt: 70000000 })
   .connect("adjacent");`;
 
 const added = `${stockData}
@@ -110,5 +110,5 @@ export const scenarios = [
   sample('split', '13 · Split into company lines', 'Release AAPL and GOOG from the mean reference like a zipper, then remove the reference once both company lines are readable.', series, 'average', 'detailed'),
   sample('merge', '14 · Merge into an average', 'Grow the mean as a thin dashed reference, zip AAPL and GOOG onto it, then snap the coincident paths into one line.', series, 'detailed', 'average'),
   sample('shift', '15 · Shift the time window', 'Remove the leaving AAPL day, move the shared observations, extend the line, then reveal the entering day.', slidingWindow, 'firstWindow', 'nextWindow'),
-  sample('focus', '16 · Focus the view', 'Keep every AAPL observation and the full line, but fit the view around days whose close is at least $325.', base, 'base', 'base.focus("datum.close >= 325")')
+  sample('focus', '16 · Focus the view', 'Keep every AAPL observation and the full line, but fit the view around days whose close is at least $325.', base, 'base', 'base.focus({ field: "close", gte: 325 })')
 ];

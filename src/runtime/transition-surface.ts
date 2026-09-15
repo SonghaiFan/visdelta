@@ -14,11 +14,11 @@ import { hideTooltip } from './marks.js';
 import { clearSceneTransitionProgress } from '../transition-progress.js';
 import type { SceneHostElement } from './scene.js';
 import type { FrameEvaluator } from './tracks.js';
-import type { ChartType, D3Lib, MarginSpec, RuntimeOptions } from '../types/index.js';
+import type { ChartType, MarginSpec, RuntimeOptions } from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
+import { select } from 'd3-selection';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
-  d3: D3Lib;
   height?: number;
   /** Force the reconstruction bridge even for chart types that allow cached frames. */
   reconstruct?: boolean;
@@ -48,7 +48,6 @@ export function createTransitionSurface(
   options: TransitionSurfaceOptions,
   chartTypes: ChartTypeRegistry
 ): TransitionSurface {
-  const { d3 } = options;
   const { drawView, prepareSeekSourceState, compileTransitionSource,
     renderSeekPhase, applySeekSequence } = createViewRenderer(chartTypes);
   const chartType = chartTypes.get(from);
@@ -57,9 +56,9 @@ export function createTransitionSurface(
   const source = canonical.from;
   const target = canonical.to;
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;
-  const host = resolveTarget(options.target || '#app');
+  const host = resolveTarget(options.target);
   const root = document.createElement('div');
-  const styleKey = String(options.chartStyle?.key || 'd3').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
+  const styleKey = String(options.chartStyle?.key || '').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase();
   root.className = `vd-transition-root vd-style-${styleKey}`;
   root.dataset.chartStyle = styleKey;
   const shell = renderChartShell(root, 'main');
@@ -80,7 +79,7 @@ export function createTransitionSurface(
       clearSceneTransitionProgress(scene, { finish: false });
       if (scene.phaseTimer) window.clearTimeout(scene.phaseTimer);
     }
-    d3.select(node).selectAll('*').interrupt();
+    select(node).selectAll('*');
     node.replaceChildren();
     delete node.__visDeltaScene;
   };
@@ -89,9 +88,9 @@ export function createTransitionSurface(
 
   function compileFrames(): FrameEvaluator {
     disposeScene();
-    prepareSeekSourceState(node, config, {}, shell.tooltip, d3, compileTransitionSource(source));
+    prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(source));
     const startFrame = captureDomFrame(node);
-    drawView(node, target, config, {}, shell.tooltip, d3, scenes, { previousViewSpec: source, seekable: true });
+    drawView(node, target, config, {}, shell.tooltip, scenes, { previousViewSpec: source, seekable: true });
     const scene = runtimeScene();
     if (!scene?.transitionProgress) throw new Error('VisDelta could not compile the transition: no seekable render was produced.');
     const controller = scene.transitionProgress;
@@ -110,7 +109,7 @@ export function createTransitionSurface(
       if (index < phases.length - 1 && 'spec' in phase) {
         const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
         clearSceneTransitionProgress(scene, { finish: true });
-        prepareSeekSourceState(node, config, {}, shell.tooltip, d3, compileTransitionSource(endpoint));
+        prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(endpoint));
         boundaries.push({ at: phase.end, dom: captureDomFrame(node) });
       }
       return frame;
@@ -118,7 +117,7 @@ export function createTransitionSurface(
     // Save the clean endpoint (no zero-opacity exit marks/ticks), while keeping
     // detached nodes alive in the phase snapshots for later reverse seeks.
     clearSceneTransitionProgress(scene, { finish: true });
-    prepareSeekSourceState(node, config, {}, shell.tooltip, d3, compileTransitionSource(target));
+    prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(target));
     const endFrame = captureDomFrame(node);
     let activeFrame: DomFrame = endFrame;
     const activate = (frame: DomFrame) => {
@@ -160,9 +159,9 @@ export function createTransitionSurface(
       disposeScene();
       if (value === 0 || value === 1) {
         const endpoint = compileTransitionSource(value === 0 ? source : target);
-        prepareSeekSourceState(node, config, {}, shell.tooltip, d3, endpoint);
+        prepareSeekSourceState(node, config, {}, shell.tooltip, endpoint);
       } else {
-        drawView(node, target, config, {}, shell.tooltip, d3, scenes, {
+        drawView(node, target, config, {}, shell.tooltip, scenes, {
           previousViewSpec: source,
           seekable: true
         });

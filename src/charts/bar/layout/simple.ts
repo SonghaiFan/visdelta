@@ -7,7 +7,7 @@ import {
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
 import type { RuntimeScale } from '../../../runtime/marks.js';
-import type { ChartContext, D3Lib, ViewSpec } from '../../../types/index.js';
+import type { ChartContext, ViewSpec } from '../../../types/index.js';
 import type {
   BarDatum,
   BarGeometryContract,
@@ -18,13 +18,13 @@ import type {
   TargetGeometry
 } from '../render-pattern.js';
 import type { TransitionItemAction } from '../../../types/index.js';
+import { scaleBand, scaleLinear } from 'd3-scale';
 
 export type BarLayoutRenderer = (
   chart: ChartContext,
   rows: BarDatum[],
   spec: ViewSpec,
   tooltip: HTMLElement,
-  d3: D3Lib,
   segmentField?: string | null
 ) => void;
 
@@ -41,7 +41,7 @@ interface SimpleGeom {
 export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
   const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain, themeValue } = deps;
 
-  return function renderSimpleBar(chart, rows, spec, tooltip, d3) {
+  return function renderSimpleBar(chart, rows, spec, tooltip) {
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const orientation = barOrientationFromEncoding(enc);
@@ -55,9 +55,9 @@ export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKi
     const categoryRange: [number, number] = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
 
     const baseCategoryScale = horizontal
-      ? asRuntimeScale(d3.scaleBand().domain(channelDomain(rows, categoryChannel) as string[]).range(categoryRange).padding(0.22))
-      : bandOrLinear(rows, categoryChannel, categoryRange, d3);
-    const baseMeasureScale = asRuntimeScale(d3.scaleLinear()
+      ? asRuntimeScale(scaleBand().domain(channelDomain(rows, categoryChannel) as string[]).range(categoryRange).padding(0.22))
+      : bandOrLinear(rows, categoryChannel, categoryRange);
+    const baseMeasureScale = asRuntimeScale(scaleLinear()
       .domain(quantitativeDomain(domainRows, measureChannel, 0))
       .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
@@ -71,9 +71,9 @@ export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKi
     );
     const x = cameraScale(baseX, camera, 'x');
     const y = cameraScale(baseY, camera, 'y');
-    const color = colorScale(domainRows, enc.color, d3);
+    const color = colorScale(domainRows, enc.color);
     const geom: SimpleGeom = { x, y, categoryField, valueField, chart, horizontal, position };
-    const steps = kit.steps(chart, orientation, d3);
+    const steps = kit.steps(chart, orientation);
     const xAxisTransition = kit.axisTransition(steps, 'x') || chart.transition.base;
     const yAxisTransition = kit.axisTransition(steps, 'y') || chart.transition.base;
     const collapseLineage = kit.collapseLineage(chart, categoryField);
@@ -88,13 +88,13 @@ export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKi
       y: (d: BarDatum) => horizontal ? position(y, d[categoryField]) : scaled(y, d[valueField])
     };
 
-    drawBarAxes(chart, x, y, enc, d3, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, deps, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });
 
     kit.renderBarJoin({
-      chart, rows, spec, tooltip, d3, bindTooltip, key,
+      chart, rows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
       className: 'vd-bar', orientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),
       fill: (d) => color(d),

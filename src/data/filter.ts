@@ -3,27 +3,12 @@ import { comparableValue, temporalDate } from './types.js';
 
 const operators = ['equal', 'notEqual', 'oneOf', 'gt', 'gte', 'lt', 'lte'];
 
-/** A small comparison grammar, deliberately not JavaScript evaluation. */
+/** Filters are structured objects; strings are rejected so every spec stays plain data. */
 export function normalizeFilter(value: unknown): FilterSpec {
   if (typeof value === 'string') {
-    const match = value.trim().match(/^datum\.([A-Za-z_$][\w$]*)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/);
-    if (!match) throw new Error('Invalid filter expression. Use datum.field <operator> literal.');
-    const [, field, operator, text] = match;
-    let literal: unknown;
-    const raw = text.trim();
-    if (/^'(?:[^'\\]|\\['\\])*'$/.test(raw)) literal = raw.slice(1, -1).replace(/\\(['\\])/g, '$1');
-    else {
-      try { literal = JSON.parse(raw); }
-      catch { throw new Error('Invalid filter literal: quote strings; use finite numbers, booleans, or null.'); }
-    }
-    if (literal !== null && !['string', 'number', 'boolean'].includes(typeof literal)) {
-      throw new Error('Filter expressions accept scalar literals only.');
-    }
-    const key = ({ '===': 'equal', '==': 'equal', '!==': 'notEqual', '!=': 'notEqual',
-      '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte' } as Record<string, string>)[operator]!;
-    return normalizeFilter({ field, [key]: literal });
+    throw new Error(`Filter "${value}" must be an object such as { field, equal } or { field, gte }; string expressions are not supported.`);
   }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Filter must be an object or comparison expression.');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Filter must be an object.');
   const filter = value as FilterSpec;
   if (typeof filter.field !== 'string' || !filter.field.trim()) throw new Error('Filter requires a non-empty field.');
   if (Object.keys(filter).some(key => key !== 'field' && !operators.includes(key))) throw new Error('Unsupported filter operator.');

@@ -483,7 +483,7 @@ test('point lab fits a narrow viewport and keeps progress after resize', async (
 test('point connector renders lollipop stems and ordered dumbbell links behind dots', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   const result = await page.evaluate(async () => {
-    const { mount, point } = window.VisDelta;
+    const { transition, point } = window.VisDelta;
     document.body.innerHTML = '<div id="lollipop"></div><div id="dumbbell"></div>';
 
     const lollipop = point([
@@ -508,8 +508,8 @@ test('point connector renders lollipop stems and ordered dumbbell links behind d
       .key(['country', 'year'])
       .connector({ by: 'country', orderBy: 'year' });
 
-    await mount(lollipop, { target: '#lollipop', height: 320 });
-    await mount(dumbbell, { target: '#dumbbell', height: 320 });
+    (await transition(lollipop, lollipop, { target: '#lollipop', height: 320 })).progress(1);
+    (await transition(dumbbell, dumbbell, { target: '#dumbbell', height: 320 })).progress(1);
 
     const geometry = (selector) => {
       const root = document.querySelector(selector);
@@ -599,7 +599,7 @@ test('adding and removing a point connector are the same motion in reverse', asy
 test('a constant connector needs an explicit channel when both axes are quantitative', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   const message = await page.evaluate(async () => {
-    const { mount, point } = window.VisDelta;
+    const { transition, point } = window.VisDelta;
     document.body.innerHTML = '<div id="ambiguous"></div>';
     const state = point([{ id: 'A', x: 10, y: 20 }])
       .x('x')
@@ -607,7 +607,7 @@ test('a constant connector needs an explicit channel when both axes are quantita
       .key('id')
       .connector({ from: 0 });
     try {
-      await mount(state, { target: '#ambiguous', height: 320 });
+      await transition(state, state, { target: '#ambiguous', height: 320 });
       return '';
     } catch (error) {
       return error.message;

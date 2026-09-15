@@ -47,7 +47,7 @@ interface Segment {
 export async function sequence(states: readonly Visualization[], options: SequenceOptions): Promise<VisualizationSequence> {
   if (states.length < 2) throw new Error('sequence() requires at least two visualization states.');
 
-  const host = resolveTarget(options.target ?? '#app');
+  const host = resolveTarget(options.target);
   const segments: Segment[] = [];
   let activeIndex = -1;
   let value = 0;

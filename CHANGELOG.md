@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 - Unreleased first release
+## 0.2.0 - 2026-09-16
 
 VisDelta is a greenfield library. There is no compatibility layer or migration
 API in this release.
@@ -10,14 +10,26 @@ API in this release.
 - Added immutable chart states, `delta(from, to)`, and a seekable
   `transition(from, to)` controller.
 - Added exact progress control, play, pause, reverse, resize, and destroy.
+- The runtime keeps no registry of mounted charts: `transition()` and
+  `sequence()` are the whole controller API, and the application owns the
+  current state. There is no `mount()`/`select()`.
+- Renderers animate through recorded property tracks (`motion()`), never
+  through D3's scheduler; renderers import the `d3-*` modules they use and
+  receive no D3 object.
 - Defined one semantic rule for every chart: each rendered frame keeps marks,
   scales, axes, ticks, and grid lines consistent.
 - Defined one membership order: exit marks before the scale changes; change the
   scale before entering marks appear. Reverse traverses the same frames.
 - Separated `.where()` (membership), `.highlight()` (attention), and `.focus()`
   (camera only).
-- Added tidy-data input from arrays, CSV URLs, promises, and optional declared
-  transforms. VisDelta does not clean or reshape undeclared data.
+- Added tidy-data input from arrays, `{ url }` sources, and `{ name }`
+  references resolved by `transition()`. A bare string is rejected as ambiguous.
+  Declared transforms run in order with no extra dependency; VisDelta does not
+  clean or reshape undeclared data.
+- Selectors for `where()`, `highlight()`, and `focus()` are objects only; there
+  is no string expression grammar. Chart states are JSON-safe by construction
+  (`toSpec()` serializes dates), and a revived spec is accepted wherever a state is.
+- `transition()` and `sequence()` require an explicit `target`.
 - Added quantitative, nominal, ordinal, and temporal type detection.
 
 ### Chart modules

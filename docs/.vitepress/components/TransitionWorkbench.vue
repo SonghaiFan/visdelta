@@ -1,6 +1,5 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import * as d3 from 'd3';
 
 const target = ref(null);
 const status = ref('Loading');
@@ -27,7 +26,7 @@ const profit = base.y("profit");
 const change = await transition(
   base,
   profit,
-  { target: "#chart", d3 }
+  { target: "#chart" }
 );
 
 change.progress(0.42);
@@ -76,7 +75,6 @@ onMounted(async () => {
     await nextTick();
     change = await transition(base, profitState, {
       target: target.value,
-      d3,
       height: 270
     });
 
