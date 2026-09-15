@@ -161,7 +161,7 @@ async function assertGlobalScript(path) {
   vm.createContext(context);
   vm.runInContext(await readFile(path, "utf8"), context);
   assertSame(Object.keys(context.VisDelta).sort(), expectedApi, "global script API");
-  if (context.vd !== context.VisDelta) throw new Error("global script vd alias mismatch");
+  if ("vd" in context) throw new Error("the global script must define only the VisDelta global");
 }
 `;
   await writeFile(join(dir, "consumer-smoke.mjs"), source);
