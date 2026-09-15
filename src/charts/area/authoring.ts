@@ -15,6 +15,17 @@ export interface AreaViewState extends ViewSpec {
   curve?: D3AreaCurveName;
 }
 
+export type AreaLayout = 'stacked' | 'stream';
+export type AreaStackOffset = 'none' | 'expand' | 'diverging' | 'silhouette' | 'wiggle';
+export type AreaStackOrder = 'none' | 'reverse' | 'appearance' | 'ascending' | 'descending' | 'insideOut';
+
+export interface AreaStreamOptions {
+  /** D3 stack offset; wiggle is the default streamgraph baseline. */
+  offset?: AreaStackOffset;
+  /** D3 stack order; insideOut is the default streamgraph layer order. */
+  order?: AreaStackOrder;
+}
+
 /** Describe a band across an ordered x field. */
 export function area(data?: unknown): AreaState {
   return new AreaState({
@@ -71,6 +82,40 @@ export class AreaState extends ChartState<AreaViewState> {
     }, 'detail') as this;
   }
 
+  /** Arrange stacked layers from a fixed baseline or as a configurable streamgraph. */
+  layout(value: AreaLayout, options: AreaStreamOptions = {}): this {
+    if (value !== 'stacked' && value !== 'stream') {
+      throw new Error('Area layout must be "stacked" or "stream".');
+    }
+    if (!options || typeof options !== 'object' || Array.isArray(options)) {
+      throw new Error('Area stream options must be an object.');
+    }
+    const detail = (this.state.detail as Record<string, unknown> | undefined) || {};
+    if (detail['mode'] !== 'stacked' || !detail['series']) {
+      throw new Error('Area layout requires .breakdown("field") first.');
+    }
+    if (value === 'stacked' && Object.keys(options).length) {
+      throw new Error('Area stack offset and order options require .layout("stream", options).');
+    }
+    const offset = options.offset ?? 'wiggle';
+    const order = options.order ?? 'insideOut';
+    if (!AREA_STACK_OFFSETS.has(offset)) {
+      throw new Error(`Area stream offset must be one of: ${[...AREA_STACK_OFFSETS].join(', ')}.`);
+    }
+    if (!AREA_STACK_ORDERS.has(order)) {
+      throw new Error(`Area stream order must be one of: ${[...AREA_STACK_ORDERS].join(', ')}.`);
+    }
+    const { offset: _offset, order: _order, ...rest } = detail;
+    return this.replaceState('detail', {
+      ...rest,
+      // DetailSpec predates chart-owned layouts and names only BarLayout.
+      // Keep the shared Core contract unchanged; the Area compiler resolves
+      // this chart-local value before it reaches rendering.
+      layout: value as 'stacked',
+      ...(value === 'stream' ? { offset, order } : {})
+    }, 'detail') as this;
+  }
+
   /** Combine stacked parts into one total at every x value. */
   rollup(options: Record<string, unknown> = {}): this {
     const series = (this.state.detail as Record<string, unknown> | undefined)?.['series'];
@@ -83,3 +128,10 @@ export class AreaState extends ChartState<AreaViewState> {
     }, 'detail') as this;
   }
 }
+
+const AREA_STACK_OFFSETS = new Set<AreaStackOffset>([
+  'none', 'expand', 'diverging', 'silhouette', 'wiggle'
+]);
+const AREA_STACK_ORDERS = new Set<AreaStackOrder>([
+  'none', 'reverse', 'appearance', 'ascending', 'descending', 'insideOut'
+]);

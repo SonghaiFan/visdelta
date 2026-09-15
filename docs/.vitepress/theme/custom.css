@@ -364,6 +364,7 @@
 }
 
 .home-studio-output-pane {
+  position: relative;
   display: flex;
   min-height: 540px;
   flex-direction: column;
@@ -463,20 +464,24 @@
   flex: 1;
   min-height: 490px;
   padding: 18px;
+  transition: filter 220ms ease, opacity 220ms ease;
 }
 
-.home-studio-chart.is-hidden {
-  display: none;
+.home-studio-chart.is-stale {
+  filter: blur(2px);
+  opacity: .6;
 }
 
 .home-studio-visual-error {
+  position: absolute;
+  inset: 49px 0 0;
   display: grid;
-  flex: 1;
   place-content: center;
   gap: 8px;
-  min-height: 490px;
   padding: 24px;
+  background: color-mix(in srgb, var(--vp-c-bg) 20%, transparent);
   color: var(--vp-c-text-2);
+  pointer-events: none;
   text-align: center;
 }
 

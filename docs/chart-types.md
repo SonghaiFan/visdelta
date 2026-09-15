@@ -48,10 +48,13 @@ declares detail but does not silently add `.color("region")`.
 | `.curve(d3CurveName)` | Use an exact D3 curve export supported by `d3.area()` |
 | `.connect("adjacent" | "across")` | Preserve gaps or connect across filtered observations |
 | `.breakdown(field, options?)` | Split a total into stacked layers |
+| `.layout("stacked" | "stream", { offset?, order? })` | Use a fixed stack or configure D3 stream offsets and layer orders |
 | `.rollup(options?)` | Combine stacked layers into a total |
 
 Area owns `y0`/`y1` geometry. Its divider appears only during a detail
 transition; endpoints have no default border.
+Stream defaults to `wiggle`/`insideOut`; `diverging` supports signed values and
+stream layout owns its baseline.
 
 ## Bar
 

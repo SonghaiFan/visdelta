@@ -18,7 +18,7 @@ export {
   unit,
   UNIT_LAYOUTS
 } from "./grammar/index.js";
-export type { D3AreaCurveName, D3CurveName, UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from "./grammar/index.js";
+export type { AreaLayout, AreaStackOffset, AreaStackOrder, AreaStreamOptions, AreaViewState, D3AreaCurveName, D3CurveName, UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from "./grammar/index.js";
 export { defineChartType } from "./charts/plugin.js";
 export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, paperChartStyle } from "./charts/style.js";
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from "./charts/style.js";

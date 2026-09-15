@@ -56,11 +56,9 @@ for (const sample of scenarios) {
 
 test('area split and merge are the same cached transition in reverse', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const frames = await page.evaluate(async () => {
-    const [{ area }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, transition } = VisDelta;
     document.body.innerHTML = '<div id="split"></div><div id="merge"></div>';
     const rows = [
       { period: 'Q1', region: 'North', value: 12 },
@@ -98,6 +96,61 @@ test('area split and merge are the same cached transition in reverse', async ({ 
     });
   });
   for (const frame of frames) expect(frame.merge).toEqual(frame.split);
+});
+
+test('area custom stream offset and order move the same boundaries in exact reverse', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
+  const result = await page.evaluate(async () => {
+    const { area, transition } = VisDelta;
+    document.body.innerHTML = '<div id="forward"></div><div id="reverse"></div>';
+    const rows = [
+      { period: 'Q1', industry: 'A', value: 10 },
+      { period: 'Q1', industry: 'B', value: 3 },
+      { period: 'Q1', industry: 'C', value: 7 },
+      { period: 'Q2', industry: 'A', value: 4 },
+      { period: 'Q2', industry: 'B', value: 12 },
+      { period: 'Q2', industry: 'C', value: 5 },
+      { period: 'Q3', industry: 'A', value: 8 },
+      { period: 'Q3', industry: 'B', value: 6 },
+      { period: 'Q3', industry: 'C', value: 15 }
+    ];
+    const stacked = area(rows).x('period').y('value').key(['period', 'industry'])
+      .breakdown('industry', { color: ['#d73027', '#fee08b', '#1a9850'] });
+    const sourceStream = stacked.layout('stream', { offset: 'wiggle', order: 'insideOut' });
+    const targetStream = stacked.layout('stream', { offset: 'silhouette', order: 'appearance' });
+    const options = target => ({ target, d3, aq, height: 360 });
+    const forward = await transition(sourceStream, targetStream, options('#forward'));
+    const reverse = await transition(targetStream, sourceStream, options('#reverse'));
+    const geometry = selector => [...document.querySelectorAll(`${selector} path.vd-area`)]
+      .map(node => ({
+        key: node.getAttribute('data-key'),
+        d: node.getAttribute('d'),
+        fill: node.getAttribute('fill'),
+        opacity: Number(node.style.opacity)
+      }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+    const frames = [0, 0.2, 0.5, 0.8, 1].map(progress => {
+      forward.progress(progress);
+      reverse.progress(1 - progress);
+      return { forward: geometry('#forward'), reverse: geometry('#reverse') };
+    });
+    forward.progress(0);
+    const start = geometry('#forward').map(mark => mark.d);
+    forward.progress(0.5);
+    const middle = geometry('#forward').map(mark => mark.d);
+    forward.progress(1);
+    const end = geometry('#forward').map(mark => mark.d);
+    return { frames, start, middle, end };
+  });
+
+  for (const frame of result.frames) expect(frame.reverse).toEqual(frame.forward);
+  expect(result.middle).not.toEqual(result.start);
+  expect(result.middle).not.toEqual(result.end);
+  for (const path of [...result.start, ...result.middle, ...result.end]) {
+    expect(path).toMatch(/^M/);
+    expect(path).not.toMatch(/NaN|undefined/);
+  }
 });
 
 test('area focus fits selected cells with one camera without removing area cells', async ({ page }) => {
@@ -218,11 +271,9 @@ test('area split draws a thin contrast divider only between endpoints', async ({
 
 test('area divider marks only internal same-direction stack boundaries', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const layers = await page.evaluate(async () => {
-    const [{ area }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, transition } = VisDelta;
     const rows = [
       { period: 'Q1', region: 'positive-a', value: 12 },
       { period: 'Q1', region: 'negative', value: -5 },
@@ -251,11 +302,9 @@ test('area divider marks only internal same-direction stack boundaries', async (
 
 test('area restore, prepend, and append keep both boundaries in observation order', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const result = await page.evaluate(async () => {
-    const [{ area }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, transition } = VisDelta;
     document.body.innerHTML = '<div id="restore"></div><div id="prepend"></div><div id="append"></div>';
     const rows = [
       { id: 'Q1', period: 'Q1', sales: 28 },
@@ -309,11 +358,9 @@ test('area restore, prepend, and append keep both boundaries in observation orde
 
 test('area add/remove and restore/filter reuse the same frames backward', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const result = await page.evaluate(async () => {
-    const [{ area }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, transition } = VisDelta;
     document.body.innerHTML = '<div id="add"></div><div id="remove"></div><div id="restore"></div><div id="filter"></div>';
     const rows = [
       { id: 'Q1', period: 'Q1', sales: 28 },
@@ -371,11 +418,9 @@ test('area add/remove and restore/filter reuse the same frames backward', async 
 
 test('area filter preserves connected cells, gaps, and the no-isolated-area rule', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const result = await page.evaluate(async () => {
-    const [{ area }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, transition } = VisDelta;
     document.body.innerHTML = '<div id="adjacent"></div><div id="across"></div><div id="isolated"></div>';
     const rows = [
       { id: 'Q1', period: 'Q1', sales: 28 },
@@ -458,11 +503,9 @@ test('area filter preserves connected cells, gaps, and the no-isolated-area rule
 
 test('every D3 Area curve renders and curve changes interpolate from the real path', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
   const result = await page.evaluate(async () => {
-    const [{ area, D3_AREA_CURVE_NAMES }, { transition }] = await Promise.all([
-      import('/dist/area.js'),
-      import('/dist/transition-entry.js')
-    ]);
+    const { area, D3_AREA_CURVE_NAMES, transition } = VisDelta;
     const rows = [
       { id: 'Q1', period: 'Q1', sales: 28 },
       { id: 'Q2', period: 'Q2', sales: 47 },

@@ -47,7 +47,24 @@ function compileAreaDetail(spec: ViewSpec, detailSpec: AnyRecord = {}): ViewSpec
       };
     }
     return withSceneState({ ...spec, encoding }, {
-      detail: { mode, seriesField }
+      detail: {
+        mode,
+        seriesField,
+        layout: detailSpec['layout'] === 'stream' ? 'stream' : 'stacked',
+        ...(detailSpec['layout'] === 'stream'
+          ? {
+              offset: detailSpec['offset'] === 'none' || detailSpec['offset'] === 'expand' ||
+                detailSpec['offset'] === 'diverging' || detailSpec['offset'] === 'silhouette'
+                ? detailSpec['offset']
+                : 'wiggle',
+              order: detailSpec['order'] === 'none' || detailSpec['order'] === 'reverse' ||
+                detailSpec['order'] === 'appearance' || detailSpec['order'] === 'ascending' ||
+                detailSpec['order'] === 'descending'
+                ? detailSpec['order']
+                : 'insideOut'
+            }
+          : {})
+      }
     });
   }
 

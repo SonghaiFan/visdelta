@@ -67,7 +67,9 @@ let chart = detail.rollup();`
 ];
 
 const starterCode = chartPresets[0].code;
-const EDIT_IDLE_MS = 720;
+// Let people complete a thought before evaluating ordinary keystrokes. Enter
+// remains deliberately quicker because it is an explicit line boundary.
+const EDIT_IDLE_MS = 1200;
 const LINE_COMMIT_DELAY_MS = 140;
 
 const chartTarget = ref(null);
@@ -75,6 +77,7 @@ const editorHost = ref(null);
 const code = ref(starterCode);
 const status = ref('Loading runtime');
 const error = ref('');
+const previewIsStale = ref(false);
 const eventLabel = ref('Initial state');
 const transitionCount = ref(0);
 const activeChartType = ref(chartPresets[0].type);
@@ -217,6 +220,9 @@ function onInput(reason = 'Code changed', delay = EDIT_IDLE_MS) {
   // a newer, already-correct line of code.
   runVersion += 1;
   error.value = '';
+  // A debounce or an ordinary chart transition is not an error state. Keep the
+  // committed visualization clear until this version actually fails to render.
+  previewIsStale.value = false;
   status.value = reason === 'Line committed' ? 'Running completed line' : 'Editing';
   window.clearTimeout(debounceTimer);
   debounceTimer = window.setTimeout(() => renderCode(reason), delay);
@@ -289,6 +295,7 @@ async function renderCode(reason, animate = true) {
   materializeTable(nextState, compiledNextSpec.transform?.length ?? 0);
   const nextSpec = JSON.stringify(compiledNextSpec);
   if (nextSpec === renderedSpec) {
+    previewIsStale.value = false;
     status.value = 'Ready, no visual change';
     eventLabel.value = reason;
     return;
@@ -334,6 +341,7 @@ async function renderCode(reason, animate = true) {
       activeTransition.progress(1);
     }
     status.value = 'Ready';
+    previewIsStale.value = false;
   } catch (cause) {
     nextTransition?.destroy();
     candidate.remove();
@@ -344,6 +352,7 @@ async function renderCode(reason, animate = true) {
 function showError(cause) {
   const message = cause instanceof Error ? cause.message : String(cause);
   error.value = message;
+  previewIsStale.value = true;
   status.value = 'Fix the current line';
   eventLabel.value = 'No output';
 }
@@ -410,13 +419,12 @@ function renderedError(candidate) {
         <div
           ref="chartTarget"
           class="home-studio-chart"
-          :aria-hidden="error ? 'true' : 'false'"
-          :class="{ 'is-hidden': error }"
+          :class="{ 'is-stale': previewIsStale }"
           aria-label="Live VisDelta chart output"
         ></div>
         <div v-if="error" class="home-studio-visual-error" role="status">
           <strong>Cannot render current state</strong>
-          <span>Fix the code to restore the visualization.</span>
+          <span>Showing the previous valid visualization. Fix the code to update it.</span>
         </div>
       </div>
 

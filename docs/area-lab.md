@@ -1,11 +1,12 @@
 # Area transition lab
 
-These fourteen editable scenarios use a bundled tidy US unemployment dataset
+These fifteen editable scenarios use a bundled tidy US unemployment dataset
 to exercise VisDelta's Area module. Each source row is one month and industry.
 The demo asset adds `year` and the industry's `share` of that month's total
 before it enters VisDelta; the library receives tidy rows and performs no data
 cleaning. The scenarios cover scales, mappings, keyed observations, filtering,
-focus, highlight, fill, baseline, and reversible total/stacked changes.
+focus, highlight, fill, baseline, stream layout, and reversible
+total/stacked changes.
 
 Area is a **band**, not a filled Line. Every x position has a lower boundary
 `y0` and an upper boundary `y1`:
@@ -14,7 +15,24 @@ Area is a **band**, not a filled Line. Every x position has a lower boundary
   `y1`;
 - Stacked Area computes both boundaries from the cumulative values of each
   `.breakdown()` part;
+- `.layout("stream")` orders those parts inside-out and applies D3's wiggle
+  offset, producing a curved baseline that keeps the stream visually centered;
 - positive and negative values accumulate on opposite sides of the baseline.
+
+Stream defaults to D3's `wiggle` offset and `insideOut` order. Customize either
+with `.layout("stream", { offset, order })`:
+
+```js
+const stream = detailed.layout("stream", {
+  offset: "silhouette", // none | expand | diverging | silhouette | wiggle
+  order: "appearance"   // none | reverse | appearance | ascending | descending | insideOut
+});
+```
+
+`silhouette` places the total stream's center at zero; `wiggle` minimizes its
+weighted movement. The `diverging` offset supports signed values. Other stream
+offsets are most meaningful with non-negative values. Stream layout owns its
+baseline, so `.baseline()` applies to ordinary and fixed stacked Area instead.
 
 On an ordinal x axis, Area exists **between connected observations**. Each
 observation owns half of the space to its previous neighbour and half of the
@@ -37,6 +55,11 @@ fills then appear over the total. Merge reuses those cached frames backward:
 the colors disappear and the divider erases itself. The divider is absent from
 both endpoints and exists only while the transition explains the split or
 merge. There is no separate merge effect.
+
+Stacked and stream layouts also share one cached boundary transition. Each
+layer keeps the same observations while its `y0` and `y1` boundaries move from
+the fixed stack to the inside-out wiggle stack. Returning to stacked evaluates
+those exact frames backward, including the changing y scale and axes.
 
 Observation membership also has one rule. Restore and Add place each new keyed
 observation at its target x with zero thickness (`y1 = y0`), then grow it to its

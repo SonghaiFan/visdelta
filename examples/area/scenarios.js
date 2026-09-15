@@ -81,5 +81,6 @@ export const scenarios = [
   sample('focus', '11 · Focus the view', 'Keep all manufacturing observations while fitting one 2D camera around the 2009 area cells.', base, 'base', 'base.focus({ field: "year", equal: 2009 })'),
   sample('split', '12 · Split into industry areas', 'Draw the internal boundaries through the combined total, then reveal five explicitly colored industries.', stacked, 'total', 'detailed'),
   sample('merge', '13 · Merge into a total', 'Hide the industry parts and erase the same boundaries in exact reverse.', stacked, 'detailed', 'total'),
-  sample('curve', '14 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")')
+  sample('curve', '14 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")'),
+  sample('stream', '15 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })')
 ];

@@ -4,12 +4,16 @@ import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
 import { matchesSelection, viewHighlight, viewSelection } from '../../focus.js';
+import type { AreaStackOffset, AreaStackOrder } from './authoring.js';
 
 export interface AreaSceneState {
   selection: SelectionSpec | null;
   highlight: SelectionSpec | null;
   filtersRows: boolean;
   mode: 'single' | 'stacked';
+  layout: 'stacked' | 'stream';
+  stackOffset: AreaStackOffset;
+  stackOrder: AreaStackOrder;
   seriesField: string | null;
   baseline: number;
   connect: 'adjacent' | 'across';
@@ -53,12 +57,28 @@ export function areaState(spec: ViewSpec, enc: Record<string, ChannelSpec> = {})
     highlight: viewHighlight(spec),
     filtersRows: hasRowFilter(spec),
     mode,
+    layout: mode === 'stacked' && detail?.['layout'] === 'stream' ? 'stream' : 'stacked',
+    stackOffset: streamOffset(detail?.['offset']),
+    stackOrder: streamOrder(detail?.['order']),
     seriesField: mode === 'stacked'
       ? String(detail?.['seriesField'] || enc['color']?.field || '') || null
       : null,
     baseline: Number.isFinite(baseline) ? baseline : 0,
     connect: spec.connect === 'across' ? 'across' : 'adjacent'
   };
+}
+
+function streamOffset(value: unknown): AreaStackOffset {
+  return value === 'none' || value === 'expand' || value === 'diverging' || value === 'silhouette'
+    ? value
+    : 'wiggle';
+}
+
+function streamOrder(value: unknown): AreaStackOrder {
+  return value === 'none' || value === 'reverse' || value === 'appearance' ||
+    value === 'ascending' || value === 'descending'
+    ? value
+    : 'insideOut';
 }
 
 /** Turn rows into explicit lower/upper boundaries owned by the Area module. */
@@ -79,6 +99,13 @@ export function areaLayers(
         y0: state.baseline, y1: number(row[yField])
       }))
     }];
+  }
+
+  if (state.layout === 'stream') {
+    return streamAreaLayers(
+      rows, xField, yField, state.seriesField,
+      state.stackOffset ?? 'wiggle', state.stackOrder ?? 'insideOut', key
+    );
   }
 
   const xValues = unique(rows.map((row) => row[xField]));
@@ -106,6 +133,185 @@ export function areaLayers(
       points
     };
   });
+}
+
+/** D3-compatible stack geometry for the Area stream layout. */
+function streamAreaLayers(
+  rows: Record<string, unknown>[],
+  xField: string,
+  yField: string,
+  seriesField: string,
+  offset: AreaStackOffset,
+  orderName: AreaStackOrder,
+  key: (row: Record<string, unknown>, index: number) => string
+): AreaLayer[] {
+  const xValues = unique(rows.map((row) => row[xField]));
+  const seriesValues = unique(rows.map((row) => row[seriesField]));
+  const byCell = new Map(rows.map((row) => [cellKey(row[xField], row[seriesField]), row]));
+  const stack = seriesValues.map((seriesValue) => xValues.map((xValue) => {
+    const row = byCell.get(cellKey(xValue, seriesValue));
+    return [0, number(row?.[yField])];
+  }));
+  const order = stackOrder(stack, orderName);
+  stackOffset(stack, order, offset);
+
+  return seriesValues.map((seriesValue, seriesIndex) => {
+    const points = xValues.map((xValue, xIndex) => {
+      const original = byCell.get(cellKey(xValue, seriesValue));
+      const row = original || { [xField]: xValue, [seriesField]: seriesValue, [yField]: 0 };
+      return {
+        key: key(row, xIndex),
+        row,
+        x: xValue,
+        y0: stack[seriesIndex][xIndex][0],
+        y1: stack[seriesIndex][xIndex][1]
+      };
+    });
+    return {
+      key: String(seriesValue),
+      value: seriesValue,
+      rows: points.map((point) => point.row),
+      points
+    };
+  });
+}
+
+function stackOrder(series: number[][][], order: AreaStackOrder): number[] {
+  const indexes = series.map((_values, index) => index);
+  if (order === 'none') return indexes;
+  if (order === 'reverse') return indexes.reverse();
+  if (order === 'appearance' || order === 'insideOut') {
+    const appearance = appearanceOrder(series);
+    if (order === 'appearance') return appearance;
+    return insideOutOrder(series, appearance);
+  }
+  const sums = series.map(seriesSum);
+  const ascending = indexes.sort((a, b) => sums[a] - sums[b]);
+  return order === 'ascending' ? ascending : ascending.reverse();
+}
+
+function appearanceOrder(series: number[][][]): number[] {
+  return series.map((values, index) => ({
+    index,
+    peak: values.reduce(
+      (best, point, pointIndex) => point[1] > best.value ? { value: point[1], index: pointIndex } : best,
+      { value: -Infinity, index: 0 }
+    ).index
+  })).sort((a, b) => a.peak - b.peak).map(({ index }) => index);
+}
+
+function seriesSum(values: number[][]): number {
+  return values.reduce((sum, point) => point[1] ? sum + point[1] : sum, 0);
+}
+
+function insideOutOrder(series: number[][][], appearance = appearanceOrder(series)): number[] {
+  const sums = series.map((values) => values.reduce((sum, point) => sum + point[1], 0));
+  let top = 0;
+  let bottom = 0;
+  const tops: number[] = [];
+  const bottoms: number[] = [];
+  appearance.forEach((index) => {
+    if (top < bottom) {
+      top += sums[index];
+      tops.push(index);
+    } else {
+      bottom += sums[index];
+      bottoms.push(index);
+    }
+  });
+  return bottoms.reverse().concat(tops);
+}
+
+function stackOffset(series: number[][][], order: number[], offset: AreaStackOffset): void {
+  if (offset === 'none') return stackOffsetNone(series, order);
+  if (offset === 'expand') return stackOffsetExpand(series, order);
+  if (offset === 'diverging') return stackOffsetDiverging(series, order);
+  if (offset === 'silhouette') return stackOffsetSilhouette(series, order);
+  stackOffsetWiggle(series, order);
+}
+
+function stackOffsetNone(series: number[][][], order: number[]): void {
+  if (series.length < 2 || !order.length) return;
+  for (let orderIndex = 1; orderIndex < order.length; orderIndex += 1) {
+    const lower = series[order[orderIndex - 1]];
+    const current = series[order[orderIndex]];
+    current.forEach((point, xIndex) => {
+      point[0] = Number.isNaN(lower[xIndex][1]) ? lower[xIndex][0] : lower[xIndex][1];
+      point[1] += point[0];
+    });
+  }
+}
+
+function stackOffsetExpand(series: number[][][], order: number[]): void {
+  if (!series.length) return;
+  const width = series[0].length;
+  for (let xIndex = 0; xIndex < width; xIndex += 1) {
+    const total = series.reduce((sum, values) => sum + (values[xIndex][1] || 0), 0);
+    if (total) series.forEach((values) => { values[xIndex][1] /= total; });
+  }
+  stackOffsetNone(series, order);
+}
+
+function stackOffsetDiverging(series: number[][][], order: number[]): void {
+  if (!series.length || !order.length) return;
+  const width = series[order[0]].length;
+  for (let xIndex = 0; xIndex < width; xIndex += 1) {
+    let positive = 0;
+    let negative = 0;
+    order.forEach((seriesIndex) => {
+      const point = series[seriesIndex][xIndex];
+      const value = point[1] - point[0];
+      if (value > 0) {
+        point[0] = positive;
+        point[1] = positive += value;
+      } else if (value < 0) {
+        point[1] = negative;
+        point[0] = negative += value;
+      } else {
+        point[0] = 0;
+        point[1] = value;
+      }
+    });
+  }
+}
+
+function stackOffsetSilhouette(series: number[][][], order: number[]): void {
+  if (!series.length || !order.length) return;
+  const first = series[order[0]];
+  first.forEach((point, xIndex) => {
+    const total = series.reduce((sum, values) => sum + (values[xIndex][1] || 0), 0);
+    point[0] = -total / 2;
+    point[1] += point[0];
+  });
+  stackOffsetNone(series, order);
+}
+
+function stackOffsetWiggle(series: number[][][], order: number[]): void {
+  const first = series[order[0]];
+  if (!first?.length) return;
+  let baseline = 0;
+  for (let xIndex = 1; xIndex < first.length; xIndex += 1) {
+    let total = 0;
+    let weightedSlope = 0;
+    order.forEach((seriesIndex, orderIndex) => {
+      const current = series[seriesIndex][xIndex][1] || 0;
+      const previous = series[seriesIndex][xIndex - 1][1] || 0;
+      let slope = (current - previous) / 2;
+      for (let lower = 0; lower < orderIndex; lower += 1) {
+        const lowerSeries = series[order[lower]];
+        slope += (lowerSeries[xIndex][1] || 0) - (lowerSeries[xIndex - 1][1] || 0);
+      }
+      total += current;
+      weightedSlope += slope * current;
+    });
+    first[xIndex - 1][0] = baseline;
+    first[xIndex - 1][1] += baseline;
+    if (total) baseline -= weightedSlope / total;
+  }
+  first[first.length - 1][0] = baseline;
+  first[first.length - 1][1] += baseline;
+
+  stackOffsetNone(series, order);
 }
 
 /**
@@ -166,6 +372,15 @@ export function canonicalAreaTransitionPair<S extends ViewSpec>(
 ): CanonicalTransitionPair<S> {
   const previous = areaState(previousSpec, previousSpec.encoding as Record<string, ChannelSpec>);
   const next = areaState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>);
+  if (previous.mode === 'stacked' && next.mode === 'stacked') {
+    const previousStack = stackGeometrySignature(previous);
+    const nextStack = stackGeometrySignature(next);
+    if (previousStack !== nextStack) {
+      return previousStack > nextStack
+        ? { from: nextSpec, to: previousSpec, reverse: true }
+        : { from: previousSpec, to: nextSpec, reverse: false };
+    }
+  }
   if (previous.mode === 'stacked' && next.mode === 'single') {
     return { from: nextSpec, to: previousSpec, reverse: true };
   }
@@ -175,6 +390,12 @@ export function canonicalAreaTransitionPair<S extends ViewSpec>(
     return { from: nextSpec, to: previousSpec, reverse: true };
   }
   return { from: previousSpec, to: nextSpec, reverse: false };
+}
+
+function stackGeometrySignature(state: AreaSceneState): string {
+  return state.layout === 'stream'
+    ? `stream:${state.stackOffset}:${state.stackOrder}`
+    : 'stacked';
 }
 
 export interface AreaObservationChange {

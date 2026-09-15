@@ -303,6 +303,7 @@ their intermediate values add up to an endpoint value.
 .curve(d3AreaCurveName)
 .connect("adjacent" | "across")
 .breakdown(field, options?)
+.layout("stacked" | "stream", { offset?, order? })
 .rollup(options?)
 ```
 

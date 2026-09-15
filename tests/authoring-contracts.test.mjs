@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as d3 from 'd3';
 import { area, bar, chartStylePresets, darkChartStyle, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
 import { areaCells, areaLayers } from '../dist/charts/area/state.js';
 import { matchAreaFramePoints } from '../dist/charts/area/render.js';
@@ -383,10 +384,12 @@ test('area owns explicit baseline and diverging stacked boundaries', () => {
   const spec = detailed.toSpec();
   assert.equal(spec.baseline, 10);
   assert.equal(spec.meta.state.sceneState.detail.mode, 'stacked');
+  assert.equal(spec.meta.state.sceneState.detail.layout, 'stacked');
   assert.deepEqual(spec.encoding.color.range, ['#111111', '#eeeeee']);
 
   const layers = areaLayers(rows, 'period', 'value', {
-    selection: null, mode: 'stacked', seriesField: 'region', baseline: 10
+    selection: null, highlight: null, filtersRows: false, mode: 'stacked',
+    layout: 'stacked', seriesField: 'region', baseline: 10, connect: 'adjacent'
   });
   assert.deepEqual(layers[0].points.map(point => [point.y0, point.y1]), [[10, 22], [10, 18]]);
   assert.deepEqual(layers[1].points.map(point => [point.y0, point.y1]), [[10, 6], [18, 23]]);
@@ -411,13 +414,113 @@ test('area owns explicit baseline and diverging stacked boundaries', () => {
   assert.throws(() => detailed.curve('smooth'), /supports areas/);
 });
 
+test('area stream layout matches D3 inside-out order and wiggle offset', () => {
+  const rows = [
+    { period: 'Q1', industry: 'A', value: 10 },
+    { period: 'Q1', industry: 'B', value: 3 },
+    { period: 'Q1', industry: 'C', value: 7 },
+    { period: 'Q2', industry: 'A', value: 4 },
+    { period: 'Q2', industry: 'B', value: 12 },
+    { period: 'Q2', industry: 'C', value: 5 },
+    { period: 'Q3', industry: 'A', value: 8 },
+    { period: 'Q3', industry: 'B', value: 6 },
+    { period: 'Q3', industry: 'C', value: 15 }
+  ];
+  const detailed = area(rows).x('period').y('value').key(['period', 'industry'])
+    .breakdown('industry');
+  const streamSpec = detailed.layout('stream').toSpec();
+  assert.equal(streamSpec.meta.state.sceneState.detail.layout, 'stream');
+  assert.equal(streamSpec.meta.state.sceneState.detail.offset, 'wiggle');
+  assert.equal(streamSpec.meta.state.sceneState.detail.order, 'insideOut');
+  const customized = detailed.layout('stream', {
+    offset: 'silhouette', order: 'ascending'
+  }).toSpec();
+  assert.equal(customized.meta.state.sceneState.detail.offset, 'silhouette');
+  assert.equal(customized.meta.state.sceneState.detail.order, 'ascending');
+  assert.equal(detailed.layout('stacked').toSpec().meta.state.sceneState.detail.layout, 'stacked');
+  assert.throws(() => area(rows).x('period').y('value').layout('stream'), /breakdown/);
+  assert.throws(() => detailed.layout('river'), /stacked.*stream/);
+  assert.throws(() => detailed.layout('stream', { offset: 'centered' }), /stream offset/);
+  assert.throws(() => detailed.layout('stream', { order: 'alphabetical' }), /stream order/);
+  assert.throws(() => detailed.layout('stacked', { offset: 'none' }), /require.*stream/);
+
+  const actual = areaLayers(rows, 'period', 'value', {
+    selection: null, highlight: null, filtersRows: false, mode: 'stacked',
+    layout: 'stream', seriesField: 'industry', baseline: 0, connect: 'adjacent'
+  });
+  const periods = d3.union(rows.map(row => row.period));
+  const industries = d3.union(rows.map(row => row.industry));
+  const matrix = Array.from(periods, period => Object.fromEntries(
+    rows.filter(row => row.period === period).map(row => [row.industry, row.value])
+  ));
+  const expected = d3.stack()
+    .keys(industries)
+    .order(d3.stackOrderInsideOut)
+    .offset(d3.stackOffsetWiggle)(matrix);
+  const expectedByKey = new Map(expected.map(series => [series.key, series]));
+
+  for (const layer of actual) {
+    const series = expectedByKey.get(layer.value);
+    layer.points.forEach((point, index) => {
+      assert.ok(Math.abs(point.y0 - series[index][0]) < 1e-9);
+      assert.ok(Math.abs(point.y1 - series[index][1]) < 1e-9);
+      assert.ok(Math.abs((point.y1 - point.y0) - Number(point.row.value)) < 1e-9);
+    });
+  }
+  assert.ok(actual.some(layer => layer.points.some(point => point.y0 < 0)));
+
+  const offsets = {
+    none: d3.stackOffsetNone,
+    expand: d3.stackOffsetExpand,
+    diverging: d3.stackOffsetDiverging,
+    silhouette: d3.stackOffsetSilhouette,
+    wiggle: d3.stackOffsetWiggle
+  };
+  const orders = {
+    none: d3.stackOrderNone,
+    reverse: d3.stackOrderReverse,
+    appearance: d3.stackOrderAppearance,
+    ascending: d3.stackOrderAscending,
+    descending: d3.stackOrderDescending,
+    insideOut: d3.stackOrderInsideOut
+  };
+  for (const [offsetName, offset] of Object.entries(offsets)) {
+    for (const [orderName, order] of Object.entries(orders)) {
+      const layers = areaLayers(rows, 'period', 'value', {
+        selection: null, highlight: null, filtersRows: false, mode: 'stacked',
+        layout: 'stream', stackOffset: offsetName, stackOrder: orderName,
+        seriesField: 'industry', baseline: 0, connect: 'adjacent'
+      });
+      const expectedStack = d3.stack().keys(industries).order(order).offset(offset)(matrix);
+      const expectedByKey = new Map(expectedStack.map(series => [series.key, series]));
+      for (const layer of layers) {
+        const series = expectedByKey.get(layer.value);
+        layer.points.forEach((point, index) => {
+          assert.ok(Math.abs(point.y0 - series[index][0]) < 1e-9, `${offsetName}/${orderName} y0`);
+          assert.ok(Math.abs(point.y1 - series[index][1]) < 1e-9, `${offsetName}/${orderName} y1`);
+        });
+      }
+    }
+  }
+
+  const negative = rows.map(row => row.period === 'Q1' && row.industry === 'A'
+    ? { ...row, value: -1 }
+    : row);
+  assert.doesNotThrow(() => areaLayers(negative, 'period', 'value', {
+    selection: null, highlight: null, filtersRows: false, mode: 'stacked',
+    layout: 'stream', stackOffset: 'diverging', stackOrder: 'insideOut',
+    seriesField: 'industry', baseline: 0, connect: 'adjacent'
+  }));
+});
+
 test('area filters keep separate connected stretches unless the author connects across', () => {
   const lineage = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6']
     .map((id, index) => ({ id, period: id, value: index + 1 }));
   const rows = lineage.filter(row => !['Q3', 'Q4'].includes(row.id));
   const selection = { filter: { field: 'id', oneOf: rows.map(row => row.id) } };
   const state = {
-    selection, mode: 'single', seriesField: null, baseline: 0, connect: 'adjacent'
+    selection, highlight: null, filtersRows: true, mode: 'single', layout: 'stacked',
+    seriesField: null, baseline: 0, connect: 'adjacent'
   };
   const key = row => row.id;
   const layers = areaLayers(rows, 'period', 'value', state, key);

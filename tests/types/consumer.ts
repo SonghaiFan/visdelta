@@ -42,6 +42,8 @@ selectedBar().data([]).x('key');
 selectedPoint().data([]).x('x').y('y').radius(6);
 selectedLine().data([]).x('x').y('y').curve('curveMonotoneX').strokeWidth(3).pointSize(4);
 selectedArea().data([]).x('x').y('y').curve('curveMonotoneX');
+selectedArea().data([]).x('x').y('y').breakdown('industry')
+  .layout('stream', { offset: 'silhouette', order: 'ascending' });
 selectedUnit().data([]).value('count', { unitValue: 10 }).group('category').layout('bar', { columns: 2 }).radius(4);
 selectedUnit().data([]).layout('force', { radius: 5 });
 // @ts-expect-error VisDelta uses exact D3 curve names rather than aliases.

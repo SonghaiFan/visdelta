@@ -1,5 +1,6 @@
 export { bar, BarState } from '../charts/bar/grammar.js';
 export { area, AreaState } from '../charts/area/grammar.js';
+export type { AreaLayout, AreaStackOffset, AreaStackOrder, AreaStreamOptions, AreaViewState } from '../charts/area/grammar.js';
 export { line, LineState } from '../charts/line/grammar.js';
 export { D3_AREA_CURVE_NAMES, D3_CURVE_NAMES } from '../charts/curve.js';
 export type { D3AreaCurveName, D3CurveName } from '../charts/curve.js';

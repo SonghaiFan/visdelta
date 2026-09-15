@@ -160,16 +160,19 @@ for (const width of [1100, 390]) {
 let chart = detail;`);
     await editor.press('Enter');
     await expect(studio.locator('.home-studio-status')).toHaveText('Fix the current line');
-    await expect(studio.getByRole('alert')).toContainText('needs one value per year');
+    await expect(studio.getByRole('alert')).toContainText(
+      'Bar chart needs one value per year. Found more than one row for "2004".'
+    );
     await expect(studio).toHaveAttribute('data-transition-count', beforeError);
     await expect(studio.getByText('Cannot render current state')).toBeVisible();
-    await expect(studio.locator('.home-studio-chart')).toHaveAttribute('aria-hidden', 'true');
-    await expect(studio.locator('rect.vd-bar').first()).toBeHidden();
+    await expect(studio.locator('.home-studio-chart')).toHaveClass(/is-stale/);
+    await expect(studio.locator('rect.vd-bar').first()).toBeVisible();
+    await expect(studio.locator('.home-studio-chart')).toHaveCSS('filter', /blur\(2px\)/);
 
     await studio.getByRole('button', { name: 'Reset' }).click();
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
     await expect(studio.getByText('Cannot render current state')).toHaveCount(0);
-    await expect(studio.locator('.home-studio-chart')).toHaveAttribute('aria-hidden', 'false');
+    await expect(studio.locator('.home-studio-chart')).not.toHaveClass(/is-stale/);
     await expect(studio.locator('rect.vd-bar').first()).toBeVisible();
 
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);

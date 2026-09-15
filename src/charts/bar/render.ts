@@ -43,7 +43,7 @@ function createBarDraw(deps) {
       if (duplicate) {
         drawBarDataError(
           chart,
-          `Bar chart needs one value per ${duplicate.field}. Found ${duplicate.count} rows for "${duplicate.value}". Use .where(...), .breakdown(...), or .rollup(...) to make the grain explicit.`
+          `Bar chart needs one value per ${duplicate.field}. Found more than one row for "${duplicate.value}". Use .where(...), .breakdown(...), or .rollup(...) to make the grain explicit.`
         );
         return;
       }
@@ -63,9 +63,10 @@ function duplicateCategory(rows, channel = {}) {
   const counts = new Map();
   for (const row of rows) {
     const value = row[channel.field];
-    const count = (counts.get(value) || 0) + 1;
-    if (count > 1) return { field: channel.field, value, count };
-    counts.set(value, count);
+    if (counts.has(value)) {
+      return { field: channel.field, value };
+    }
+    counts.set(value, true);
   }
   return null;
 }
