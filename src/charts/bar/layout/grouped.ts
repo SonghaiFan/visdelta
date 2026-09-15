@@ -1,16 +1,42 @@
-// @ts-nocheck — D3 rendering code; typed via deps injection
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
-import { cameraScale, cameraSize, focusCamera, rectBounds, viewSelection } from '../../../focus.js';
+import { cameraScale, cameraSize, focusCamera, viewSelection } from '../../../focus.js';
 import {
-  barCategoryChannel, barMeasureChannel, barOrientationFromEncoding, barRendererKey
+  asRuntimeScale, bandwidth, barCategoryChannel, barMeasureChannel, barOrientationFromEncoding, barRendererKey,
+  geometryBounds, scaled
 } from './index.js';
 import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
+import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
+import type { RuntimeScale } from '../../../runtime/marks.js';
+import type { ChartContext, TransitionItemAction } from '../../../types/index.js';
+import type {
+  BarDatum,
+  BarGeometryContract,
+  BarMotion,
+  BarRenderKit,
+  LineageStart,
+  RectGeometry,
+  TargetGeometry
+} from '../render-pattern.js';
+import type { BarLayoutRenderer } from './simple.js';
 
-export function createGroupedBarRenderer(deps, kit) {
+interface GroupedGeom {
+  x: RuntimeScale;
+  y: RuntimeScale;
+  /** Segment offset scale within a category band, along the category axis. */
+  x1: RuntimeScale | null;
+  y1: RuntimeScale | null;
+  categoryField: string;
+  segmentField: string;
+  valueField: string;
+  chart: ChartContext;
+  horizontal: boolean;
+}
+
+export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
   const { bindTooltip, channelDomain, colorScale, quantitativeDomain, themeValue } = deps;
 
-  return function renderGroupedBar(chart, rows, spec, tooltip, d3, segmentField) {
+  return function renderGroupedBar(chart, rows, spec, tooltip, d3, segmentFieldName) {
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const orientation = barOrientationFromEncoding(enc);
@@ -18,31 +44,33 @@ export function createGroupedBarRenderer(deps, kit) {
     const rendererOrientation = barRendererKey('grouped', orientation);
     const categoryChannel = barCategoryChannel(enc);
     const measureChannel = barMeasureChannel(enc);
-    const categoryField = categoryChannel?.field;
-    const valueField = measureChannel?.field;
+    const categoryField = categoryChannel.field ?? '';
+    const valueField = measureChannel.field ?? '';
+    const segmentField = segmentFieldName ?? '';
     const state = specState(spec);
-    const stateSegments = state.sceneState?.detail?.segments || state.detail?.segments;
+    const stateSegments = (state.sceneState?.detail?.segments || state.detail?.segments) as unknown[] | undefined;
     const selection = viewSelection(spec);
-    const categories = channelDomain(rows, categoryChannel);
-    const segments = channelDomain(rows, { field: segmentField, domain: stateSegments });
+    const categories = channelDomain(rows, categoryChannel) as string[];
+    const segments = channelDomain(rows, { field: segmentField, domain: stateSegments }) as string[];
     const color = colorScale(domainRows, enc.color, d3);
     const key = barKeyAccessor(chart, spec, [categoryField, segmentField]);
     const splitLineage = kit.splitLineage(chart);
     const zeroBaselineEnter = kit.baselineEnterPlan(chart, 'zero-baseline');
     const zeroBaselineExit = kit.baselineExitPlan(chart, 'zero-baseline');
 
-    const categoryRange = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
-    const baseCategoryScale = d3.scaleBand().domain(categories).range(categoryRange).padding(0.24);
-    const baseSegmentScale = d3.scaleBand().domain(segments)
-      .range([0, baseCategoryScale.bandwidth()]).padding(0.08);
-    const baseMeasureScale = d3.scaleLinear()
+    const categoryRange: [number, number] = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
+    const baseCategoryBand = d3.scaleBand().domain(categories).range(categoryRange).padding(0.24);
+    const baseCategoryScale = asRuntimeScale(baseCategoryBand);
+    const baseSegmentScale = asRuntimeScale(d3.scaleBand().domain(segments)
+      .range([0, baseCategoryBand.bandwidth()]).padding(0.08));
+    const baseMeasureScale = asRuntimeScale(d3.scaleLinear()
       .domain(quantitativeDomain(domainRows, measureChannel, 0))
-      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice();
+      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
     const baseX1 = horizontal ? null : baseSegmentScale;
     const baseY1 = horizontal ? baseSegmentScale : null;
-    const baseGeom = {
+    const baseGeom: GroupedGeom = {
       x: baseX, y: baseY, x1: baseX1, y1: baseY1,
       categoryField, segmentField, valueField, chart, horizontal
     };
@@ -54,24 +82,24 @@ export function createGroupedBarRenderer(deps, kit) {
     );
     const categoryScale = cameraScale(baseCategoryScale, camera, horizontal ? 'y' : 'x');
     const measureScale = cameraScale(baseMeasureScale, camera, horizontal ? 'x' : 'y');
-    const segmentScale = d3.scaleBand().domain(segments)
-      .range([0, categoryScale.bandwidth()]).padding(0.08);
+    const segmentScale = asRuntimeScale(d3.scaleBand().domain(segments)
+      .range([0, bandwidth(categoryScale)]).padding(0.08));
     const x = horizontal ? measureScale : categoryScale;
     const y = horizontal ? categoryScale : measureScale;
     const x1 = horizontal ? null : segmentScale;
     const y1 = horizontal ? segmentScale : null;
-    const geom = { x, y, x1, y1, categoryField, segmentField, valueField, chart, horizontal };
+    const geom: GroupedGeom = { x, y, x1, y1, categoryField, segmentField, valueField, chart, horizontal };
     const steps = kit.steps(chart, rendererOrientation, d3);
-    const xAxisTransition = kit.axisTransition(steps, 'x', d3) || chart.transition.base;
-    const yAxisTransition = kit.axisTransition(steps, 'y', d3) || chart.transition.base;
+    const xAxisTransition = kit.axisTransition(steps, 'x') || chart.transition.base;
+    const yAxisTransition = kit.axisTransition(steps, 'y') || chart.transition.base;
     const geometry = groupedSegmentGeometryContract(geom, splitLineage, zeroBaselineEnter, kit.sourceBaselineExit, zeroBaselineExit);
 
     chart.scales = { x, ...(x1 ? { x1 } : {}), y, ...(y1 ? { y1 } : {}), color, orientation: rendererOrientation };
     chart.camera = camera;
     chart.channels = enc;
     chart.position = {
-      x: (d) => horizontal ? x(d[valueField]) : x(d[categoryField]) + x1(d[segmentField]) + x1.bandwidth() / 2,
-      y: (d) => horizontal ? y(d[categoryField]) + y1(d[segmentField]) + y1.bandwidth() / 2 : y(d[valueField])
+      x: (d: BarDatum) => horizontal ? scaled(x, d[valueField]) : segmentCenter(x, x1, d, geom),
+      y: (d: BarDatum) => horizontal ? segmentCenter(y, y1, d, geom) : scaled(y, d[valueField])
     };
 
     drawBarAxes(chart, x, y, enc, d3, deps, horizontal, {
@@ -90,7 +118,26 @@ export function createGroupedBarRenderer(deps, kit) {
   };
 }
 
-function groupedSegmentGeometryContract(geom, splitLineage, zeroBaselineEnter, sourceBaselineExit, exitPlan) {
+/** Center of a segment along the category axis: category band + segment offset + half segment width. */
+function segmentCenter(category: RuntimeScale, segment: RuntimeScale | null, d: BarDatum, geom: GroupedGeom): number {
+  return scaled(category, d[geom.categoryField]) + segmentOffset(segment, d, geom) + segmentWidth(segment) / 2;
+}
+
+function segmentOffset(segment: RuntimeScale | null, d: BarDatum, geom: GroupedGeom): number {
+  return segment ? scaled(segment, d[geom.segmentField]) : 0;
+}
+
+function segmentWidth(segment: RuntimeScale | null): number {
+  return segment ? bandwidth(segment) : 0;
+}
+
+function groupedSegmentGeometryContract(
+  geom: GroupedGeom,
+  splitLineage: LineageStart | null,
+  zeroBaselineEnter: TransitionItemAction | null,
+  sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
+  exitPlan: TransitionItemAction | null
+): BarGeometryContract {
   return {
     start: (d) => splitLineage?.start(d) || groupedSegmentEnterGeometry(d, geom, zeroBaselineEnter),
     target: groupedSegmentGeometry(geom),
@@ -101,68 +148,76 @@ function groupedSegmentGeometryContract(geom, splitLineage, zeroBaselineEnter, s
   };
 }
 
-function groupedSegmentEnterGeometry(d, geom, enterPlan = null) {
-  const { x, y, x1, y1, categoryField, segmentField, horizontal } = geom;
+function groupedSegmentEnterGeometry(d: BarDatum, geom: GroupedGeom, enterPlan: TransitionItemAction | null = null): RectGeometry {
+  const { x, y, x1, y1, categoryField, valueField, horizontal } = geom;
   const fromZero = !enterPlan || enterPlan.from === 'zero-baseline';
   if (horizontal) {
     return {
-      x: fromZero ? x(0) : Math.min(x(0), x(d[geom.valueField])),
-      y: y(d[categoryField]) + y1(d[segmentField]),
-      width: 0, height: Math.max(1, y1.bandwidth())
+      x: fromZero ? scaled(x, 0) : Math.min(scaled(x, 0), scaled(x, d[valueField])),
+      y: scaled(y, d[categoryField]) + segmentOffset(y1, d, geom),
+      width: 0, height: Math.max(1, segmentWidth(y1))
     };
   }
   return {
-    x: x(d[categoryField]) + x1(d[segmentField]),
-    y: fromZero ? y(0) : Math.min(y(0), y(d[geom.valueField])),
-    width: Math.max(1, x1.bandwidth()), height: 0
+    x: scaled(x, d[categoryField]) + segmentOffset(x1, d, geom),
+    y: fromZero ? scaled(y, 0) : Math.min(scaled(y, 0), scaled(y, d[valueField])),
+    width: Math.max(1, segmentWidth(x1)), height: 0
   };
 }
 
-function applyGroupedSegmentGeometry(selection, geom) {
+function applyGroupedSegmentGeometry(selection: BarMotion, geom: GroupedGeom): BarMotion {
   applyGroupedSegmentX(selection, geom);
   applyGroupedSegmentY(selection, geom);
   return selection;
 }
 
-function groupedSegmentGeometry(geom) {
-  const { x, y, x1, y1, categoryField, segmentField, valueField, horizontal } = geom;
+function groupedSegmentGeometry(geom: GroupedGeom): TargetGeometry {
+  const { x, y, x1, y1, categoryField, valueField, horizontal } = geom;
   if (horizontal) {
     return {
-      x: (d) => Math.min(x(0), x(d[valueField])),
-      width: (d) => Math.abs(x(d[valueField]) - x(0)),
-      y: (d) => y(d[categoryField]) + y1(d[segmentField]),
-      height: Math.max(1, y1.bandwidth())
+      x: (d) => Math.min(scaled(x, 0), scaled(x, d[valueField])),
+      width: (d) => Math.abs(scaled(x, d[valueField]) - scaled(x, 0)),
+      y: (d) => scaled(y, d[categoryField]) + segmentOffset(y1, d, geom),
+      height: Math.max(1, segmentWidth(y1))
     };
   }
   return {
-    x: (d) => x(d[categoryField]) + x1(d[segmentField]),
-    width: Math.max(1, x1.bandwidth()),
-    y: (d) => Math.min(y(0), y(d[valueField])),
-    height: (d) => Math.abs(y(d[valueField]) - y(0))
+    x: (d) => scaled(x, d[categoryField]) + segmentOffset(x1, d, geom),
+    width: Math.max(1, segmentWidth(x1)),
+    y: (d) => Math.min(scaled(y, 0), scaled(y, d[valueField])),
+    height: (d) => Math.abs(scaled(y, d[valueField]) - scaled(y, 0))
   };
 }
 
-function applyGroupedSegmentX(selection, geom) {
-  const { x, x1, categoryField, segmentField, valueField, horizontal } = geom;
+function applyGroupedSegmentX(selection: BarMotion, geom: GroupedGeom): BarMotion {
+  const { x, x1, categoryField, valueField, horizontal } = geom;
   if (horizontal) {
-    return selection.attr('x', (d) => Math.min(x(0), x(d[valueField]))).attr('width', (d) => Math.abs(x(d[valueField]) - x(0)));
+    return selection
+      .attr('x', (d) => Math.min(scaled(x, 0), scaled(x, d[valueField])))
+      .attr('width', (d) => Math.abs(scaled(x, d[valueField]) - scaled(x, 0)));
   }
-  return selection.attr('x', (d) => x(d[categoryField]) + x1(d[segmentField])).attr('width', Math.max(1, x1.bandwidth()));
+  return selection
+    .attr('x', (d) => scaled(x, d[categoryField]) + segmentOffset(x1, d, geom))
+    .attr('width', Math.max(1, segmentWidth(x1)));
 }
 
-function applyGroupedSegmentY(selection, geom) {
-  const { y, y1, categoryField, segmentField, valueField, horizontal } = geom;
+function applyGroupedSegmentY(selection: BarMotion, geom: GroupedGeom): BarMotion {
+  const { y, y1, categoryField, valueField, horizontal } = geom;
   if (horizontal) {
-    return selection.attr('y', (d) => y(d[categoryField]) + y1(d[segmentField])).attr('height', Math.max(1, y1.bandwidth()));
+    return selection
+      .attr('y', (d) => scaled(y, d[categoryField]) + segmentOffset(y1, d, geom))
+      .attr('height', Math.max(1, segmentWidth(y1)));
   }
-  return selection.attr('y', (d) => Math.min(y(0), y(d[valueField]))).attr('height', (d) => Math.abs(y(d[valueField]) - y(0)));
+  return selection
+    .attr('y', (d) => Math.min(scaled(y, 0), scaled(y, d[valueField])))
+    .attr('height', (d) => Math.abs(scaled(y, d[valueField]) - scaled(y, 0)));
 }
 
-function applyGroupedSegmentExitGeometry(selection, geom, sourceBaselineExit, exitPlan) {
+function applyGroupedSegmentExitGeometry(
+  selection: BarMotion,
+  geom: GroupedGeom,
+  sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
+  exitPlan: TransitionItemAction | null
+): BarMotion {
   return sourceBaselineExit(selection, { horizontal: geom.horizontal, plan: exitPlan, value: (d) => d[geom.valueField] });
-}
-
-function geometryBounds(geometry, datum) {
-  const value = (property) => typeof property === 'function' ? property(datum) : property;
-  return rectBounds(value(geometry.x), value(geometry.y), value(geometry.width), value(geometry.height));
 }

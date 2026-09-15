@@ -258,12 +258,14 @@ test('matched bars share one clock unless the author explicitly adds per-mark de
 
 test('successive steps on the same property initialize from preceding endpoints', async ({ page }) => {
   const frames = await page.evaluate(async () => {
-    const { createSceneTransitionProgress } = await import('/dist/transition-progress.js');
+    const { record } = await import('/dist/runtime/recorder.js');
+    const { createProgressController } = await import('/dist/runtime/tracks.js');
     const root = d3.select('#cached').append('svg');
     const rect = root.append('rect').attr('x', 0);
-    rect.transition('property-contract').duration(100).ease(d3.easeLinear).attr('x', 10)
+    const tracks = [];
+    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear }, d3).attr('x', 10)
       .transition().duration(100).ease(d3.easeLinear).attr('x', 30);
-    const schedules = createSceneTransitionProgress({ node: root.node() }, { transitionName: 'property-contract' });
+    const schedules = createProgressController(tracks);
     const plan = schedules.compile();
     schedules.destroy({ finish: false });
     return [0.75, 0.25, 1, 0.5, 0, 0.1].map(p => {
@@ -276,16 +278,15 @@ test('successive steps on the same property initialize from preceding endpoints'
 
 test('compiled property tracks can use a direction-aware ease', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createSceneTransitionProgress, directionalEase } = await import('/dist/transition-progress.js');
+    const { record } = await import('/dist/runtime/recorder.js');
+    const { createProgressController, directionalEase } = await import('/dist/runtime/tracks.js');
     const root = d3.select('#cached').append('svg');
     const rect = root.append('rect').attr('x', 0);
-    rect.transition('direction-contract').duration(100)
+    const tracks = [];
+    record(rect, tracks, { time: d3.now(), delay: 0, duration: 100, ease: d3.easeLinear }, d3)
       .easeVarying(() => directionalEase(d3.easeLinear, value => value * value))
       .attr('x', 100);
-    const schedules = createSceneTransitionProgress(
-      { node: root.node() },
-      { transitionName: 'direction-contract' }
-    );
+    const schedules = createProgressController(tracks);
     const plan = schedules.compile();
     schedules.destroy({ finish: false });
     plan.progress(0.5, 1);

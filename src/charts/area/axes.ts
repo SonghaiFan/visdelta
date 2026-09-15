@@ -1,8 +1,18 @@
-// @ts-nocheck - D3 axis rendering is provided through chart runtime deps.
 import { chartStyle, responsiveTickCount } from '../style.js';
+import { motion } from '../../runtime/recorder.js';
+import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { RuntimeScale } from '../../runtime/marks.js';
+import type { ChartContext, D3Lib, EncodingSpec } from '../../types/index.js';
 
 /** Area-owned presentation: Line-like axes with a quiet horizontal reading grid. */
-export function drawAreaAxes(chart, x, y, enc, d3, deps) {
+export function drawAreaAxes(
+  chart: ChartContext,
+  x: RuntimeScale,
+  y: RuntimeScale,
+  enc: EncodingSpec,
+  d3: D3Lib,
+  deps: ChartRuntimeDeps
+): void {
   const transition = chart.transition.base;
   const style = chartStyle(deps);
   const rule = style.charts.area;
@@ -24,14 +34,14 @@ export function drawAreaAxes(chart, x, y, enc, d3, deps) {
   if (rule.openYDomain) chart.scene.yAxis.select('.domain').style('opacity', 0);
 
   if (rule.edgeTitles && enc.x?.title) {
-    chart.scene.xLabel.attr('text-anchor', 'end').transition(transition)
+    motion(chart.scene.xLabel.attr('text-anchor', 'end'), transition)
       .attr('text-anchor', 'end')
       .attr('x', chart.margin.left + chart.innerWidth - style.edgeTitleInset.right)
       .attr('y', chart.height - style.edgeTitleInset.bottom)
       .attr('transform', null);
   }
   if (rule.edgeTitles && enc.y?.title) {
-    chart.scene.yLabel.attr('text-anchor', 'start').transition(transition)
+    motion(chart.scene.yLabel.attr('text-anchor', 'start'), transition)
       .attr('text-anchor', 'start')
       .attr('x', chart.margin.left + style.edgeTitleInset.left)
       .attr('y', chart.margin.top - style.edgeTitleInset.top)

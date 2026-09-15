@@ -10,6 +10,9 @@ export {
   selectorFrom
 } from './charts/authoring.js';
 export { compileViewWithCompiler } from './charts/compile-view.js';
+export { motion } from './runtime/recorder.js';
+export { directionalEase } from './runtime/tracks.js';
+export type { Motion, MotionTiming } from './runtime/recorder.js';
 export { detectDataTypes, resolveEncodingTypes } from './data/types.js';
 export { registerChartType, registerChartModule, availableChartTypes } from './runtime/chart-registry.js';
 export type { ChartTypeConfig } from './charts/plugin.js';

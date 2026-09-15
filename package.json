@@ -108,6 +108,7 @@
     "prepublishOnly": "npm run release:check"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
     "arquero": "^8.0.0",
     "d3": "^7.0.0"
   },

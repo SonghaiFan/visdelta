@@ -1,7 +1,8 @@
 import {
   ChartState,
   defineChartModule,
-  defineChartType
+  defineChartType,
+  motion
 } from '/dist/plugins.js';
 
 let loads = 0;
@@ -10,13 +11,14 @@ const plugin = defineChartType({
   key: 'dot',
   renderer(chart, rows, spec) {
     const field = spec.encoding.x.field;
-    chart.g.selectAll('circle.dot')
+    const dots = chart.g.selectAll('circle.dot')
       .data(rows, row => row.id)
       .join('circle')
       .attr('class', 'dot')
       .attr('cy', 40)
-      .attr('r', 6)
-      .transition(chart.transition.base)
+      .attr('r', 6);
+    // Seekable motion: recorded as tracks, never scheduled through D3.
+    motion(dots, chart.transition.base)
       .attr('cx', row => Number(row[field]) * 20);
   }
 });

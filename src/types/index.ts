@@ -444,30 +444,73 @@ export interface TransitionPlan {
 
 export type DataRow = Record<string, unknown>;
 
+export interface ChartAxisElement extends SVGGElement {
+  __visDeltaAxisActive?: boolean;
+  __visDeltaAxisKind?: string;
+}
+
+export type ChartSelection<ElementType extends import('d3-selection').BaseType, Datum = unknown> =
+  import('d3-selection').Selection<ElementType, Datum, import('d3-selection').BaseType, unknown>;
+
+export interface ChartSceneContext {
+  clipIdentity: number;
+  svg: ChartSelection<SVGSVGElement>;
+  grid: ChartSelection<ChartAxisElement>;
+  xAxis: ChartSelection<ChartAxisElement>;
+  yAxis: ChartSelection<ChartAxisElement>;
+  xLabel: ChartSelection<SVGTextElement>;
+  yLabel: ChartSelection<SVGTextElement>;
+  legend: ChartSelection<SVGGElement>;
+  markRoot: ChartSelection<SVGGElement>;
+  markLayers: Map<string, ChartSelection<SVGGElement>>;
+  /** Message host shown instead of marks when a render has nothing valid to draw. */
+  empty: ChartSelection<HTMLDivElement>;
+  [key: string]: unknown;
+}
+
+/** Plain timing descriptors; renderers animate through `motion(selection, timing)`. */
+export type MotionTiming = import('../runtime/recorder.js').MotionTiming;
+
+export interface ChartTransitionContext extends TransitionSpec {
+  base: MotionTiming;
+  enter?: MotionTiming;
+  exit?: MotionTiming;
+  /** Membership phases (exit marks, then scale, then enter marks), set when rows leave or arrive. */
+  exitFirst?: boolean;
+  enterLast?: boolean;
+  exitDuration?: number;
+  scaleDuration?: number;
+  enterDuration?: number;
+  enterDelay?: number;
+}
+
 export interface ChartContext {
-  g: unknown;
-  scene: unknown;
-  transition: unknown;
+  g: ChartSelection<SVGGElement>;
+  scene: ChartSceneContext;
+  transition: ChartTransitionContext;
   transitionPlan?: TransitionPlan;
   scales?: unknown;
   channels?: EncodingSpec;
   position?: unknown;
+  width: number;
+  height: number;
+  innerWidth: number;
+  innerHeight: number;
+  margin: MarginSpec;
+  sourceRows?: DataRow[];
+  domainRows?: DataRow[];
+  /** Focus camera the chart resolved for this render; the runtime mirrors it on the scene. */
+  camera?: import('../focus.js').FocusCamera | null;
   [key: string]: unknown;
 }
 
-export interface TooltipContext {
-  show(content: string | HTMLElement, options?: Record<string, unknown>): void;
-  hide(): void;
-  [key: string]: unknown;
-}
-
-export type D3Lib = Record<string, unknown>;
+export type D3Lib = typeof import('d3');
 
 export type Renderer<S extends ViewSpec = ViewSpec> = (
   chart: ChartContext,
   rows: DataRow[],
   spec: S,
-  tooltip: TooltipContext,
+  tooltip: HTMLElement,
   d3: D3Lib
 ) => void;
 
@@ -496,15 +539,19 @@ export interface SpecCompiler {
   operations: Record<string, (spec: ViewSpec, operationSpec: any, context: Record<string, unknown>) => ViewSpec>;
 }
 
-export interface ChartDeps {
-  chartStyle?: import('../charts/style.js').ChartStyleModule;
-  drawGrid?: (chart: ChartContext, scale: unknown, d3: D3Lib, transition?: unknown, options?: Record<string, unknown>) => void;
-  drawXAxis?: (chart: ChartContext, scale: unknown, title: string | undefined, d3: D3Lib, transition?: unknown, options?: Record<string, unknown>) => void;
-  drawYAxis?: (chart: ChartContext, scale: unknown, title: string | undefined, d3: D3Lib, transition?: unknown, options?: Record<string, unknown>) => void;
-  drawLegend?: (chart: ChartContext, rows: DataRow[], colorSpec: ChannelSpec | undefined, d3: D3Lib) => void;
-  fadeNonBarShapes?: (chart: ChartContext) => void;
-  [key: string]: unknown;
-}
+/**
+ * Runtime helpers a chart plugin may rely on. This is the supported subset of
+ * the object every renderer receives; built-in charts use the full internal
+ * `ChartRuntimeDeps`. Adding a key here is a public API promise.
+ */
+export type ChartDeps = Pick<
+  import('../runtime/chart-deps.js').ChartRuntimeDeps,
+  | 'chartStyle'
+  | 'bandOrLinear' | 'quantitativeScale' | 'position'
+  | 'colorScale' | 'channelDomain' | 'quantitativeDomain' | 'niceExtent'
+  | 'drawXAxis' | 'drawYAxis' | 'drawGrid' | 'updateGrid' | 'drawLegend'
+  | 'bindTooltip' | 'staggerDelay' | 'themeValue' | 'easeFor'
+>;
 
 export interface ChartType<S extends ViewSpec = ViewSpec> {
   key: string;

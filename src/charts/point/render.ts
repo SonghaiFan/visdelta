@@ -5,6 +5,7 @@ import { applyTransforms } from '../../data/transforms.js';
 import { drawPointAxes } from './axes.js';
 import { applyPointIdentity, pointKeyAccessor, pointStoredKey } from './keys.js';
 import { defaultPointRadius, parentAnchors, parentKey, pointState, radiusScale } from './state.js';
+import { motion } from '../../runtime/recorder.js';
 
 export function createPointRenderer(deps) {
   return new PointChart(deps).renderer();
@@ -39,12 +40,13 @@ class PointChart extends BaseChart {
     const connector = resolvePointConnector(spec, viewEnc);
     const selection = viewSelection(spec);
     const movesPoints = state.detailMode === 'detail' && !state.view;
-    // Summary -> detail is the canonical path. Giving that path ease-out makes
-    // its exact reverse (detail -> summary) ease-in: gather starts slowly and
-    // accelerates as the points converge.
-    const t = movesPoints
-      ? chart.transition.base.ease(d3.easeCubicOut)
-      : chart.transition.base;
+    // Scatter and gather use the shared base timing (ease-in-out by default).
+    // An earlier `base.ease(d3.easeCubicOut)` here never took effect: D3
+    // transitions inherit timing from the nearest scheduled ancestor, and the
+    // frame had already been scheduled on the unmodified base. Recorded tracks
+    // read the base directly, so a per-chart ease must be declared before the
+    // frame is scheduled (a transition-plan concern), not mutated here.
+    const t = chart.transition.base;
     const fallbackRadius = Number.isFinite(Number(spec.size))
       ? Number(spec.size)
       : defaultPointRadius(rows.length);
@@ -148,40 +150,45 @@ class PointChart extends BaseChart {
     crispLayer.selectAll('circle.vd-point')
       .data(rows, (d, i) => pointStoredKey(d, i, key))
       .join(
-        (enter) => enter
-          .append('circle')
-          .attr('class', 'vd-point')
-          .call(applyPointIdentity, key)
-          .attr('cx', (d) => pointEnterPosition(d).x)
-          .attr('cy', (d) => pointEnterPosition(d).y)
-          .attr('r', 0)
-          .attr('fill', (d) => color(d))
-          .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
-          .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
-          .style('opacity', 0)
-          .call(bindTooltip, spec, tooltip)
-          .transition(chart.transition.enter || t)
-          .delay((d, i) => (chart.transition.enterDelay || 0) + markDelay(d, i))
-          .attr('cx', (d) => chartPosition(d).x)
-          .attr('cy', (d) => chartPosition(d).y)
-          .attr('r', (d) => radius(d))
-          .style('opacity', (d) => opacity(d)),
-        (update) => update
-          .call(applyPointIdentity, key)
-          .call(bindTooltip, spec, tooltip)
-          .transition(t)
-          .delay(scaleMarkDelay)
-          .attr('cx', (d) => chartPosition(d).x)
-          .attr('cy', (d) => chartPosition(d).y)
-          .attr('r', (d) => radius(d))
-          .attr('fill', (d) => color(d))
-          .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
-          .style('opacity', (d) => opacity(d)),
-        (exit) => {
-          const leaving = exit
-            .transition(chart.transition.exit || t)
-            .delay(markDelay)
+        (enter) => {
+          const entered = enter
+            .append('circle')
+            .attr('class', 'vd-point')
+            .call(applyPointIdentity, key)
+            .attr('cx', (d) => pointEnterPosition(d).x)
+            .attr('cy', (d) => pointEnterPosition(d).y)
+            .attr('r', 0)
+            .attr('fill', (d) => color(d))
+            .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
+            .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
             .style('opacity', 0)
+            .call(bindTooltip, spec, tooltip);
+          motion(entered, chart.transition.enter || t)
+            .delay((d, i) => (chart.transition.enterDelay || 0) + markDelay(d, i))
+            .attr('cx', (d) => chartPosition(d).x)
+            .attr('cy', (d) => chartPosition(d).y)
+            .attr('r', (d) => radius(d))
+            .style('opacity', (d) => opacity(d));
+          return entered;
+        },
+        (update) => {
+          const prepared = update
+            .call(applyPointIdentity, key)
+            .call(bindTooltip, spec, tooltip);
+          motion(prepared, t)
+            .delay(scaleMarkDelay)
+            .attr('cx', (d) => chartPosition(d).x)
+            .attr('cy', (d) => chartPosition(d).y)
+            .attr('r', (d) => radius(d))
+            .attr('fill', (d) => color(d))
+            .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
+            .style('opacity', (d) => opacity(d));
+          return prepared;
+        },
+        (exit) => {
+          const leaving = motion(exit, chart.transition.exit || t)
+            .delay(markDelay)
+            .style('opacity', 0);
           if (!chart.transition.exitFirst) {
             leaving
               .attr('cx', (d) => exitAnchor(d).x)
@@ -189,7 +196,8 @@ class PointChart extends BaseChart {
           }
           if (blendMotion) leaving.attrTween('r', blendMotion.parentRadiusTween);
           else leaving.attr('r', 0);
-          return leaving.remove();
+          leaving.remove();
+          return exit;
         }
       );
 
@@ -200,8 +208,7 @@ class PointChart extends BaseChart {
     };
 
     // Clean up any stale parent-centroid markers from previous renders.
-    chart.g.selectAll('circle.vd-point-parent')
-      .transition(t)
+    motion(chart.g.selectAll('circle.vd-point-parent'), t)
       .attr('r', 0)
       .style('opacity', 0)
       .remove();
@@ -300,33 +307,42 @@ function drawPointConnectors({ chart, connectors, transition, themeValue }) {
   layer.selectAll('line.vd-point-connector')
     .data(connectors, (connector) => connector.key)
     .join(
-      (enter) => enter.append('line')
-        .attr('class', 'vd-point-connector')
-        .attr('data-key', (connector) => connector.key)
-        .attr('x1', (connector) => connector.x1)
-        .attr('y1', (connector) => connector.y1)
-        .attr('x2', (connector) => connector.x1)
-        .attr('y2', (connector) => connector.y1)
-        .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
-        .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
-        .style('opacity', 0)
-        .transition(transition)
-        .attr('x2', (connector) => connector.x2)
-        .attr('y2', (connector) => connector.y2)
-        .style('opacity', 1),
-      (update) => update.transition(transition)
-        .attr('x1', (connector) => connector.x1)
-        .attr('y1', (connector) => connector.y1)
-        .attr('x2', (connector) => connector.x2)
-        .attr('y2', (connector) => connector.y2)
-        .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
-        .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
-        .style('opacity', 1),
-      (exit) => exit.transition(transition)
-        .attr('x2', (connector) => connector.x1)
-        .attr('y2', (connector) => connector.y1)
-        .style('opacity', 0)
-        .remove()
+      (enter) => {
+        const entered = enter.append('line')
+          .attr('class', 'vd-point-connector')
+          .attr('data-key', (connector) => connector.key)
+          .attr('x1', (connector) => connector.x1)
+          .attr('y1', (connector) => connector.y1)
+          .attr('x2', (connector) => connector.x1)
+          .attr('y2', (connector) => connector.y1)
+          .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
+          .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
+          .style('opacity', 0);
+        motion(entered, transition)
+          .attr('x2', (connector) => connector.x2)
+          .attr('y2', (connector) => connector.y2)
+          .style('opacity', 1);
+        return entered;
+      },
+      (update) => {
+        motion(update, transition)
+          .attr('x1', (connector) => connector.x1)
+          .attr('y1', (connector) => connector.y1)
+          .attr('x2', (connector) => connector.x2)
+          .attr('y2', (connector) => connector.y2)
+          .attr('stroke', themeValue('--vd-point-connector', '#8a8f98'))
+          .attr('stroke-width', themeValue('--vd-point-connector-width', 2))
+          .style('opacity', 1);
+        return update;
+      },
+      (exit) => {
+        motion(exit, transition)
+          .attr('x2', (connector) => connector.x1)
+          .attr('y2', (connector) => connector.y1)
+          .style('opacity', 0)
+          .remove();
+        return exit;
+      }
     );
 }
 
@@ -368,42 +384,47 @@ function drawPointBlend({
     d3.select(this).selectAll('circle.vd-point-blend')
       .data(entry.values, (row, index) => pointStoredKey(row, index, key))
       .join(
-        (enter) => enter.append('circle')
-          .attr('class', 'vd-point-blend')
-          .attr('data-blend-role', state.detailMode === 'aggregate' ? 'summary' : 'child')
-          .attr('cx', (row) => enterAnchor(row).x)
-          .attr('cy', (row) => enterAnchor(row).y)
-          .attr('r', (row) => Math.max(4, radius(row)))
-          .attr('fill', (row) => color(row))
-          .transition(transition)
-          .attr('cx', (row) => chartPosition(row).x)
-          .attr('cy', (row) => chartPosition(row).y),
-        (update) => update
-          .attr('data-blend-role', state.detailMode === 'aggregate' ? 'summary' : 'child')
-          .transition(transition)
-          .attr('cx', (row) => chartPosition(row).x)
-          .attr('cy', (row) => chartPosition(row).y)
-          .attr('r', (row) => Math.max(4, radius(row)))
-          .attr('fill', (row) => color(row)),
+        (enter) => {
+          const entered = enter.append('circle')
+            .attr('class', 'vd-point-blend')
+            .attr('data-blend-role', state.detailMode === 'aggregate' ? 'summary' : 'child')
+            .attr('cx', (row) => enterAnchor(row).x)
+            .attr('cy', (row) => enterAnchor(row).y)
+            .attr('r', (row) => Math.max(4, radius(row)))
+            .attr('fill', (row) => color(row));
+          motion(entered, transition)
+            .attr('cx', (row) => chartPosition(row).x)
+            .attr('cy', (row) => chartPosition(row).y);
+          return entered;
+        },
+        (update) => {
+          const prepared = update
+            .attr('data-blend-role', state.detailMode === 'aggregate' ? 'summary' : 'child');
+          motion(prepared, transition)
+            .attr('cx', (row) => chartPosition(row).x)
+            .attr('cy', (row) => chartPosition(row).y)
+            .attr('r', (row) => Math.max(4, radius(row)))
+            .attr('fill', (row) => color(row));
+          return prepared;
+        },
         (exit) => {
-          const leaving = exit
-            .attr('data-blend-role', 'parent')
-            .transition(transition)
+          const leaving = motion(exit.attr('data-blend-role', 'parent'), transition)
             .attr('cx', (row) => exitAnchor(row).x)
             .attr('cy', (row) => exitAnchor(row).y);
           if (blendMotion) leaving.attrTween('r', blendMotion.parentRadiusTween);
           else leaving.attr('r', 0);
-          return leaving.remove();
+          leaving.remove();
+          return exit;
         }
       );
   });
 
   layer.interrupt().style('visibility', 'hidden');
   if (movesPoints) {
-    layer.transition(transition)
+    motion(layer, transition)
       .styleTween('visibility', () => (progress) =>
         pointBlendVisibility(progress));
-    crispLayer.transition(transition)
+    motion(crispLayer, transition)
       .styleTween('visibility', () => (progress) =>
         pointCrispVisibility(progress));
   }

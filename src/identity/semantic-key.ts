@@ -3,7 +3,7 @@ import { specObjectKey, specSemanticKey } from '../spec-meta.js';
 
 type KeyFn = (d: Record<string, unknown>, i: number) => string | number;
 
-export function keyAccessor(spec: ViewSpec, fallbackField = 'id'): KeyFn {
+export function keyAccessor(spec: ViewSpec, fallbackField: string | string[] = 'id'): KeyFn {
   const key = specObjectKey(spec) || fallbackField;
   if (Array.isArray(key)) {
     return (d: Record<string, unknown>, i: number) =>

@@ -5,7 +5,7 @@ import { resolveTarget } from './target.js';
 import { inferTransition } from '../grammar/infer-transition.js';
 import { captureDomFrame } from './dom-frame.js';
 import { hideTooltip } from './marks.js';
-import { VISDELTA_TRANSITION_NAME, clearSceneTransitionProgress } from '../transition-progress.js';
+import { clearSceneTransitionProgress } from '../transition-progress.js';
 import type { AnyRecord } from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
 
@@ -41,7 +41,7 @@ export function createTransitionSurface(from: AnyRecord, to: AnyRecord, options:
       clearSceneTransitionProgress(scene, { finish: false });
       if (scene.phaseTimer) window.clearTimeout(scene.phaseTimer);
     }
-    d3.select(node).selectAll('*').interrupt().interrupt(VISDELTA_TRANSITION_NAME);
+    d3.select(node).selectAll('*').interrupt();
     node.replaceChildren();
     delete node.__visDeltaScene;
   };

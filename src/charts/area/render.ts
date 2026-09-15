@@ -12,6 +12,7 @@ import {
   areaState
 } from './state.js';
 import { drawAreaAxes } from './axes.js';
+import { motion } from '../../runtime/recorder.js';
 
 export function createAreaRenderer(deps) {
   return new AreaChart(deps).renderer();
@@ -115,8 +116,8 @@ class AreaChart extends BaseChart {
     };
 
     // Area owns this cleanup locally; Core does not need to know the chart type.
-    chart.g.selectAll('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point,circle.vd-unit')
-      .transition(chart.transition.base).style('opacity', 0);
+    motion(chart.g.selectAll('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point,circle.vd-unit'),
+      chart.transition.base).style('opacity', 0);
     this.setCartesianState(chart, enc, { x, y, color }, {
       x: (row) => position(x, row[xField]),
       y: (row) => position(y, row[yField])
@@ -126,40 +127,49 @@ class AreaChart extends BaseChart {
     chart.g.selectAll('path.vd-area')
       .data(cells, (cell) => cell.key)
       .join(
-        (enter) => enter.append('path')
-          .attr('class', 'vd-area vd-area-cell')
-          .attr('data-key', (cell) => cell.key)
-          .attr('data-layer-key', (cell) => cell.layerKey)
-          .attr('data-observation-key', (cell) => cell.observationKey)
-          .attr('d', (cell) => shape(isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell)))
-          .attr('fill', (cell) => color(cell.row || {}))
-          .attr('stroke', 'none')
-          .style('opacity', (cell) => isAdded(cell) ? opacity(cell) : 0)
-          .call(bindTooltip, spec, tooltip)
-          .each(function(cell) {
-            this.__visDeltaAreaFrame = isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell);
-            this.__visDeltaAreaCurve = curveName;
-          })
-          .transition(chart.transition.enter || chart.transition.base)
-          .style('opacity', opacity)
-          .attrTween('d', function(cell) {
-            return tween(this, cell, shape);
-          }),
-        (update) => update
-          .attr('data-key', (cell) => cell.key)
-          .attr('data-layer-key', (cell) => cell.layerKey)
-          .attr('data-observation-key', (cell) => cell.observationKey)
-          .call(bindTooltip, spec, tooltip)
-          .transition(chart.transition.base)
-          .style('opacity', opacity)
-          .attr('fill', (cell) => color(cell.row || {}))
-          .attr('stroke', 'none')
-          .attrTween('d', function(cell) {
-            return tween(this, cell, shape);
-          }),
-        (exit) => exit.transition(chart.transition.exit || chart.transition.base)
-          .style('opacity', 0)
-          .remove()
+        (enter) => {
+          const entered = enter.append('path')
+            .attr('class', 'vd-area vd-area-cell')
+            .attr('data-key', (cell) => cell.key)
+            .attr('data-layer-key', (cell) => cell.layerKey)
+            .attr('data-observation-key', (cell) => cell.observationKey)
+            .attr('d', (cell) => shape(isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell)))
+            .attr('fill', (cell) => color(cell.row || {}))
+            .attr('stroke', 'none')
+            .style('opacity', (cell) => isAdded(cell) ? opacity(cell) : 0)
+            .call(bindTooltip, spec, tooltip)
+            .each(function(cell) {
+              this.__visDeltaAreaFrame = isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell);
+              this.__visDeltaAreaCurve = curveName;
+            });
+          motion(entered, chart.transition.enter || chart.transition.base)
+            .style('opacity', opacity)
+            .attrTween('d', function(cell) {
+              return tween(this, cell, shape);
+            });
+          return entered;
+        },
+        (update) => {
+          const prepared = update
+            .attr('data-key', (cell) => cell.key)
+            .attr('data-layer-key', (cell) => cell.layerKey)
+            .attr('data-observation-key', (cell) => cell.observationKey)
+            .call(bindTooltip, spec, tooltip);
+          motion(prepared, chart.transition.base)
+            .style('opacity', opacity)
+            .attr('fill', (cell) => color(cell.row || {}))
+            .attr('stroke', 'none')
+            .attrTween('d', function(cell) {
+              return tween(this, cell, shape);
+            });
+          return prepared;
+        },
+        (exit) => {
+          motion(exit, chart.transition.exit || chart.transition.base)
+            .style('opacity', 0)
+            .remove();
+          return exit;
+        }
       );
 
     // Area is fill-first by default. Do not add a persistent outline or use a
@@ -172,7 +182,7 @@ class AreaChart extends BaseChart {
     // Cached canonical playback makes detail -> total the exact reverse.
     const dividerJoin = chart.g.selectAll('path.vd-area-divider')
       .data(dividers, (divider) => divider.key);
-    dividerJoin.exit().transition(chart.transition.base).style('opacity', 0).remove();
+    motion(dividerJoin.exit(), chart.transition.base).style('opacity', 0).remove();
     const dividerEnter = dividerJoin.enter().append('path')
       .attr('class', 'vd-area-divider')
       .attr('data-key', (divider) => divider.key)
@@ -191,8 +201,7 @@ class AreaChart extends BaseChart {
     }
     const divider = dividerEnter.merge(dividerJoin);
     const dividerDrawDuration = Math.max(1, chart.transition.duration * DIVIDER_DRAW_PROGRESS);
-    divider
-      .transition(chart.transition.base)
+    motion(divider, chart.transition.base)
       .duration(dividerDrawDuration)
       .style('opacity', 1)
       .attr('stroke-dashoffset', 0)

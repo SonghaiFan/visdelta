@@ -6,6 +6,7 @@ import { linePointKeyAccessor, lineSeriesKey } from './keys.js';
 import { matchLinePathFrames, matchLinePaths, matchLineZipperFrames } from './path.js';
 import { connectedLineStretches, lineRowsAtTotal, lineState } from './state.js';
 import { drawLineAxes } from './axes.js';
+import { motion } from '../../runtime/recorder.js';
 
 export function createLineRenderer(deps) {
   return new LineChart(deps).renderer();
@@ -163,13 +164,13 @@ class LineChart extends BaseChart {
             .each(function(d) { this.__visDeltaLineFrame = pathFrame(d); })
             .attr('data-line-stage', lineIsZipper ? lineStage : 'connected');
           if (lineAtAttractor) {
-            return entered.style('opacity', 0).transition(t).style('opacity', (d) => seriesOpacity(d));
+            motion(entered.style('opacity', 0), t).style('opacity', (d) => seriesOpacity(d));
+            return entered;
           }
-          return entered
-            .call((selection) => drawLinePath(selection, enterTransition, d3, addsObservations ? lineDuration : null))
-            // Path drawing owns dash offset only. Selection owns opacity and is
-            // applied last so a fresh endpoint cannot reset a dimmed series.
-            .style('opacity', (d) => seriesOpacity(d));
+          drawLinePath(entered, enterTransition, addsObservations ? lineDuration : null);
+          // Path drawing owns dash offset only. Selection owns opacity and is
+          // applied last so a fresh endpoint cannot reset a dimmed series.
+          return entered.style('opacity', (d) => seriesOpacity(d));
         },
         (update) => {
           const wasAttractor = update.nodes().some((node) =>
@@ -179,8 +180,7 @@ class LineChart extends BaseChart {
             .attr('data-line-stage', lineIsZipper ? lineStage : 'connected')
             .attr('stroke-dasharray', null)
             .attr('stroke-dashoffset', null);
-          return prepared
-            .transition(t)
+          motion(prepared, t)
             .duration(scaleDuration)
             .style('opacity', (d) => seriesOpacity(d))
             .attr('stroke', (d) => color(d.rows[0]))
@@ -196,18 +196,22 @@ class LineChart extends BaseChart {
               this.setAttribute('data-line-transition', match.strategy);
               return match.interpolate;
             });
+          return prepared;
         },
-        (exit) => exit
-          .attr('data-line-transition', 'remove-line')
-          .attr('stroke-dasharray', null)
-          .attr('stroke-dashoffset', null)
-          .transition(exitTransition)
-          .duration(chart.transition.exitFirst ? chart.transition.exitDuration : lineDuration)
-          // During a filter restore, the disconnected source pieces stay put
-          // while the missing connection is drawn over them. The clean target
-          // frame removes these duplicate pieces at progress 1.
-          .style('opacity', addsObservations ? 1 : 0)
-          .remove()
+        (exit) => {
+          const leaving = exit
+            .attr('data-line-transition', 'remove-line')
+            .attr('stroke-dasharray', null)
+            .attr('stroke-dashoffset', null);
+          motion(leaving, exitTransition)
+            .duration(chart.transition.exitFirst ? chart.transition.exitDuration : lineDuration)
+            // During a filter restore, the disconnected source pieces stay put
+            // while the missing connection is drawn over them. The clean target
+            // frame removes these duplicate pieces at progress 1.
+            .style('opacity', addsObservations ? 1 : 0)
+            .remove();
+          return exit;
+        }
       );
 
     // The reference is a temporary preview of the authored aggregate line.
@@ -248,23 +252,28 @@ class LineChart extends BaseChart {
           .attr('stroke', '#fff')
           .attr('stroke-width', 3)
           .attr('d', (d) => d.path),
-        (update) => update
-          .attr('stroke-dasharray', null)
-          .attr('stroke-dashoffset', null)
-          .transition(t)
-          .attrTween('d', function(d) {
-            return matchLinePaths(this, d.path);
-          }),
-        (exit) => exit
-          .each(function() {
+        (update) => {
+          const prepared = update
+            .attr('stroke-dasharray', null)
+            .attr('stroke-dashoffset', null);
+          motion(prepared, t)
+            .attrTween('d', function(d) {
+              return matchLinePaths(this, d.path);
+            });
+          return prepared;
+        },
+        (exit) => {
+          const retracting = exit.each(function() {
             const length = Math.max(0, this.getTotalLength());
             d3.select(this)
               .attr('stroke-dasharray', `${length} ${length}`)
               .attr('stroke-dashoffset', 0);
-          })
-          .transition(t)
-          .attr('stroke-dashoffset', function() { return this.getTotalLength(); })
-          .remove()
+          });
+          motion(retracting, t)
+            .attr('stroke-dashoffset', function() { return this.getTotalLength(); })
+            .remove();
+          return exit;
+        }
       );
     chart.g.selectAll('path.vd-line-reference')
       .data(referencePath ? [{ key: 'aggregate-reference', path: referencePath }] : [], (d) => d.key)
@@ -277,67 +286,78 @@ class LineChart extends BaseChart {
           .attr('fill', 'none')
           .attr('d', (d) => d.path)
           .attr('mask', `url(#${referenceMaskId})`),
-        (update) => update
-          .attr('data-line-stage', lineStage)
-          .transition(t)
-          .attrTween('d', function(d) {
-            return matchLinePaths(this, d.path);
-          }),
-        (exit) => exit
-          .transition(t)
-          .remove()
+        (update) => {
+          const prepared = update.attr('data-line-stage', lineStage);
+          motion(prepared, t)
+            .attrTween('d', function(d) {
+              return matchLinePaths(this, d.path);
+            });
+          return prepared;
+        },
+        (exit) => {
+          motion(exit, t).remove();
+          return exit;
+        }
       );
 
     chart.g.selectAll('circle.vd-line-point')
       .data(plottedRows, key)
       .join(
-        (enter) => enter
-          .append('circle')
-          .attr('class', 'vd-line-point')
-          .attr('data-key', (d, i) => key(d, i))
-          .attr('cx', (d, i) => targetPoint(d, i).x)
-          .attr('cy', (d, i) => targetPoint(d, i).y)
-          .attr('r', 0)
-          .attr('data-scroll-radius', pointRadius)
-          .attr('fill', (d) => color(d))
-          .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
-          .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
-          .style('opacity', pointsAreExplicit ? null : 0)
-          .call(bindTooltip, spec, tooltip)
-          .transition(enterTransition)
-          .delay((d, i) => addedKeys.has(String(key(d, i)))
-            ? (chart.transition.enterDelay || 0) + pointStart
-            : (chart.transition.enterDelay || 0) + 260 + staggerDelay(spec, d, i))
-          .duration((d, i) => addedKeys.has(String(key(d, i))) ? pointDuration : lineDuration)
-          .style('opacity', (d) => visiblePointOpacity(d))
-          .attr('cx', (d, i) => targetPoint(d, i).x)
-          .attr('cy', (d, i) => targetPoint(d, i).y)
-          .attr('r', visiblePointRadius),
-        (update) => update
-          .attr('data-key', (d, i) => key(d, i))
-          .call(bindTooltip, spec, tooltip)
-          .transition(t)
-          .duration(scaleDuration)
-          .style('opacity', (d) => visiblePointOpacity(d))
-          .attr('cx', (d) => position(x, d[enc.x.field]))
-          .attr('cy', (d) => position(y, d[enc.y.field]))
-          .attr('fill', (d) => color(d))
-          .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
-          .attr('data-scroll-radius', pointRadius)
-          .attr('r', visiblePointRadius),
-        (exit) => exit
-          .transition(exitTransition)
-          .duration((d, i) => chart.transition.exitFirst
-            ? chart.transition.exitDuration
-            : (removedKeys.has(String(key(d, i))) ? pointDuration : lineDuration))
-          .style('opacity', function(d, i) {
-            if (!pointsAreExplicit) return 0;
-            return removedKeys.has(String(key(d, i)))
-              ? this.style.opacity || 1
-              : 0;
-          })
-          .attr('r', 0)
-          .remove()
+        (enter) => {
+          const entered = enter
+            .append('circle')
+            .attr('class', 'vd-line-point')
+            .attr('data-key', (d, i) => key(d, i))
+            .attr('cx', (d, i) => targetPoint(d, i).x)
+            .attr('cy', (d, i) => targetPoint(d, i).y)
+            .attr('r', 0)
+            .attr('data-scroll-radius', pointRadius)
+            .attr('fill', (d) => color(d))
+            .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
+            .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
+            .style('opacity', pointsAreExplicit ? null : 0)
+            .call(bindTooltip, spec, tooltip);
+          motion(entered, enterTransition)
+            .delay((d, i) => addedKeys.has(String(key(d, i)))
+              ? (chart.transition.enterDelay || 0) + pointStart
+              : (chart.transition.enterDelay || 0) + 260 + staggerDelay(spec, d, i))
+            .duration((d, i) => addedKeys.has(String(key(d, i))) ? pointDuration : lineDuration)
+            .style('opacity', (d) => visiblePointOpacity(d))
+            .attr('cx', (d, i) => targetPoint(d, i).x)
+            .attr('cy', (d, i) => targetPoint(d, i).y)
+            .attr('r', visiblePointRadius);
+          return entered;
+        },
+        (update) => {
+          const prepared = update
+            .attr('data-key', (d, i) => key(d, i))
+            .call(bindTooltip, spec, tooltip);
+          motion(prepared, t)
+            .duration(scaleDuration)
+            .style('opacity', (d) => visiblePointOpacity(d))
+            .attr('cx', (d) => position(x, d[enc.x.field]))
+            .attr('cy', (d) => position(y, d[enc.y.field]))
+            .attr('fill', (d) => color(d))
+            .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
+            .attr('data-scroll-radius', pointRadius)
+            .attr('r', visiblePointRadius);
+          return prepared;
+        },
+        (exit) => {
+          motion(exit, exitTransition)
+            .duration((d, i) => chart.transition.exitFirst
+              ? chart.transition.exitDuration
+              : (removedKeys.has(String(key(d, i))) ? pointDuration : lineDuration))
+            .style('opacity', function(d, i) {
+              if (!pointsAreExplicit) return 0;
+              return removedKeys.has(String(key(d, i)))
+                ? this.style.opacity || 1
+                : 0;
+            })
+            .attr('r', 0)
+            .remove();
+          return exit;
+        }
       );
 
     drawLegend(chart, rows, enc.color, d3);
@@ -363,19 +383,18 @@ export function lineSelectionOpacity(row, selection, dimOpacity = 0.22) {
     : Number(selection.opacity ?? dimOpacity);
 }
 
-function drawLinePath(selection, transition, d3, duration = null) {
-  selection.each(function(d) {
-    const path = d3.select(this);
+// Draw each entering path by retracting its dash offset from the full length
+// to zero. The dash attributes stay on the node once drawn: a full-length dash
+// at offset 0 renders identically to no dash, and the next update clears both
+// before it moves the path. That keeps every frame a pure function of progress
+// with no end-of-transition side effect.
+function drawLinePath(selection, transition, duration = null) {
+  selection.each(function() {
     const total = this.getTotalLength();
-    const drawing = path
-      .attr('stroke-dasharray', `${total} ${total}`)
-      .attr('stroke-dashoffset', total)
-      .transition(transition);
-    if (Number.isFinite(duration)) drawing.duration(duration);
-    drawing
-      .attr('stroke-dashoffset', 0)
-      .on('end', function() {
-        d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
-      });
+    this.setAttribute('stroke-dasharray', `${total} ${total}`);
+    this.setAttribute('stroke-dashoffset', total);
   });
+  const drawing = motion(selection, transition);
+  if (Number.isFinite(duration)) drawing.duration(duration);
+  drawing.attr('stroke-dashoffset', 0);
 }

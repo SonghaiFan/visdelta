@@ -1,10 +1,101 @@
-// @ts-nocheck — D3 rendering utilities; typed via deps injection
 import { specTransition } from '../spec-meta.js';
 import { DEFAULT_MARK_DELAY, DEFAULT_TIMING, defaultTransition } from '../timing.js';
-import { VISDELTA_TRANSITION_NAME } from '../transition-progress.js';
+import { renderAxis } from './axis.js';
+import type { AxisOrient } from './axis.js';
+import { motion } from './recorder.js';
+import type { Motion, MotionTiming } from './recorder.js';
 import { clamp, escapeHtml, titleize } from './utils.js';
 import { channelValue, inferFieldType } from '../data/types.js';
 import type { ChartStyleModule } from '../charts/style.js';
+import type {
+  ChannelSpec,
+  ChartContext,
+  ChartSceneContext,
+  ChartTransitionContext,
+  DataRow,
+  D3Lib,
+  StaggerSpec,
+  TransitionSpec,
+  ViewSpec
+} from '../types/index.js';
+import type { Axis, AxisDomain, AxisScale } from 'd3-axis';
+import type { BaseType, Selection } from 'd3-selection';
+
+type SvgSelection<ElementType extends BaseType, Datum = unknown> =
+  Selection<ElementType, Datum, BaseType, unknown>;
+type MotionTransition = MotionTiming;
+
+interface AxisElement extends SVGGElement {
+  __visDeltaAxisActive?: boolean;
+  __visDeltaAxisKind?: string;
+}
+
+export interface RuntimeScale {
+  (value: unknown): number | undefined;
+  domain(): unknown[];
+  domain(values: Iterable<unknown>): RuntimeScale;
+  range(): number[];
+  range(values: Iterable<number>): RuntimeScale;
+  bandwidth?: () => number;
+  step?: () => number;
+  ticks?: (count?: number) => unknown[];
+  copy?: () => RuntimeScale;
+  invert?: (value: number) => unknown;
+  __visDeltaChannel?: RenderChannel;
+  __visDeltaDataDomain?: unknown[];
+}
+
+export interface RenderChannel extends ChannelSpec {
+  field?: string;
+  value?: string;
+  range?: string[];
+  scaleType?: string;
+  hue?: RenderChannel;
+  luminance?: RenderChannel;
+  base?: string;
+  lightness?: number[];
+}
+
+export interface RenderDatum extends DataRow {
+  __row?: DataRow;
+}
+
+type RenderScene = ChartSceneContext;
+type RenderTransition = ChartTransitionContext;
+type RenderChartContext = ChartContext;
+
+export interface ScaleOptions {
+  domainPadding?: number;
+}
+
+export interface AxisOptions {
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  duration?: number;
+  tickCount?: number;
+  tickFormat?: string;
+  position?: number;
+}
+
+export interface GridOptions {
+  x?: RuntimeScale | null;
+  keepX?: boolean;
+  xTickCount?: number;
+  yTickCount?: number;
+  tickCount?: number;
+  duration?: number;
+}
+
+interface RectBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface LegendLayoutItem {
+  x: number;
+  y: number;
+}
 
 export interface RenderContext {
   root?: Element;
@@ -37,7 +128,7 @@ export function createMarkHelpers(context: RenderContext = {}) {
 // color regardless of which subset of categories appears in a frame.
 
 // Tableau 10 — widely-adopted, perceptually balanced categorical palette.
-const DEFAULT_PALETTE = [
+const DEFAULT_PALETTE: Array<readonly [string, string]> = [
   ['--vd-series-1',  '#4e79a7'],
   ['--vd-series-2',  '#f28e2b'],
   ['--vd-series-3',  '#e15759'],
@@ -49,12 +140,12 @@ const DEFAULT_PALETTE = [
   ['--vd-series-9',  '#9c755f'],
   ['--vd-series-10', '#bab0ac']
 ];
-const DEFAULT_LUMINANCE_BASE = ['--vd-accent', '#4e79a7'];
+const DEFAULT_LUMINANCE_BASE: readonly [string, string] = ['--vd-accent', '#4e79a7'];
 
 // ─── Hue-maximisation helpers ─────────────────────────────────────────────────
 
 // Circular angular distance between two hue angles (0–180°).
-function hueDist(a, b) {
+function hueDist(a: number, b: number): number {
   const d = Math.abs(a - b) % 360;
   return d > 180 ? 360 - d : d;
 }
@@ -62,7 +153,7 @@ function hueDist(a, b) {
 // Extract hue angle (0–360°) from a CSS color string.
 // Supports #rrggbb, #rgb, and rgb(r,g,b).
 // Returns null for near-achromatic colors (saturation range < 10 %).
-function parseColorHue(color) {
+function parseColorHue(color: string): number | null {
   if (typeof color !== 'string') return null;
   let r, g, b;
   const hex = color.trim().match(/^#([0-9a-f]{3,6})$/i)?.[1];
@@ -95,7 +186,7 @@ function parseColorHue(color) {
 // minimum pairwise hue distance among the chosen set is maximised.
 // Near-achromatic entries are relegated to the end (appended only when needed).
 // Works on any resolved-color array, so user-customised palettes benefit too.
-function pickCategoricalColors(n, colors) {
+function pickCategoricalColors(n: number, colors: string[]): string[] {
   if (n <= 0) return [];
   if (n >= colors.length) {
     return Array.from({ length: n }, (_, i) => colors[i % colors.length]);
@@ -114,7 +205,7 @@ function pickCategoricalColors(n, colors) {
       let bestK = 0, bestMinDist = -Infinity;
       for (let k = 0; k < remaining.length; k++) {
         const i = remaining[k];
-        const minDist = Math.min(...chosen.map((j) => hueDist(hues[i], hues[j])));
+        const minDist = Math.min(...chosen.map((j) => hueDist(hues[i]!, hues[j]!)));
         if (minDist > bestMinDist) { bestMinDist = minDist; bestK = k; }
       }
       chosen.push(remaining.splice(bestK, 1)[0]);
@@ -132,7 +223,9 @@ function pickCategoricalColors(n, colors) {
 // Numeric fallback → strips units and returns a number (e.g. parseFloat("11px") = 11).
 // String fallback  → returns the raw trimmed value.
 // Falls back silently when running outside a browser (SSR / tests).
-function themeValue(cssVar, fallback) {
+function themeValue(cssVar: string, fallback: number): number;
+function themeValue(cssVar: string, fallback: string): string;
+function themeValue(cssVar: string, fallback: string | number): string | number {
   if (typeof document === 'undefined') return fallback;
   const contextRoot = context.root ?? document.documentElement;
   const scopedRoot = contextRoot.matches?.('.vd-transition-root, .vd-chart-root')
@@ -166,52 +259,65 @@ function themeValue(cssVar, fallback) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function transitionSpec(spec, previousSpec, { seekable = false, d3 } = {}) {
+function transitionSpec(
+  spec: ViewSpec,
+  previousSpec: ViewSpec | null | undefined,
+  { d3 }: { seekable?: boolean; d3?: D3Lib } = {}
+): RenderTransition {
   if (!d3) throw new Error('VisDelta transitions require D3. Pass { d3 } to transition() or the driver runtime.');
   const local = specTransition(spec);
   const previous = previousSpec ? specTransition(previousSpec) : {};
   const transition = { ...defaultTransition(), ...previous, ...local };
-  const ease = easeFor(transition.ease, d3);
-  const base = (seekable ? d3.transition(VISDELTA_TRANSITION_NAME) : d3.transition())
-    .duration(transition.duration).ease(ease);
+  const base: MotionTiming = { delay: 0, duration: transition.duration, ease: easeFor(transition.ease, d3) };
   return { ...transition, base };
 }
 
-function effectiveTransitionSpec(spec = {}) {
+function effectiveTransitionSpec(spec: ViewSpec = {}): Required<TransitionSpec> {
   return defaultTransition(specTransition(spec));
 }
 
-function easeFor(name, d3) {
+function easeFor(name: string | undefined, d3: D3Lib): (progress: number) => number {
   const eases = {
     linear: d3.easeLinear, cubic: d3.easeCubic, cubicInOut: d3.easeCubicInOut,
     exp: d3.easeExp, expInOut: d3.easeExpInOut, elastic: d3.easeElasticOut, back: d3.easeBackOut
   };
-  return eases[name] || d3.easeCubicInOut;
+  return (name ? eases[name as keyof typeof eases] : undefined) || d3.easeCubicInOut;
 }
 
-function activeMarkLayer(scene, mark, transition) {
+function activeMarkLayer(scene: RenderScene, mark: string, transition: RenderTransition): SvgSelection<SVGGElement> {
   fadeLayers(scene, mark, transition);
   if (!scene.markLayers.has(mark)) {
     scene.markLayers.set(mark, scene.markRoot.append('g').attr('class', `vd-mark-layer vd-${mark}-layer`));
   }
-  const layer = scene.markLayers.get(mark);
-  layer.interrupt().style('display', null).transition(transition.base).style('opacity', 1);
+  const layer = scene.markLayers.get(mark)!;
+  motion(layer.interrupt().style('display', null), transition.base).style('opacity', 1);
   return layer;
 }
 
-function fadeLayers(scene, activeMark, transition = null, d3 = null) {
-  const resolvedTransition = transition || { base: d3.transition().duration(300) };
+function fadeLayers(
+  scene: RenderScene,
+  activeMark: string,
+  transition: RenderTransition | null = null,
+  d3: D3Lib | null = null
+): void {
+  if (!transition && !d3) throw new Error('fadeLayers requires a transition or D3 runtime.');
+  const resolvedTransition = transition || { base: { delay: 0, duration: 300, ease: d3!.easeCubicInOut } };
   scene.markLayers.forEach((layer, mark) => {
     if (mark === activeMark) return;
-    layer.interrupt().transition(resolvedTransition.base).style('opacity', 0);
+    motion(layer.interrupt(), resolvedTransition.base).style('opacity', 0);
   });
 }
 
-function staggerDelay(spec, datum, index, override) {
+function staggerDelay(
+  spec: ViewSpec,
+  datum: RenderDatum,
+  index: number,
+  override?: StaggerSpec | number
+): number {
   const stagger = override === undefined ? effectiveTransitionSpec(spec).stagger : override;
   if (!stagger) return 0;
   if (typeof stagger === 'number') return index * stagger;
-  const step = stagger.step ?? stagger.ms ?? DEFAULT_MARK_DELAY.step;
+  const step = stagger.step ?? (stagger as StaggerSpec & { ms?: number }).ms ?? DEFAULT_MARK_DELAY.step;
   const max = stagger.max ?? DEFAULT_MARK_DELAY.max;
   if (stagger.by) {
     const value = Number(datum[stagger.by] ?? datum.__row?.[stagger.by] ?? index);
@@ -220,87 +326,87 @@ function staggerDelay(spec, datum, index, override) {
   return Math.min(index * step, max);
 }
 
-function drawPath(selection, transition, d3) {
-  selection.each(function() {
-    const path = d3.select(this);
-    const total = this.getTotalLength();
-    path.attr('stroke-dasharray', `${total} ${total}`)
-      .attr('stroke-dashoffset', total)
-      .style('opacity', 1)
-      .transition(transition)
-      .attr('stroke-dashoffset', 0)
-      .on('end', function() {
-        d3.select(this).attr('stroke-dasharray', null).attr('stroke-dashoffset', null);
-      });
-  });
+function fadeNonBarShapes(chart: RenderChartContext): void {
+  motion(chart.g.selectAll<SVGElement, unknown>('circle,path:not(.vd-line)'), chart.transition.base).style('opacity', 0);
 }
 
-function fadeNonBarShapes(chart) {
-  chart.g.selectAll('circle,path:not(.vd-line)').transition(chart.transition.base).style('opacity', 0);
+function fadeNonLineShapes(chart: RenderChartContext): void {
+  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,circle.vd-point,circle.vd-unit'), chart.transition.base).style('opacity', 0);
 }
 
-function fadeNonLineShapes(chart) {
-  chart.g.selectAll('rect.vd-bar,circle.vd-point,circle.vd-unit').transition(chart.transition.base).style('opacity', 0);
+function fadeNonPointShapes(chart: RenderChartContext): void {
+  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-unit'), chart.transition.base).style('opacity', 0);
 }
 
-function fadeNonPointShapes(chart) {
-  chart.g.selectAll('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-unit').transition(chart.transition.base).style('opacity', 0);
+function fadeNonUnitShapes(chart: RenderChartContext): void {
+  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point'), chart.transition.base).style('opacity', 0);
 }
 
-function fadeNonUnitShapes(chart) {
-  chart.g.selectAll('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point').transition(chart.transition.base).style('opacity', 0);
-}
-
-function applyPlotClip(chart, enabled) {
+function applyPlotClip(chart: RenderChartContext, enabled: boolean): void {
   if (!enabled) { chart.g.attr('clip-path', null); return; }
   const id = `vd-mark-clip-${chart.scene.clipIdentity}`;
   ensureClipRect(chart.scene, id, { x: 0, y: 0, width: chart.innerWidth, height: chart.innerHeight });
   chart.g.attr('clip-path', `url(#${id})`);
 }
 
-function drawUnsupported(chart, spec, availableTypes = []) {
+function drawUnsupported(chart: RenderChartContext, spec: ViewSpec, availableTypes: string[] = []): void {
   chart.g.append('text')
     .attr('x', chart.innerWidth / 2).attr('y', chart.innerHeight / 2)
     .attr('text-anchor', 'middle').attr('fill', 'var(--vd-muted)')
     .text(`Unsupported chart type "${spec.mark}"${availableTypes.length ? ` · available: ${availableTypes.join(', ')}` : ''}`);
 }
 
-function bandOrLinear(rows, channel, range, d3, options = {}) {
-  if (!channel) return d3.scaleLinear().domain([0, 1]).range(range);
+function bandOrLinear(
+  rows: RenderDatum[],
+  channel: RenderChannel | undefined,
+  range: [number, number],
+  d3: D3Lib,
+  options: ScaleOptions = {}
+): RuntimeScale {
+  if (!channel) return asRuntimeScale(d3.scaleLinear().domain([0, 1]).range(range));
   const resolved = channel.field && !channel.type
     ? { ...channel, type: inferFieldType(rows, channel.field) }
     : channel;
   let scale;
   if (resolved.type === 'quantitative') scale = quantitativeScale(rows, resolved, range, d3, options);
   else if (resolved.type === 'temporal') {
+    const field = resolved.field ?? '';
     const explicitDomain = Array.isArray(resolved.domain);
-    const dataDomain = d3.extent(rows, (d) => channelValue(d[resolved.field], resolved));
-    const domain = (resolved.domain || d3.extent(rows, (d) => channelValue(d[resolved.field], resolved)))
-      .map((value) => channelValue(value, resolved));
-    scale = d3.scaleTime().domain(domain).range(range).nice();
+    const values = rows.map((datum) => channelValue(datum[field], resolved)) as Array<Date | number>;
+    const dataDomain = d3.extent(values);
+    const domain = (resolved.domain || dataDomain)
+      .map((value) => channelValue(value, resolved)) as Array<Date | number>;
+    scale = asRuntimeScale(d3.scaleTime().domain(domain).range(range).nice());
     scale.__visDeltaDataDomain = dataDomain;
     if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
   } else {
-    scale = d3.scaleBand().domain(channelDomain(rows, resolved)).range(range).padding(0.24);
+    scale = asRuntimeScale(d3.scaleBand<AxisDomain>().domain(channelDomain(rows, resolved) as AxisDomain[]).range(range).padding(0.24));
   }
   scale.__visDeltaChannel = resolved;
   return scale;
 }
 
-function quantitativeScale(rows, channel = {}, range, d3, options = {}) {
+function quantitativeScale(
+  rows: RenderDatum[],
+  channel: RenderChannel = {},
+  range: [number, number],
+  d3: D3Lib,
+  options: ScaleOptions = {}
+): RuntimeScale {
   const scaleType = channel.scale?.type || channel.scaleType || 'linear';
   const domain = quantitativeDomain(rows, channel, scaleType === 'log' ? 1 : undefined);
-  const values = rows.map((row) => Number(row[channel.field])).filter(Number.isFinite);
+  const field = channel.field ?? '';
+  const values = rows.map((row) => Number(row[field])).filter(Number.isFinite);
   const dataDomain = values.length ? d3.extent(values) : domain;
   const explicitDomain = Array.isArray(channel.domain);
   let scale;
   if (scaleType === 'log') {
     const safeDomain = domain.map((value) => Math.max(Number(value) || 1, 0.1));
-    scale = d3.scaleLog().domain(safeDomain).range(range).nice();
+    scale = asRuntimeScale(d3.scaleLog().domain(safeDomain).range(range).nice());
   } else if (scaleType === 'sqrt') {
-    scale = d3.scaleSqrt().domain(domain).range(range).nice();
+    scale = asRuntimeScale(d3.scaleSqrt().domain(domain).range(range).nice());
   } else {
-    scale = d3.scaleLinear().domain(domain).range(range).nice();
+    scale = asRuntimeScale(d3.scaleLinear().domain(domain).range(range).nice());
   }
   scale.__visDeltaDataDomain = dataDomain;
   if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
@@ -314,7 +420,7 @@ function quantitativeScale(rows, channel = {}, range, d3, options = {}) {
  * range; only its inferred domain grows. Explicit author domains remain
  * authoritative and never reach this helper.
  */
-function padContinuousDomain(scale, padding = 0) {
+function padContinuousDomain(scale: RuntimeScale, padding = 0): RuntimeScale {
   const pixels = Math.max(0, Number(padding) || 0);
   if (!pixels || typeof scale.copy !== 'function' || typeof scale.invert !== 'function') return scale;
   const range = scale.range();
@@ -326,58 +432,73 @@ function padContinuousDomain(scale, padding = 0) {
   const direction = Math.sign(end - start) || 1;
   const inner = [start + direction * pixels, end - direction * pixels];
   const projection = scale.copy().range(inner);
-  scale.domain([projection.invert(start), projection.invert(end)]);
+  scale.domain([projection.invert!(start), projection.invert!(end)]);
   return scale;
 }
 
-function position(scale, value) {
-  const scaled = scale(channelValue(value, scale.__visDeltaChannel));
-  if (typeof scale.bandwidth === 'function') return scaled + scale.bandwidth() / 2;
-  return scaled;
+function asRuntimeScale(scale: unknown): RuntimeScale {
+  return scale as RuntimeScale;
 }
 
-function niceExtent(rows, field, floor) {
-  const values = rows.map((row) => Number(row[field])).filter(Number.isFinite);
+function position(scale: RuntimeScale, value: unknown): number {
+  const scaled = scale(channelValue(value, scale.__visDeltaChannel));
+  if (typeof scale.bandwidth === 'function') return (scaled as number) + scale.bandwidth() / 2;
+  return scaled as number;
+}
+
+function niceExtent(rows: RenderDatum[], field: string | undefined, floor?: number): [number, number] {
+  const key = field ?? '';
+  const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
   if (!values.length) return [0, 1];
   const min = floor ?? Math.min(...values);
   const max = Math.max(...values);
   return min === max ? [min - 1, max + 1] : [min, max];
 }
 
-function quantitativeDomain(rows, channel = {}, floor) {
-  if (Array.isArray(channel.domain)) return channel.domain;
+function quantitativeDomain(rows: RenderDatum[], channel: RenderChannel = {}, floor?: number): number[] {
+  if (Array.isArray(channel.domain)) return channel.domain as number[];
   return niceExtent(rows, channel.field, floor);
 }
 
-function channelDomain(rows, channel = {}) {
+function channelDomain(rows: RenderDatum[], channel: RenderChannel = {}): unknown[] {
   if (Array.isArray(channel.domain)) return channel.domain;
-  return Array.from(new Set(rows.map((row) => row[channel.field])));
+  const field = channel.field ?? '';
+  return Array.from(new Set(rows.map((row) => row[field])));
 }
 
-function colorScale(rows, channel, d3) {
+function colorScale(rows: RenderDatum[], channel: RenderChannel | undefined, d3: D3Lib): (row: RenderDatum) => string {
   const resolved = resolveColorChannel(rows, channel);
   if (!resolved) return () => themeColor(DEFAULT_LUMINANCE_BASE);
-  channel = resolved;
-  if (channel.value) return () => cssColor(channel.value, '#4e79a7');
-  if (channel.hue || channel.luminance) return compositeColorScale(channel, d3);
-  if (!channel.field) return () => themeColor(DEFAULT_LUMINANCE_BASE);
-  if (channel.type === 'quantitative') return luminanceColorScale(rows, channel, d3);
+  const activeChannel = resolved;
+  if (activeChannel.value) return () => cssColor(activeChannel.value, '#4e79a7');
+  if (activeChannel.hue || activeChannel.luminance) return compositeColorScale(activeChannel, d3);
+  if (!activeChannel.field) return () => themeColor(DEFAULT_LUMINANCE_BASE);
+  if (activeChannel.type === 'quantitative') return luminanceColorScale(rows, activeChannel, d3);
   // Use the transition registry for consistent key→color mapping across frames.
-  const fieldRegistry = !channel.range && context.colors?.get(channel.field);
+  const field = activeChannel.field;
+  const fieldRegistry = !activeChannel.range && context.colors?.get(field);
   if (fieldRegistry) {
     const fallback = themeColor(DEFAULT_LUMINANCE_BASE);
-    return (row) => fieldRegistry.get(String(row[channel.field])) ?? fallback;
+    return (row) => fieldRegistry.get(String(row[field])) ?? fallback;
   }
-  const domain = channelDomain(rows, channel);
-  const scale = d3.scaleOrdinal(colorRange(channel.range || categoricalRange(domain))).domain(domain);
-  return (row) => scale(row[channel.field]);
+  const domain = channelDomain(rows, activeChannel);
+  const scale = d3.scaleOrdinal<AxisDomain, string>(colorRange(activeChannel.range || categoricalRange(domain)))
+    .domain(domain as AxisDomain[]);
+  return (row) => scale(row[field] as AxisDomain);
 }
 
-function drawXAxis(chart, scale, title, d3, transition = chart.transition.base, options = {}) {
+function drawXAxis(
+  chart: RenderChartContext,
+  scale: RuntimeScale | null,
+  title: string | undefined,
+  d3: D3Lib,
+  transition: MotionTransition = chart.transition.base,
+  options: AxisOptions = {}
+): void {
   const side = options.side === 'top' ? 'top' : 'bottom';
   const duration = options.duration;
   if (!scale) {
-    const inactiveSide = activeAxisSide(chart.scene.xAxis, side);
+    const inactiveSide = activeHorizontalAxisSide(chart.scene.xAxis, side);
     markAxisInactive(chart.scene.xAxis);
     timedTransition(chart.scene.xAxis, transition, duration)
       .attr('transform', axisSideTransform(chart, inactiveSide, true))
@@ -392,11 +513,12 @@ function drawXAxis(chart, scale, title, d3, transition = chart.transition.base, 
   const tickCount = options.tickCount ?? themeValue('--vd-tick-count', 6);
   const labelOffset = themeValue('--vd-axis-label-offset', 48);
   const axisFactory = side === 'top' ? d3.axisTop : d3.axisBottom;
+  const axisScale = scale as unknown as AxisScale<AxisDomain>;
   let axis = typeof scale.bandwidth === 'function'
-    ? axisFactory(scale)
-    : axisFactory(scale).ticks(tickCount, options.tickFormat);
+    ? axisFactory(axisScale)
+    : axisFactory(axisScale).ticks(tickCount, options.tickFormat);
   if (typeof scale.bandwidth !== 'function') {
-    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 44));
+    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 44) as AxisDomain[]);
   }
   axis = axis.tickSizeOuter(0);
   // Adaptive label thinning for band (categorical) x-axes:
@@ -404,10 +526,10 @@ function drawXAxis(chart, scale, title, d3, transition = chart.transition.base, 
   if (typeof scale.bandwidth === 'function') {
     const domain = scale.domain();
     const minPxPerLabel = 44; // ~5 chars × 7px + 9px padding
-    const pxPerBand = scale.step();
+    const pxPerBand = scale.step!();
     if (pxPerBand < minPxPerLabel) {
       const step = Math.ceil(minPxPerLabel / pxPerBand);
-      axis = axis.tickValues(domain.filter((_, i) => i % step === 0));
+      axis = axis.tickValues(domain.filter((_, i) => i % step === 0) as AxisDomain[]);
     }
   }
   const kind = axisKind(side, scale);
@@ -441,7 +563,14 @@ function drawXAxis(chart, scale, title, d3, transition = chart.transition.base, 
   }
 }
 
-function drawYAxis(chart, scale, title, d3, transition = chart.transition.base, options = {}) {
+function drawYAxis(
+  chart: RenderChartContext,
+  scale: RuntimeScale | null,
+  title: string | undefined,
+  d3: D3Lib,
+  transition: MotionTransition = chart.transition.base,
+  options: AxisOptions = {}
+): void {
   const side = options.side === 'right' ? 'right' : 'left';
   const duration = options.duration;
   if (!scale) {
@@ -456,21 +585,22 @@ function drawYAxis(chart, scale, title, d3, transition = chart.transition.base, 
   const tickCount = options.tickCount ?? themeValue('--vd-tick-count', 6);
   const labelOffset = themeValue('--vd-axis-label-offset', 48);
   const axisFactory = side === 'right' ? d3.axisRight : d3.axisLeft;
+  const axisScale = scale as unknown as AxisScale<AxisDomain>;
   let axis = typeof scale.bandwidth === 'function'
-    ? axisFactory(scale)
-    : axisFactory(scale).ticks(tickCount, options.tickFormat);
+    ? axisFactory(axisScale)
+    : axisFactory(axisScale).ticks(tickCount, options.tickFormat);
   if (typeof scale.bandwidth !== 'function') {
-    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 22));
+    axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 22) as AxisDomain[]);
   }
   axis = axis.tickSizeOuter(0);
   // Adaptive label thinning for band (categorical) y-axes (horizontal bar charts):
   if (typeof scale.bandwidth === 'function') {
     const domain = scale.domain();
     const minPxPerLabel = 22; // vertical: ~1 line height
-    const pxPerBand = scale.step();
+    const pxPerBand = scale.step!();
     if (pxPerBand < minPxPerLabel) {
       const step = Math.ceil(minPxPerLabel / pxPerBand);
-      axis = axis.tickValues(domain.filter((_, i) => i % step === 0));
+      axis = axis.tickValues(domain.filter((_, i) => i % step === 0) as AxisDomain[]);
     }
   }
   const kind = axisKind(side, scale);
@@ -493,16 +623,28 @@ function drawYAxis(chart, scale, title, d3, transition = chart.transition.base, 
   }
 }
 
-function drawGrid(chart, y, d3, transition = chart.transition.base, options = {}) {
+function drawGrid(
+  chart: RenderChartContext,
+  y: RuntimeScale | null,
+  d3: D3Lib,
+  transition: MotionTransition = chart.transition.base,
+  options: GridOptions = {}
+): void {
   updateGrid(chart, y, d3, transition, {
     keepX: Boolean(options.x),
     tickCount: options.yTickCount,
     duration: options.duration
   });
-  updateXGrid(chart, options.x, d3, transition, options.xTickCount, options.duration);
+  updateXGrid(chart, options.x ?? null, d3, transition, options.xTickCount, options.duration);
 }
 
-function updateGrid(chart, y, d3, transition = chart.transition.base, options = {}) {
+function updateGrid(
+  chart: RenderChartContext,
+  y: RuntimeScale | null,
+  d3: D3Lib,
+  transition: MotionTransition = chart.transition.base,
+  options: GridOptions = {}
+): void {
   if (!options.keepX) updateXGrid(chart, null, d3, transition, undefined, options.duration);
   if (!y) {
     markAxisInactive(chart.scene.grid);
@@ -511,15 +653,22 @@ function updateGrid(chart, y, d3, transition = chart.transition.base, options = 
   }
   const grid = chart.scene.grid.interrupt().attr('transform', null);
   const tickCount = options.tickCount ?? themeValue('--vd-tick-count', 6);
-  renderAxisWithGuard(grid, d3.axisLeft(y)
+  renderAxisWithGuard(grid, d3.axisLeft(y as unknown as AxisScale<AxisDomain>)
     .ticks(tickCount)
-    .tickValues(prioritizedContinuousTicks(y, tickCount, 22))
+    .tickValues(prioritizedContinuousTicks(y, tickCount, 22) as AxisDomain[])
     .tickSize(-chart.innerWidth)
-    .tickFormat(''), transition, axisKind('grid-left', y), options.duration);
+    .tickFormat(() => ''), transition, axisKind('grid-left', y), options.duration);
   timedTransition(grid, transition, options.duration).style('opacity', 1);
 }
 
-function updateXGrid(chart, x, d3, transition, tickCount, duration) {
+function updateXGrid(
+  chart: RenderChartContext,
+  x: RuntimeScale | null,
+  d3: D3Lib,
+  transition: MotionTransition,
+  tickCount: number | undefined,
+  duration: number | undefined
+): void {
   const layer = chart.scene.grid.selectAll('g.vd-point-x-grid')
     .data(x ? [null] : [])
     .join(
@@ -539,46 +688,61 @@ function updateXGrid(chart, x, d3, transition, tickCount, duration) {
     .join(
       (enter) => {
         const entered = enter.append('line')
-          .attr('x1', (value) => x(value))
-          .attr('x2', (value) => x(value))
+          .attr('x1', (value) => x(value) as number)
+          .attr('x2', (value) => x(value) as number)
           .attr('y1', 0)
           .attr('y2', chart.innerHeight)
           .style('opacity', 0);
-        return timedTransition(entered, transition, duration).style('opacity', 1);
+        timedTransition(entered, transition, duration).style('opacity', 1);
+        return entered;
       },
-      (update) => timedTransition(update, transition, duration)
-        .attr('x1', (value) => x(value))
-        .attr('x2', (value) => x(value))
-        .attr('y1', 0)
-        .attr('y2', chart.innerHeight)
-        .style('opacity', 1),
-      (exit) => timedTransition(exit, transition, duration).style('opacity', 0).remove()
+      (update) => {
+        timedTransition(update, transition, duration)
+          .attr('x1', (value) => x(value) as number)
+          .attr('x2', (value) => x(value) as number)
+          .attr('y1', 0)
+          .attr('y2', chart.innerHeight)
+          .style('opacity', 1);
+        return update;
+      },
+      (exit) => { timedTransition(exit, transition, duration).style('opacity', 0).remove(); }
     );
 }
 
-function drawLegend(chart, rows, channel, d3) {
+function drawLegend(
+  chart: RenderChartContext,
+  rows: RenderDatum[],
+  channel: RenderChannel | undefined,
+  d3: D3Lib
+): void {
   const colorRows = chart.domainRows?.length ? chart.domainRows : rows;
-  channel = resolveColorChannel(colorRows, channel);
-  if (!channel || channel.value || (!channel.field && !channel.hue && !channel.luminance)) {
-    chart.scene.legend.transition(chart.transition.base).style('opacity', 0);
+  const activeChannel = resolveColorChannel(colorRows, channel);
+  if (!activeChannel || activeChannel.value || (!activeChannel.field && !activeChannel.hue && !activeChannel.luminance)) {
+    motion(chart.scene.legend, chart.transition.base).style('opacity', 0);
     return;
   }
-  const legendChannel = channel.hue?.field ? channel.hue : channel.luminance?.field ? channel.luminance : channel;
+  const legendChannel = activeChannel.hue?.field
+    ? activeChannel.hue
+    : activeChannel.luminance?.field
+      ? activeChannel.luminance
+      : activeChannel;
+  const legendField = legendChannel.field!;
   const quantitativeLegend = legendChannel.type === 'quantitative';
   const domain = quantitativeLegend
     ? quantitativeLegendDomain(colorRows, legendChannel, d3)
     : channelDomain(colorRows, legendChannel);
-  const fieldRegistry = !channel.range && !channel.hue && !channel.luminance && !quantitativeLegend
-    ? context.colors?.get(legendChannel.field)
+  const fieldRegistry = !activeChannel.range && !activeChannel.hue && !activeChannel.luminance && !quantitativeLegend
+    ? context.colors?.get(legendField)
     : null;
-  const scale = channel.hue || channel.luminance
-    ? compositeColorScale(channel, d3)
+  const scale = activeChannel.hue || activeChannel.luminance
+    ? compositeColorScale(activeChannel, d3)
     : quantitativeLegend
       ? luminanceColorScale(colorRows, legendChannel, d3)
       : fieldRegistry
-        ? (d) => fieldRegistry.get(String(d)) ?? themeColor(DEFAULT_LUMINANCE_BASE)
-        : d3.scaleOrdinal(channel.range || categoricalRange(domain)).domain(domain);
-  const legendRow = (value) => ({ [legendChannel.field]: value });
+        ? (value: unknown) => fieldRegistry.get(String(value)) ?? themeColor(DEFAULT_LUMINANCE_BASE)
+        : d3.scaleOrdinal<AxisDomain, string>(activeChannel.range || categoricalRange(domain))
+            .domain(domain as AxisDomain[]);
+  const legendRow = (value: unknown): RenderDatum => ({ [legendField]: value });
   const swatchSize = themeValue('--vd-legend-swatch-size', 9);
   const swatchRadius = themeValue('--vd-legend-swatch-radius', 1.5);
   const legendInset = context.chartStyle?.legendInset ?? { top: 8, left: 8 };
@@ -590,66 +754,77 @@ function drawLegend(chart, rows, channel, d3) {
   );
   const legend = chart.scene.legend.interrupt().style('opacity', 1)
     .attr('transform', `translate(${chart.margin.left + legendInset.left + (atRight ? chart.innerWidth : 0)},${legendInset.top + (atRight ? chart.margin.top : 0)})`);
-  const items = legend.selectAll('g.vd-legend-item').data(domain, (d) => d);
+  const items = legend.selectAll<SVGGElement, unknown>('g.vd-legend-item').data(domain, (value) => String(value));
   const entered = items.enter().append('g').attr('class', 'vd-legend-item').style('opacity', 0);
   entered.append('rect').attr('width', swatchSize).attr('height', swatchSize).attr('rx', swatchRadius);
   entered.append('text').attr('x', swatchSize + 6).attr('y', swatchSize - 0.5);
-  items.merge(entered).transition(chart.transition.base).style('opacity', 1)
+  motion(items.merge(entered), chart.transition.base).style('opacity', 1)
     .attr('transform', (_, index) => {
       const item = layout.items[index];
       return `translate(${item.x},${item.y})`;
     });
-  items.merge(entered).select('rect').transition(chart.transition.base)
-    .attr('fill', (d) => channel.hue || channel.luminance ? scale(legendRow(d)) : scale(d));
-  items.merge(entered).select('text').text((d) => quantitativeLegend ? d3.format('~g')(d) : d);
-  items.exit().transition(chart.transition.base).style('opacity', 0).remove();
+  motion(items.merge(entered).select<SVGRectElement>('rect'), chart.transition.base)
+    .attr('fill', (value) => activeChannel.hue || activeChannel.luminance
+      ? scale(legendRow(value) as RenderDatum & AxisDomain)
+      : scale(value as RenderDatum & AxisDomain));
+  items.merge(entered).select('text').text((value) => quantitativeLegend ? d3.format('~g')(Number(value)) : String(value));
+  motion(items.exit<unknown>(), chart.transition.base).style('opacity', 0).remove();
 }
 
-function bindTooltip(selection, spec, tooltip) {
+function bindTooltip<E extends Element, D extends RenderDatum, P extends BaseType, PD>(
+  selection: Selection<E, D, P, PD>,
+  spec: ViewSpec,
+  tooltip: HTMLElement
+): void {
+  // d3 types the generic element's pointer events as CustomEvent | MouseEvent.
   selection
-    .on('mouseenter', (event, row) => { const html = tooltipHtml(row, spec.encoding?.tooltip); if (html) showTooltip(tooltip, event, html); })
-    .on('mousemove', (event) => moveTooltip(tooltip, event))
+    .on('mouseenter', (event, row) => { const html = tooltipHtml(row, spec.encoding?.tooltip); if (html) showTooltip(tooltip, event as MouseEvent, html); })
+    .on('mousemove', (event) => moveTooltip(tooltip, event as MouseEvent))
     .on('mouseleave', () => hideTooltip(tooltip));
 }
 
-function showTooltip(tooltip, event, html) {
+function showTooltip(tooltip: HTMLElement, event: MouseEvent, html: string): void {
   tooltip.innerHTML = html;
   tooltip.style.opacity = '1';
   moveTooltip(tooltip, event);
 }
 
-function moveTooltip(tooltip, event) {
+function moveTooltip(tooltip: HTMLElement, event: MouseEvent): void {
   tooltip.style.left = `${event.clientX + 14}px`;
   tooltip.style.top = `${event.clientY + 14}px`;
 }
 
-function hideTooltip(tooltip) { tooltip.style.opacity = '0'; }
+function hideTooltip(tooltip: HTMLElement): void { tooltip.style.opacity = '0'; }
 
-function markAxisInactive(axisGroup) {
+function markAxisInactive(axisGroup: SvgSelection<AxisElement>): void {
   const node = axisGroup.node();
   if (!node) return;
   node.__visDeltaAxisActive = false;
 }
 
-function applyXAxisClip(chart) {
+function applyXAxisClip(chart: RenderChartContext): void {
   const id = `vd-x-axis-clip-${chart.scene.clipIdentity}`;
   ensureClipRect(chart.scene, id, { x: -28, y: -8, width: chart.innerWidth + 56, height: 72 });
   chart.scene.xAxis.attr('clip-path', `url(#${id})`);
 }
 
-function ensureClipRect(scene, id, rect) {
-  let defs = scene.svg.select('defs');
-  if (defs.empty()) defs = scene.svg.append('defs');
+function ensureClipRect(scene: RenderScene, id: string, rect: RectBounds): void {
+  let defs = scene.svg.select<SVGDefsElement>('defs');
+  if (defs.empty()) defs = scene.svg.append<SVGDefsElement>('defs');
   defs.selectAll(`#${id}`).data([null]).join('clipPath').attr('id', id)
     .selectAll('rect').data([null]).join('rect')
     .attr('x', rect.x).attr('y', rect.y).attr('width', rect.width).attr('height', rect.height);
 }
 
-function alignEdgeTickLabels(axisGroup, scale, d3) {
+function alignEdgeTickLabels(
+  axisGroup: SvgSelection<AxisElement>,
+  scale: RuntimeScale,
+  d3: D3Lib
+): void {
   if (typeof scale.bandwidth === 'function' || typeof scale.range !== 'function') return;
   const range = scale.range();
   const min = Math.min(...range), max = Math.max(...range);
-  axisGroup.selectAll('.tick').each(function() {
+  axisGroup.selectAll<SVGGElement, unknown>('.tick').each(function(this: SVGGElement) {
     const tick = d3.select(this);
     const match = (tick.attr('transform') || '').match(/translate\(([-\d.]+)/);
     if (!match) return;
@@ -666,7 +841,7 @@ function alignEdgeTickLabels(axisGroup, scale, d3) {
  * observations at either end. Keep data endpoints first, then admit ordinary
  * ticks only when they have enough screen distance from those endpoints.
  */
-function prioritizedContinuousTicks(scale, count, minSpacing) {
+function prioritizedContinuousTicks(scale: RuntimeScale, count: number, minSpacing: number): unknown[] {
   const ordinary = typeof scale.ticks === 'function' ? scale.ticks(count) : scale.domain();
   const scaleDomain = scale.domain().map((value) => Number(value));
   const domainMin = Math.min(...scaleDomain);
@@ -678,32 +853,48 @@ function prioritizedContinuousTicks(scale, count, minSpacing) {
       })
     : [];
   if (!endpoints.length) return ordinary;
-  const valueKey = (value) => value instanceof Date ? value.getTime() : Number(value);
+  const valueKey = (value: unknown) => value instanceof Date ? value.getTime() : Number(value);
   const uniqueEndpoints = [...new Map(endpoints.map((value) => [valueKey(value), value])).values()];
   const accepted = [...uniqueEndpoints];
   for (const tick of ordinary) {
     const duplicate = accepted.some((value) => valueKey(value) === valueKey(tick));
-    const crowded = uniqueEndpoints.some((value) => Math.abs(scale(value) - scale(tick)) < minSpacing);
+    const crowded = uniqueEndpoints.some((value) => Math.abs((scale(value) as number) - (scale(tick) as number)) < minSpacing);
     if (!duplicate && !crowded) accepted.push(tick);
   }
-  return accepted.sort((a, b) => scale(a) - scale(b));
+  return accepted.sort((a, b) => (scale(a) as number) - (scale(b) as number));
 }
 
-function axisKind(placement, scale) {
+function axisKind(placement: string, scale: RuntimeScale): string {
   return `${placement}:${typeof scale.bandwidth === 'function' ? 'band' : 'continuous'}`;
 }
 
-function axisIsEntering(axisGroup) {
+function axisIsEntering(axisGroup: SvgSelection<AxisElement>): boolean {
   const node = axisGroup.node();
   return !node?.__visDeltaAxisActive;
 }
 
-function activeAxisSide(axisGroup, fallback) {
+function activeAxisSide(
+  axisGroup: SvgSelection<AxisElement>,
+  fallback: 'top' | 'right' | 'bottom' | 'left'
+): 'top' | 'right' | 'bottom' | 'left' {
   const side = String(axisGroup.node()?.__visDeltaAxisKind || '').split(':')[0];
-  return ['top', 'right', 'bottom', 'left'].includes(side) ? side : fallback;
+  const sides = ['top', 'right', 'bottom', 'left'] as const;
+  return sides.includes(side as (typeof sides)[number]) ? side as (typeof sides)[number] : fallback;
 }
 
-function axisSideTransform(chart, side, outside) {
+function activeHorizontalAxisSide(
+  axisGroup: SvgSelection<AxisElement>,
+  fallback: 'top' | 'bottom'
+): 'top' | 'bottom' {
+  const side = activeAxisSide(axisGroup, fallback);
+  return side === 'top' || side === 'bottom' ? side : fallback;
+}
+
+function axisSideTransform(
+  chart: RenderChartContext,
+  side: 'top' | 'right' | 'bottom' | 'left',
+  outside: boolean
+): string {
   if (side === 'top') return `translate(${chart.margin.left},${outside ? 0 : chart.margin.top})`;
   if (side === 'right') {
     return `translate(${outside ? chart.width : chart.margin.left + chart.innerWidth},${chart.margin.top})`;
@@ -712,49 +903,91 @@ function axisSideTransform(chart, side, outside) {
   return `translate(${chart.margin.left},${outside ? chart.height : chart.margin.top + chart.innerHeight})`;
 }
 
-function axisPositionTransform(chart, side, position) {
+function axisPositionTransform(
+  chart: RenderChartContext,
+  side: 'top' | 'right' | 'bottom' | 'left',
+  position: number | undefined
+): string {
   if (!Number.isFinite(position)) return axisSideTransform(chart, side, false);
   if (side === 'top' || side === 'bottom') {
-    return `translate(${chart.margin.left},${chart.margin.top + position})`;
+    return `translate(${chart.margin.left},${chart.margin.top + position!})`;
   }
-  return `translate(${chart.margin.left + position},${chart.margin.top})`;
+  return `translate(${chart.margin.left + position!},${chart.margin.top})`;
 }
 
-function xLabelSideY(chart, side, outside, offset) {
+function xLabelSideY(
+  chart: RenderChartContext,
+  side: 'top' | 'bottom',
+  outside: boolean,
+  offset: number
+): number {
   if (side === 'top') return outside ? 0 : chart.margin.top - offset;
   return outside ? chart.height : chart.margin.top + chart.innerHeight + offset;
 }
 
-function placeYLabel(label, chart, side, offset, outside) {
+interface LabelTarget { attr(name: string, value: string | number | null): LabelTarget }
+
+function placeYLabel<Label extends LabelTarget>(
+  label: Label,
+  chart: RenderChartContext,
+  side: 'right' | 'left',
+  offset: number,
+  outside: boolean
+) : Label {
+  const target = label;
   if (side === 'right') {
-    return label
+    target
       .attr('x', chart.innerHeight / 2)
       .attr('y', outside ? -chart.margin.right : -offset)
       .attr('text-anchor', 'middle')
       .attr('transform', `translate(${chart.margin.left + chart.innerWidth},${chart.margin.top}) rotate(90)`);
+    return label;
   }
-  return label
+  target
     .attr('x', -chart.innerHeight / 2)
     .attr('y', outside ? 0 : chart.margin.left - offset)
     .attr('text-anchor', 'middle')
     .attr('transform', `translate(0,${chart.margin.top}) rotate(-90)`);
+  return label;
 }
 
-function renderAxisWithGuard(axisGroup, axis, transition, kind, duration) {
+function renderAxisWithGuard(
+  axisGroup: SvgSelection<AxisElement>,
+  axis: Axis<AxisDomain>,
+  transition: MotionTransition,
+  kind: string,
+  duration: number | undefined
+): void {
   const node = axisGroup.node();
   const canTransition = node?.__visDeltaAxisActive && node.__visDeltaAxisKind === kind;
   const replacesKind = node?.__visDeltaAxisActive && node.__visDeltaAxisKind !== kind;
   if (node) { node.__visDeltaAxisActive = true; node.__visDeltaAxisKind = kind; }
-  if (canTransition) { timedTransition(axisGroup, transition, duration).call(axis); return; }
-  if (replacesKind) {
-    fadeClone(axisGroup, 'vd-axis vd-axis-ghost', transition, duration);
-    axisGroup.call(axis).style('opacity', 0);
+  const orient = axisOrient(kind);
+  if (canTransition) {
+    renderAxis(axisGroup, axis, orient, (selection) => timedTransition(selection, transition, duration));
     return;
   }
-  axisGroup.call(axis);
+  if (replacesKind) {
+    fadeClone(axisGroup, 'vd-axis vd-axis-ghost', transition, duration);
+    renderAxis(axisGroup, axis, orient, null);
+    axisGroup.style('opacity', 0);
+    return;
+  }
+  renderAxis(axisGroup, axis, orient, null);
 }
 
-function transitionAxisLabel(label, title, transition, duration) {
+/** Axis kinds are `${placement}:${scale}`; grid placements are prefixed `grid-`. */
+function axisOrient(kind: string): AxisOrient {
+  const placement = kind.split(':')[0].replace(/^grid-/, '');
+  return placement === 'top' || placement === 'right' || placement === 'bottom' ? placement : 'left';
+}
+
+function transitionAxisLabel(
+  label: SvgSelection<SVGTextElement>,
+  title: string,
+  transition: MotionTransition,
+  duration: number | undefined
+): Motion<SVGTextElement, unknown> {
   const previousTitle = label.text();
   // An axis has one meaning in each frame, so it must have one label node.
   // Keep incompatible axis geometry ghosts, but never duplicate title text.
@@ -763,8 +996,8 @@ function transitionAxisLabel(label, title, transition, duration) {
   if (previousTitle && previousTitle !== title) {
     label.text(previousTitle).style('opacity', 1);
     return timedTransition(label, transition, duration)
-      .tween('text', function() {
-        return (progress) => { this.textContent = progress < 0.5 ? previousTitle : title; };
+      .tween('text', function(this: Element) {
+        return (progress: number) => { this.textContent = progress < 0.5 ? previousTitle : title; };
       })
       .style('opacity', 1);
   }
@@ -772,19 +1005,30 @@ function transitionAxisLabel(label, title, transition, duration) {
   return timedTransition(label, transition, duration).style('opacity', 1);
 }
 
-function fadeClone(selection, className, transition, duration) {
+function fadeClone<ElementType extends BaseType, Datum>(
+  selection: Selection<ElementType, Datum, any, any>,
+  className: string,
+  transition: MotionTransition,
+  duration: number | undefined
+): void {
   const clone = selection.clone(true).attr('class', className).attr('aria-hidden', 'true');
   timedTransition(clone, transition, duration).style('opacity', 0).remove();
 }
 
-function timedTransition(selection, transition, duration) {
-  const scheduled = selection.transition(transition);
-  return Number.isFinite(Number(duration))
-    ? scheduled.duration(Math.max(0, Number(duration)))
-    : scheduled;
+function timedTransition<ElementType extends BaseType, Datum>(
+  selection: Selection<ElementType, Datum, any, any>,
+  transition: MotionTransition,
+  duration: number | undefined
+): Motion<ElementType, Datum> {
+  return motion(selection, Number.isFinite(Number(duration))
+    ? { ...transition, duration: Math.max(0, Number(duration)) }
+    : transition);
 }
 
-function resolveColorChannel(rows, channel) {
+function resolveColorChannel(
+  rows: RenderDatum[],
+  channel: RenderChannel | false | null | undefined
+): RenderChannel | null {
   if (channel === false) return null;
   // Color is a data encoding only when the author declares one. With no
   // channel, renderers use the single theme accent and draw no legend.
@@ -801,7 +1045,7 @@ function resolveColorChannel(rows, channel) {
   return null;
 }
 
-function normalizeColorSubchannel(rows, channel = {}) {
+function normalizeColorSubchannel(rows: RenderDatum[], channel: RenderChannel = {}): RenderChannel {
   if (!channel.field) return channel;
   return { ...channel, type: channel.type || inferFieldType(rows, channel.field) };
 }
@@ -809,7 +1053,7 @@ function normalizeColorSubchannel(rows, channel = {}) {
 // Automatic categorical color assignment: resolve the active palette from CSS
 // variables, then use greedy farthest-first hue selection so that the n chosen
 // colors are as distinct as possible (Rules #4 + #5).
-function categoricalRange(domain) {
+function categoricalRange(domain: unknown[]): string[] {
   const resolved = DEFAULT_PALETTE.map((entry) => themeColor(entry));
   // Sequential slot assignment: Nth category → series-N. Consistent with the
   // stacked/grouped bar chart's explicit 'var(--vd-series-N)' range and with
@@ -817,25 +1061,30 @@ function categoricalRange(domain) {
   return domain.map((_, i) => resolved[i % resolved.length]);
 }
 
-function luminanceColorScale(rows, channel, d3) {
+function luminanceColorScale(
+  rows: RenderDatum[],
+  channel: RenderChannel,
+  d3: D3Lib
+): (row: RenderDatum) => string {
   const domain = quantitativeDomain(rows, channel);
   const base = cssColor(channel.base || channel.value || themeColor(DEFAULT_LUMINANCE_BASE), '#4e79a7');
   const lightness = channel.lightness || [22, -18];
   const scale = d3.scaleLinear().domain(domain).range(lightness).clamp(true);
-  return (row = {}) => adjustLightness(base, scale(Number(row[channel.field])), d3);
+  const field = channel.field!;
+  return (row = {}) => adjustLightness(base, scale(Number(row[field])), d3);
 }
 
-function themeColor([name, fallback] = []) {
+function themeColor([name, fallback]: readonly [string, string]): string {
   if (!name) return fallback;
   return themeValue(name, fallback);
 }
 
-function colorRange(range = []) {
+function colorRange(range: string[] = []): string[] {
   return range.map((color, index) => cssColor(color, themeColor(DEFAULT_PALETTE[index % DEFAULT_PALETTE.length])));
 }
 
-function cssColor(color, fallback = '#4e79a7') {
-  if (typeof color !== 'string') return color || fallback;
+function cssColor(color: unknown, fallback = '#4e79a7'): string {
+  if (typeof color !== 'string') return (color as string) || fallback;
   const value = color.trim();
   if (!value.startsWith('var(')) return value || fallback;
   if (typeof document === 'undefined') return fallback;
@@ -846,29 +1095,35 @@ function cssColor(color, fallback = '#4e79a7') {
   return resolved || inlineFallback || fallback;
 }
 
-function compositeColorScale(channel, d3) {
+function compositeColorScale(channel: RenderChannel, d3: D3Lib): (row: RenderDatum) => string {
   const hue = channel.hue || {};
   const luminance = channel.luminance || {};
   const hueDomain = hue.domain || [];
-  const hueScale = d3.scaleOrdinal(colorRange(hue.range || categoricalRange(hueDomain))).domain(hueDomain);
+  const hueScale = d3.scaleOrdinal<AxisDomain, string>(colorRange(hue.range || categoricalRange(hueDomain)))
+    .domain(hueDomain as AxisDomain[]);
   const luminanceDomain = luminance.domain || [];
   const continuousLuminance = luminance.type === 'quantitative' ||
     (luminanceDomain.length === 2 && luminanceDomain.every((value) => Number.isFinite(Number(value))));
   const lightness = luminance.lightness || [18, 0, -18];
   const lightnessScale = continuousLuminance
     ? d3.scaleLinear().domain(luminanceDomain.map(Number)).range([lightness[0], lightness[lightness.length - 1]]).clamp(true)
-    : d3.scaleOrdinal(lightness).domain(luminanceDomain);
+    : d3.scaleOrdinal<AxisDomain, number>(lightness).domain(luminanceDomain as AxisDomain[]);
+  const lightnessOffset = continuousLuminance
+    ? (value: unknown) => (lightnessScale as import('d3-scale').ScaleLinear<number, number>)(Number(value))
+    : (value: unknown) => (lightnessScale as import('d3-scale').ScaleOrdinal<AxisDomain, number>)(value as AxisDomain);
+  const hueField = hue.field;
+  const luminanceField = luminance.field;
   return (row = {}) => {
-    const base = cssColor(hue.value || hueScale(row[hue.field]), '#4e79a7');
-    const luminanceValue = row[luminance.field];
-    const offset = luminance.field && (continuousLuminance || luminanceDomain.includes(luminanceValue))
-      ? Number(lightnessScale(continuousLuminance ? Number(luminanceValue) : luminanceValue)) || 0
+    const base = cssColor(hue.value || hueScale(row[hueField!] as AxisDomain), '#4e79a7');
+    const luminanceValue = luminanceField ? row[luminanceField] : undefined;
+    const offset = luminanceField && (continuousLuminance || luminanceDomain.includes(luminanceValue))
+      ? Number(lightnessOffset(luminanceValue)) || 0
       : 0;
     return adjustLightness(base, offset, d3);
   };
 }
 
-function adjustLightness(color, offset, d3) {
+function adjustLightness(color: unknown, offset: number, d3: D3Lib): string {
   const resolved = cssColor(color, '#4e79a7');
   const hcl = d3.hcl(resolved);
   if (!Number.isFinite(hcl.l)) return resolved;
@@ -876,16 +1131,16 @@ function adjustLightness(color, offset, d3) {
   return hcl.formatHex();
 }
 
-function quantitativeLegendDomain(rows, channel, d3) {
+function quantitativeLegendDomain(rows: RenderDatum[], channel: RenderChannel, d3: D3Lib): number[] {
   const [min, max] = quantitativeDomain(rows, channel);
   if (min === max) return [min];
   return d3.ticks(min, max, 3);
 }
 
-function legendLayout(domain, availableWidth, swatchSize) {
+function legendLayout(domain: unknown[], availableWidth: number, swatchSize: number) {
   const rowHeight = Math.max(14, swatchSize + 5);
   const width = Math.max(1, Number(availableWidth) || 1);
-  const items = [];
+  const items: LegendLayoutItem[] = [];
   let x = 0;
   let row = 0;
   domain.forEach((value) => {
@@ -901,7 +1156,7 @@ function legendLayout(domain, availableWidth, swatchSize) {
   return { items, rows, height: rows * rowHeight };
 }
 
-function tooltipHtml(row, tooltipSpec) {
+function tooltipHtml(row: RenderDatum, tooltipSpec: unknown): string {
   if (tooltipSpec === false) return '';
   const source = row?.__row && typeof row.__row === 'object' ? row.__row : row;
   const items = Array.isArray(tooltipSpec)
@@ -914,8 +1169,8 @@ function tooltipHtml(row, tooltipSpec) {
     .join('<br>');
 }
 
-return { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, drawPath, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive };
+return { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive };
 }
 
 // Context-free utilities are shared by chart modules through dependency injection.
-export const { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, drawPath, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive } = createMarkHelpers();
+export const { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive } = createMarkHelpers();

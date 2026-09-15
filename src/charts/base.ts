@@ -1,47 +1,58 @@
-import type { ChartContext, D3Lib, EncodingSpec, ViewSpec } from '../types/index.js';
+import type { ChartRuntimeDeps } from '../runtime/chart-deps.js';
+import type { RenderDatum, RuntimeScale } from '../runtime/marks.js';
+import type { ChartContext, ChartDeps, D3Lib, EncodingSpec, ViewSpec } from '../types/index.js';
+
+/** Row accessors a chart publishes for scene helpers (axis cues, focus). */
+export interface ChartPosition {
+  x(row: RenderDatum): number;
+  y(row: RenderDatum): number;
+}
 
 export abstract class BaseChart<S extends ViewSpec = ViewSpec> {
-  constructor(protected readonly deps: Record<string, unknown> = {}) {}
+  protected readonly deps: ChartRuntimeDeps;
 
-  renderer(): (chart: ChartContext, rows: unknown[], spec: S, tooltip: unknown, d3: D3Lib) => void {
+  /**
+   * Built-in charts always receive the full runtime helper object; the public
+   * `ChartDeps` is the supported subset plugins may depend on.
+   */
+  constructor(deps: ChartDeps) {
+    this.deps = deps as ChartRuntimeDeps;
+  }
+
+  renderer(): (chart: ChartContext, rows: RenderDatum[], spec: S, tooltip: HTMLElement, d3: D3Lib) => void {
     return this.render.bind(this);
   }
 
   abstract render(
     chart: ChartContext,
-    rows: unknown[],
+    rows: RenderDatum[],
     spec: S,
-    tooltip: unknown,
+    tooltip: HTMLElement,
     d3: D3Lib
   ): void;
 
   protected setCartesianState(
     chart: ChartContext,
     enc: EncodingSpec,
-    scales: unknown,
-    position: unknown
+    scales: Record<string, unknown>,
+    position: ChartPosition
   ): void {
-    chart.scales = { ...(scales as object), orientation: 'cartesian' };
+    chart.scales = { ...scales, orientation: 'cartesian' };
     chart.channels = enc;
     chart.position = position;
   }
 
   protected drawCartesianAxes(
     chart: ChartContext,
-    x: unknown,
-    y: unknown,
+    x: RuntimeScale | null,
+    y: RuntimeScale | null,
     enc: EncodingSpec,
     d3: D3Lib,
     options: { duration?: number } = {}
   ): void {
-    const deps = this.deps as {
-      drawGrid?: (chart: ChartContext, y: unknown, d3: D3Lib, transition: unknown, options: { duration?: number }) => void;
-      drawXAxis?: (chart: ChartContext, x: unknown, title: string | undefined, d3: D3Lib, transition: unknown, options: { duration?: number }) => void;
-      drawYAxis?: (chart: ChartContext, y: unknown, title: string | undefined, d3: D3Lib, transition: unknown, options: { duration?: number }) => void;
-    };
-    const transition = (chart as ChartContext & { transition: { base: unknown } }).transition.base;
-    deps.drawGrid?.(chart, y, d3, transition, options);
-    deps.drawXAxis?.(chart, x, enc.x?.title, d3, transition, options);
-    deps.drawYAxis?.(chart, y, enc.y?.title, d3, transition, options);
+    const transition = chart.transition.base;
+    this.deps.drawGrid(chart, y, d3, transition, options);
+    this.deps.drawXAxis(chart, x, enc.x?.title, d3, transition, options);
+    this.deps.drawYAxis(chart, y, enc.y?.title, d3, transition, options);
   }
 }

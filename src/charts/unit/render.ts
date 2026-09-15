@@ -2,7 +2,8 @@
 import { BaseChart } from '../base.js';
 import { cameraPosition, cameraScale, cameraSize, focusCamera, pointBounds, viewSelection } from '../../focus.js';
 import { specTransition } from '../../spec-meta.js';
-import { directionalEase } from '../../transition-progress.js';
+import { directionalEase } from '../../runtime/tracks.js';
+import { motion } from '../../runtime/recorder.js';
 import { unitKey } from './keys.js';
 import { clearUnitAxes, drawUnitAxes } from './axes.js';
 import {
@@ -47,9 +48,10 @@ class UnitChart extends BaseChart {
       ? unitLineageSources(chart.g.selectAll('circle.vd-unit').nodes())
       : [];
     const originalTransition = chart.transition.base;
-    const grainTransition = isUnitValueSplit
-      ? originalTransition.ease(d3.easeCubicOut)
-      : originalTransition;
+    // See point/render.ts: mutating the base ease here never reached the marks
+    // under D3 (they inherited the frame's earlier copy), so the value split
+    // keeps the shared base timing.
+    const grainTransition = originalTransition;
     const stage = isUnitValueSplit ? null : unitStageTiming(chart);
     if (stage) chart.transition.base = transitionFor(chart, d3, stage.viewDuration);
     const baseLayout = unitLayout(units, chart, spec, {
@@ -199,16 +201,15 @@ class UnitChart extends BaseChart {
           .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
           .attr('stroke-width', cameraSize(themeValue('--vd-unit-stroke-width', 0.5), camera))
           .call(bindTooltip, spec, tooltip);
-          const entering = entered.transition(enterTransition)
-          .delay(enterMarkDelay)
-          .attr('r', layout.r)
-          .style('opacity', opacity);
-          return layout.trajectory
-            ? applyForceTrajectory(entering, layout, d3, enterPosition)
-            : entering;
+          const entering = motion(entered, enterTransition)
+            .delay(enterMarkDelay)
+            .attr('r', layout.r)
+            .style('opacity', opacity);
+          if (layout.trajectory) applyForceTrajectory(entering, layout, d3, enterPosition);
+          return entered;
         },
         (update) => {
-          const moveAcross = update
+          const prepared = update
             .attr('data-key', semanticUnitKey)
             .attr('data-source-key', (d) => d.__sourceUnitKey)
             .attr('data-travel-distance', (d) => d.__travelDistance || 0)
@@ -216,8 +217,8 @@ class UnitChart extends BaseChart {
             .attr('data-parent-key', (d) => d.__parentKey)
             .attr('data-unit-index', (d) => d.__unitIndex)
             .attr('data-group-key', (d) => layout.groupField ? d.__row[layout.groupField] : null)
-            .call(bindTooltip, spec, tooltip)
-            .transition(updateTransition)
+            .call(bindTooltip, spec, tooltip);
+          const moveAcross = motion(prepared, updateTransition)
             .delay(updateMarkDelay)
             .attr('cx', layout.x)
             .attr('r', layout.r)
@@ -225,27 +226,34 @@ class UnitChart extends BaseChart {
             .attr('stroke-width', cameraSize(themeValue('--vd-unit-stroke-width', 0.5), camera))
             .style('opacity', opacity);
 
-          if (layout.trajectory) return applyForceTrajectory(moveAcross, layout, d3);
-          if (!fallsToAxis) return moveAcross.attr('cy', layout.y);
-          return moveAcross
-            .transition()
-            .delay(perMarkDelay)
-            .duration(Math.max(1, stage.markDuration))
-            .easeVarying(function(unit, index) {
-              const fromY = Number(this.getAttribute('cy'));
-              const toY = Number(layout.y(unit, index));
-              return toY > fromY
-                ? directionalEase(d3.easeBounceOut, d3.easeExpIn)
-                : directionalEase(d3.easeExpOut, d3.easeBounceIn);
-            })
-            .attr('cy', layout.y);
+          if (layout.trajectory) applyForceTrajectory(moveAcross, layout, d3);
+          else if (!fallsToAxis) moveAcross.attr('cy', layout.y);
+          else {
+            moveAcross
+              .transition()
+              .delay(perMarkDelay)
+              .duration(Math.max(1, stage.markDuration))
+              // Falling onto the axis bounces; lifting off it accelerates away.
+              // The reverse ease keeps the same route when played backwards.
+              .easeVarying(function(unit, index) {
+                const fromY = Number(this.getAttribute('cy'));
+                const toY = Number(layout.y(unit, index));
+                return toY > fromY
+                  ? directionalEase(d3.easeBounceOut, d3.easeExpIn)
+                  : directionalEase(d3.easeExpOut, d3.easeBounceIn);
+              })
+              .attr('cy', layout.y);
+          }
+          return prepared;
         },
-        (exit) => exit
-          .transition(chart.transition.exit || updateTransition)
-          .delay(layout.trajectory ? 0 : stage ? stage.viewDuration : 0)
-          .attr('r', 0)
-          .style('opacity', 0)
-          .remove()
+        (exit) => {
+          motion(exit, chart.transition.exit || updateTransition)
+            .delay(layout.trajectory ? 0 : stage ? stage.viewDuration : 0)
+            .attr('r', 0)
+            .style('opacity', 0)
+            .remove();
+          return exit;
+        }
       );
   }
 }
@@ -377,7 +385,7 @@ function drawUnitValueBlend({
       end: { x: layout.x(unit, unit.__targetIndex), y: layout.y(unit, unit.__targetIndex) },
       radius: Math.max(4, layout.r)
     }));
-    parent.transition(transition)
+    motion(parent, transition)
       .attrTween('r', () => (progress) => String(unitBlendParentRadius({
         progress,
         startRadius: entry.source.radius,
@@ -386,7 +394,7 @@ function drawUnitValueBlend({
       })))
       .remove();
 
-    d3.select(this).selectAll('circle.vd-unit-blend-child')
+    const children = d3.select(this).selectAll('circle.vd-unit-blend-child')
       .data(entry.children, (unit) => unit.__unitKey)
       .join('circle')
       .attr('class', 'vd-unit-blend vd-unit-blend-child')
@@ -395,18 +403,18 @@ function drawUnitValueBlend({
       .attr('cx', entry.source.x)
       .attr('cy', entry.source.y)
       .attr('r', Math.max(4, layout.r))
-      .attr('fill', (unit) => color(unit.__row || unit))
-      .transition(transition)
+      .attr('fill', (unit) => color(unit.__row || unit));
+    motion(children, transition)
       .attrTween('cx', (unit) => (progress) =>
         unitBlendPosition(layout, unit, progress, entry.source).x)
       .attrTween('cy', (unit) => (progress) =>
         unitBlendPosition(layout, unit, progress, entry.source).y);
   });
 
-  layer.transition(transition)
+  motion(layer, transition)
     .styleTween('visibility', () => (progress) =>
       progress > 0 && progress < 1 ? 'visible' : 'hidden');
-  crispLayer.transition(transition)
+  motion(crispLayer, transition)
     .styleTween('visibility', () => (progress) =>
       progress > 0 && progress < 1 ? 'hidden' : 'visible');
 }
@@ -519,9 +527,7 @@ function travelDelay(unit, maxDistance, travelWindow) {
   return (Number(unit.__travelDistance) || 0) / maxDistance * travelWindow;
 }
 
+// Stage timings are plain descriptors sharing the chart's ease.
 function transitionFor(chart, d3, duration) {
-  const transition = chart.seekable
-    ? d3.transition(chart.seekTransitionName)
-    : d3.transition();
-  return transition.duration(Math.max(1, duration)).ease(chart.transition.base.ease());
+  return { delay: 0, duration: Math.max(1, duration), ease: chart.transition.base.ease };
 }

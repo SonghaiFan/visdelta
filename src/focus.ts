@@ -98,23 +98,25 @@ export function fitCamera(
  * the band path supplies the range adapter that d3-zoom cannot provide because
  * band scales have no invert method.
  */
-export function cameraScale(scale: AnyRecord, camera: FocusCamera, axis: 'x' | 'y'): AnyRecord {
+/** A camera-adjusted copy of `scale` (same type), or `scale` itself when the camera is identity. */
+export function cameraScale<T extends object>(scale: T, camera: FocusCamera, axis: 'x' | 'y'): T {
   if (!scale || camera.k === 1 && camera.x === 0 && camera.y === 0) return scale;
-  const copy = (scale.copy as (() => AnyRecord) | undefined)?.call(scale);
-  const range = (scale.range as (() => number[]) | undefined)?.call(scale);
+  const source = scale as AnyRecord;
+  const copy = (source.copy as (() => AnyRecord) | undefined)?.call(source);
+  const range = (source.range as (() => number[]) | undefined)?.call(source);
   if (!copy || !Array.isArray(range) || range.length < 2) return scale;
 
-  const invert = scale.invert as ((value: number) => unknown) | undefined;
+  const invert = source.invert as ((value: number) => unknown) | undefined;
   if (typeof invert === 'function') {
-    const domain = range.map((pixel) => invert.call(scale, cameraInvert(pixel, camera, axis)));
+    const domain = range.map((pixel) => invert.call(source, cameraInvert(pixel, camera, axis)));
     (copy.domain as (domain: unknown[]) => AnyRecord)(domain);
   } else {
     (copy.range as (range: number[]) => AnyRecord)(
       range.map((pixel) => cameraPosition(pixel, camera, axis))
     );
   }
-  copy.__visDeltaChannel = scale.__visDeltaChannel;
-  return copy;
+  copy.__visDeltaChannel = source.__visDeltaChannel;
+  return copy as T;
 }
 
 export function cameraSize(value: number, camera: FocusCamera): number {

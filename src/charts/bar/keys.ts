@@ -7,7 +7,7 @@ type KeyFn = (this: Element, d: DataRow, i: number) => string | number;
 export function barKeyAccessor(
   chart: ChartContext,
   spec: ViewSpec,
-  fallbackField = 'id'
+  fallbackField: string | string[] = 'id'
 ): KeyFn {
   const fallback = keyAccessor(spec, fallbackField) as KeyFn;
   const matchPlan = chart.transitionPlan?.match as
@@ -25,19 +25,26 @@ export function barKeyAccessor(
   };
 }
 
-export function applyBarIdentity(
-  selection: unknown,
+/** A selection or recorded motion whose datum-valued attrs identify a bar. */
+interface IdentityTarget<D extends DataRow> {
+  attr(name: string, value: (this: Element, d: D, i: number) => string | number | null): this;
+}
+
+export function applyBarIdentity<D extends DataRow, T extends IdentityTarget<D>>(
+  selection: T,
   spec: ViewSpec,
   key: KeyFn,
-  categoryValue: (d: DataRow) => unknown
-): unknown {
-  type D3Selection = { attr(name: string, fn: unknown): D3Selection };
-  const s = selection as D3Selection;
-  return s
-    .attr('data-key', function (this: Element, d: DataRow, i: number) {
+  categoryValue: (d: D) => unknown
+): T {
+  return selection
+    .attr('data-key', function (this: Element, d: D, i: number) {
       return key.call(this, d, i);
     })
-    .attr('data-category', categoryValue)
-    .attr('data-measure', (d: DataRow) => semanticMeasureForDatum(d, spec))
-    .attr('data-semantic-key', (d: DataRow) => semanticKeyForDatum(d, spec));
+    .attr('data-category', (d) => attrText(categoryValue(d)))
+    .attr('data-measure', (d) => attrText(semanticMeasureForDatum(d, spec)))
+    .attr('data-semantic-key', (d) => semanticKeyForDatum(d, spec));
+}
+
+function attrText(value: unknown): string | null {
+  return value == null ? null : String(value);
 }

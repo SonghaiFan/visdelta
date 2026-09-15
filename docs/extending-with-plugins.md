@@ -29,6 +29,46 @@ export const customModule = defineChartModule({
 package. Renderer helpers and D3 are injected; the module must not reach into
 another built-in chart.
 
+## Renderer motion contract
+
+A renderer joins data with D3 as usual, but animates through `motion()`, never
+through `selection.transition()`. VisDelta seeks recorded property tracks;
+D3's scheduler is timer-driven and cannot be sought, so anything it animates is
+interrupted the moment the transition compiles.
+
+```js
+import { motion } from "visdelta/plugins";
+
+function customRenderer(chart, rows, spec) {
+  const dots = chart.g.selectAll("circle.dot")
+    .data(rows, row => row.id)
+    .join("circle")
+    .attr("class", "dot");
+
+  motion(dots, chart.transition.base)
+    .attr("cx", row => chart.scales.x(row.value))
+    .style("opacity", 1);
+}
+```
+
+`motion(selection, base)` has the d3-transition authoring surface — `attr`,
+`style`, `attrTween`, `styleTween`, `tween`, `text`, `delay`, `duration`,
+`ease`, `easeVarying`, `remove`, chained `transition()` — and returns the same
+kind of object in both modes: a track recorder when the render is seekable, a
+timed D3 transition otherwise. Three rules follow from seeking:
+
+- `on("start" | "end" | …)` is rejected. Side effects do not seek; compute the
+  end state up front.
+- `remove()` detaches a node only when the transition finishes, never while
+  seeking, so exited marks can be restored on reverse.
+- `chart.transition.base`, `enter`, and `exit` are plain `MotionTiming`
+  descriptors — `{ delay, duration, ease }` — not D3 transitions. A chart that
+  needs its own stage timing builds another descriptor, typically sharing the
+  chart's ease: `{ delay: 0, duration: 300, ease: chart.transition.base.ease }`.
+
+`directionalEase(forward, reverse)` gives a track different easing per seek
+direction.
+
 ## Builder contract
 
 A focused builder extends `ChartState`, compiles its own grammar, and returns
@@ -72,7 +112,7 @@ plain object cannot carry a module reference.
 | `canonicalTransitionPair(from, to)` | Reuse one deterministic reversible path |
 | `intermediateSpecs(from, to)` | Add meaningful intermediate chart states |
 | `defaultMargin(spec)` | Reserve chart-owned space |
-| `transitionEvaluation` | Opt into cached frame evaluation when every animated property is captured |
+| `transitionEvaluation` | Opt into cached frame evaluation; safe whenever the renderer animates only through `motion()` |
 
 Only implement hooks the chart needs. Do not add chart-name switches or empty
 extension hooks to Core.

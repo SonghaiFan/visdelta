@@ -1,4 +1,4 @@
-// @ts-nocheck — extracted rendering pipeline; D3 scene internals remain dynamic.
+import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
 import { resolveMarkRendererKey } from '../charts/index.js';
 import { serializeViewSpec, specState } from '../spec-meta.js';
@@ -8,34 +8,149 @@ import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
 import { applySceneTransitions, getScene, resetSceneToEmptySource, resizeScene } from './scene.js';
 import { clamp } from './utils.js';
-import { VISDELTA_TRANSITION_NAME, clearSceneTransitionProgress, createSceneTransitionProgress } from '../transition-progress.js';
+import { clearSceneTransitionProgress, createSceneTransitionProgress } from '../transition-progress.js';
 import { createViewCompiler } from './view-compile.js';
-import type { AnyRecord } from '../types/index.js';
+import type { CompileResult, StepTransition } from './view-compile.js';
+import type {
+  AnyRecord,
+  ChartContext,
+  ChartType,
+  ChartTransitionContext,
+  D3Lib,
+  DataRow,
+  MarginSpec,
+  TransitionPlan,
+  ViewSpec
+} from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
 import { viewLineageCorrespondence } from '../data/view-lineage.js';
+import { motion } from './recorder.js';
+import type { MotionTiming } from './recorder.js';
+import type { RuntimeScene, SceneHostElement } from './scene.js';
+
+type ArqueroRuntime = NonNullable<Parameters<typeof applyTransforms>[2]>;
+type DatasetMap = Record<string, DataRow[]>;
+type SceneTransition = CompileResult['sceneTransition'];
+
+interface ViewConfig {
+  height?: number;
+  margin?: Partial<MarginSpec>;
+}
+
+interface ViewLayoutSpec extends ViewSpec {
+  height?: number;
+  margin?: Partial<MarginSpec>;
+}
+
+interface DrawViewOptions {
+  previousViewSpec?: ViewSpec | null;
+  previousTransition?: StepTransition;
+  seekable?: boolean;
+}
+
+interface RenderOptions {
+  transitionSource?: CompileResult | null;
+  seekable?: boolean;
+  skipSourcePrep?: boolean;
+}
+
+interface MembershipChange {
+  exit: boolean;
+  enter: boolean;
+}
+
+interface RuntimeTransition extends ChartTransitionContext {
+  exitFirst?: boolean;
+  enterLast?: boolean;
+  exitDuration?: number;
+  scaleDuration?: number;
+  enterDuration?: number;
+  enterDelay?: number;
+}
+
+interface RuntimeChart extends ChartContext {
+  scene: RuntimeScene;
+  type: string;
+  transition: RuntimeTransition;
+  transitionPlan: TransitionPlan;
+  sceneTransition: SceneTransition;
+  seekable: boolean;
+  aq: ArqueroRuntime;
+  position?: { x(row: DataRow): number; y(row: DataRow): number };
+}
+
+interface IntermediatePhase {
+  spec: ViewSpec;
+  scene?: string;
+  [key: string]: unknown;
+}
+
+interface RenderPhaseConfig {
+  node: SceneHostElement;
+  spec: ViewSpec;
+  viewConfig: ViewConfig;
+  datasets: DatasetMap;
+  tooltip: HTMLElement;
+  d3: D3Lib;
+  aq: ArqueroRuntime;
+  seekable: boolean;
+  sceneTransition: SceneTransition;
+  transitionSource: CompileResult;
+  transitionPlanDuration: number | null;
+  reverse: boolean;
+}
+
+interface RenderPhaseContext {
+  chartType: ChartType;
+  node: SceneHostElement;
+  finalSpec: ViewSpec;
+  viewConfig: ViewConfig;
+  datasets: DatasetMap;
+  tooltip: HTMLElement;
+  d3: D3Lib;
+  aq: ArqueroRuntime;
+  seekable: boolean;
+  finalSceneTransition: SceneTransition;
+  transitionSource: CompileResult;
+}
+
+interface SeekPhase extends RenderPhaseConfig {
+  start: number;
+  end: number;
+}
+
+interface SeekSequence {
+  phase: number | null;
+  phases: SeekPhase[];
+}
+
+interface ViewRuntimeScene extends RuntimeScene {
+  seekSequence?: SeekSequence | null;
+}
 
 /** Per-instance rendering pipeline for standalone transitions. */
 export function createViewRenderer(chartTypes: ChartTypeRegistry) {
 const { compileEffectiveView, compileTransitionSource } = createViewCompiler(chartTypes);
 return { drawView, prepareSeekSourceState, compileTransitionSource,
   renderSeekPhase, applySeekSequence };
-function drawView(node: any, viewSpec: AnyRecord, viewConfig: AnyRecord, datasets: AnyRecord, tooltip: Element, d3: AnyRecord, aq: AnyRecord, stepTransition: AnyRecord = {}, options: AnyRecord = {}) {
-  const scene = getScene(node, viewConfig, d3);
-  scene.progressRoots = [
-    node,
-    node.__visDeltaMarkName
-  ].filter(Boolean);
-
+function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, d3: D3Lib, aq: ArqueroRuntime, stepTransition: StepTransition = {}, options: DrawViewOptions = {}): void {
+  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
   if (!viewSpec || !viewSpec.mark) {
     clearSeekSequence(scene);
     scene.empty.style("display", "grid").text("No view for this step.");
-    fadeLayers(scene, null, null, d3);
+    fadeLayers(scene, '', null, d3);
     return;
   }
 
   scene.empty.style("display", "none");
 
   const { sceneTransition, effectiveViewSpec } = compileEffectiveView(viewSpec, stepTransition);
+  if (!effectiveViewSpec) {
+    clearSeekSequence(scene);
+    scene.empty.style("display", "grid").text("No view for this step.");
+    fadeLayers(scene, '', null, d3);
+    return;
+  }
   const transitionSource = compileTransitionSource(
     options.previousViewSpec,
     options.previousTransition
@@ -56,7 +171,7 @@ function drawView(node: any, viewSpec: AnyRecord, viewConfig: AnyRecord, dataset
   const intermediatePhases = intermediateRenderPhases(chartType, sourceForPlan, targetForPlan);
   if (intermediatePhases.length) {
     const renderPhases = renderPhaseConfigs(intermediatePhases, {
-      chartType,
+      chartType: chartType!,
       node,
       finalSpec: effectiveViewSpec,
       viewConfig,
@@ -87,8 +202,8 @@ function drawView(node: any, viewSpec: AnyRecord, viewConfig: AnyRecord, dataset
   });
 }
 
-function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig: AnyRecord, datasets: AnyRecord, tooltip: Element, d3: AnyRecord, aq: AnyRecord, sceneTransition: AnyRecord = {}, renderOptions: AnyRecord = {}) {
-  const scene = getScene(node, viewConfig, d3);
+function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, d3: D3Lib, aq: ArqueroRuntime, sceneTransition: SceneTransition = { scene: [] }, renderOptions: RenderOptions = {}): void {
+  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
   const seekable = Boolean(renderOptions.seekable);
   if (seekable && !renderOptions.skipSourcePrep) {
     prepareSeekSourceState(
@@ -98,7 +213,7 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
       tooltip,
       d3,
       aq,
-      renderOptions.transitionSource
+      renderOptions.transitionSource ?? undefined
     );
   }
   clearSceneTransitionProgress(scene, { finish: !seekable });
@@ -112,26 +227,27 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
     ? renderOptions.transitionSource?.effectiveViewSpec || null
     : scene.previousSpec;
   const previousSpec = prepareChartSpec(chartType, previousRawSpec, datasets);
-  const source = viewRows(renderSpec.data, datasets);
+  const source = viewRows(renderSpec.data, datasets) as DataRow[];
   const rows = applyTransforms(source, renderSpec.transform || [], aq);
   const domainRows = applyTransforms(source, domainTransforms(renderSpec.transform || []), aq);
   if (!rows.length) {
     const emptyTransition = transitionSpec(renderSpec, previousSpec, { seekable, d3 });
-    scene.empty.style("display", "grid").style('opacity', 0).text("No rows after transforms.")
-      .transition(emptyTransition.base).style('opacity', 1);
-    fadeLayers(scene, null, emptyTransition, d3);
-    for (const layer of [scene.grid, scene.xAxis, scene.yAxis, scene.xLabel, scene.yLabel, scene.legend]) {
-      layer.transition(emptyTransition.base).style('opacity', 0);
-    }
+    motion(scene.empty.style("display", "grid").style('opacity', 0).text("No rows after transforms."), emptyTransition.base)
+      .style('opacity', 1);
+    fadeLayers(scene, '', emptyTransition, d3);
+    // d3 Selection is invariant in its element type, so fade each layer through one generic call.
+    const fade = <E extends BaseType>(layer: Selection<E, unknown, any, any>) => motion(layer, emptyTransition.base).style('opacity', 0);
+    fade(scene.grid); fade(scene.xAxis); fade(scene.yAxis); fade(scene.xLabel); fade(scene.yLabel); fade(scene.legend);
     if (seekable) {
-      scene.transitionProgress = createSceneTransitionProgress(scene, { transitionName: VISDELTA_TRANSITION_NAME });
+      scene.transitionProgress = createSceneTransitionProgress(scene);
     }
     scene.previousSpec = renderSpec;
     return;
   }
 
   const width = Math.max(60, node.clientWidth || 720);
-  const height = viewConfig.height || effectiveViewSpec.height || 500;
+  const layoutSpec = effectiveViewSpec as ViewLayoutSpec;
+  const height = viewConfig.height || layoutSpec.height || 500;
   resizeScene(scene, width, height);
 
   const rendererKey = resolveMarkRendererKey(renderSpec);
@@ -141,13 +257,13 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
     bottom: 64,
     left: 68,
     ...(chartType?.defaultMargin?.(renderSpec) || {}),
-    ...(effectiveViewSpec.margin || {}),
+    ...(layoutSpec.margin || {}),
     ...(viewConfig.margin || {})
   });
   scene.svg
     .attr('class', `vd-chart vd-chart-${rendererKey}`)
     .attr('data-chart-type', rendererKey);
-  const previousSource = previousSpec ? viewRows(previousSpec.data, datasets) : [];
+  const previousSource = previousSpec ? viewRows(previousSpec.data, datasets) as DataRow[] : [];
   const previousRows = previousSpec
     ? applyTransforms(previousSource, previousSpec.transform || [], aq)
     : [];
@@ -160,8 +276,16 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
   const transitionPlan = chartType?.resolveTransitionPlan?.(previousSpec, renderSpec) || {};
   const lineage = previousSpec ? viewLineageCorrespondence(previousSpec, renderSpec) : null;
   if (lineage) transitionPlan.lineage = lineage;
-  const chart: AnyRecord = {
+  const innerWidth = width - margin.left - margin.right;
+  const innerHeight = height - margin.top - margin.bottom;
+  const chartTransitionFrame = motion(scene.frame, chartTransition.base).attr(
+    "transform",
+    `translate(${margin.left},${margin.top})`
+  );
+  const g = activeMarkLayer(scene, rendererKey, chartTransition);
+  const chart: RuntimeChart = {
     scene,
+    g,
     type: rendererKey,
     width,
     height,
@@ -170,18 +294,13 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
     transitionPlan,
     sceneTransition,
     seekable,
-    seekTransitionName: VISDELTA_TRANSITION_NAME,
     sourceRows: source,
     domainRows,
-    aq
+    aq,
+    innerWidth,
+    innerHeight,
+    frame: chartTransitionFrame
   };
-  chart.innerWidth = chart.width - chart.margin.left - chart.margin.right;
-  chart.innerHeight = chart.height - chart.margin.top - chart.margin.bottom;
-  chart.frame = scene.frame.transition(chart.transition.base).attr(
-    "transform",
-    `translate(${chart.margin.left},${chart.margin.top})`
-  );
-  chart.g = activeMarkLayer(scene, rendererKey, chart.transition);
   applyPlotClip(chart, true);
 
   const renderer = chartType?.renderer;
@@ -191,9 +310,7 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
 
   applySceneTransitions(chart, rows, renderSpec);
   if (seekable) {
-    scene.transitionProgress = createSceneTransitionProgress(scene, {
-      transitionName: VISDELTA_TRANSITION_NAME
-    });
+    scene.transitionProgress = createSceneTransitionProgress(scene);
   }
   scene.previousSpec = renderSpec;
 }
@@ -204,7 +321,12 @@ function renderCompiledView(node: any, effectiveViewSpec: AnyRecord, viewConfig:
  * marks leave, then move the shared view. Aggregation and reshaping have their
  * own chart-specific visual order and deliberately do not take this path.
  */
-function observationMembershipChange(previousSpec, nextSpec, previousRows, nextRows) {
+function observationMembershipChange(
+  previousSpec: ViewSpec | null,
+  nextSpec: ViewSpec,
+  previousRows: DataRow[],
+  nextRows: DataRow[]
+): MembershipChange {
   if (!previousSpec || previousSpec.mark !== nextSpec?.mark) return { exit: false, enter: false };
   if ((previousSpec.transform || []).some((transform) => transform?.aggregate) ||
       (nextSpec.transform || []).some((transform) => transform?.aggregate)) return { exit: false, enter: false };
@@ -219,7 +341,11 @@ function observationMembershipChange(previousSpec, nextSpec, previousRows, nextR
  * old view; then the scale moves; then entering marks appear in the new view.
  * A one-way add or remove simply omits the unused third.
  */
-function observationTransition(transition, change, { d3, seekable }) {
+function observationTransition(
+  transition: RuntimeTransition,
+  change: MembershipChange,
+  { d3, seekable }: { d3: D3Lib; seekable: boolean }
+): RuntimeTransition {
   if (!change.exit && !change.enter) return transition;
   const totalDuration = Math.max(1, Number(transition.duration) || 900);
   const parts = 1 + Number(change.exit) + Number(change.enter);
@@ -227,13 +353,8 @@ function observationTransition(transition, change, { d3, seekable }) {
   const exitDuration = change.exit ? partDuration : 0;
   const enterDuration = change.enter ? partDuration : 0;
   const scaleDuration = Math.max(1, totalDuration - exitDuration - enterDuration);
-  const ease = transition.base.ease();
-  const create = (duration, delay = 0) => {
-    const next = seekable
-      ? d3.transition(VISDELTA_TRANSITION_NAME)
-      : d3.transition();
-    return next.duration(duration).delay(delay).ease(ease);
-  };
+  const ease = transition.base.ease;
+  const create = (duration: number, delay = 0): MotionTiming => ({ delay, duration, ease });
   return {
     ...transition,
     base: create(scaleDuration, exitDuration),
@@ -248,7 +369,7 @@ function observationTransition(transition, change, { d3, seekable }) {
   };
 }
 
-function reflectCamera(scene: AnyRecord, camera: AnyRecord | null | undefined) {
+function reflectCamera(scene: RuntimeScene, camera: ChartContext['camera']): void {
   const value = camera || { k: 1, x: 0, y: 0 };
   scene.svg
     .attr('data-camera-k', Number(value.k) || 1)
@@ -256,14 +377,19 @@ function reflectCamera(scene: AnyRecord, camera: AnyRecord | null | undefined) {
     .attr('data-camera-y', Number(value.y) || 0);
 }
 
-function fitMargins(width, height, margin) {
+function fitMargins(width: number, height: number, margin: MarginSpec): MarginSpec {
   const fitted = { ...margin };
   fitMarginPair(fitted, 'left', 'right', Math.max(0, width - 24));
   fitMarginPair(fitted, 'top', 'bottom', Math.max(0, height - 24));
   return fitted;
 }
 
-function fitMarginPair(margin, start, end, budget) {
+function fitMarginPair(
+  margin: MarginSpec,
+  start: keyof MarginSpec,
+  end: keyof MarginSpec,
+  budget: number
+): void {
   const total = Math.max(0, Number(margin[start]) || 0) + Math.max(0, Number(margin[end]) || 0);
   if (!total || total <= budget) return;
   const scale = budget / total;
@@ -271,35 +397,50 @@ function fitMarginPair(margin, start, end, budget) {
   margin[end] = Math.max(0, margin[end] * scale);
 }
 
-function prepareChartSpec(chartType, spec, datasets = {}) {
+function prepareChartSpec(
+  chartType: ChartType | undefined,
+  spec: ViewSpec | null | undefined,
+  datasets: DatasetMap = {}
+): ViewSpec | null {
   if (!spec) return null;
   const typed = resolveSpecDataTypes(spec, viewRows(spec.data, datasets));
   return chartType?.prepareSpec?.(typed) || typed;
 }
 
-function intermediateRenderPhases(chartType, sourceSpec, targetSpec) {
+function intermediateRenderPhases(
+  chartType: ChartType | undefined,
+  sourceSpec: ViewSpec | null,
+  targetSpec: ViewSpec | null
+): IntermediatePhase[] {
+  if (!chartType || !sourceSpec || !targetSpec) return [];
   const raw = chartType?.intermediateSpecs?.(sourceSpec, targetSpec) ?? [];
-  const phases = Array.isArray(raw) ? raw : raw?.sequence || [raw];
+  const phases = Array.isArray(raw) ? raw : [raw];
   return phases
-    .map((phase) => ({
+    .map((phase): IntermediatePhase => ({
       ...phase,
-      spec: serializeViewSpec(phase?.spec || null)
+      spec: serializeViewSpec(phase.spec)
     }))
-    .filter((phase) => phase.spec);
+    .filter((phase): phase is IntermediatePhase => Boolean(phase.spec));
 }
 
-function renderPhaseConfigs(intermediatePhases, context) {
+function renderPhaseConfigs(
+  intermediatePhases: IntermediatePhase[],
+  context: RenderPhaseContext
+): RenderPhaseConfig[] {
   let authoredSource = context.transitionSource;
-  const phaseConfig = (spec, sceneTransition) => {
+  const phaseConfig = (spec: ViewSpec, sceneTransition: SceneTransition): RenderPhaseConfig => {
     const authoredTarget = { effectiveViewSpec: spec, sceneTransition };
-    const canonical = context.chartType?.canonicalTransitionPair?.(
-      authoredSource?.effectiveViewSpec,
-      authoredTarget.effectiveViewSpec
-    ) ?? {
-      from: authoredSource?.effectiveViewSpec,
-      to: authoredTarget.effectiveViewSpec,
-      reverse: false
-    };
+    const authoredSourceSpec = authoredSource.effectiveViewSpec;
+    const canonical = authoredSourceSpec
+      ? context.chartType.canonicalTransitionPair?.(
+          authoredSourceSpec,
+          authoredTarget.effectiveViewSpec
+        ) ?? { from: authoredSourceSpec, to: authoredTarget.effectiveViewSpec, reverse: false }
+      : {
+          from: authoredTarget.effectiveViewSpec,
+          to: authoredTarget.effectiveViewSpec,
+          reverse: false
+        };
     const canonicalSource = canonical.reverse ? authoredTarget : authoredSource;
     const canonicalTarget = canonical.reverse ? authoredSource : authoredTarget;
     const config = {
@@ -336,7 +477,11 @@ function renderPhaseConfigs(intermediatePhases, context) {
   return phases;
 }
 
-function transitionPlanDurationForPhase(chartType, previousSpec, nextSpec) {
+function transitionPlanDurationForPhase(
+  chartType: ChartType,
+  previousSpec: ViewSpec | null,
+  nextSpec: ViewSpec | null
+): number | null {
   const plan = chartType?.resolveTransitionPlan?.(
     prepareChartSpec(chartType, previousSpec),
     prepareChartSpec(chartType, nextSpec)
@@ -345,20 +490,28 @@ function transitionPlanDurationForPhase(chartType, previousSpec, nextSpec) {
   return Number.isFinite(duration) ? duration : null;
 }
 
-function sceneTransitionForPhase(phase) {
+function sceneTransitionForPhase(phase: IntermediatePhase): SceneTransition {
   const sceneType = phase.scene || "axis";
   const state = specState(phase.spec);
   return {
     scene: [sceneType],
     [sceneType]:
-      state[sceneType] ||
-      state.sceneState?.[sceneType] ||
+      (state as AnyRecord)[sceneType] ||
+      (state.sceneState as AnyRecord | undefined)?.[sceneType] ||
       null
-  };
+  } as SceneTransition;
 }
 
-function prepareSeekSourceState(node: any, viewConfig: AnyRecord, datasets: AnyRecord, tooltip: Element, d3: AnyRecord, aq: AnyRecord, transitionSource: AnyRecord = {}) {
-  const scene = getScene(node, viewConfig, d3);
+function prepareSeekSourceState(
+  node: SceneHostElement,
+  viewConfig: ViewConfig,
+  datasets: DatasetMap,
+  tooltip: HTMLElement,
+  d3: D3Lib,
+  aq: ArqueroRuntime,
+  transitionSource: CompileResult = { effectiveViewSpec: null, sceneTransition: { scene: [] } }
+): void {
+  const scene = getScene(node, viewConfig, d3) as ViewRuntimeScene;
   const sourceSpec = transitionSource?.effectiveViewSpec || null;
   if (!sourceSpec) {
     resetSceneToEmptySource(scene);
@@ -385,7 +538,7 @@ function prepareSeekSourceState(node: any, viewConfig: AnyRecord, datasets: AnyR
 }
 
 
-function phaseDuration(phaseOrSpec: AnyRecord = {}) {
+function phaseDuration(phaseOrSpec: Partial<RenderPhaseConfig> & { spec?: ViewSpec } = {}): number {
   const spec = phaseOrSpec.spec || phaseOrSpec;
   const plannedDuration = Number(phaseOrSpec.transitionPlanDuration);
   if (Number.isFinite(plannedDuration)) return Math.max(1, plannedDuration);
@@ -409,11 +562,11 @@ function phaseDuration(phaseOrSpec: AnyRecord = {}) {
   return Math.max(1, Number.isFinite(effectiveDuration) ? effectiveDuration : fallbackDuration) + (Number.isFinite(staggerMax) ? staggerMax : 0);
 }
 
-function clearSeekSequence(scene) {
+function clearSeekSequence(scene: ViewRuntimeScene): void {
   scene.seekSequence = null;
 }
 
-function createSeekSequence(phases = []) {
+function createSeekSequence(phases: RenderPhaseConfig[] = []): SeekSequence {
   const durations = phases.map((phase) => phaseDuration(phase));
   const total = Math.max(1, durations.reduce((sum, duration) => sum + duration, 0));
   let cursor = 0;
@@ -428,7 +581,7 @@ function createSeekSequence(phases = []) {
   };
 }
 
-function renderPhaseSequence(scene, phases = [], index = 0) {
+function renderPhaseSequence(scene: ViewRuntimeScene, phases: RenderPhaseConfig[] = [], index = 0): void {
   const config = phases[index];
   if (!config) return;
 
@@ -454,7 +607,7 @@ function renderPhaseSequence(scene, phases = [], index = 0) {
   }, phaseDuration(config));
 }
 
-function renderSeekPhase(scene, phaseIndex) {
+function renderSeekPhase(scene: ViewRuntimeScene, phaseIndex: number): void {
   const sequence = scene.seekSequence;
   const config = sequence?.phases?.[phaseIndex];
   if (!sequence || !config || sequence.phase === phaseIndex) return;
@@ -476,7 +629,7 @@ function renderSeekPhase(scene, phaseIndex) {
   );
 }
 
-function applySeekSequence(scene, progress, direction = 1) {
+function applySeekSequence(scene: ViewRuntimeScene, progress: number, direction = 1): boolean {
   const sequence = scene.seekSequence;
   if (!sequence?.phases?.length) return false;
 
@@ -496,7 +649,7 @@ function applySeekSequence(scene, progress, direction = 1) {
   return true;
 }
 
-function phaseProgress(phase, value) {
+function phaseProgress(phase: SeekPhase, value: number): number {
   const progress = clamp(value, 0, 1);
   return phase.reverse ? 1 - progress : progress;
 }

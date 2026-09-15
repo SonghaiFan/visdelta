@@ -56,7 +56,7 @@ export interface SpecCompilerEntry {
 export function registerChartModules(
   registry: ChartTypeRegistry,
   modules: Array<{ plugin: ChartPlugin }>,
-  deps: ChartDeps = {}
+  deps: ChartDeps
 ): ChartTypeRegistry {
   for (const module of modules) {
     const chartType = chartTypeFromModule(module, deps);
