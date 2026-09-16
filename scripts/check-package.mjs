@@ -135,7 +135,7 @@ assertEqual(packageJson.repository, {
 assertEqual(packageJson.bugs, {
   url: "https://github.com/SonghaiFan/visdelta/issues"
 }, "bugs");
-assertEqual(packageJson.homepage, "https://github.com/SonghaiFan/visdelta#readme", "homepage");
+assertEqual(packageJson.homepage, "https://songhaifan.github.io/visdelta/", "homepage");
 assertEqual(packageJson.publishConfig, { access: "public" }, "publishConfig");
 assertEqual(packageJson.engines, { node: ">=18" }, "engines");
 if (!packageJson.devDependencies?.esbuild) {
