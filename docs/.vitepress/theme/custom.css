@@ -212,13 +212,30 @@
   .VPFeatures .item { width: 50% !important; }
 }
 
+/* Below 960px VitePress stacks the hero image above the text and pulls it in
+   with negative margins sized for a 320px illustration. The hero is a live
+   chart here, so give it the full width and its own height, and let the text
+   start below it instead of under it. */
+@media (max-width: 959px) {
+  .VPHomeHero .container { min-height: auto; }
+  .VPHero .image { width: 100%; margin: 0 0 12px !important; }
+  .VPHero .image-container { width: 100% !important; max-width: 560px; height: auto !important; margin: 0 auto; }
+  .hero-transition { justify-content: start; }
+  .hero-transition-chart, .hero-transition-chart .vd-view, .hero-transition-chart .vd-view svg { min-height: 240px; height: 240px; }
+  .hero-transition > p { margin: 2px 0 0; }
+  .VPHero .main { text-align: left; }
+  .VPHero .name, .VPHero .text, .VPHero .tagline { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
+  .VPHero .actions { justify-content: flex-start !important; }
+  .VPHero .text { font-size: clamp(2.5rem, 10.5vw, 4.25rem) !important; }
+  .VPHero .tagline { padding-top: 16px !important; font-size: 16px; }
+  .VPHero .actions { padding-top: 20px !important; }
+}
+
 @media (max-width: 767px) {
   .VPFeatures .item { width: 100% !important; }
   .VPHomeHero::before,
   .VPHomeHero::after { display: none; }
-  .VPHomeHero .container { min-height: auto; }
-  .VPHero .image-container { width: 100% !important; height: 280px !important; }
-  .hero-transition-chart, .hero-transition-chart .vd-view, .hero-transition-chart .vd-view svg { min-height: 250px; height: 250px; }
+  .hero-transition-chart, .hero-transition-chart .vd-view, .hero-transition-chart .vd-view svg { min-height: 220px; height: 220px; }
   .home-content { width: min(100% - 32px, 1120px); }
   .home-section { padding: 58px 0; }
   .home-section-heading { display: block; }
