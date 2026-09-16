@@ -91,24 +91,27 @@ for (const width of [1100, 390]) {
 
     await studio.getByRole('button', { name: 'Unit' }).click();
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
-    await expect(studio.locator('circle.vd-unit')).toHaveCount(55);
-    await expect(studio.locator('.vd-x-label')).toContainText('Year');
-    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '1');
-    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '1');
-    expect((await studio.locator('.vd-x-axis .tick text').allTextContents()).length).toBeGreaterThan(2);
+    // The preset is a force layout: unitValue 2 gives ceil(sites / 2) circles per
+    // row (3+2+7+4+5+8), and force draws year anchors only — no axis line, no title.
+    await expect(studio.locator('circle.vd-unit')).toHaveCount(29);
+    expect(await studio.locator('.vd-x-axis .tick text').allTextContents()).toEqual(['2004', '2022']);
+    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '0');
+    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '0');
+    // A beeswarm along a real axis brings the axis line and title back.
     await editor.fill(`const chart = unit(rows)
   .datumKey(["year", "country"])
   .key(["year", "country"])
   .x("year", { title: "Year" })
   .color("country", { range: ["#195fb5", "#f28e2b", "#0fa470"] })
   .value("sites", { maxUnits: 60 })
-  .layout("force");`);
+  .layout("beeswarm");`);
     await editor.press('Enter');
     await expect(studio.locator('.home-studio-status')).toHaveText('Ready');
-    await expect(studio.locator('circle.vd-unit').first()).toHaveAttribute('r', '12');
-    expect(await studio.locator('.vd-x-axis .tick text').allTextContents()).toEqual(['2004', '2022']);
-    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '0');
-    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '0');
+    await expect(studio.locator('circle.vd-unit')).toHaveCount(55);
+    await expect(studio.locator('.vd-x-label')).toContainText('Year');
+    await expect(studio.locator('.vd-x-label')).toHaveCSS('opacity', '1');
+    await expect(studio.locator('.vd-x-axis .domain')).toHaveCSS('opacity', '1');
+    expect((await studio.locator('.vd-x-axis .tick text').allTextContents()).length).toBeGreaterThan(2);
     const unitBounds = await studio.locator('.home-studio-chart').evaluate(chart => {
       const clip = chart.querySelector('clipPath[id^="vd-mark-clip-"] rect');
       const width = Number(clip?.getAttribute('width'));

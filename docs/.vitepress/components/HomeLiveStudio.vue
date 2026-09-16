@@ -11,6 +11,8 @@ const rows = [
 ];
 
 const colors = '["#195fb5", "#f28e2b", "#0fa470"]';
+// One idiom across all five: grain first (breakdown / key), then the explicit
+// color encoding. The showcase is the first VisDelta code most people read.
 const chartPresets = [
   {
     type: 'bar',
@@ -19,7 +21,8 @@ const chartPresets = [
   .datumKey(["year", "country"])
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
-  .breakdown("country", { color: ${colors} });
+  .breakdown("country")
+  .color("country", { range: ${colors} });
 
 let chart = detail.rollup();`
   },
@@ -28,29 +31,35 @@ let chart = detail.rollup();`
     label: 'Line',
     code: `const chart = line(rows)
   .datumKey(["year", "country"])
+  .key(["year", "country"])
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
-  .key(["year", "country"])
-  .breakdown("country", { color: ${colors} });`
+  .breakdown("country")
+  .color("country", { range: ${colors} })
+  .curve("curveBumpX");`
   },
   {
     type: 'area',
     label: 'Area',
     code: `const chart = area(rows)
   .datumKey(["year", "country"])
+  .key(["year", "country"])
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
-  .key(["year", "country"])
-  .breakdown("country", { color: ${colors} });`
+  .breakdown("country")
+  .color("country", { range: ${colors} })
+  .layout("stream")
+  .curve("curveBumpX");`
   },
   {
     type: 'point',
     label: 'Point',
     code: `const chart = point(rows)
   .datumKey(["year", "country"])
-  .x("year", { title: "Year" })
-  .y("sites", { title: "World Heritage Sites" })
   .key(["year", "country"])
+  .x("sites", { title: "World Heritage Sites" })
+  .y("country", { title: "Country" })
+  .connector({ by: "country", orderBy: "year" })
   .color("country", { range: ${colors} });`
   },
   {
@@ -61,8 +70,8 @@ let chart = detail.rollup();`
   .key(["year", "country"])
   .x("year", { title: "Year" })
   .color("country", { range: ${colors} })
-  .value("sites", { maxUnits: 60 })
-  .layout("beeswarm");`
+  .value("sites", { unitValue: 2 })
+  .layout("force");`
   }
 ];
 
