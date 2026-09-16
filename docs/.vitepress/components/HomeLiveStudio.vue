@@ -17,21 +17,16 @@ const chartPresets = [
   {
     type: 'bar',
     label: 'Bar',
-    code: `const detail = bar(rows)
-  .datumKey(["year", "country"])
+    code: `const chart = bar(rows)
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
-  .color("country", { range: ${colors} });
-
-let chart = detail.rollup();`
+  .color("country", { range: ${colors} });`
   },
   {
     type: 'line',
     label: 'Line',
     code: `const chart = line(rows)
-  .datumKey(["year", "country"])
-  .key(["year", "country"])
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
@@ -42,8 +37,6 @@ let chart = detail.rollup();`
     type: 'area',
     label: 'Area',
     code: `const chart = area(rows)
-  .datumKey(["year", "country"])
-  .key(["year", "country"])
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
@@ -55,8 +48,6 @@ let chart = detail.rollup();`
     type: 'point',
     label: 'Point',
     code: `const chart = point(rows)
-  .datumKey(["year", "country"])
-  .key(["year", "country"])
   .x("sites", { title: "World Heritage Sites" })
   .y("country", { title: "Country" })
   .connector({ by: "country", orderBy: "year" })
@@ -66,8 +57,6 @@ let chart = detail.rollup();`
     type: 'unit',
     label: 'Unit',
     code: `const chart = unit(rows)
-  .datumKey(["year", "country"])
-  .key(["year", "country"])
   .x("year", { title: "Year" })
   .color("country", { range: ${colors} })
   .value("sites", { unitValue: 2 })
