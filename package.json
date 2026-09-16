@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/SonghaiFan/visdelta/issues"
   },
-  "homepage": "https://github.com/SonghaiFan/visdelta#readme",
+  "homepage": "https://songhaifan.github.io/visdelta/",
   "main": "./dist/visdelta.esm.js",
   "module": "./dist/visdelta.esm.js",
   "types": "./dist/index.d.ts",
@@ -96,6 +96,7 @@
     "docs:dev": "npm run build && vitepress dev docs --host 127.0.0.1",
     "docs:build": "npm run build && vitepress build docs",
     "docs:preview": "vitepress preview docs --host 127.0.0.1",
+    "demo:gif": "node scripts/render-demo-gif.mjs",
     "clean:check": "node scripts/check-clean-install.mjs",
     "manifest:check": "node scripts/check-chart-manifest.mjs",
     "pack:check": "node scripts/check-pack-consumer.mjs",

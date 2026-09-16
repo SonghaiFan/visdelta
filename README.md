@@ -4,6 +4,13 @@ VisDelta is a declarative visualization-transition library. Describe a chart
 before and after a change; VisDelta finds the difference and lets any external
 control play or seek the transition.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SonghaiFan/visdelta/main/docs/public/demo.gif" width="760" alt="A bar chart scrubbed from a rollup to an age breakdown to a grouped layout and back, driven by progress(t)">
+</p>
+
+Every frame above is `change.progress(t)` — the same frames play forward,
+backward, or under a scrollbar. Try it in the [live labs](https://songhaifan.github.io/visdelta/).
+
 ```text
 Data -> Chart state -> Difference -> Transition -> Frame
 ```
