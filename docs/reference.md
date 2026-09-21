@@ -1,19 +1,19 @@
 # API reference
 
-VisDelta compares two immutable states of the same chart type and creates a
-seekable transition.
+VisDelta compares two immutable states of the same chart type. Use `delta()` to
+inspect what changed, then `transition()` or `sequence()` to evaluate a path.
+The seven `stateChanges` categories are semantic facts, not playback phases.
 
 <TransitionWorkbench />
 
 The workbench uses the built package from this checkout. Seek in either
 direction and inspect the resolved endpoints and semantic difference.
 
-## Edit the grammar live
+## Run the grammar against a real transition
 
-<SyntaxPlayground />
-
-Return `{ from, to }` from the editor. Both states must use the same chart type.
-The surrounding workbench owns rendering, playback, resize, and cleanup.
+Use the [ontology playground](/language-framework#run-a-state-difference) to
+edit a pair of immutable states, inspect its directional `stateChanges`, and
+scrub the generated transition. This reference stays focused on the API shape.
 
 ## Chart state
 
@@ -376,15 +376,26 @@ them here.
 
 ## `delta(from, to)`
 
-`delta()` is DOM-free. It requires matching chart types and returns a semantic
-difference with `deltas` plus `hasDelta(type)`.
+`delta()` is DOM-free. It requires matching chart types and returns raw semantic
+`deltas`, normalized `stateChanges`, and `hasDelta(type)`.
 
 ```js
 import { delta } from "visdelta/core";
 
 const change = delta(base, next);
 change.hasDelta("encoding.y");
+change.stateChanges;
+// [{ category: "encoding", action: "remap", channel: "y" }]
 ```
+
+The seven `stateChanges` categories describe what changed: `data`, `grain`,
+`encoding`, `coordinate`, `layout`, `attention`, and `appearance`. They are
+non-exclusive and their array order is not an animation schedule. Grain entries
+include their previous and next `groupby` and `measures`, including each
+aggregate operator, input field, and output field. Identity remains separate in
+`.datumKey()`, `.key()`, and the optional `lineage` correspondence result.
+When record identity is unavailable, an uncertain Data action is omitted from
+`stateChanges`; the original low-level `data` or `filter` delta remains visible.
 
 ## `transition(from, to, options)`
 

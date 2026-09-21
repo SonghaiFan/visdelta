@@ -35,8 +35,11 @@ test('application state controls drive the same transition progress', async ({ p
   await expect(page.locator('.workbench-seq-head output')).toHaveText('3 / 3');
 });
 
-test('editable grammar recompiles live, reports errors, and switches chart types', async ({ page }) => {
+test('ontology playground recompiles live, reports errors, and switches state differences', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
   await page.locator('.syntax-playground').scrollIntoViewIfNeeded();
+  await expect(page.locator('.ontology-inspector')).toHaveCount(0);
+  await expect(page.getByText('Live semantic inspection', { exact: true })).toHaveCount(0);
   const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
   const status = page.locator('.playground-status');
   await expect(status).toHaveText('Ready');
@@ -65,16 +68,18 @@ return { from: all, to: north };`);
 });
 
 test('every editable preset produces real marks', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
   await page.locator('.syntax-playground').scrollIntoViewIfNeeded();
   const picker = page.getByRole('combobox', { name: 'Syntax example' });
   const status = page.locator('.playground-status');
   const cases = [
+    ['measure', 'rect.vd-bar'],
     ['filter', 'rect.vd-bar'],
+    ['focus', 'rect.vd-bar'],
     ['highlight', 'rect.vd-bar'],
     ['split', 'rect.vd-bar'],
     ['flip', 'rect.vd-bar'],
     ['line', 'path.vd-line'],
-    ['point', 'circle'],
     ['unit', 'circle']
   ];
 
@@ -95,22 +100,20 @@ test('reference stays usable at a narrow viewport', async ({ page }) => {
   await expect(page.getByRole('slider', { name: 'Transition progress', exact: true })).toBeEnabled();
 });
 
-test('design principles document the implemented language and core boundary', async ({ page }) => {
+test('ontology documents the implemented state model and core boundary', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/language-framework.html');
-  await expect(page).toHaveTitle(/Language and implementation rules.*VisDelta/);
+  await expect(page).toHaveTitle(/Ontology and transition contracts.*VisDelta/);
+  await expect(page.getByRole('heading', { name: 'Four layers, kept separate' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Rules that guide implementation' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Every frame is true/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Core knows no chart types/ })).toBeVisible();
-  await expect(page.locator('.syntax-playground')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Run a state difference' })).toBeVisible();
+  await expect(page.locator('.syntax-playground')).toHaveCount(1);
 });
 
-test('examples are inline editors rather than source-file references', async ({ page }) => {
+test('legacy examples page routes readers to the ontology playground', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/examples.html');
-  await expect(page.locator('.syntax-playground')).toHaveCount(10);
-  await expect(page.getByText(/^Source:/)).toHaveCount(0);
-
-  const finalPlayground = page.locator('.syntax-playground').last();
-  await finalPlayground.scrollIntoViewIfNeeded();
-  await expect(finalPlayground.locator('.playground-status')).toHaveText('Ready');
-  expect(await finalPlayground.locator('circle').count()).toBeGreaterThan(0);
+  await expect(page.locator('.syntax-playground')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Ontology and transition contracts' }))
+    .toHaveAttribute('href', '/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
 });

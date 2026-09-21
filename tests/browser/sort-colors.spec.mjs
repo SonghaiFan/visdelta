@@ -55,6 +55,40 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
   });
 }
 
+test('dark chart style uses white neutral ink without changing authored color', async ({ page }) => {
+  const samples = await page.evaluate(async () => {
+    const vd = await import('/dist/visdelta.esm.js');
+    const rows = [
+      { category: 'A', value: 10 },
+      { category: 'B', value: 20 }
+    ];
+    const base = vd.bar(rows).x('category').y('value').key('category');
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const samples = [];
+    for (const [mode, view] of [['none', base], ['constant', base.color('#cc3366')]]) {
+      const change = await vd.transition(view, view, {
+        target: host,
+        height: 400,
+        chartStyle: vd.darkChartStyle
+      });
+      samples.push({
+        mode,
+        rootClass: host.firstElementChild.className,
+        colors: [...host.querySelectorAll('rect.vd-bar')]
+          .map(node => d3.color(getComputedStyle(node).fill).formatHex())
+      });
+      change.destroy();
+    }
+    host.remove();
+    return samples;
+  });
+  expect(samples[0].rootClass).toContain('vd-style-dark');
+  expect([...new Set(samples[0].colors)]).toEqual(['#ffffff']);
+  expect([...new Set(samples[1].colors)]).toEqual(['#cc3366']);
+});
+
 test('reaggregation never invents color meaning across phases or reverse seeks', async ({ page }) => {
   const samples = await page.evaluate(async () => {
     const vd = await import('/dist/visdelta.esm.js');

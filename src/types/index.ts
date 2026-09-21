@@ -359,6 +359,46 @@ export interface SemanticDiffResult {
   get<T = unknown>(type: string): Delta<T> | null;
 }
 
+export type StateChangeCategory =
+  | 'data'
+  | 'grain'
+  | 'encoding'
+  | 'coordinate'
+  | 'layout'
+  | 'attention'
+  | 'appearance';
+
+export interface GrainMeasure {
+  op: string;
+  field: string | null;
+  as: string | null;
+}
+
+export interface GrainDescription {
+  groupby: string[];
+  measures: GrainMeasure[];
+  /** Quantity represented by one Unit mark. */
+  unitValue?: number;
+}
+
+export type StateChange =
+  | { category: 'data'; action: 'add' | 'remove' | 'update' }
+  | {
+      category: 'grain';
+      action: 'split' | 'merge' | 'reaggregate' | 'change-reducer';
+      previous: GrainDescription;
+      next: GrainDescription;
+    }
+  | { category: 'encoding'; action: 'bind' | 'unbind' | 'remap'; channel: string }
+  | { category: 'coordinate'; action: 'rescale' | 'reorient'; channel?: 'x' | 'y' }
+  | { category: 'layout'; action: 'reorder' | 'rearrange' | 'reconnect' }
+  | {
+      category: 'attention';
+      action: 'enter' | 'exit' | 'shift';
+      target: 'focus' | 'highlight';
+    }
+  | { category: 'appearance'; action: 'restyle' | 'reshape'; property: string };
+
 export interface DiffResult {
   changed: string[];
   has(key: string): boolean;
@@ -368,8 +408,15 @@ export interface DiffResult {
   semantic: SemanticDiffResult;
   previous: SemanticViewState;
   next: SemanticViewState;
+  /** Normalized endpoint semantics. These categories do not prescribe phase order. */
+  stateChanges?: StateChange[];
   /** Data-level mark correspondence when both endpoints have inline data. */
   lineage?: import('../data/lineage.js').LineageCorrespondence;
+}
+
+/** The complete result returned by public delta() and transition.delta. */
+export interface DeltaResult extends DiffResult {
+  stateChanges: StateChange[];
 }
 
 // ─── Transition planning ──────────────────────────────────────────────────────

@@ -7,16 +7,16 @@ const base = process.env.DOCS_BASE || '/docs/.vitepress/dist/';
 
 export default defineConfig({
   title: 'VisDelta',
-  description: 'Declarative visualization states and seekable animated transitions.',
+  description: 'Compare immutable chart states, inspect what changed, and render a seekable transition.',
   lang: 'en-US',
   base,
   cleanUrls: false,
   lastUpdated: true,
   head: [
-    ['meta', { name: 'theme-color', content: '#fbfbf8' }],
+    ['meta', { name: 'theme-color', content: '#f4f3ef' }],
     ['link', {
       rel: 'icon',
-      href: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Crect x="8" y="20" width="14" height="34" rx="4" fill="%231c6ae4"/%3E%3Crect x="26" y="10" width="14" height="44" rx="4" fill="%23fa4d1d"/%3E%3Crect x="44" y="28" width="14" height="26" rx="4" fill="%2303b976"/%3E%3C/svg%3E'
+      href: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Cpath d="M12 16h18v12H12zM34 36h18v12H34z" fill="%23111"/%3E%3Cpath d="M26 22h12v20" fill="none" stroke="%232f64ff" stroke-width="5"/%3E%3C/svg%3E'
     }]
   ],
   markdown: {
@@ -25,42 +25,48 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'VisDelta',
     nav: [
-      { text: 'Guide', link: '/getting-started' },
-      { text: 'Playground', link: '/examples' },
+      { text: 'Start', link: '/getting-started' },
+      { text: 'Ontology', link: '/language-framework' },
       { text: 'API', link: '/reference' },
-      { text: 'Learn', items: [
-        { text: 'Design principles', link: '/language-framework' },
+      { text: 'Explore', items: [
+        { text: 'Run a state difference', link: '/language-framework#run-a-state-difference' },
         { text: 'Chart types', link: '/chart-types' },
         { text: 'Data and transforms', link: '/data-sources-and-transforms' },
-        { text: 'Chart styling', link: '/chart-style' }
+        { text: 'Transition runtime', link: '/runtime-api' },
+        { text: 'Chart style', link: '/chart-style' }
       ] },
-      { text: '0.2.0', items: [
+      { text: '0.3.0', items: [
         { text: 'Changelog', link: 'https://github.com/SonghaiFan/visdelta/blob/main/CHANGELOG.md' },
         { text: 'npm package', link: 'https://www.npmjs.com/package/visdelta' }
       ] }
     ],
     sidebar: [
       {
-        text: 'Start',
+        text: 'Learn the model',
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Getting started', link: '/getting-started' },
-          { text: 'Interactive reference', link: '/reference' },
-          { text: 'Examples', link: '/examples' }
+          { text: 'Ontology and contracts', link: '/language-framework' }
         ]
       },
       {
-        text: 'Learn',
+        text: 'Build a chart state',
         items: [
-          { text: 'Design principles', link: '/language-framework' },
-          { text: 'Chart types', link: '/chart-types' },
           { text: 'Data and transforms', link: '/data-sources-and-transforms' },
-          { text: 'Chart style', link: '/chart-style' },
+          { text: 'Chart types', link: '/chart-types' },
+          { text: 'Appearance and style', link: '/chart-style' }
+        ]
+      },
+      {
+        text: 'Inspect and run a transition',
+        items: [
+          { text: 'Ontology playground', link: '/language-framework#run-a-state-difference' },
+          { text: 'API reference', link: '/reference' },
           { text: 'Transition runtime', link: '/runtime-api' }
         ]
       },
       {
-        text: 'Playground',
+        text: 'Chart-specific labs',
         items: [
           { text: 'Bar transition lab', link: '/transition-lab' },
           { text: 'Point transition lab', link: '/point-lab' },
@@ -95,8 +101,8 @@ export default defineConfig({
       text: 'Edit this page on GitHub'
     },
     footer: {
-      message: 'Released under the MIT License.',
-      copyright: 'VisDelta 0.2 documentation'
+      message: 'Built from the current repository. Released under the MIT License.',
+      copyright: 'VisDelta documentation'
     },
     docFooter: {
       prev: 'Previous',

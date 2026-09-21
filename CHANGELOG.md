@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 - 2026-09-17
+
+This release adds normalized state-change inspection and aligns the package
+with its published documentation site.
+
+- `delta().stateChanges` describes Data, Grain, Encoding, Coordinate, Layout,
+  Attention, and Appearance changes without prescribing animation order.
+- `homepage` points at the docs site, <https://songhaifan.github.io/visdelta/>,
+  which now opens with a live showcase and a README demo recording.
+- Documented both browser routes without a bundler: versioned ESM files through
+  jsDelivr's `/+esm` endpoint (the plain `dist/*.js` URLs cannot resolve their
+  `d3-*` imports in a browser) and the self-contained global script, with a
+  complete slider-driven page in `examples/cdn-demo.html`.
+
 ## 0.2.0 - 2026-09-16
 
 VisDelta is a greenfield library. There is no compatibility layer or migration

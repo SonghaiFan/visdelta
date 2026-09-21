@@ -4,6 +4,8 @@
   --vd-color-surface: #fff;
   --vd-color-bg: #f8f8f7;
   --vd-color-on-surface: #1f2328;
+  /* Ink for marks without an authored color encoding. */
+  --vd-color-mark-default: #000000;
   --vd-color-muted: #66707a;
   --vd-color-border: #dde1e6;
   --vd-color-outline: #747b83;
@@ -307,6 +309,7 @@
   --vd-color-surface: #11161c;
   --vd-color-bg: #0b1015;
   --vd-color-on-surface: #dbe7ef;
+  --vd-color-mark-default: #ffffff;
   --vd-color-muted: #91a0ac;
   --vd-color-border: #2b3741;
   --vd-color-outline: #536472;

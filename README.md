@@ -39,7 +39,7 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 ## Install
 
 ```sh
-npm install visdelta@0.2.0
+npm install visdelta@0.3.0
 ```
 
 VisDelta depends only on the `d3-*` modules it renders with. Declared transforms

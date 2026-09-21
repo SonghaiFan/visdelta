@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VisDelta CDN demo</title>
+    <!-- 1. Stylesheet: required chart styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
+    <!-- 2. Script: the self-contained global bundle (~105 KB gzip). The D3 modules
+         VisDelta uses are compiled in, so no other <script> is needed; nothing
+         else (no Arquero) is bundled. Exposes window.VisDelta -->
+
+    <script src="https://cdn.jsdelivr.net/npm/visdelta@0.3.0"></script>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; max-width: 880px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p { color: #555; margin: 0 0 16px; }
+      #chart { border: 1px solid #ddd; border-radius: 8px; min-height: 420px; }
+      .controls { display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+      .controls input[type=range] { flex: 1; min-width: 200px; }
+      .controls button { padding: 6px 14px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+      .controls button:hover { background: #f3f3f3; }
+      output { font-variant-numeric: tabular-nums; min-width: 3.5em; }
+      #status { color: #b00; }
+    </style>
+  </head>
+  <body>
+    <h1>VisDelta from the CDN</h1>
+    <p>Two immutable chart states, one seekable transition. Drag the slider or press play.</p>
+
+    <div id="chart"></div>
+
+    <div class="controls">
+      <button id="start">Start · 0</button>
+      <input id="progress" type="range" min="0" max="1" step="0.001" value="0" aria-label="Transition progress">
+      <output id="value">0.000</output>
+      <button id="play">Play →</button>
+      <button id="reverse">← Reverse</button>
+      <button id="end">End · 1</button>
+    </div>
+    <div id="status" role="alert"></div>
+
+    <script>
+      (async () => {
+        const { bar, transition } = VisDelta;
+
+        const rows = [
+          { category: "A", revenue: 12, profit: 5 },
+          { category: "B", revenue: 18, profit: 11 },
+          { category: "C", revenue: 9, profit: 7 },
+          { category: "D", revenue: 15, profit: 2 }
+        ];
+
+        // Chart states are immutable: `profit` branches from `revenue`.
+        // Color is an explicit encoding; without one, marks are neutral black.
+        const revenue = bar(rows).x("category").y("revenue", { title: "Revenue" }).key("category").color("#4e79a7");
+        const profit = revenue.y("profit", { title: "Profit" });
+
+        try {
+          const change = await transition(revenue, profit, { target: "#chart", height: 420 });
+
+          const slider = document.querySelector("#progress");
+          const value = document.querySelector("#value");
+          const show = (t) => { slider.value = t; value.value = Number(t).toFixed(3); };
+
+          slider.addEventListener("input", () => { change.progress(slider.valueAsNumber); value.value = slider.valueAsNumber.toFixed(3); });
+          document.querySelector("#start").onclick = () => { change.progress(0); show(0); };
+          document.querySelector("#end").onclick = () => { change.progress(1); show(1); };
+          document.querySelector("#play").onclick = () => { change.play({ from: 0, to: 1, duration: 900 }); track(change); };
+          document.querySelector("#reverse").onclick = () => { change.play({ from: 1, to: 0, duration: 900 }); track(change); };
+
+          // Mirror playback onto the slider.
+          function track(controller) {
+            const tick = () => {
+              show(controller.value);
+              if (controller.value > 0 && controller.value < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          }
+        } catch (error) {
+          document.querySelector("#status").textContent = String(error.message || error);
+          throw error;
+        }
+      })();
+    </script>
+  </body>
+</html>

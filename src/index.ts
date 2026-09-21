@@ -28,6 +28,6 @@ export { buildGroupingTree, compileLineage, correspondLineage, delta, diffViewSt
 export { detectDataTypes, resolveEncodingTypes } from "./data/types.js";
 export type { Visualization } from "./core.js";
 export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, LineageAtom, LineageCapability, LineageCompileOptions, LineageComponent, LineageContribution, LineageCorrespondence, LineageEdge, LineageOperation, LineageRow, LineageTable } from "./core.js";
-export type { ChannelType, ConnectorSpec } from "./types/index.js";
+export type { ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
 export type { TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";
 export type { SequenceOptions, SequencePlayOptions, VisualizationSequence } from "./sequence.js";

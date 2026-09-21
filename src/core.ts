@@ -1,10 +1,11 @@
-import type { DiffResult, ViewSpec } from './types/index.js';
+import type { DeltaResult, ViewSpec } from './types/index.js';
 import { cloneState } from './grammar/view-state.js';
 import { diffViewStates } from './grammar/diff.js';
 import { serializeViewSpec } from './spec-meta.js';
 import type { ChartModule } from './charts/module.js';
 import { resolveSpecDataTypes } from './data/types.js';
-import { viewLineageCorrespondence } from './data/view-lineage.js';
+import { analyzeViewLineage } from './data/view-lineage.js';
+import { classifyStateChanges } from './grammar/state-changes.js';
 
 export type Visualization = ViewSpec | {
   toSpec(): ViewSpec;
@@ -32,15 +33,17 @@ export function visualizationSpec(input: Visualization): ViewSpec {
 }
 
 /** Compute the declarative difference between two states of the same chart type. */
-export function delta(from: Visualization, to: Visualization): DiffResult {
+export function delta(from: Visualization, to: Visualization): DeltaResult {
   const source = visualizationSpec(from);
   const target = visualizationSpec(to);
   if (!source.mark || source.mark !== target.mark) {
     throw new Error('delta() requires two states of the same chart type.');
   }
   const diff = diffViewStates(source, target);
-  const lineage = viewLineageCorrespondence(source, target);
-  return lineage ? { ...diff, lineage } : diff;
+  const analysis = analyzeViewLineage(source, target);
+  const lineage = analysis?.correspondence;
+  const stateChanges = classifyStateChanges(source, target, diff.semantic, analysis);
+  return lineage ? { ...diff, lineage, stateChanges } : { ...diff, stateChanges };
 }
 
 export { diffViewStates };
@@ -66,4 +69,4 @@ export type {
 export { cameraPosition, cameraScale, cameraSize, fitCamera, focusCamera, pointBounds, rectBounds } from './focus.js';
 export type { FocusBounds, FocusCamera, FocusTarget, FocusViewport } from './focus.js';
 export type { ChannelType } from './types/index.js';
-export type { DiffResult, ViewSpec } from './types/index.js';
+export type { DeltaResult, DiffResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory, ViewSpec } from './types/index.js';

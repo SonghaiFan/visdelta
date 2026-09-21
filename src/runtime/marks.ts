@@ -161,6 +161,9 @@ const DEFAULT_PALETTE: Array<readonly [string, string]> = [
   ['--vd-series-10', '#bab0ac']
 ];
 const DEFAULT_LUMINANCE_BASE: readonly [string, string] = ['--vd-accent', '#4e79a7'];
+// Color is only introduced when authors declare an encoding. This token keeps
+// neutral ink legible when a chart style changes its surface.
+const DEFAULT_MARK_COLOR: readonly [string, string] = ['--vd-color-mark-default', '#000000'];
 
 // ─── Hue-maximisation helpers ─────────────────────────────────────────────────
 
@@ -482,11 +485,11 @@ function channelDomain(rows: RenderDatum[], channel: RenderChannel = {}): unknow
 
 function colorScale(rows: RenderDatum[], channel: RenderChannel | undefined): (row: RenderDatum) => string {
   const resolved = resolveColorChannel(rows, channel);
-  if (!resolved) return () => '#000000';
+  if (!resolved) return () => themeColor(DEFAULT_MARK_COLOR);
   const activeChannel = resolved;
   if (activeChannel.value) return () => cssColor(activeChannel.value, '#4e79a7');
   if (activeChannel.hue || activeChannel.luminance) return compositeColorScale(activeChannel);
-  if (!activeChannel.field) return () => '#000000';
+  if (!activeChannel.field) return () => themeColor(DEFAULT_MARK_COLOR);
   if (activeChannel.type === 'quantitative') return luminanceColorScale(rows, activeChannel);
   // Use the transition registry for consistent key→color mapping across frames.
   const field = activeChannel.field;
@@ -1041,7 +1044,13 @@ function renderAxisWithGuard(
     return;
   }
   if (replacesKind) {
-    fadeClone(axisGroup, 'vd-axis vd-axis-ghost', transition, duration);
+    // Grid axes share tick rendering, not axis presentation. Their exiting
+    // copy must retain grid strokes (including nested x-grid lines) and keep
+    // the domain path hidden throughout the crossfade.
+    const ghostClass = kind.startsWith('grid-')
+      ? 'vd-grid vd-grid-ghost'
+      : 'vd-axis vd-axis-ghost';
+    fadeClone(axisGroup, ghostClass, transition, duration);
     renderAxis(axisGroup, axis, orient, null);
     axisGroup.style('opacity', 0);
     return;

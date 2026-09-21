@@ -124,9 +124,10 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       controller.progress(start);
       const span = duration * Math.abs(end - start);
       if (!span) { controller.progress(end); return controller; }
-      let started: number | null = null;
+      // Start the clock when play() is called so the first scheduled frame
+      // advances instead of repeating the already-committed start frame.
+      const started = performance.now();
       const tick = (now: number) => {
-        started ??= now;
         const fraction = Math.min(1, (now - started) / span);
         controller.progress(start + (end - start) * fraction);
         animation = fraction < 1 ? requestAnimationFrame(tick) : null;

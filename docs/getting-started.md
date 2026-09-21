@@ -1,12 +1,13 @@
 # Getting started
 
-VisDelta declares immutable chart states and creates a seekable transition
-between two states of the same chart type. The application supplies progress.
+VisDelta declares immutable chart states, describes what changed between them,
+and creates a seekable transition between states of the same chart type. The
+application supplies progress.
 
 ## Install
 
 ```sh
-npm install visdelta@0.2.0
+npm install visdelta
 ```
 
 VisDelta includes the D3 runtime used by rendering. Declared transforms run
@@ -35,6 +36,23 @@ const profit = revenue.y("profit");
 
 The second declaration branches from the first. It does not mutate `revenue`.
 
+## Inspect the difference
+
+```js
+import { delta } from "visdelta/core";
+
+delta(revenue, profit).stateChanges;
+// [{ category: "encoding", action: "remap", channel: "y" }]
+```
+
+`stateChanges` answers what changed using seven non-exclusive categories:
+Data, Grain, Encoding, Coordinate, Layout, Attention, and Appearance. The array
+is an inspection result, not a playback schedule.
+
+Data actions are reported only when the endpoint evidence supports them. Add
+`.datumKey("id")` when source records have a stable identifier; VisDelta does
+not guess value updates from row position.
+
 ## Create and control the transition
 
 ```js
@@ -53,5 +71,5 @@ change.destroy();
 `progress(value)` accepts a normalized value from 0 through 1. A range input,
 button, gesture, route, timer, or scroll adapter can provide that value.
 
-Continue with the [interactive reference](/reference), [chart types](/chart-types),
-and [design rules](/language-framework).
+Continue with the [ontology and contracts](/language-framework), [interactive
+reference](/reference), and [chart types](/chart-types).

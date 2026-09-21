@@ -38,9 +38,13 @@ void [rendererShape, legacyRenderer];
 
 const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
+const semanticChange = delta(a, b);
+semanticChange.stateChanges[0]?.category;
+selectedDelta(a, b).stateChanges[0]?.action;
 const currentRows = a.rows();
 currentRows[0]?.value;
 const pair = await transition(a, b, { target: '#chart' });
+pair.delta.stateChanges[0]?.category;
 pair.progress(0.4).play({ duration: 300 }).pause().resize();
 pair.destroy();
 const journey = await sequence([a, b, a], { target: '#chart' });

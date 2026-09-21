@@ -1,4 +1,4 @@
-import type { ViewSpec, DiffResult, RuntimeOptions } from './types/index.js';
+import type { ViewSpec, DeltaResult, RuntimeOptions } from './types/index.js';
 import { cloneState } from './grammar/view-state.js';
 import { delta, visualizationChartModule, visualizationSpec } from './core.js';
 import type { Visualization } from './core.js';
@@ -31,7 +31,7 @@ export interface PlayOptions {
 export interface VisualizationTransition {
   readonly from: ViewSpec;
   readonly to: ViewSpec;
-  readonly delta: DiffResult;
+  readonly delta: DeltaResult;
   readonly view: Element;
   readonly value: number;
   /** Synchronously display a frame. Direction is inferred from the previous value. */
@@ -137,9 +137,11 @@ export async function transition(
       show(start, direction);
       const span = duration * Math.abs(end - start);
       if (!span) { show(end, direction); return controller; }
-      let started: number | null = null;
+      // The play call is the clock origin. If the first animation frame becomes
+      // the origin instead, that frame redraws progress(0) and creates a visible
+      // dead beat between an authored state change and its projected motion.
+      const started = performance.now();
       const tick = (now: number) => {
-        started ??= now;
         const fraction = Math.min(1, (now - started) / span);
         show(start + (end - start) * fraction, direction);
         animation = fraction < 1 ? requestAnimationFrame(tick) : null;

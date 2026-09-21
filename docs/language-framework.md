@@ -1,10 +1,10 @@
-# Language and implementation rules
+# Ontology and transition contracts
 
-This page is the source of truth for VisDelta's words and design decisions.
-It records rules that are implemented now. Possible future chart types and
-roadmaps do not belong in the public language.
+This page is the source of truth for how VisDelta names state difference,
+identity, correspondence, and paths. It records behavior implemented now.
+Possible future chart types and roadmaps do not belong in the public language.
 
-## The model
+## Four layers, kept separate
 
 The core concepts are **state, correspondence, and path**:
 
@@ -31,7 +31,35 @@ appearance are useful non-exclusive descriptions, not seven animation engines
 or a global priority list. The current renderer scene labels (`selection`,
 `mapping`, `detail`, `axis`) are execution hints, not an exhaustive ontology.
 
-### Three governing contracts
+`delta().stateChanges` normalizes those descriptions into directional facts:
+
+| Category | Question | Actions |
+| --- | --- | --- |
+| Data | Which source records participate, and did their values change? | `add`, `remove`, `update` |
+| Grain | Which records make one mark, and how is its measure calculated? | `split`, `merge`, `reaggregate`, `change-reducer` |
+| Encoding | Which field is bound to a visual channel? | `bind`, `unbind`, `remap` |
+| Coordinate | How are values mapped into position and space? | `rescale`, `reorient` |
+| Layout | How are the same objects arranged or connected? | `reorder`, `rearrange`, `reconnect` |
+| Attention | Which objects are emphasized or framed by the camera? | `enter`, `exit`, `shift`, with target `focus` or `highlight` |
+| Appearance | What fixed visual form or styling is used? | `restyle`, `reshape` |
+
+Identity remains correspondence evidence rather than a change category.
+`.datumKey()` identifies source records and `.key()` identifies marks at the
+current grain. A Grain change records both grouping fields and aggregate
+measures, so `sum` to `mean` is `change-reducer` even when grouping is unchanged.
+The array's stable categorical order is for inspection only; a chart transition
+policy still chooses the route and phase order.
+
+## Run a state difference
+
+Edit a pair of immutable states below. This is the documentation's single
+general-purpose playground: it renders a real transition and exposes the
+computed delta, but it does not promise a particular playback order from the
+category list.
+
+<SyntaxPlayground initial="filter" />
+
+## Three governing contracts
 
 1. **State is fact; operation history is not an animation script.** Planning
    consumes endpoint states, not the sequence of builder method calls that
@@ -57,7 +85,7 @@ share pair/frame execution, while keeping their distinct timeline ownership.
 These contracts do not imply a universal route-search engine: supported paths
 are currently chart-owned policies, with concrete cases documented below.
 
-### Execution flow
+## Execution flow
 
 The concepts above are implemented through this pipeline:
 

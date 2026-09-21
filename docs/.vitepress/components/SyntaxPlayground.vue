@@ -14,7 +14,7 @@ const props = defineProps({
 
 const samples = {
   measure: {
-    label: 'Change measure',
+    label: 'Encoding - remap y',
     code: `const revenue = bar(rows)
   .x("category")
   .y("sales", { title: "Revenue" })
@@ -28,7 +28,7 @@ const profit = revenue
 return { from: revenue, to: profit };`
   },
   filter: {
-    label: 'Filter with where()',
+    label: 'Data - remove records',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -39,7 +39,7 @@ const northOnly = all.where({ region: "North" });
 return { from: all, to: northOnly };`
   },
   focus: {
-    label: 'Focus the view',
+    label: 'Attention - focus enter',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -50,7 +50,7 @@ const northView = all.focus({ region: "North" });
 return { from: all, to: northView };`
   },
   highlight: {
-    label: 'Highlight a subset',
+    label: 'Attention - highlight enter',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -64,7 +64,7 @@ const focused = all.highlight(
 return { from: all, to: focused };`
   },
   split: {
-    label: 'Break down bars',
+    label: 'Grain - split marks',
     code: `const detailed = bar(segments)
   .x("category")
   .y("sales")
@@ -78,7 +78,7 @@ const total = detailed.rollup();
 return { from: total, to: detailed };`
   },
   flip: {
-    label: 'Flip orientation',
+    label: 'Coordinate - reorient',
     code: `const vertical = bar(rows)
   .x("category")
   .y("sales")
@@ -89,7 +89,7 @@ const horizontal = vertical.flip();
 return { from: vertical, to: horizontal };`
   },
   line: {
-    label: 'Line chart',
+    label: 'Appearance - reshape line',
     code: `const sales = line(series)
   .x("quarter")
   .y("sales")
@@ -97,50 +97,21 @@ return { from: vertical, to: horizontal };`
   .curve("curveMonotoneX")
   .pointSize(4);
 
-const profit = sales.y("profit");
+const curved = sales.curve("curveBumpX");
 
-return { from: sales, to: profit };`
-  },
-  point: {
-    label: 'Point chart',
-    code: `const sales = point(series)
-  .x("sales")
-  .y("profit")
-  .key("quarter")
-  .radius(6);
-
-const reordered = sales
-  .x("profit")
-  .y("sales")
-  .color("#fa4d1d");
-
-return { from: sales, to: reordered };`
-  },
-  area: {
-    label: 'Area chart',
-    code: `const sales = area(series)
-  .x("quarter")
-  .y("sales")
-  .key("quarter")
-  .color("#1c6ae4");
-
-const profit = sales.y("profit");
-
-return { from: sales, to: profit };`
+return { from: sales, to: curved };`
   },
   unit: {
-    label: 'Unit chart',
+    label: 'Layout - rearrange units',
     code: `const grid = unit(units)
   .value("count", { maxUnits: 80 })
   .key("team")
+  .group("team")
   .layout("grid", { columns: 10, radius: 4 });
 
-const grouped = grid
-  .group("team")
-  .layout("bar", { columns: 3 })
-  .color("team");
+const arranged = grid.layout("bar", { columns: 3 });
 
-return { from: grid, to: grouped };`
+return { from: grid, to: arranged };`
   }
 };
 
@@ -344,6 +315,7 @@ async function runCode() {
     hasChange.value = true;
     deltaText.value = JSON.stringify({
       changed: change.delta.changed,
+      stateChanges: change.delta.stateChanges,
       deltas: change.delta.deltas,
       semantic: change.delta.semantic.deltas
     }, null, 2);
@@ -491,7 +463,7 @@ function handleEditorKeydown(event) {
   <div class="syntax-playground" :class="{ 'is-compact': compact }">
     <div class="playground-toolbar">
       <label v-if="!compact">
-        <span>Example</span>
+        <span>State difference</span>
         <select :id="isLabMode ? 'scenario' : undefined" v-model="selected" aria-label="Syntax example">
           <option v-for="(sample, key) in availableSamples" :key="key" :value="key">{{ sample.label }}</option>
         </select>
@@ -516,7 +488,7 @@ function handleEditorKeydown(event) {
 
     <div class="playground-grid">
       <div class="playground-editor-pane">
-        <div class="playground-pane-label">Editable JavaScript</div>
+        <div class="playground-pane-label">Two immutable states</div>
         <textarea
           v-model="code"
           :id="isLabMode ? 'editor' : undefined"
@@ -528,11 +500,11 @@ function handleEditorKeydown(event) {
           @keydown="handleEditorKeydown"
         ></textarea>
         <p v-if="isLabMode" class="playground-contract"><code>{{ labChart }}</code> and <code>d3</code> are provided. Define the data and both states, then end with <code>return { from, to };</code>. Code runs locally in this page.</p>
-        <p v-else class="playground-contract">Available: <code>area</code>, <code>bar</code>, <code>line</code>, <code>point</code>, <code>unit</code>, <code>delta</code>, plus <code>rows</code>, <code>segments</code>, <code>series</code>, and <code>units</code>. End with <code>return { from, to };</code>.</p>
+        <p v-else class="playground-contract">Available: <code>area</code>, <code>bar</code>, <code>line</code>, <code>point</code>, <code>unit</code>, <code>delta</code>, plus <code>rows</code>, <code>segments</code>, <code>series</code>, and <code>units</code>. End with <code>return { from, to };</code>. Categories describe the difference, not playback order.</p>
       </div>
 
       <div class="playground-output-pane">
-        <div class="playground-pane-label">Live output · progress <output :id="isLabMode ? 'value' : undefined">{{ progress.toFixed(2) }}</output></div>
+        <div class="playground-pane-label">Transition frame · progress <output :id="isLabMode ? 'value' : undefined">{{ progress.toFixed(2) }}</output></div>
         <div v-if="lineTransition" class="playground-line-plan">Line transition <strong>{{ lineTransition }}</strong></div>
         <div :id="isLabMode ? 'chart' : undefined" ref="chartTarget" class="playground-chart" aria-label="Editable syntax output"></div>
         <div v-if="error" class="playground-runtime-error" role="alert">{{ error }}</div>
@@ -555,7 +527,7 @@ function handleEditorKeydown(event) {
           <button v-if="isLabMode" id="end" type="button" :disabled="!hasChange" @click="setProgress(1)">End · 1</button>
         </div>
         <details>
-          <summary>Inspect computed delta</summary>
+          <summary>Inspect computed state difference</summary>
           <pre><code>{{ deltaText }}</code></pre>
         </details>
       </div>
