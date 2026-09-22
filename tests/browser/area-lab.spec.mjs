@@ -7,7 +7,9 @@ const ready = async page => {
   await expect(page.locator('#status')).toHaveText('Ready');
 };
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
-  Array.from(svg.querySelectorAll('path.vd-area, .tick, .vd-legend-item')).map(node => ({
+  Array.from(svg.querySelectorAll(
+    'g.vd-area-cells, g.vd-area-highlights, path.vd-area, .tick, .vd-legend-item'
+  )).map(node => ({
     tag: node.tagName,
     text: node.textContent,
     attrs: Array.from(node.attributes).map(attr => [attr.name, attr.value]).sort(),
@@ -20,7 +22,7 @@ for (const sample of scenarios) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/area-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(scenarios.length);
+    await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 
@@ -211,16 +213,84 @@ test('area axis titles align to the plot frame and stay clear of y-axis ticks', 
   }
 });
 
-test('area is borderless by default at endpoints and during ordinary transitions', async ({ page }) => {
+test('area uses only a same-fill seam cover, never a contrasting border', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/area-lab.html#highlight');
   await ready(page);
   for (const progress of [0, 0.5, 1]) {
     await page.locator('#progress').fill(String(progress));
     await expect(page.locator('#chart path.vd-area-edge')).toHaveCount(0);
-    const strokes = await page.locator('#chart path.vd-area-cell')
-      .evaluateAll(nodes => nodes.map(node => getComputedStyle(node).stroke));
-    expect(strokes.every(stroke => stroke === 'none')).toBe(true);
+    const paints = await page.locator('#chart path.vd-area-cell')
+      .evaluateAll(nodes => nodes.map(node => {
+        const style = getComputedStyle(node);
+        return { fill: style.fill, stroke: style.stroke, width: style.strokeWidth };
+      }));
+    expect(paints.every(({ fill, stroke, width }) => fill === stroke && width === '1px')).toBe(true);
   }
+});
+
+test('area fades isolated cohorts rather than individual seam-covered cells', async ({ page }) => {
+  for (const { id, progress } of [
+    { id: 'split', progress: '0.39' },
+    { id: 'filter', progress: '0.4' }
+  ]) {
+    await page.goto(`/docs/.vitepress/dist/area-lab.html#${id}`);
+    await page.reload();
+    await ready(page);
+    await page.locator('#progress').fill(progress);
+    const frame = await page.locator('#chart').evaluate(chart => {
+      const opacity = selector => {
+        const node = chart.querySelector(selector);
+        return node ? Number(getComputedStyle(node).opacity) : null;
+      };
+      const cohort = chart.querySelector('g.vd-area-entering-cells');
+      return {
+        entering: opacity('g.vd-area-entering-cells'),
+        exiting: opacity('g.vd-area-exiting-cells'),
+        isolation: cohort ? getComputedStyle(cohort).isolation : null,
+        childOpacity: [...chart.querySelectorAll('path.vd-area-cell')]
+          .map(node => Number(getComputedStyle(node).opacity))
+      };
+    });
+    expect(frame.entering).toBeGreaterThan(0);
+    expect(frame.entering).toBeLessThan(1);
+    if (id === 'split') {
+      expect(frame.exiting).toBeGreaterThan(0);
+      expect(frame.exiting).toBeLessThan(1);
+    }
+    expect(frame.isolation).toBe('isolate');
+    expect(frame.childOpacity.every(opacity => opacity === 1)).toBe(true);
+  }
+});
+
+test('area highlight clips a bounded x range at exact scale coordinates', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/area-lab.html#highlight-range');
+  await ready(page);
+  await page.locator('#end').click();
+  const highlight = await page.locator('#chart').evaluate(chart => {
+    const base = [...chart.querySelectorAll('path.vd-area-cell')];
+    const overlay = [...chart.querySelectorAll('path.vd-area-highlight')];
+    const observations = new Map([...chart.querySelectorAll('line.vd-area-observation')]
+      .map(node => [node.getAttribute('data-key'), Number(node.getAttribute('x1'))]));
+    const selectedX = overlay.map(node => observations.get(node.getAttribute('data-key')));
+    const clip = chart.querySelector('defs.vd-area-highlight-defs rect');
+    return {
+      baseCount: base.length,
+      baseOpacity: Number(getComputedStyle(chart.querySelector('g.vd-area-cells')).opacity),
+      overlayCount: overlay.length,
+      highlightOpacity: Number(getComputedStyle(chart.querySelector('g.vd-area-highlights')).opacity),
+      overlayOpacity: overlay.map(node => Number(getComputedStyle(node).opacity)),
+      selectedX,
+      clipX: Number(clip?.getAttribute('x')),
+      clipWidth: Number(clip?.getAttribute('width'))
+    };
+  });
+  expect(highlight.baseCount).toBe(38);
+  expect(highlight.baseOpacity).toBeCloseTo(0.12, 3);
+  expect(highlight.overlayCount).toBe(10);
+  expect(highlight.highlightOpacity).toBeCloseTo(1, 3);
+  expect(highlight.overlayOpacity.filter(opacity => opacity > 0.99)).toHaveLength(10);
+  expect(highlight.clipX).toBeCloseTo(Math.min(...highlight.selectedX), 4);
+  expect(highlight.clipX + highlight.clipWidth).toBeCloseTo(Math.max(...highlight.selectedX), 4);
 });
 
 test('area split draws a thin contrast divider only between endpoints', async ({ page }) => {
@@ -414,6 +484,57 @@ test('area add/remove and restore/filter reuse the same frames backward', async 
     expect(frame.remove).toEqual(frame.add);
     expect(frame.filter).toEqual(frame.restore);
   }
+});
+
+test('area filter updates leaving cells and connected boundaries simultaneously', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  await expect(page.locator('#status')).toHaveText('Ready');
+  const result = await page.evaluate(async () => {
+    const { area, transition } = VisDelta;
+    document.body.innerHTML = '<div id="filter"></div>';
+    const rows = [
+      { id: 'Q1', period: 'Q1', sales: 28 },
+      { id: 'Q2', period: 'Q2', sales: 47 },
+      { id: 'Q3', period: 'Q3', sales: 39 },
+      { id: 'Q4', period: 'Q4', sales: 66 },
+      { id: 'Q5', period: 'Q5', sales: 58 },
+      { id: 'Q6', period: 'Q6', sales: 79 }
+    ];
+    const base = area(rows).x('period').y('sales').key('id');
+    const filtered = base.where({ field: 'id', oneOf: ['Q1', 'Q2', 'Q5', 'Q6'] });
+    const change = await transition(base, filtered, { target: '#filter', height: 360 });
+    const sample = progress => {
+      change.progress(progress);
+      const boundary = document.querySelector('#filter path.vd-area-cell[data-observation-key="Q2"]');
+      const leaving = document.querySelector('#filter path.vd-area-cell[data-observation-key="Q3"]');
+      const coordinates = node => [...(node?.getAttribute('d') || '').matchAll(
+        /(-?\d*\.?\d+(?:e[-+]?\d+)?),(-?\d*\.?\d+(?:e[-+]?\d+)?)/gi
+      )].map(match => ({ x: Number(match[1]), y: Number(match[2]) }));
+      const boundaryPoints = coordinates(boundary);
+      const leavingPoints = coordinates(leaving);
+      const leavingLayer = leaving?.closest('g.vd-area-entering-cells, g.vd-area-exiting-cells');
+      return {
+        right: Math.max(...boundaryPoints.map(point => point.x)),
+        leavingOpacity: Number(leaving ? getComputedStyle(leaving).opacity : 0) *
+          Number(leavingLayer ? getComputedStyle(leavingLayer).opacity : 1),
+        leavingThickness: leavingPoints.length
+          ? Math.max(...leavingPoints.map(point => point.y)) - Math.min(...leavingPoints.map(point => point.y))
+          : 0
+      };
+    };
+    return { start: sample(0), middle: sample(0.5), end: sample(1) };
+  });
+
+  expect(result.middle.leavingOpacity).toBeGreaterThan(0);
+  expect(result.middle.leavingOpacity).toBeLessThan(1);
+  expect(result.middle.leavingThickness).toBeGreaterThan(Math.min(
+    result.start.leavingThickness, result.end.leavingThickness
+  ));
+  expect(result.middle.leavingThickness).toBeLessThan(Math.max(
+    result.start.leavingThickness, result.end.leavingThickness
+  ));
+  expect(result.middle.right).toBeGreaterThan(Math.min(result.start.right, result.end.right));
+  expect(result.middle.right).toBeLessThan(Math.max(result.start.right, result.end.right));
 });
 
 test('area filter preserves connected cells, gaps, and the no-isolated-area rule', async ({ page }) => {

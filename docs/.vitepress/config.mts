@@ -20,7 +20,11 @@ export default defineConfig({
     }]
   ],
   markdown: {
-    lineNumbers: true
+    lineNumbers: true,
+    theme: {
+      light: 'github-dark',
+      dark: 'github-dark'
+    }
   },
   themeConfig: {
     siteTitle: 'VisDelta',

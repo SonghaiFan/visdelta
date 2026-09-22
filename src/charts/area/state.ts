@@ -3,7 +3,7 @@ import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { connectedStretches } from '../continuity.js';
-import { matchesSelection, viewHighlight, viewSelection } from '../../focus.js';
+import { viewHighlight, viewSelection } from '../../focus.js';
 import type { AreaStackOffset, AreaStackOrder } from './authoring.js';
 
 export interface AreaSceneState {
@@ -352,17 +352,6 @@ export function areaPointKeyAccessor(
   return (row, index) => fields.length
     ? fields.map((field) => String(row[String(field)] ?? '')).join('\u0000')
     : String(index);
-}
-
-export function areaSelectionOpacity(
-  layer: AreaLayer,
-  selection: SelectionSpec | null,
-  dimOpacity = 0.22
-): number {
-  if (selection?.mode !== 'highlight' || !(selection.filters?.length || selection.filter)) return 1;
-  return layer.rows.some((row) => matchesSelection(row, selection))
-    ? 1
-    : Number(selection.opacity ?? dimOpacity);
 }
 
 /** Detail and observation membership each have one canonical direction. */

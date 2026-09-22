@@ -6,7 +6,7 @@ import type { TransitionOptions, VisualizationTransition } from './transition.js
 export interface SequenceOptions extends TransitionOptions {}
 
 export interface SequencePlayOptions {
-  /** Milliseconds for each adjacent state change. */
+  /** Milliseconds for each serial route stage. */
   duration?: number;
   /** Timeline position in leg units: 0 is the first state, 1 the second. */
   from?: number;
@@ -21,7 +21,7 @@ export interface VisualizationSequence {
   readonly value: number;
   /** Display a frame synchronously. Values between integers seek within a leg. */
   progress(value: number): VisualizationSequence;
-  /** Play across adjacent legs. Duration applies to each leg. */
+  /** Play across adjacent legs. Duration applies to each serial route stage. */
   play(options?: SequencePlayOptions): VisualizationSequence;
   pause(): VisualizationSequence;
   /** Recompile the active leg for the container's current size/theme. */
@@ -33,6 +33,11 @@ interface Segment {
   controller: VisualizationTransition;
   mount: Element;
   root: Element;
+  stageCount: number;
+}
+
+interface TimedVisualizationTransition extends VisualizationTransition {
+  stageCount(): number;
 }
 
 /**
@@ -62,7 +67,13 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       const controller = await transition(states[index], states[index + 1], { ...options, target: mount });
       const root = mount.firstElementChild;
       if (!root) throw new Error('sequence() could not prepare a transition surface.');
-      segments.push({ controller, mount, root });
+      const timed = controller as TimedVisualizationTransition;
+      segments.push({
+        controller,
+        mount,
+        root,
+        stageCount: Math.max(1, Number(timed.stageCount?.()) || 1)
+      });
     }
   } catch (error) {
     segments.forEach(segment => {
@@ -87,6 +98,29 @@ export async function sequence(states: readonly Visualization[], options: Sequen
     if (clamped === lastState) return { index: lastState - 1, local: 1, value: clamped };
     const index = Math.floor(clamped);
     return { index, local: clamped - index, value: clamped };
+  }
+
+  /** Convert authored-leg coordinates into serial route-stage coordinates. */
+  function stagePosition(next: number): number {
+    const frame = location(next);
+    const completed = segments
+      .slice(0, frame.index)
+      .reduce((sum, segment) => sum + segment.stageCount, 0);
+    return completed + frame.local * segments[frame.index].stageCount;
+  }
+
+  /** Convert serial route-stage coordinates back into authored-leg coordinates. */
+  function timelinePosition(next: number): number {
+    const total = segments.reduce((sum, segment) => sum + segment.stageCount, 0);
+    const bounded = Math.max(0, Math.min(total, next));
+    if (bounded === total) return states.length - 1;
+    let cursor = 0;
+    for (let index = 0; index < segments.length; index += 1) {
+      const count = segments[index].stageCount;
+      if (bounded <= cursor + count) return index + (bounded - cursor) / count;
+      cursor += count;
+    }
+    return states.length - 1;
   }
 
   function activate(index: number) {
@@ -122,14 +156,16 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       const end = location(to).value;
       stop();
       controller.progress(start);
-      const span = duration * Math.abs(end - start);
+      const startStage = stagePosition(start);
+      const endStage = stagePosition(end);
+      const span = duration * Math.abs(endStage - startStage);
       if (!span) { controller.progress(end); return controller; }
       // Start the clock when play() is called so the first scheduled frame
       // advances instead of repeating the already-committed start frame.
       const started = performance.now();
       const tick = (now: number) => {
         const fraction = Math.min(1, (now - started) / span);
-        controller.progress(start + (end - start) * fraction);
+        controller.progress(timelinePosition(startStage + (endStage - startStage) * fraction));
         animation = fraction < 1 ? requestAnimationFrame(tick) : null;
       };
       animation = requestAnimationFrame(tick);

@@ -2,6 +2,7 @@ import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds } from '../../focus.js';
 import { d3Curve } from './curve.js';
 import { linePointKeyAccessor, lineSeriesKey } from './keys.js';
+import { drawLineTooltip } from './tooltip.js';
 import { matchLinePathFrames, matchLinePaths, matchLineZipperFrames } from './path.js';
 import { connectedLineStretches, lineRowsAtTotal, lineState } from './state.js';
 import { drawLineAxes } from './axes.js';
@@ -37,7 +38,6 @@ class LineChart extends BaseChart<LineViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: LineViewState, tooltip: HTMLElement): void {
     const {
       bandOrLinear,
-      bindTooltip,
       colorScale,
       drawLegend,
       fadeNonLineShapes,
@@ -329,8 +329,7 @@ class LineChart extends BaseChart<LineViewState> {
             .attr('stroke', themeValue('--vd-mark-stroke', 'white'))
             .attr('stroke-width', cameraSize(themeValue('--vd-point-stroke-width', 1.5), camera))
             // d3's style() overloads split null from values; a value function accepts both.
-            .style('opacity', () => pointsAreExplicit ? null : 0)
-            .call(bindTooltip, spec, tooltip);
+            .style('opacity', () => pointsAreExplicit ? null : 0);
           motion(entered, enterTransition)
             .delay((d, i) => addedKeys.has(String(key(d, i)))
               ? (chart.transition.enterDelay || 0) + pointStart
@@ -344,8 +343,7 @@ class LineChart extends BaseChart<LineViewState> {
         },
         (update) => {
           const prepared = update
-            .attr('data-key', (d, i) => key(d, i))
-            .call(bindTooltip, spec, tooltip);
+            .attr('data-key', (d, i) => key(d, i));
           motion(prepared, t)
             .duration(scaleDuration)
             .style('opacity', (d) => visiblePointOpacity(d))
@@ -375,6 +373,7 @@ class LineChart extends BaseChart<LineViewState> {
       );
 
     drawLegend(chart, rows, enc.color);
+    drawLineTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '');
   }
 }
 

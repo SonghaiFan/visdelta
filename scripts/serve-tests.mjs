@@ -12,7 +12,7 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/ja
 const shims = new Map();
 for (const name of [
   'd3-array', 'd3-axis', 'd3-color', 'd3-dsv', 'd3-ease', 'd3-fetch',
-  'd3-force', 'd3-format', 'd3-interpolate', 'd3-scale', 'd3-selection',
+  'd3-force', 'd3-format', 'd3-interpolate', 'd3-scale', 'd3-scale-chromatic', 'd3-selection',
   'd3-shape', 'd3-timer'
 ]) {
   const names = Object.keys(await import(name)).filter((key) => key !== 'default');

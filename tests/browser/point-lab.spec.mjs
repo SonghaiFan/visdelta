@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { pointScenarios } from '../../examples/point/scenarios.js';
 
 const ready = page => expect(page.locator('#status')).toHaveText('Ready');
+const chooseScenario = async (page, id) => {
+  const sample = pointScenarios.find(candidate => candidate.id === id);
+  await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
+  await page.locator(`[data-scenario="${id}"]`).click();
+};
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
   Array.from(svg.querySelectorAll('circle.vd-point, .tick, .vd-legend-item')).map(node => ({
     tag: node.tagName,
@@ -15,7 +20,7 @@ for (const sample of pointScenarios) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/point-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(13);
+    await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 
@@ -60,7 +65,7 @@ test('point radius, highlight, and cached node identity are real renderer behavi
   expect(result.opacity.filter(value => value === 1)).toHaveLength(11);
   expect(result.opacity.filter(value => value === 0.12)).toHaveLength(21);
 
-  await page.locator('#scenario').selectOption('size');
+  await chooseScenario(page, 'size');
   await ready(page);
   await page.locator('#start').click();
   await expect(page.locator('#chart circle.vd-point').first()).toHaveAttribute('r', '5');
@@ -97,7 +102,7 @@ test('point defaults use compact, open correlation axes', async ({ page }) => {
   expect(style.xAxisTransform).toMatch(/^translate\(44,/);
   expect(style.yAxisTransform).toMatch(/^translate\(44,\s*56\)$/);
 
-  await page.locator('#scenario').selectOption('color');
+  await chooseScenario(page, 'color');
   await ready(page);
   await page.locator('#end').click();
   const header = await page.locator('#chart svg').evaluate(svg => {
@@ -456,7 +461,7 @@ test('point Blend parent exists only while a child is close enough to connect', 
     }
   }
 
-  await page.locator('#scenario').selectOption('rollup');
+  await chooseScenario(page, 'rollup');
   await ready(page);
   const mergeFrames = await connectionFrames([0.04, 0.1, 0.16, 0.22, 0.28, 0.34]);
   for (const frame of mergeFrames) {

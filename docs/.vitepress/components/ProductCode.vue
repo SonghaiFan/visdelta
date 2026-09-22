@@ -18,5 +18,5 @@ change.play({ from: 1, to: 0 });`;
 </script>
 
 <template>
-  <pre><code>{{ snippet }}</code></pre>
+  <DocsCodeBlock :code="snippet" language="js" />
 </template>

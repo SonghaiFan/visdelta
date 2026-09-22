@@ -58,8 +58,15 @@ const base = area(beforeLatest)
 
 const withLatest = base.data(recentRows);`;
 
+const sampleCategories = {
+  x: 'coordinate', y: 'encoding', filter: 'data', restore: 'data', add: 'data',
+  remove: 'data', data: 'data', highlight: 'attention', 'highlight-range': 'attention', color: 'appearance',
+  baseline: 'appearance', focus: 'attention', split: 'grain', merge: 'grain',
+  curve: 'appearance', stream: 'layout'
+};
+
 function sample(id, label, description, setup, from, to) {
-  return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
 
 export const chart = 'area';
@@ -76,11 +83,12 @@ export const scenarios = [
   sample('remove', '06 · Remove an observation', 'Remove February 2010 in the exact reverse of Add.', added, 'withLatest', 'base'),
   sample('data', '07 · Compare industries', 'Keep the monthly dates and mapping, but move from manufacturing to construction unemployment.', base, 'base', 'base.data(constructionRows)'),
   sample('highlight', '08 · Highlight one industry', 'Keep all five industry layers and dim every layer except Construction.', stacked, 'detailed', 'detailed.highlight({ industry: "Construction" }, { opacity: 0.12 })'),
-  sample('color', '09 · Change fill color', 'Change a constant fill without changing manufacturing data or geometry.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),
-  sample('baseline', '10 · Change baseline', 'Rebase the band at 500 thousand so the filled height shows unemployment above that level.', base, 'base', 'base.baseline(500)'),
-  sample('focus', '11 · Focus the view', 'Keep all manufacturing observations while fitting one 2D camera around the 2009 area cells.', base, 'base', 'base.focus({ field: "year", equal: 2009 })'),
-  sample('split', '12 · Split into industry areas', 'Draw the internal boundaries through the combined total, then reveal five explicitly colored industries.', stacked, 'total', 'detailed'),
-  sample('merge', '13 · Merge into a total', 'Hide the industry parts and erase the same boundaries in exact reverse.', stacked, 'detailed', 'total'),
-  sample('curve', '14 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")'),
-  sample('stream', '15 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })')
+  sample('highlight-range', '09 · Highlight an x range', 'Keep the complete manufacturing series and emphasize the recession interval from September 2008 through June 2009.', base, 'base', 'base.highlight({ field: "date", gte: new Date("2008-09-01"), lte: new Date("2009-06-01") }, { opacity: 0.12 })'),
+  sample('color', '10 · Change fill color', 'Change a constant fill without changing manufacturing data or geometry.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),
+  sample('baseline', '11 · Change baseline', 'Rebase the band at 500 thousand so the filled height shows unemployment above that level.', base, 'base', 'base.baseline(500)'),
+  sample('focus', '12 · Focus the view', 'Keep all manufacturing observations while fitting one 2D camera around the 2009 area cells.', base, 'base', 'base.focus({ field: "year", equal: 2009 })'),
+  sample('split', '13 · Split into industry areas', 'Draw the internal boundaries through the combined total, then reveal five explicitly colored industries.', stacked, 'total', 'detailed'),
+  sample('merge', '14 · Merge into a total', 'Hide the industry parts and erase the same boundaries in exact reverse.', stacked, 'detailed', 'total'),
+  sample('curve', '15 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")'),
+  sample('stream', '16 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })')
 ];

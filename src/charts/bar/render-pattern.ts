@@ -89,7 +89,6 @@ export interface BarJoinOptions {
   category: (d: BarDatum) => unknown;
   className: string;
   orientation: string;
-  rx?: number;
   fill: (d: BarDatum) => string;
   geometry: BarGeometryContract;
   steps: BarSteps | null;
@@ -181,7 +180,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
   function renderBarJoin(options: BarJoinOptions): void {
     const {
       chart, rows, spec, tooltip, bindTooltip, key, category, className, orientation,
-      rx = 3, fill, geometry, steps
+      fill, geometry, steps
     } = options;
     const startGeometry = geometry.start;
     const targetGeometry = geometry.target;
@@ -205,7 +204,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
             .attr('class', className)
             .attr('data-orientation', orientation)
             .call(options.applyIdentity, spec, key, category)
-            .attr('rx', rx)
+            .attr('rx', 0)
             .attr('fill', fill)
             .style('opacity', 0)
             .call(bindTooltip, spec, tooltip)
@@ -224,10 +223,13 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
             .attr('class', className)
             .attr('data-orientation', orientation)
             .call(options.applyIdentity, spec, key, category)
+            .attr('rx', 0)
             .call(bindTooltip, spec, tooltip);
           if (steps) {
             applyMarkSteps(prepared, steps, spec, markGeometry,
-              (target) => target.style('opacity', (d) => barSelectionOpacity(d, spec, dimOpacity)).attr('fill', fill));
+              (target) => target
+                .style('opacity', (d) => barSelectionOpacity(d, spec, dimOpacity))
+                .attr('fill', fill));
             return prepared;
           }
           motion(prepared, chart.transition.base)

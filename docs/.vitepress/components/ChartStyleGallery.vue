@@ -285,7 +285,7 @@ function showError(cause) {
           <output>{{ progress.toFixed(2) }}</output>
         </label>
       </div>
-      <pre class="style-gallery-code"><code>{{ snippet }}</code></pre>
+      <DocsCodeBlock class="style-gallery-code" :code="snippet" language="js" />
     </div>
   </section>
 </template>

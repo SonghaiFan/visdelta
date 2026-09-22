@@ -20,6 +20,8 @@ export interface ChannelSpec {
   value?: string;
   sort?: SortOrder | SortSpec;
   domain?: unknown[];
+  /** Named d3-scale-chromatic scheme, for example "Tableau10" or "Viridis". */
+  scheme?: string;
   scale?: Record<string, unknown>;
   bin?: boolean | Record<string, unknown>;
   [key: string]: unknown;
@@ -359,6 +361,8 @@ export interface SemanticDiffResult {
   get<T = unknown>(type: string): Delta<T> | null;
 }
 
+/** Closed public vocabulary for what changed between two chart states.
+ * These categories are semantic facts, not transition phases. */
 export type StateChangeCategory =
   | 'data'
   | 'grain'
@@ -381,6 +385,8 @@ export interface GrainDescription {
   unitValue?: number;
 }
 
+/** Directional facts emitted by delta().stateChanges.
+ * Action names are not fluent builder methods. */
 export type StateChange =
   | { category: 'data'; action: 'add' | 'remove' | 'update' }
   | {
@@ -485,6 +491,8 @@ export interface TransitionPlan {
   steps?: TransitionStep[];
   timing?: TransitionSpec;
   totalDuration?: number;
+  /** Whether row membership and the surviving view share one progress window. */
+  membershipTiming?: 'staged' | 'simultaneous';
   /** Datum-provenance evidence, not an instruction to use a particular motion. */
   lineage?: import('../data/lineage.js').LineageCorrespondence;
 }

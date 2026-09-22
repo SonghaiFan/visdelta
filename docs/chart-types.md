@@ -69,7 +69,8 @@ stream layout owns its baseline.
 | `.layout("simple" | "grouped" | "stacked", options?)` | Change bar layout |
 
 Bar owns baseline-preserving enter/exit, grouped and stacked geometry, and
-reversible split/merge paths.
+reversible split/merge paths. Bar marks use square corners in every layout and
+throughout transitions.
 
 ## Line
 

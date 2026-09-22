@@ -1,5 +1,5 @@
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
-import { cameraScale, cameraSize, focusCamera, viewSelection } from '../../../focus.js';
+import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
   asRuntimeScale, bandwidth, barCategoryChannel, barMeasureChannel, barOrientationFromEncoding,
   geometryBounds, resolveGeometry as resolve, scaled
@@ -39,7 +39,7 @@ interface SimpleGeom {
 }
 
 export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain, themeValue } = deps;
+  const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain } = deps;
 
   return function renderSimpleBar(chart, rows, spec, tooltip) {
     const enc = spec.encoding || {};
@@ -96,7 +96,7 @@ export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKi
     kit.renderBarJoin({
       chart, rows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
-      className: 'vd-bar', orientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),
+      className: 'vd-bar', orientation,
       fill: (d) => color(d),
       applyIdentity: applyBarIdentity, steps, geometry
     });
@@ -192,5 +192,3 @@ function applySimpleBarExitGeometry(
 function simpleCategoryWidth(scale: RuntimeScale): number {
   return typeof scale.bandwidth === 'function' ? scale.bandwidth() : 10;
 }
-
-

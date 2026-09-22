@@ -47,9 +47,30 @@ See [Data and transforms](/data-sources-and-transforms).
 .tooltip(fieldOrFields)
 ```
 
+For a declared color field, omit `range` to use VisDelta's default categorical
+palette, provide `range` for exact colors, or name a
+[D3 Scale Chromatic](https://d3js.org/d3-scale-chromatic) scheme:
+
+```js
+bar(rows).color("region", { scheme: "Tableau10" });
+point(rows).color("score", { type: "quantitative", scheme: "Viridis" });
+```
+
+Categorical schemes such as `Category10`, `Observable10`, `Accent`, `Dark2`,
+`Paired`, `Pastel1`, `Pastel2`, `Set1`, `Set2`, `Set3`, and `Tableau10` map
+categories to discrete colors. Sequential and diverging names such as `Blues`,
+`Viridis`, `RdBu`, and `Spectral` may color categories discretely; for a
+quantitative field they use D3's continuous interpolator. An explicit `range`
+takes precedence over `scheme`.
+
 Channel options can include `type`, `title`, `format`, `domain`, `scale`,
 `sort`, `aggregate`, `timeUnit`, and `bin`. Core fills a missing type from data;
 an authored type always wins.
+
+Quantitative position channels support `scale: { type: "linear" }`,
+`scale: { type: "sqrt" }`, and `scale: { type: "log", base? }`. Log scales
+default to base 10; for example, use `scale: { type: "log", base: 2 }` for
+base-2 tick selection.
 
 ### Shared changes
 
@@ -428,7 +449,7 @@ import { sequence } from "visdelta/transition";
 const story = await sequence([revenue, profit, ranked], { target: "#chart" });
 
 story.progress(1.5);              // halfway through profit → ranked
-story.play({ duration: 900 });    // 900ms for each adjacent leg
+story.play({ duration: 900 });    // 900ms for each serial route stage
 story.pause();
 story.destroy();
 ```

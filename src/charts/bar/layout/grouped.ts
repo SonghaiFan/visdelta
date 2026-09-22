@@ -1,5 +1,5 @@
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
-import { cameraScale, cameraSize, focusCamera, viewSelection } from '../../../focus.js';
+import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
   asRuntimeScale, bandwidth, barCategoryChannel, barMeasureChannel, barOrientationFromEncoding, barRendererKey,
   geometryBounds, scaled
@@ -35,7 +35,7 @@ interface GroupedGeom {
 }
 
 export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, quantitativeDomain, themeValue } = deps;
+  const { bindTooltip, channelDomain, colorScale, quantitativeDomain } = deps;
 
   return function renderGroupedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
@@ -112,7 +112,7 @@ export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       chart, rows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
       className: 'vd-bar vd-bar-segment vd-bar-grouped',
-      orientation: rendererOrientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),
+      orientation: rendererOrientation,
       fill: (d) => color(d),
       applyIdentity: applyBarIdentity, steps, geometry
     });

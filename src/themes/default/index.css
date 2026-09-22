@@ -3,28 +3,28 @@
 :root {
   color-scheme: light;
 
-  --vd-color-primary: #4e79a7;
+  --vd-color-primary: #1533ff;
   --vd-color-surface: #ffffff;
-  --vd-color-bg: #f8f8f7;
-  --vd-color-on-surface: #1f2328;
-  --vd-color-muted: #66707a;
-  --vd-color-border: #dde1e6;
-  --vd-color-outline: #747b83;
-  --vd-color-outline-variant: #e7eaed;
-  --vd-color-series-1: #4e79a7;
-  --vd-color-series-2: #f28e2b;
-  --vd-color-series-3: #59a14f;
-  --vd-color-series-4: #b07aa1;
-  --vd-color-series-5: #e15759;
-  --vd-color-series-6: #76b7b2;
-  --vd-color-series-7: #edc948;
-  --vd-color-series-8: #9c755f;
-  --vd-color-series-9: #ff9da7;
-  --vd-color-series-10: #bab0ac;
+  --vd-color-bg: #f4f4f2;
+  --vd-color-on-surface: #303039;
+  --vd-color-muted: #696971;
+  --vd-color-border: #d8d8d4;
+  --vd-color-outline: #76767d;
+  --vd-color-outline-variant: #e7e7e3;
+  --vd-color-series-1: #4269d0;
+  --vd-color-series-2: #efb118;
+  --vd-color-series-3: #ff725c;
+  --vd-color-series-4: #6cc5b0;
+  --vd-color-series-5: #3ca951;
+  --vd-color-series-6: #ff8ab7;
+  --vd-color-series-7: #a463f2;
+  --vd-color-series-8: #97bbf5;
+  --vd-color-series-9: #9c6b4e;
+  --vd-color-series-10: #9498a0;
 
-  --vd-rounded-sm: 2;
-  --vd-rounded-md: 3;
-  --vd-rounded-lg: 6;
+  --vd-rounded-sm: 4;
+  --vd-rounded-md: 7;
+  --vd-rounded-lg: 12;
   --vd-type-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
                     "Segoe UI", sans-serif;
   --vd-type-label-size: 10px;
@@ -35,7 +35,6 @@
   --vd-legend-text: var(--vd-color-muted);
   --vd-shadow: none;
   --vd-dim-opacity: 0.22;
-  --vd-bar-radius: 3;
   --vd-line-width: 2;
   --vd-line-point-size: 3.5;
   --vd-unit-stroke-width: 0.75;
@@ -43,7 +42,7 @@
 
   --vd-figure-bg: var(--vd-color-surface);
   --vd-figure-blur: 0px;
-  --vd-figure-radius: 4px;
+  --vd-figure-radius: 12px;
   --vd-figure-border: 1px solid var(--vd-color-border);
   --vd-figure-shadow: none;
 

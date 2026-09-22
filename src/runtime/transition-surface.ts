@@ -7,7 +7,7 @@ import { createViewRenderer } from './view-renderer.js';
 import type { ViewConfig, ViewLayoutSpec, ViewRuntimeScene } from './view-renderer.js';
 import { resolveTarget } from './target.js';
 import { inferTransition } from '../grammar/infer-transition.js';
-import { canonicalTransitionPair } from '../charts/transition-route.js';
+import { canonicalTransitionPair, resolveTransitionRoute } from '../charts/transition-route.js';
 import { captureDomFrame } from './dom-frame.js';
 import type { DomFrame } from './dom-frame.js';
 import { hideTooltip } from './marks.js';
@@ -26,6 +26,8 @@ export interface TransitionSurfaceOptions extends RuntimeOptions {
 
 export interface TransitionSurface {
   readonly view: Element;
+  /** Number of serial route stages chosen for this authored pair. */
+  stageCount(): number;
   commitMount(): void;
   rollbackMount(): void;
   progress(value: number, direction?: number): void;
@@ -55,6 +57,15 @@ export function createTransitionSurface(
   const canonical = canonicalTransitionPair(chartType, from, to);
   const source = canonical.from;
   const target = canonical.to;
+  // A chart may insert complete states inside this one authored pair. They are
+  // route stages, not extra authored sequence entries. Their count is known
+  // from the same pure route policy that the renderer uses below.
+  const routeStages = resolveTransitionRoute(
+    chartType,
+    source,
+    target,
+    chartType.intermediateSpecs?.(source, target) ?? []
+  ).legs.length;
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;
   const host = resolveTarget(options.target);
   const root = document.createElement('div');
@@ -142,6 +153,7 @@ export function createTransitionSurface(
 
   return {
     view: node,
+    stageCount() { return Math.max(1, routeStages); },
     commitMount() { previousChildren = []; },
     rollbackMount() {
       if (root.parentNode === host) host.replaceChildren(...previousChildren);

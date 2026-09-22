@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const rows = [
   { year: 2004, country: 'Norway', sites: 5 },
@@ -96,7 +96,6 @@ const selectedType = ref('bar');
 const code = ref(sourceFor('bar', 0));
 const changedLine = ref(-1);
 const status = ref('Rendering Bar');
-const codeLines = computed(() => code.value.split('\n'));
 
 const AUTO_START_DELAY = 1400;
 const AUTO_LINE_HOLD = 1300;
@@ -280,12 +279,17 @@ async function selectChart(type) {
   if (!chartFactories || destroyed) return;
   window.clearTimeout(timer);
   renderVersion += 1;
+  const nextCode = sourceFor(type, 0);
   selectedType.value = type;
+  // Selecting a chart type changes the declaration immediately. Rendering the
+  // corresponding chart can remain asynchronous without leaving the selected
+  // tab paired with the previous chart's source code.
+  code.value = nextCode;
   currentStep = 0;
   direction = 1;
   changedLine.value = -1;
   status.value = `Rendering ${configFor(type).label}`;
-  const committed = await commitCode(sourceFor(type, 0), 0, type, { animate: false });
+  const committed = await commitCode(nextCode, 0, type, { animate: false });
   if (!committed || destroyed) return;
   if (!reducedMotion) timer = window.setTimeout(advance, AUTO_START_DELAY);
 }
@@ -361,11 +365,12 @@ async function advance() {
           <span>state.js</span>
           <b>Auto editing</b>
         </div>
-        <pre><code><span
-          v-for="(line, index) in codeLines"
-          :key="`${index}-${line}`"
-          :class="{ 'is-changing': index === changedLine }"
-        ><i>{{ index + 1 }}</i>{{ line }}</span></code></pre>
+        <DocsCodeBlock
+          embedded
+          :code="code"
+          language="js"
+          :highlighted-line="changedLine"
+        />
       </section>
 
       <span class="hero-flow-arrow hero-flow-arrow-code" aria-hidden="true"></span>

@@ -9,7 +9,9 @@ const ready = async page => {
   }
 };
 const selectScenario = async (page, id) => {
-  await page.locator('#scenario').selectOption(id);
+  const sample = scenarios.find(candidate => candidate.id === id);
+  await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
+  await page.locator(`[data-scenario="${id}"]`).click();
   await expect(page.locator('#status')).toHaveText('Waiting for input');
   await ready(page);
 };
@@ -77,7 +79,7 @@ for (const sample of scenarios) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/line-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(16);
+    await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 
@@ -257,8 +259,8 @@ test('all exact D3 curve names render through the Line module', async ({ page })
   }
 });
 
-test('line flip changes x before y', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#flip');
+test('line y scale changes from linear to base-2 logarithmic without changing x', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/line-lab.html#log');
   await ready(page);
   const positions = async () => page.locator('#chart circle.vd-line-point').evaluateAll(nodes =>
     nodes.map(node => ({
@@ -267,15 +269,18 @@ test('line flip changes x before y', async ({ page }) => {
       y: Number(node.getAttribute('cy'))
     })).sort((a, b) => a.key.localeCompare(b.key)));
   const start = await positions();
-  await page.locator('#progress').fill('0.24');
-  const firstAxis = await positions();
-  expect(firstAxis.map(point => point.y)).toEqual(start.map(point => point.y));
-  expect(firstAxis.map(point => point.x)).not.toEqual(start.map(point => point.x));
+  await page.locator('#progress').fill('0.5');
+  const middle = await positions();
+  expect(middle.map(point => point.x)).toEqual(start.map(point => point.x));
+  expect(middle.map(point => point.y)).not.toEqual(start.map(point => point.y));
 
   await page.locator('#end').click();
   const end = await positions();
   expect(end.every(point => Number.isFinite(point.x) && Number.isFinite(point.y))).toBe(true);
-  expect(new Set(end.map(point => Math.round(point.y))).size).toBeGreaterThan(12);
+  expect(end.map(point => point.x)).toEqual(start.map(point => point.x));
+  expect(end.map(point => point.y)).not.toEqual(start.map(point => point.y));
+  const tickLabels = await page.locator('#chart .vd-y-axis .tick text').allTextContents();
+  expect(tickLabels).toEqual(expect.arrayContaining(['1', '32', '1.024k', '32.768k']));
   await expect(page.locator('#chart path.vd-line')).not.toHaveAttribute('d', /NaN/);
 });
 

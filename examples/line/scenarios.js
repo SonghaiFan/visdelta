@@ -13,8 +13,7 @@ const base = `${stockData}
 const base = line(aaplRows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
-  .key("date")
-  .tooltip(["date", "ticker", "open", "high", "low", "close", "volume"]);`;
+  .key("date");`;
 
 const timeGrain = `${base}
 
@@ -85,8 +84,22 @@ const firstWindow = line(windowRows.slice(0, windowSize))
 
 const nextWindow = firstWindow.data(windowRows.slice(1));`;
 
+const volumeScale = `${base}
+
+const volume = base.y("volume", {
+  title: "Volume",
+  format: "~s"
+});`;
+
+const sampleCategories = {
+  x: 'grain', y: 'encoding', xy: 'grain', filter: 'data', restore: 'data',
+  add: 'data', remove: 'data', data: 'data', highlight: 'attention',
+  color: 'appearance', style: 'appearance', log: 'coordinate', split: 'grain',
+  merge: 'grain', shift: 'data', focus: 'attention'
+};
+
 function sample(id, label, description, setup, from, to) {
-  return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
 
 export const chart = 'line';
@@ -106,7 +119,7 @@ export const scenarios = [
   sample('highlight', '09 · Highlight one series', 'Keep both company lines and dim GOOG without filtering it out.', series, 'detailed', 'detailed.highlight({ ticker: "AAPL" }, { opacity: 0.12 })'),
   sample('color', '10 · Change line color', 'Change a constant color without changing AAPL data or position.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),
   sample('style', '11 · Change line style', 'Change the D3 curve, line width, and point size as one visual state change.', base, 'base.curve("curveLinear").strokeWidth(2).pointSize(3)', 'base.curve("curveStep").strokeWidth(6).pointSize(7)'),
-  sample('flip', '12 · Flip orientation', 'Move AAPL close from a vertical value axis to a horizontal value axis, changing x before y.', base, 'base', 'base.flip({ order: ["x", "y"] })'),
+  sample('log', '12 · Linear → log₂ scale', 'Keep AAPL trading volume on y and change only how that measure is positioned: from a linear scale to a base-2 logarithmic scale.', volumeScale, 'volume', 'volume.y("volume", { title: "Volume", format: "~s", scale: { type: "log", base: 2 } })'),
   sample('split', '13 · Split into company lines', 'Release AAPL and GOOG from the mean reference like a zipper, then remove the reference once both company lines are readable.', series, 'average', 'detailed'),
   sample('merge', '14 · Merge into an average', 'Grow the mean as a thin dashed reference, zip AAPL and GOOG onto it, then snap the coincident paths into one line.', series, 'detailed', 'average'),
   sample('shift', '15 · Shift the time window', 'Remove the leaving AAPL day, move the shared observations, extend the line, then reveal the entering day.', slidingWindow, 'firstWindow', 'nextWindow'),

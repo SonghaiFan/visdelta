@@ -5,6 +5,7 @@ import '../../../dist/visdelta.css';
 import BarTransitionShowcase from '../components/BarTransitionShowcase.vue';
 import HeroTransitionDemo from '../components/HeroTransitionDemo.vue';
 import ProductCode from '../components/ProductCode.vue';
+import DocsCodeBlock from '../components/DocsCodeBlock.vue';
 
 export default {
   extends: DefaultTheme,
@@ -21,6 +22,10 @@ export default {
     app.component('BarTransitionShowcase', BarTransitionShowcase);
     app.component('HeroTransitionDemo', HeroTransitionDemo);
     app.component('ProductCode', ProductCode);
+    app.component('DocsCodeBlock', DocsCodeBlock);
+    app.component('StateChangeCatalogue', defineAsyncComponent(
+      () => import('../components/StateChangeCatalogue.vue')
+    ));
     app.component('ChartStyleGallery', defineAsyncComponent(
       () => import('../components/ChartStyleGallery.vue')
     ));

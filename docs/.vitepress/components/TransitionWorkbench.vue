@@ -182,7 +182,7 @@ function moveSequence(direction) {
         <div class="workbench-tabs" role="tablist" aria-label="Runtime inspector">
           <button v-for="panel in ['code', 'delta', 'spec']" :key="panel" type="button" role="tab" :aria-selected="activePanel === panel" :class="{ 'is-active': activePanel === panel }" @click="activePanel = panel">{{ panel[0].toUpperCase() + panel.slice(1) }}</button>
         </div>
-        <pre class="workbench-inspector"><code>{{ inspectorText }}</code></pre>
+        <DocsCodeBlock class="workbench-inspector" :code="inspectorText" language="json" />
       </div>
     </div>
 

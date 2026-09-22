@@ -32,7 +32,7 @@ the previous target contents are restored.
 | `view` | Mounted chart-view element |
 | `value` | Current progress |
 | `progress(value)` | Pause playback and show one frame; direction is inferred from the previous value |
-| `play({ duration?, from?, to? })` | Animate across any part of the `0`–`1` interval |
+| `play({ duration?, from?, to? })` | Animate across any part of `0`–`1`; duration is per serial route stage |
 | `pause()` | Stop owned playback at the current frame |
 | `resize()` | Recompile at the current container size and keep progress |
 | `destroy()` | Stop playback and remove the mounted transition |
@@ -76,7 +76,7 @@ const journey = await sequence([revenue, profit, ranked, revenue], {
 });
 
 journey.progress(1.5);           // halfway through profit → ranked
-journey.play({ duration: 850 }); // duration per adjacent leg
+journey.play({ duration: 850 }); // duration per serial route stage
 ```
 
 | Member | Meaning |
@@ -84,7 +84,7 @@ journey.play({ duration: 850 }); // duration per adjacent leg
 | `states` | Authored states in order |
 | `value` | Timeline position from `0` to `states.length - 1` |
 | `progress(value)` | Seek a leg or exact authored state; `1.5` is halfway through the second leg |
-| `play({ duration?, from?, to? })` | Play across adjacent legs; duration applies to each leg |
+| `play({ duration?, from?, to? })` | Play across adjacent legs; duration applies to each serial route stage |
 | `pause()`, `resize()`, `destroy()` | Same lifecycle meaning as the pair controller |
 
 All adjacent states must still use the same chart type. Repeat the first state
@@ -93,8 +93,10 @@ at the end when a sequence should return to its starting visual state.
 Each adjacent transition may include automatically inferred intermediate
 states. For example, additive Bar detail can merge while retaining its focus,
 then return the camera to the complete chart. These generated steps occupy
-the existing leg: they do not add entries to `states`, move authored integer
-positions, or increase the leg duration passed to `play()`.
+the existing leg and do not add entries to `states` or move authored integer
+positions. They do add playback time: `duration` is the time for one serial
+route stage, so two serial stages take `2 × duration`. Changes that share one
+stage still use one duration.
 
 ## Keeping a chart on screen
 

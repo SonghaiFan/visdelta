@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as d3 from 'd3';
+import StateChangeIcon from './StateChangeIcon.vue';
 
 const labModules = import.meta.glob('../../../examples/*/scenarios.js', { eager: true });
 
@@ -15,6 +16,7 @@ const props = defineProps({
 const samples = {
   measure: {
     label: 'Encoding - remap y',
+    category: 'encoding',
     code: `const revenue = bar(rows)
   .x("category")
   .y("sales", { title: "Revenue" })
@@ -29,6 +31,7 @@ return { from: revenue, to: profit };`
   },
   filter: {
     label: 'Data - remove records',
+    category: 'data',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -40,6 +43,7 @@ return { from: all, to: northOnly };`
   },
   focus: {
     label: 'Attention - focus enter',
+    category: 'attention',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -51,6 +55,7 @@ return { from: all, to: northView };`
   },
   highlight: {
     label: 'Attention - highlight enter',
+    category: 'attention',
     code: `const all = bar(rows)
   .x("category")
   .y("sales")
@@ -65,6 +70,7 @@ return { from: all, to: focused };`
   },
   split: {
     label: 'Grain - split marks',
+    category: 'grain',
     code: `const detailed = bar(segments)
   .x("category")
   .y("sales")
@@ -79,6 +85,7 @@ return { from: total, to: detailed };`
   },
   flip: {
     label: 'Coordinate - reorient',
+    category: 'coordinate',
     code: `const vertical = bar(rows)
   .x("category")
   .y("sales")
@@ -90,6 +97,7 @@ return { from: vertical, to: horizontal };`
   },
   line: {
     label: 'Appearance - reshape line',
+    category: 'appearance',
     code: `const sales = line(series)
   .x("quarter")
   .y("sales")
@@ -103,6 +111,7 @@ return { from: sales, to: curved };`
   },
   unit: {
     label: 'Layout - rearrange units',
+    category: 'layout',
     code: `const grid = unit(units)
   .value("count", { maxUnits: 80 })
   .key("team")
@@ -130,6 +139,15 @@ const labSamples = Object.fromEntries(
 const isLabMode = computed(() => Boolean(labSamples[props.mode]));
 const labChart = computed(() => labSamples[props.mode]?.chart ?? null);
 const availableSamples = computed(() => labSamples[props.mode]?.samples ?? samples);
+const ontologyCategories = [
+  { key: 'data', label: 'Data' },
+  { key: 'grain', label: 'Grain' },
+  { key: 'encoding', label: 'Encoding' },
+  { key: 'coordinate', label: 'Coordinate' },
+  { key: 'layout', label: 'Layout' },
+  { key: 'attention', label: 'Attention' },
+  { key: 'appearance', label: 'Appearance' }
+];
 
 const rows = [
   { category: 'Hardware', region: 'North', sales: 86, profit: 34 },
@@ -169,6 +187,7 @@ const initialSample = availableSamples.value[props.initial]
   ? props.initial
   : Object.keys(availableSamples.value)[0];
 const selected = ref(initialSample);
+const activeCategory = ref(availableSamples.value[initialSample].category);
 const code = ref(availableSamples.value[initialSample].code);
 const status = ref('Loading runtime');
 const error = ref('');
@@ -190,6 +209,11 @@ const drafts = new Map();
 
 const statusKind = computed(() => error.value ? 'error' : status.value === 'Ready' ? 'ready' : 'busy');
 const description = computed(() => availableSamples.value[selected.value]?.description ?? '');
+const samplesByCategory = computed(() => Object.entries(availableSamples.value).reduce((groups, [key, sample]) => {
+  (groups[sample.category] ||= []).push({ key, ...sample });
+  return groups;
+}, {}));
+const activeSamples = computed(() => samplesByCategory.value[activeCategory.value] ?? []);
 const showPointEffect = computed(() =>
   labChart.value === 'point' && ['rollup', 'breakdown'].includes(selected.value));
 
@@ -244,12 +268,24 @@ watch(code, () => {
 watch(selected, (next, previous) => {
   drafts.set(previous, code.value);
   code.value = drafts.get(next) ?? availableSamples.value[next].code;
+  activeCategory.value = availableSamples.value[next].category;
   progress.value = 0;
   if (isLabMode.value && typeof history !== 'undefined') {
     history.replaceState(null, '', `#${next}`);
   }
   if (!autoRun.value) runCode();
 });
+
+function chooseCategory(category) {
+  const first = samplesByCategory.value[category]?.[0];
+  if (!first) return;
+  activeCategory.value = category;
+  selected.value = first.key;
+}
+
+function sampleLabel(label) {
+  return label.replace(/^\d+\s*·\s*/, '').replace(/^[^-]+\s+-\s+/, '');
+}
 
 watch(pointEffect, () => {
   if (api && showPointEffect.value) runCode();
@@ -461,33 +497,59 @@ function handleEditorKeydown(event) {
 
 <template>
   <div class="syntax-playground" :class="{ 'is-compact': compact }">
-    <div class="playground-toolbar">
-      <label v-if="!compact">
-        <span>State difference</span>
-        <select :id="isLabMode ? 'scenario' : undefined" v-model="selected" aria-label="Syntax example">
-          <option v-for="(sample, key) in availableSamples" :key="key" :value="key">{{ sample.label }}</option>
-        </select>
-      </label>
-      <label v-if="showPointEffect" class="playground-effect">
-        <span>Effect</span>
-        <select id="point-effect" v-model="pointEffect" aria-label="Point detail effect">
-          <option value="clean">Clean</option>
-          <option value="blend">Blend</option>
-        </select>
-      </label>
-      <strong v-if="compact" class="playground-inline-title">{{ availableSamples[selected].label }}</strong>
-      <label class="playground-auto">
-        <input :id="isLabMode ? 'auto-run' : undefined" v-model="autoRun" type="checkbox" @change="autoRun && runCode()" />
-        Auto-run
-      </label>
-      <button :id="isLabMode ? 'run' : undefined" type="button" @click="runCode">Run <kbd>⌘↵</kbd></button>
-      <button :id="isLabMode ? 'reset' : undefined" type="button" @click="reset">Reset</button>
-      <span :id="isLabMode ? 'status' : undefined" class="playground-status" :data-kind="statusKind">{{ status }}</span>
-    </div>
-    <p v-if="description" class="playground-description">{{ description }}</p>
-
+    <nav v-if="!compact" class="playground-example-nav" aria-label="Examples by state-change category">
+      <span class="playground-nav-label">State-change category</span>
+      <div class="playground-category-tabs" role="tablist" aria-label="The seven state-change categories">
+        <button
+          v-for="category in ontologyCategories"
+          :key="category.key"
+          type="button"
+          role="tab"
+          :aria-selected="activeCategory === category.key"
+          :disabled="!samplesByCategory[category.key]?.length"
+          :class="{ 'is-active': activeCategory === category.key }"
+          @click="chooseCategory(category.key)"
+        >
+          <span class="playground-category-name">
+            <span class="playground-category-icon" aria-hidden="true">
+              <StateChangeIcon :category="category.key" />
+            </span>
+            <span>{{ category.label }}</span>
+          </span>
+          <span class="playground-category-count">{{ samplesByCategory[category.key]?.length ?? 0 }}</span>
+        </button>
+      </div>
+      <div class="playground-example-list" :aria-label="`${activeCategory} examples`">
+        <button
+          v-for="sample in activeSamples"
+          :key="sample.key"
+          type="button"
+          :data-scenario="sample.key"
+          :aria-pressed="selected === sample.key"
+          :class="{ 'is-active': selected === sample.key }"
+          @click="selected = sample.key"
+        >{{ sampleLabel(sample.label) }}</button>
+      </div>
+    </nav>
     <div class="playground-grid">
       <div class="playground-editor-pane">
+        <div class="playground-toolbar">
+          <label v-if="showPointEffect" class="playground-effect">
+            <span>Effect</span>
+            <select id="point-effect" v-model="pointEffect" aria-label="Point detail effect">
+              <option value="clean">Clean</option>
+              <option value="blend">Blend</option>
+            </select>
+          </label>
+          <strong v-if="compact" class="playground-inline-title">{{ availableSamples[selected].label }}</strong>
+          <label class="playground-auto">
+            <input :id="isLabMode ? 'auto-run' : undefined" v-model="autoRun" type="checkbox" @change="autoRun && runCode()" />
+            Auto-run
+          </label>
+          <button :id="isLabMode ? 'run' : undefined" type="button" @click="runCode">Run <kbd>⌘↵</kbd></button>
+          <button :id="isLabMode ? 'reset' : undefined" type="button" @click="reset">Reset</button>
+          <span :id="isLabMode ? 'status' : undefined" class="playground-status" :data-kind="statusKind">{{ status }}</span>
+        </div>
         <div class="playground-pane-label">Two immutable states</div>
         <textarea
           v-model="code"
@@ -507,6 +569,7 @@ function handleEditorKeydown(event) {
         <div class="playground-pane-label">Transition frame · progress <output :id="isLabMode ? 'value' : undefined">{{ progress.toFixed(2) }}</output></div>
         <div v-if="lineTransition" class="playground-line-plan">Line transition <strong>{{ lineTransition }}</strong></div>
         <div :id="isLabMode ? 'chart' : undefined" ref="chartTarget" class="playground-chart" aria-label="Editable syntax output"></div>
+        <p v-if="description" class="playground-description">{{ description }}</p>
         <div v-if="error" class="playground-runtime-error" role="alert">{{ error }}</div>
         <input
           type="range"
@@ -528,7 +591,7 @@ function handleEditorKeydown(event) {
         </div>
         <details>
           <summary>Inspect computed state difference</summary>
-          <pre><code>{{ deltaText }}</code></pre>
+          <DocsCodeBlock :code="deltaText" language="json" />
         </details>
       </div>
     </div>

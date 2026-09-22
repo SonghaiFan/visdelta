@@ -22,7 +22,7 @@ export interface TransitionOptions extends RuntimeOptions {
 }
 
 export interface PlayOptions {
-  /** Time for the complete 0–1 interval, in milliseconds. */
+  /** Milliseconds for one serial route stage. */
   duration?: number;
   from?: number;
   to?: number;
@@ -42,6 +42,11 @@ export interface VisualizationTransition {
   /** Recompile at the container's current size/theme, retaining progress and data. */
   resize(): VisualizationTransition;
   destroy(): void;
+}
+
+interface TimedVisualizationTransition extends VisualizationTransition {
+  /** Internal timing contract used by sequence(). */
+  stageCount(): number;
 }
 
 /** Compile two states of the same chart type into a standalone, seekable transition. */
@@ -112,7 +117,7 @@ export async function transition(
     surface.progress(next, lastDirection);
     value = next;
   }
-  const controller: VisualizationTransition = {
+  const controller: TimedVisualizationTransition = {
     // Expose copies: caller inspection cannot change the rendered endpoints.
     from: cloneState(source),
     to: cloneState(target),
@@ -135,7 +140,10 @@ export async function transition(
       const direction = Math.sign(end - start) || lastDirection;
       stop();
       show(start, direction);
-      const span = duration * Math.abs(end - start);
+      // Duration belongs to one semantic route stage. A planner may insert
+      // complete intermediate states, so a full pair can take n × duration.
+      // A partial seek keeps that same clock proportional to its route span.
+      const span = duration * surface.stageCount() * Math.abs(end - start);
       if (!span) { show(end, direction); return controller; }
       // The play call is the clock origin. If the first animation frame becomes
       // the origin instead, that frame redraws progress(0) and creates a visible
@@ -150,6 +158,7 @@ export async function transition(
       return controller;
     },
     pause() { assertAlive(); stop(); return controller; },
+    stageCount() { return surface.stageCount(); },
     resize() { assertAlive(); surface.resize(); show(value, lastDirection); return controller; },
     destroy() {
       if (destroyed) return;

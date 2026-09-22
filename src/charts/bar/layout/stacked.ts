@@ -1,5 +1,5 @@
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
-import { cameraScale, cameraSize, focusCamera, viewSelection } from '../../../focus.js';
+import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
   asRuntimeScale, bandwidth, barCategoryChannel, barMeasureChannel, barOrientationFromEncoding, barRendererKey,
   geometryBounds, resolveGeometry, scaled
@@ -35,7 +35,7 @@ interface StackedGeom {
 type StackedDatum = BarDatum & { __stack0: number; __stack1: number };
 
 export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, position, themeValue } = deps;
+  const { bindTooltip, channelDomain, colorScale, position } = deps;
 
   return function renderStackedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
@@ -104,7 +104,7 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       chart, rows: stackedRows, spec, tooltip, bindTooltip, key,
       category: (d) => d[categoryField],
       className: 'vd-bar vd-bar-segment vd-bar-stacked',
-      orientation: rendererOrientation, rx: cameraSize(themeValue('--vd-bar-radius', 3), camera),
+      orientation: rendererOrientation,
       fill: (d) => color(d),
       applyIdentity: applyBarIdentity, steps, geometry
     });

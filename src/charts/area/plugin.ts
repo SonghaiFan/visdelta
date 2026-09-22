@@ -44,6 +44,7 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
       const observation = previousSpec && nextSpec
         ? areaObservationChange(previousSpec, nextSpec)
         : null;
+      if (observation) plan.membershipTiming = 'simultaneous';
       if (observation && observation.mode !== 'remove') {
         plan.observation = {
           ...observation,

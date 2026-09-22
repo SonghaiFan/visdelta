@@ -2,7 +2,7 @@
 
 These sixteen scenarios are the executable transition matrix for VisDelta's
 line chart. They cover temporal granularity, y mappings, filtering, data
-changes, highlighting, focus, color, line style, axis order, sliding time
+changes, highlighting, focus, color, line style, coordinate scale, sliding time
 windows, and reversible single-line/series changes.
 
 Every scenario uses the same tidy stock dataset. Each row is one trading day
@@ -25,6 +25,13 @@ endpoints do not show point marks. Adding and restoring observations use one
 shared transition: the axis, existing line, and new segment reach the new
 geometry together. Removing and filtering evaluate those exact frames backward.
 
+Line inspection is x-led. Moving anywhere across the plot selects the nearest
+observation on the current rendered path, then shows a vertical rule, the exact
+point, and a callout. The default callout contains the x value and current y
+value; a series name is added when the line is broken down, and `.tooltip()` can
+still declare additional fields. Because inspection reads the rendered point
+positions, it remains aligned while a transition is played or scrubbed.
+
 Split and merge also use one shared transition evaluated in opposite
 directions. Here the single line is the equal-weight mean of the AAPL and GOOG
 closing prices, not a meaningless sum of stock prices. Merge first draws a
@@ -39,6 +46,11 @@ The line-style example also tests path matching. Changing from `curveLinear` to
 `curveStep` changes the structure of the SVG path; the preview matches points on
 the two visible paths before moving them, so intermediate frames stay continuous
 instead of pairing unrelated numbers from the two `d` strings.
+
+The coordinate example keeps both the date and trading-volume mappings fixed,
+then changes only the y scale from linear to base-2 logarithmic with
+`scale: { type: "log", base: 2 }`. The line and y axis rescale together; the
+base controls the logarithmic tick selection.
 
 The time-window example combines the same Add and Remove behavior. VisDelta
 matches observations by `.key()`: the leaving segment retracts, shared

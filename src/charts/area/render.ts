@@ -1,5 +1,6 @@
 import { BaseChart } from '../base.js';
-import { cameraScale, focusCamera, rectBounds } from '../../focus.js';
+import { cameraScale, focusCamera, matchesSelection, rectBounds } from '../../focus.js';
+import { temporalDate } from '../../data/types.js';
 import { d3Curve } from '../curve.js';
 import type { D3AreaCurveName } from '../curve.js';
 import { matchPathStrings, matchRenderedPaths } from '../path-interpolation.js';
@@ -8,13 +9,13 @@ import {
   areaCells,
   areaLayers,
   areaPointKeyAccessor,
-  areaSelectionOpacity,
   areaState
 } from './state.js';
 import { drawAreaAxes } from './axes.js';
+import { drawAreaTooltip } from './tooltip.js';
 import { motion } from '../../runtime/recorder.js';
 import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, Renderer } from '../../types/index.js';
+import type { ChartContext, ChartDeps, Renderer, SelectionSpec } from '../../types/index.js';
 import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { Area, Line } from 'd3-shape';
 import type { AreaViewState } from './authoring.js';
@@ -64,7 +65,7 @@ export function createAreaRenderer(deps: ChartDeps): Renderer<AreaViewState> {
 class AreaChart extends BaseChart<AreaViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: AreaViewState, tooltip: HTMLElement): void {
     const {
-      bandOrLinear, bindTooltip, colorScale, drawLegend,
+      bandOrLinear, colorScale, drawLegend,
       position, themeValue
     } = this.deps;
     const enc = spec.encoding || {};
@@ -138,8 +139,14 @@ class AreaChart extends BaseChart<AreaViewState> {
     const dividers = splitDetail && state.mode === 'stacked'
       ? areaDividerPaths(cells, layers, frame, edge)
       : [];
-    const opacity = (cell: AreaCell) => areaSelectionOpacity(
-      cell.layer, state.highlight, themeValue('--vd-dim-opacity', 0.22)
+    const highlightActive = state.highlight?.mode === 'highlight' &&
+      Boolean(state.highlight.filters?.length || state.highlight.filter);
+    const dimOpacity = Number(state.highlight?.opacity ?? themeValue('--vd-dim-opacity', 0.22));
+    const highlightedCells = highlightActive
+      ? cells.filter((cell) => matchesSelection(cell.row, state.highlight))
+      : [];
+    const highlightRange = areaHighlightXRange(
+      state.highlight, xField, x, position, chart.innerWidth
     );
     const addedKeys = new Set((plan?.observation?.addedKeys || []).map(String));
     const isAdded = (cell: AreaCell) => addedKeys.has(String(cell.observationKey));
@@ -168,26 +175,189 @@ class AreaChart extends BaseChart<AreaViewState> {
     });
     drawAreaAxes(chart, x, y, enc, this.deps);
 
-    chart.g.selectAll<AreaPathElement, AreaCell>('path.vd-area')
-      .data(cells, (cell) => cell.key)
+    // Composite the complete base Area once. Applying the highlight opacity to
+    // every cell separately would make the same-fill seam covers overlap as
+    // darker vertical lines during a fade.
+    const baseLayer = chart.g
+      .selectAll<SVGGElement, null>('g.vd-area-cells')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-area-cells');
+    motion(baseLayer, chart.transition.base)
+      .style('opacity', highlightActive ? dimOpacity : 1);
+
+    // Cell identity stays independent, but opacity is composited by cohort.
+    // This prevents adjacent same-fill seam covers from stacking alpha during
+    // split, add, filter, and remove transitions.
+    const stableCellsLayer = baseLayer
+      .selectAll<SVGGElement, null>('g.vd-area-stable-cells')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-area-stable-cells');
+    const exitingCellsLayer = baseLayer
+      .selectAll<SVGGElement, null>('g.vd-area-exiting-cells')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-area-exiting-cells');
+    const enteringCellsLayer = baseLayer
+      .selectAll<SVGGElement, null>('g.vd-area-entering-cells')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-area-entering-cells');
+    const fadesIn = (cell: AreaCell) => isAdded(cell) || (splitDetail && state.mode === 'stacked');
+
+    const stableCells = cells.filter((cell) => !fadesIn(cell));
+    const enteringCells = cells.filter(fadesIn);
+    const currentKeys = new Set(cells.map((cell) => cell.key));
+    const enteringKeys = new Set(enteringCells.map((cell) => cell.key));
+
+    // A seek, resize, or docs rerun can render the same endpoint again after
+    // its enter transition was recorded. Move the existing keyed node to its
+    // current cohort before joining so it is updated rather than duplicated.
+    baseLayer.selectAll<AreaPathElement, AreaCell>('path.vd-area').each(function(cell) {
+      if (!currentKeys.has(cell.key)) return;
+      const parent = enteringKeys.has(cell.key) ? enteringCellsLayer.node() : stableCellsLayer.node();
+      parent?.appendChild(this);
+    });
+
+    // Each cohort owns a direct-child join. Joining across nested groups would
+    // leave D3 enter placeholders pointing at siblings in a different parent.
+    const stableJoin = stableCellsLayer.selectAll<AreaPathElement, AreaCell>('path.vd-area')
+      .data(stableCells, (cell) => cell.key);
+    const stableEntered = stableJoin.enter().append<AreaPathElement>('path')
+      .attr('class', 'vd-area vd-area-cell')
+      .attr('data-key', (cell) => cell.key)
+      .attr('data-layer-key', (cell) => cell.layerKey)
+      .attr('data-observation-key', (cell) => cell.observationKey)
+      .attr('d', (cell) => shape(frame(cell)))
+      .attr('fill', (cell) => color(cell.row || {}))
+      .attr('stroke', (cell) => color(cell.row || {}))
+      .style('opacity', 1)
+      .each(function(cell) {
+        this.__visDeltaAreaFrame = frame(cell);
+        this.__visDeltaAreaCurve = curveName;
+      });
+    motion(stableEntered, chart.transition.enter || chart.transition.base)
+      .attrTween('d', function(cell) {
+        return tween(this as AreaPathElement, cell, shape);
+      });
+    const stableUpdated = stableJoin
+      .attr('data-key', (cell) => cell.key)
+      .attr('data-layer-key', (cell) => cell.layerKey)
+      .attr('data-observation-key', (cell) => cell.observationKey);
+    motion(stableUpdated, chart.transition.base)
+      .attr('fill', (cell) => color(cell.row || {}))
+      .attr('stroke', (cell) => color(cell.row || {}))
+      .attrTween('d', function(cell) {
+        return tween(this as AreaPathElement, cell, shape);
+      });
+
+    const enteringJoin = enteringCellsLayer.selectAll<AreaPathElement, AreaCell>('path.vd-area')
+      .data(enteringCells, (cell) => cell.key);
+    const entered = enteringJoin.enter().append<AreaPathElement>('path')
+      .attr('class', 'vd-area vd-area-cell')
+      .attr('data-key', (cell) => cell.key)
+      .attr('data-layer-key', (cell) => cell.layerKey)
+      .attr('data-observation-key', (cell) => cell.observationKey)
+      .attr('d', (cell) => shape(isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell)))
+      .attr('fill', (cell) => color(cell.row || {}))
+      .attr('stroke', (cell) => color(cell.row || {}))
+      .style('opacity', 1)
+      .each(function(cell) {
+        this.__visDeltaAreaFrame = isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell);
+        this.__visDeltaAreaCurve = curveName;
+      });
+    if (!entered.empty()) {
+      enteringCellsLayer.style('opacity', 0);
+      motion(enteringCellsLayer, chart.transition.enter || chart.transition.base)
+        .style('opacity', 1);
+    }
+    motion(entered, chart.transition.enter || chart.transition.base)
+      .attrTween('d', function(cell) {
+        return tween(this as AreaPathElement, cell, shape);
+      });
+
+    const exited = baseLayer.selectAll<AreaPathElement, AreaCell>('path.vd-area')
+      .filter((cell) => !currentKeys.has(cell.key));
+    if (!exited.empty()) {
+      exited.each(function() { exitingCellsLayer.node()?.appendChild(this); });
+      exitingCellsLayer.style('opacity', 1);
+      motion(exitingCellsLayer, chart.transition.exit || chart.transition.base)
+        .style('opacity', 0);
+      motion(exited, chart.transition.exit || chart.transition.base)
+        .style('opacity', 1)
+        .remove();
+    }
+
+    const enteringUpdated = enteringJoin
+      .attr('data-key', (cell) => cell.key)
+      .attr('data-layer-key', (cell) => cell.layerKey)
+      .attr('data-observation-key', (cell) => cell.observationKey);
+    motion(enteringUpdated, chart.transition.base)
+      .attr('fill', (cell) => color(cell.row || {}))
+      .attr('stroke', (cell) => color(cell.row || {}))
+      .attrTween('d', function(cell) {
+        return tween(this as AreaPathElement, cell, shape);
+      });
+
+    // Highlight is an overlay, following D3's two-path pattern: the complete
+    // Area remains as a dimmed context path while selected observations are
+    // drawn at full opacity. A range on x is clipped at exact scale positions;
+    // half-bandwidth remains a cell ownership rule, not a temporal boundary.
+    const highlightClipId = `vd-area-highlight-range-${chart.scene.clipIdentity}`;
+    const highlightDefs = chart.scene.svg
+      .selectAll<SVGDefsElement, null>('defs.vd-area-highlight-defs')
+      .data(highlightRange ? [null] : [])
+      .join('defs')
+      .attr('class', 'vd-area-highlight-defs');
+    const highlightClip = highlightDefs
+      .selectAll<SVGClipPathElement, null>(`clipPath#${highlightClipId}`)
+      .data(highlightRange ? [null] : [])
+      .join('clipPath')
+      .attr('id', highlightClipId);
+    const highlightClipRect = highlightClip
+      .selectAll<SVGRectElement, null>('rect')
+      .data(highlightRange ? [null] : [])
+      .join('rect')
+      .attr('y', 0)
+      .attr('height', chart.innerHeight);
+    if (highlightRange) {
+      motion(highlightClipRect, chart.transition.base)
+        .attr('x', highlightRange.x)
+        .attr('width', highlightRange.width);
+    }
+
+    // The highlighted overlay is also composited as one layer. Its cells stay
+    // opaque internally so their seam covers never stack alpha values.
+    const highlightLayer = chart.g
+      .selectAll<SVGGElement, null>('g.vd-area-highlights')
+      .data([null])
+      .join('g')
+      .attr('class', 'vd-area-highlights')
+      .attr('pointer-events', 'none');
+    motion(highlightLayer, chart.transition.base)
+      .style('opacity', highlightActive ? 1 : 0);
+
+    highlightLayer.selectAll<AreaPathElement, AreaCell>('path.vd-area-highlight')
+      .data(highlightedCells, (cell) => cell.key)
       .join(
         (enter) => {
           const entered = enter.append<AreaPathElement>('path')
-            .attr('class', 'vd-area vd-area-cell')
+            .attr('class', 'vd-area-highlight')
             .attr('data-key', (cell) => cell.key)
             .attr('data-layer-key', (cell) => cell.layerKey)
             .attr('data-observation-key', (cell) => cell.observationKey)
-            .attr('d', (cell) => shape(isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell)))
+            .attr('d', (cell) => shape(frame(cell)))
             .attr('fill', (cell) => color(cell.row || {}))
-            .attr('stroke', 'none')
-            .style('opacity', (cell) => isAdded(cell) ? opacity(cell) : 0)
-            .call(bindTooltip, spec, tooltip)
+            .attr('stroke', (cell) => color(cell.row || {}))
+            .attr('pointer-events', 'none')
+            .attr('clip-path', highlightRange ? `url(#${highlightClipId})` : null)
+            .style('opacity', 1)
             .each(function(cell) {
-              this.__visDeltaAreaFrame = isAdded(cell) ? flattenAreaFrame(frame(cell)) : frame(cell);
+              this.__visDeltaAreaFrame = frame(cell);
               this.__visDeltaAreaCurve = curveName;
             });
-          motion(entered, chart.transition.enter || chart.transition.base)
-            .style('opacity', opacity)
+          motion(entered, chart.transition.base)
             .attrTween('d', function(cell) {
               return tween(this as AreaPathElement, cell, shape);
             });
@@ -198,23 +368,52 @@ class AreaChart extends BaseChart<AreaViewState> {
             .attr('data-key', (cell) => cell.key)
             .attr('data-layer-key', (cell) => cell.layerKey)
             .attr('data-observation-key', (cell) => cell.observationKey)
-            .call(bindTooltip, spec, tooltip);
+            .attr('clip-path', highlightRange ? `url(#${highlightClipId})` : null);
           motion(prepared, chart.transition.base)
-            .style('opacity', opacity)
             .attr('fill', (cell) => color(cell.row || {}))
-            .attr('stroke', 'none')
+            .attr('stroke', (cell) => color(cell.row || {}))
             .attrTween('d', function(cell) {
               return tween(this as AreaPathElement, cell, shape);
             });
           return prepared;
         },
         (exit) => {
-          motion(exit, chart.transition.exit || chart.transition.base)
-            .style('opacity', 0)
-            .remove();
+          // Layer opacity owns highlight enter/exit; keep the cells internally
+          // opaque until the recorded removal completes.
+          motion(exit, chart.transition.base).style('opacity', 1).remove();
           return exit;
         }
       );
+
+    // Invisible center spans preserve the current rendered y0/y1. Their SVG
+    // attributes use the same recorded transition as the visible cell paths,
+    // so Area inspection follows playback and progress scrubbing.
+    const observationJoin = chart.g
+      .selectAll<SVGLineElement, AreaCell>('line.vd-area-observation')
+      .data(cells, (cell) => cell.key);
+    motion(observationJoin.exit(), chart.transition.exit || chart.transition.base)
+      .style('opacity', 0)
+      .remove();
+    const observationEnter = observationJoin.enter()
+      .append('line')
+      .attr('class', 'vd-area-observation')
+      .attr('aria-hidden', 'true')
+      .attr('data-key', (cell) => cell.key)
+      .attr('data-layer-key', (cell) => cell.layerKey)
+      .attr('x1', (cell) => frame(cell)[1].x)
+      .attr('x2', (cell) => frame(cell)[1].x)
+      .attr('y1', (cell) => {
+        const point = frame(cell)[1];
+        return isAdded(cell) ? point.y0 : point.y1;
+      })
+      .attr('y2', (cell) => frame(cell)[1].y0)
+      .attr('stroke', (cell) => color(cell.row || {}));
+    motion(observationEnter.merge(observationJoin), chart.transition.base)
+      .attr('x1', (cell) => frame(cell)[1].x)
+      .attr('x2', (cell) => frame(cell)[1].x)
+      .attr('y1', (cell) => frame(cell)[1].y1)
+      .attr('y2', (cell) => frame(cell)[1].y0)
+      .attr('stroke', (cell) => color(cell.row || {}));
 
     // Area is fill-first by default. Do not add a persistent outline or use a
     // border to imply layer separation that the author did not encode.
@@ -259,7 +458,38 @@ class AreaChart extends BaseChart<AreaViewState> {
       .remove();
 
     drawLegend(chart, rows, enc.color);
+    drawAreaTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '');
   }
+}
+
+function areaHighlightXRange(
+  selection: SelectionSpec | null,
+  xField: string,
+  x: RuntimeScale,
+  position: ChartRuntimeDeps['position'],
+  width: number
+): { x: number; width: number } | null {
+  const filters = selection?.filters ?? (selection?.filter ? [selection.filter] : []);
+  const rangeFilters = filters.filter((filter) => filter.field === xField &&
+    ['gt', 'gte', 'lt', 'lte'].some((key) => key in filter));
+  if (!rangeFilters.length) return null;
+
+  const project = (value: unknown) => Number(position(x, temporalDate(value) ?? value));
+  const lower = rangeFilters.flatMap((filter) => [filter.gte, filter.gt])
+    .filter((value) => value != null)
+    .map(project)
+    .filter(Number.isFinite);
+  const upper = rangeFilters.flatMap((filter) => [filter.lte, filter.lt])
+    .filter((value) => value != null)
+    .map(project)
+    .filter(Number.isFinite);
+  const x0 = clampRange(lower.length ? Math.max(...lower) : 0, width);
+  const x1 = clampRange(upper.length ? Math.min(...upper) : width, width);
+  return { x: Math.min(x0, x1), width: Math.max(0, x1 - x0) };
+}
+
+function clampRange(value: number, width: number): number {
+  return Math.max(0, Math.min(width, value));
 }
 
 function areaDividerPaths(

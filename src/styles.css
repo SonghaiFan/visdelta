@@ -1,28 +1,28 @@
 :root {
   color-scheme: light;
-  --vd-color-primary: #4e79a7;
-  --vd-color-surface: #fff;
-  --vd-color-bg: #f8f8f7;
-  --vd-color-on-surface: #1f2328;
+  --vd-color-primary: #1533ff;
+  --vd-color-surface: #ffffff;
+  --vd-color-bg: #f4f4f2;
+  --vd-color-on-surface: #303039;
   /* Ink for marks without an authored color encoding. */
   --vd-color-mark-default: #000000;
-  --vd-color-muted: #66707a;
-  --vd-color-border: #dde1e6;
-  --vd-color-outline: #747b83;
-  --vd-color-outline-variant: #e7eaed;
-  --vd-color-series-1: #4e79a7;
-  --vd-color-series-2: #f28e2b;
-  --vd-color-series-3: #e15759;
-  --vd-color-series-4: #76b7b2;
-  --vd-color-series-5: #59a14f;
-  --vd-color-series-6: #edc948;
-  --vd-color-series-7: #b07aa1;
-  --vd-color-series-8: #ff9da7;
-  --vd-color-series-9: #9c755f;
-  --vd-color-series-10: #bab0ac;
-  --vd-rounded-sm: 2;
-  --vd-rounded-md: 3;
-  --vd-rounded-lg: 6;
+  --vd-color-muted: #696971;
+  --vd-color-border: #d8d8d4;
+  --vd-color-outline: #76767d;
+  --vd-color-outline-variant: #e7e7e3;
+  --vd-color-series-1: #4269d0;
+  --vd-color-series-2: #efb118;
+  --vd-color-series-3: #ff725c;
+  --vd-color-series-4: #6cc5b0;
+  --vd-color-series-5: #3ca951;
+  --vd-color-series-6: #ff8ab7;
+  --vd-color-series-7: #a463f2;
+  --vd-color-series-8: #97bbf5;
+  --vd-color-series-9: #9c6b4e;
+  --vd-color-series-10: #9498a0;
+  --vd-rounded-sm: 4;
+  --vd-rounded-md: 7;
+  --vd-rounded-lg: 12;
   --vd-type-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --vd-type-label-size: 10px;
   --vd-type-label-weight: 400;
@@ -57,7 +57,6 @@
   --vd-series-8: var(--vd-color-series-8);
   --vd-series-9: var(--vd-color-series-9);
   --vd-series-10: var(--vd-color-series-10);
-  --vd-bar-radius: 3;
   --vd-line-width: 2;
   --vd-mark-stroke: var(--vd-color-surface);
   --vd-point-stroke-width: 1.5;
@@ -76,7 +75,7 @@
   --vd-legend-font-size: var(--vd-type-label-size);
   --vd-figure-bg: var(--vd-color-surface);
   --vd-figure-blur: 0px;
-  --vd-figure-radius: 4px;
+  --vd-figure-radius: 12px;
   --vd-figure-border: 1px solid var(--vd-color-border);
   --vd-figure-shadow: var(--vd-shadow);
 }
@@ -167,9 +166,10 @@
   display: none;
 }
 
-.vd-bar-grouped {
-  stroke: var(--vd-surface);
-  stroke-width: 1px;
+/* Bar marks are fill-only by default. Structural seams, when a split or merge
+   needs one, are separate transition-only paths rather than mark borders. */
+.vd-bar {
+  stroke: none;
 }
 
 .vd-bar-seam,
@@ -190,6 +190,135 @@
   stroke-dasharray: 3px 3px;
   vector-effect: non-scaling-stroke;
   pointer-events: none;
+}
+
+.vd-line-tooltip-layer {
+  pointer-events: none;
+}
+
+.vd-line-tooltip-hitbox {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.vd-line-tooltip-rule,
+.vd-line-tooltip-dot,
+.vd-line-tooltip-tail,
+.vd-line-tooltip-box,
+.vd-line-tooltip-text {
+  display: none;
+}
+
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-rule,
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-dot,
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-tail,
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-box,
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-text {
+  display: initial;
+}
+
+.vd-line-tooltip-rule,
+.vd-area-tooltip-rule {
+  stroke: var(--vd-color-outline);
+  stroke-width: 1px;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.vd-line-tooltip-dot {
+  stroke: var(--vd-surface);
+  stroke-width: 2px;
+  r: 4px;
+  vector-effect: non-scaling-stroke;
+}
+
+.vd-line-tooltip-box,
+.vd-line-tooltip-tail {
+  fill: var(--vd-color-on-surface);
+}
+
+.vd-line-tooltip-box {
+  rx: var(--vd-rounded-sm);
+}
+
+.vd-line-tooltip-text {
+  fill: var(--vd-color-surface);
+  font-family: var(--vd-type-family);
+  font-size: 11px;
+}
+
+/* Area keeps the Line inspector's visual language. Two dots distinguish its
+   lower and upper boundaries without turning the band into a bar. */
+.vd-area-observation {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Adjacent Area cells are separate paths for identity and transitions. A
+   same-fill hairline overlaps their independently antialiased edges without
+   introducing a visible or semantic border. */
+.vd-area-cell,
+.vd-area-highlight {
+  stroke-width: 1px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Opacity belongs to a complete Area layer or transition cohort. Force SVG to
+   composite its opaque cells first, then apply alpha once to the result. */
+.vd-area-cells,
+.vd-area-highlights,
+.vd-area-entering-cells,
+.vd-area-exiting-cells {
+  isolation: isolate;
+}
+
+.vd-area-tooltip-layer {
+  pointer-events: none;
+}
+
+.vd-area-tooltip-hitbox {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.vd-area-tooltip-rule,
+.vd-area-tooltip-dot,
+.vd-area-tooltip-tail,
+.vd-area-tooltip-box,
+.vd-area-tooltip-text {
+  display: none;
+}
+
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-rule,
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-dot,
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-tail,
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-box,
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-text {
+  display: initial;
+}
+
+.vd-area-tooltip-dot {
+  stroke: var(--vd-surface);
+  stroke-width: 2px;
+  r: 4px;
+  vector-effect: non-scaling-stroke;
+}
+
+.vd-area-tooltip-box,
+.vd-area-tooltip-tail {
+  fill: var(--vd-color-on-surface);
+}
+
+.vd-area-tooltip-box {
+  rx: var(--vd-rounded-sm);
+}
+
+.vd-area-tooltip-text {
+  fill: var(--vd-color-surface);
+  font-family: var(--vd-type-family);
+  font-size: 11px;
 }
 
 .vd-point-connector {
@@ -292,7 +421,6 @@
   --vd-axis: #a4957d;
   --vd-grid: #e4d9c7;
   --vd-legend-text: #5f513f;
-  --vd-bar-radius: 0;
   --vd-mark-stroke: #fffdf7;
   --vd-point-stroke-width: 1;
   --vd-line-width: 1.75;
@@ -346,7 +474,6 @@
   --vd-axis: #536472;
   --vd-grid: #243039;
   --vd-legend-text: #aab6bf;
-  --vd-bar-radius: 0;
   --vd-mark-stroke: #11161c;
   --vd-point-stroke-width: 1.25;
   --vd-line-width: 1.5;

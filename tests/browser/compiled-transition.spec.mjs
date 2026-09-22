@@ -136,6 +136,25 @@ test('the Paper preset owns conventional axis titles, a right legend, and its pa
   expect(result.fills).toEqual(['rgb(139, 47, 32)', 'rgb(49, 91, 69)']);
 });
 
+test('bars keep square corners in every layout and transition frame', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const segmented = sl.bar().data([
+      { id: 'A', group: 'one', value: 10 }, { id: 'A', group: 'two', value: 20 },
+      { id: 'B', group: 'one', value: 30 }, { id: 'B', group: 'two', value: 15 }
+    ]).x('id').y('value').key('id').breakdown('group');
+    const change = await sl.transition(segmented, segmented.layout('grouped'), options('#cached'));
+    return [0, 0.25, 0.5, 0.75, 1, 0.5, 0].map(progress => {
+      change.progress(progress);
+      return [...change.view.querySelectorAll('rect.vd-bar')].map(node => ({
+        rx: node.getAttribute('rx'),
+        clipPath: node.style.clipPath
+      }));
+    });
+  });
+
+  expect(result.flat().every(bar => bar.rx === '0' && bar.clipPath === '')).toBe(true);
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'split', 'merge', 'grouped-split', 'grouped-merge', 'focus-merge', 'sort-merge', 'detail-sort-merge', 'detail-sort-split']) {
   test(`${scenario}: cached mark geometry matches reconstruction`, async ({ page }) => {
     const samples = await page.evaluate(async scenario => {
@@ -293,20 +312,21 @@ test('resize recompiles changed theme at the same progress; inspection cannot mu
     const change = await sl.transition(base, base.y('other'), options('#cached'));
     change.progress(0.37);
     const before = geometry('#cached');
-    const initialRadius = change.view.querySelector('rect.vd-bar').getAttribute('rx');
+    const initialFill = change.view.querySelector('rect.vd-bar').getAttribute('fill');
     change.delta.previous.encoding.y.field = 'missing';
     change.from.encoding.y.field = 'missing';
-    document.documentElement.style.setProperty('--vd-bar-radius', '9');
+    document.documentElement.style.setProperty('--vd-color-mark-default', '#123456');
     change.progress(0.37);
-    const cachedRadius = change.view.querySelector('rect.vd-bar').getAttribute('rx');
+    const cachedFill = change.view.querySelector('rect.vd-bar').getAttribute('fill');
     change.resize();
-    const radius = change.view.querySelector('rect.vd-bar').getAttribute('rx');
+    const fill = change.view.querySelector('rect.vd-bar').getAttribute('fill');
     const after = geometry('#cached');
-    document.documentElement.style.removeProperty('--vd-bar-radius');
-    return { initialRadius, cachedRadius, radius, value: change.value, before, after };
+    document.documentElement.style.removeProperty('--vd-color-mark-default');
+    return { initialFill, cachedFill, fill, value: change.value, before, after };
   });
-  expect(result.cachedRadius).toBe(result.initialRadius);
-  expect(result.radius).toBe('9');
+  expect(result.cachedFill).toBe(result.initialFill);
+  expect(result.fill).toBe('#123456');
   expect(result.value).toBe(0.37);
-  expect(result.after).toEqual(result.before);
+  const withoutFill = rows => rows.map(({ fill, ...geometry }) => geometry);
+  expect(withoutFill(result.after)).toEqual(withoutFill(result.before));
 });

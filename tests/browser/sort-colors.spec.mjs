@@ -55,6 +55,87 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
   });
 }
 
+test('an explicit categorical encoding uses the default palette slots in order', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { bar, transition } = await import('/dist/visdelta.esm.js');
+    const rows = Array.from({ length: 10 }, (_, index) => ({
+      category: String.fromCharCode(65 + index),
+      value: 10 + index,
+      group: `group-${index + 1}`
+    }));
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const chart = bar(rows).x('category').y('value').key('category').color('group');
+    const change = await transition(chart, chart, { target: host, height: 400 });
+    change.progress(1);
+    const defaults = [...host.querySelectorAll('rect.vd-bar')]
+      .map(node => d3.color(getComputedStyle(node).fill).formatHex());
+    change.destroy();
+
+    const custom = bar(rows).x('category').y('value').key('category')
+      .color('group', { range: ['#111111', '#eeeeee'] });
+    const customChange = await transition(custom, custom, { target: host, height: 400 });
+    customChange.progress(1);
+    const authored = [...host.querySelectorAll('rect.vd-bar')]
+      .map(node => d3.color(getComputedStyle(node).fill).formatHex());
+    customChange.destroy();
+    host.remove();
+    return { defaults, authored };
+  });
+  expect(result.defaults).toEqual([
+    '#4269d0', '#efb118', '#ff725c', '#6cc5b0', '#3ca951',
+    '#ff8ab7', '#a463f2', '#97bbf5', '#9c6b4e', '#9498a0'
+  ]);
+  expect(result.authored).toEqual([
+    '#111111', '#eeeeee', '#111111', '#eeeeee', '#111111',
+    '#eeeeee', '#111111', '#eeeeee', '#111111', '#eeeeee'
+  ]);
+});
+
+test('named D3 chromatic schemes support categorical and quantitative color', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { point, transition } = await import('/dist/visdelta.esm.js');
+    const rows = [
+      { id: 'a', x: 1, y: 1, group: 'one', score: 0 },
+      { id: 'b', x: 2, y: 2, group: 'two', score: 50 },
+      { id: 'c', x: 3, y: 3, group: 'three', score: 100 }
+    ];
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const read = () => [...host.querySelectorAll('circle.vd-point')]
+      .map(node => d3.color(getComputedStyle(node).fill).formatHex());
+
+    const categorical = point(rows).x('x').y('y').key('id')
+      .color('group', { scheme: 'Tableau10' });
+    const categoricalChange = await transition(categorical, categorical, { target: host, height: 400 });
+    categoricalChange.progress(1);
+    const categoricalColors = read();
+    categoricalChange.destroy();
+
+    const quantitative = point(rows).x('x').y('y').key('id')
+      .color('score', { type: 'quantitative', scheme: 'Viridis' });
+    const quantitativeChange = await transition(quantitative, quantitative, { target: host, height: 400 });
+    quantitativeChange.progress(1);
+    const quantitativeColors = read();
+    quantitativeChange.destroy();
+
+    const overridden = point(rows).x('x').y('y').key('id')
+      .color('group', { scheme: 'Tableau10', range: ['#111111', '#eeeeee'] });
+    const overriddenChange = await transition(overridden, overridden, { target: host, height: 400 });
+    overriddenChange.progress(1);
+    const overriddenColors = read();
+    overriddenChange.destroy();
+    host.remove();
+    return { categoricalColors, quantitativeColors, overriddenColors };
+  });
+
+  expect(result.categoricalColors).toEqual(['#4e79a7', '#f28e2c', '#e15759']);
+  expect(result.quantitativeColors).toEqual(['#440154', '#21918c', '#fde725']);
+  expect(result.overriddenColors).toEqual(['#111111', '#eeeeee', '#111111']);
+});
+
 test('dark chart style uses white neutral ink without changing authored color', async ({ page }) => {
   const samples = await page.evaluate(async () => {
     const vd = await import('/dist/visdelta.esm.js');
@@ -286,7 +367,8 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
 
   await page.goto('/docs/.vitepress/dist/transition-lab.html#sort');
   await expect(page.locator('#status')).toHaveText('Ready');
-  await page.locator('#scenario').selectOption('split');
+  await page.getByRole('tab', { name: /^Grain/i }).click();
+  await page.locator('[data-scenario="split"]').click();
   await expect(page.locator('#status')).toHaveText('Ready');
   await expect(page.locator('#editor')).toHaveValue(/\.color\("age"/);
   await page.locator('#end').click();

@@ -20,7 +20,7 @@ for (const sample of scenarios) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/unit-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(scenarios.length);
+    await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 

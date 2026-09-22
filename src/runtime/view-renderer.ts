@@ -254,17 +254,17 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const previousRows = previousSpec
     ? applyTransforms(previousSource, previousSpec.transform || [])
     : [];
-  const observationChange = observationMembershipChange(previousSpec, renderSpec, previousRows, rows);
-  const chartTransition = observationTransition(
-    transitionSpec(renderSpec, previousSpec),
-    observationChange,
-    { seekable }
-  );
   // Keep chart-owned decisions separate from shared correspondence evidence;
   // attaching evidence must not mutate a plan object retained by a plugin.
   const transitionPlan = { ...(chartType?.resolveTransitionPlan?.(previousSpec, renderSpec) || {}) };
   const lineage = previousSpec ? viewLineageCorrespondence(previousSpec, renderSpec) : null;
   if (lineage) transitionPlan.lineage = lineage;
+  const observationChange = observationMembershipChange(previousSpec, renderSpec, previousRows, rows);
+  const chartTransition = observationTransition(
+    transitionSpec(renderSpec, previousSpec),
+    observationChange,
+    { seekable, simultaneous: transitionPlan.membershipTiming === 'simultaneous' }
+  );
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
   const chartTransitionFrame = motion(scene.frame, chartTransition.base).attr(
@@ -332,10 +332,25 @@ function observationMembershipChange(
 function observationTransition(
   transition: RuntimeTransition,
   change: MembershipChange,
-  { seekable }: { seekable: boolean }
+  { seekable, simultaneous = false }: { seekable: boolean; simultaneous?: boolean }
 ): RuntimeTransition {
   if (!change.exit && !change.enter) return transition;
   const totalDuration = Math.max(1, Number(transition.duration) || 900);
+  if (simultaneous) {
+    const timing: MotionTiming = { delay: 0, duration: totalDuration, ease: transition.base.ease };
+    return {
+      ...transition,
+      base: { ...timing },
+      ...(change.exit ? { exit: { ...timing } } : {}),
+      ...(change.enter ? { enter: { ...timing } } : {}),
+      exitFirst: false,
+      enterLast: false,
+      exitDuration: change.exit ? totalDuration : 0,
+      scaleDuration: totalDuration,
+      enterDuration: change.enter ? totalDuration : 0,
+      enterDelay: 0
+    };
+  }
   const parts = 1 + Number(change.exit) + Number(change.enter);
   const partDuration = Math.max(1, Math.floor(totalDuration / parts));
   const exitDuration = change.exit ? partDuration : 0;
@@ -517,7 +532,11 @@ function clearSeekSequence(scene: ViewRuntimeScene): void {
 }
 
 function createSeekSequence(phases: RenderPhaseConfig[] = []): SeekSequence {
-  const durations = phases.map((phase) => phaseDuration(phase));
+  // `progress()` partitions an authored pair by its complete route stages.
+  // Runtime playback then gives each of those stages one caller-supplied
+  // duration. Chart-local timing still controls an individual phase when a
+  // non-seekable renderer runs it directly (see renderPhaseSequence).
+  const durations = phases.map(() => 1);
   const total = Math.max(1, durations.reduce((sum, duration) => sum + duration, 0));
   let cursor = 0;
   return {

@@ -1,54 +1,87 @@
 # Ontology and transition contracts
 
-This page is the source of truth for how VisDelta names state difference,
-identity, correspondence, and paths. It records behavior implemented now.
-Possible future chart types and roadmaps do not belong in the public language.
+This page is VisDelta's semantic constitution: the source of truth for how the
+library names identity, state difference, transition planning, frames, and
+control. It records behavior implemented now. Possible features and roadmap
+ideas do not belong in the public language.
 
-## Four layers, kept separate
+## The four-layer constitution
 
-The core concepts are **state, correspondence, and path**:
+Two immutable chart states are the endpoints. VisDelta reasons about the change
+between them through four layers that must remain separate:
 
-- **State** describes what is expressed (participating records, grouping,
-  contribution units, and measures) and how it is expressed (encodings,
-  coordinates, layout, attention, and appearance). Geometry alone is not the
-  meaning of a mark.
-- **Correspondence** is evidence of continuity between endpoint objects:
-  identities, source lineage, and measure contributions where available.
-- **Path** is a chosen transition between states, optionally through complete
-  intermediate states. It is not uniquely determined by the endpoints.
+1. **Identity and correspondence** determine which source records and marks can
+   be related across the endpoints. `.datumKey()` identifies source records;
+   `.key()` identifies marks at the current grain. Lineage and contributions
+   provide additional correspondence evidence.
+2. **State difference** reports what changed using seven non-exclusive
+   categories: Data, Grain, Encoding, Coordinate, Layout, Attention, and
+   Appearance. Directional actions such as `remove`, `split`, and `reorient`
+   are emitted semantic facts, not builder methods or animation phases.
+3. **Transition plan** chooses a path and phase order. It may use chart-owned
+   intermediate states or author-supplied `sequence()` waypoints. The endpoints
+   do not determine one universal route.
+4. **Frame and control** evaluate the chosen path and supply progress. A frame
+   is the picture at one progress value; time, scroll, sliders, or other input
+   can control that value.
 
 ```text
-State A + State B
-  -> Difference (what changed) + Correspondence (what continues)
-  -> Chosen transition path -> Frame
-                               ^
-                            Control
+Identity / correspondence: what continues?
+              ↓
+State difference: what changed, and in which direction?
+              ↓
+Transition plan: which route and phase order?
+              ↓
+Frame / control: what is drawn at this progress value?
 ```
 
-Difference describes changed state properties; it does not prescribe phase
-order. Data, grain/measure, encoding, coordinate, layout, attention, and
-appearance are useful non-exclusive descriptions, not seven animation engines
-or a global priority list. The current renderer scene labels (`selection`,
-`mapping`, `detail`, `axis`) are execution hints, not an exhaustive ontology.
+These layers are normative boundaries. A term must not move between them merely
+because one chart currently implements a transition in a particular way.
 
-`delta().stateChanges` normalizes those descriptions into directional facts:
+## The seven state-change categories
 
-| Category | Question | Actions |
-| --- | --- | --- |
-| Data | Which source records participate, and did their values change? | `add`, `remove`, `update` |
-| Grain | Which records make one mark, and how is its measure calculated? | `split`, `merge`, `reaggregate`, `change-reducer` |
-| Encoding | Which field is bound to a visual channel? | `bind`, `unbind`, `remap` |
-| Coordinate | How are values mapped into position and space? | `rescale`, `reorient` |
-| Layout | How are the same objects arranged or connected? | `reorder`, `rearrange`, `reconnect` |
-| Attention | Which objects are emphasized or framed by the camera? | `enter`, `exit`, `shift`, with target `focus` or `highlight` |
-| Appearance | What fixed visual form or styling is used? | `restyle`, `reshape` |
+`delta().stateChanges` reports directional facts using this closed vocabulary:
 
-Identity remains correspondence evidence rather than a change category.
-`.datumKey()` identifies source records and `.key()` identifies marks at the
-current grain. A Grain change records both grouping fields and aggregate
-measures, so `sum` to `mean` is `change-reducer` even when grouping is unchanged.
-The array's stable categorical order is for inspection only; a chart transition
-policy still chooses the route and phase order.
+<StateChangeCatalogue />
+
+The labels under **Public syntax** are existing ways to declare relevant chart
+state. The labels under **Emitted actions** are exact `stateChanges` values;
+they are not additional fluent methods. Attention additionally reports a
+`focus` or `highlight` target.
+
+Category boundaries are strict:
+
+- **Data** is source-record membership or value change. An update is reported
+  only when stable datum identity provides evidence.
+- **Grain** includes grouping and measure semantics. `sum` to `mean` is
+  `change-reducer`, even when grouping is unchanged. Unit `unitValue` also
+  belongs here because it changes the quantity represented by one mark.
+- **Encoding** is a data-field binding. A field-driven `.color("region")` is an
+  encoding; a constant `.color("#3366ff")` is Appearance.
+- **Coordinate** is the positional scale, domain, or orientation. Remapping y
+  from one field to another remains Encoding; `.flip()` is Coordinate.
+- **Layout** is the arrangement, order, or connection of the same objects.
+- **Attention** preserves the data and marks while focus moves the camera or
+  highlight changes emphasis.
+- **Appearance** is fixed visual styling or form that does not bind a field.
+
+The array's stable categorical order is for inspection only. It is not a
+priority list, route, or playback schedule.
+
+## Vocabulary governance
+
+This ontology changes only when implementation evidence requires it:
+
+1. Reuse an existing category and action when they describe the implemented
+   semantic distinction without loss.
+2. Add a term only when the distinction is observable in chart state,
+   implemented by `delta().stateChanges`, represented in the public TypeScript
+   type, and protected by tests.
+3. Remove a term when no implemented state difference can emit it. Do not keep
+   roadmap vocabulary in the contract.
+4. Keep builder syntax, state-change actions, correspondence operations, and
+   transition phases visibly distinct in code and documentation.
+5. Update this page, the API reference, types, classifier, and tests together.
 
 ## Run a state difference
 
@@ -59,7 +92,7 @@ category list.
 
 <SyntaxPlayground initial="filter" />
 
-## Three governing contracts
+## Transition contracts
 
 1. **State is fact; operation history is not an animation script.** Planning
    consumes endpoint states, not the sequence of builder method calls that
@@ -282,12 +315,14 @@ routes can compose these presentation steps with the existing common-grain
 bridge, in its canonical direction. Unsupported combinations retain their
 existing transition route.
 
-Intermediate states are generated sequence steps within an authored pair.
-Each adjacent pair derives its own difference and reversible frame path. A
-shared endpoint displays the complete state, without the preceding leg's exit
-marks or ticks. Generated steps share the pair's `0..1` interval and total
-playback duration. In an authored `sequence([A, B, C])`, progress `1` still
-identifies B even if A-to-B contains generated intermediate states.
+Intermediate states are generated route stages within an authored pair. Each
+adjacent pair derives its own difference and reversible frame path. A shared
+endpoint displays the complete state, without the preceding leg's exit marks
+or ticks. Progress still spans the pair's `0..1` interval, but playback time
+is stage-based: `play({ duration })` gives each serial route stage that
+duration. Thus two serial stages take `2 × duration`; parallel changes in one
+stage still take one duration. In an authored `sequence([A, B, C])`, progress
+`1` still identifies B even if A-to-B contains generated intermediate states.
 
 For strict reversible routes, every adjacent leg is canonicalized independently.
 Reverse playback evaluates the same canonical frame at `1 - p`; details such as Bar dividers must

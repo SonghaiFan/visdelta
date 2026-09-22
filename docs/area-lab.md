@@ -1,12 +1,18 @@
 # Area transition lab
 
-These fifteen editable scenarios use a bundled tidy US unemployment dataset
+These sixteen editable scenarios use a bundled tidy US unemployment dataset
 to exercise VisDelta's Area module. Each source row is one month and industry.
 The demo asset adds `year` and the industry's `share` of that month's total
 before it enters VisDelta; the library receives tidy rows and performs no data
 cleaning. The scenarios cover scales, mappings, keyed observations, filtering,
-focus, highlight, fill, baseline, stream layout, and reversible
+focus, layer and x-range highlight, fill, baseline, stream layout, and reversible
 total/stacked changes.
+
+An Area observation still owns half the interval to each neighbour for identity,
+transition, and hit testing. A temporal highlight does **not** inherit that
+ownership boundary: its foreground overlay is clipped at the exact scale
+positions of the authored range. Therefore a range beginning on September 1
+starts at `x(new Date("2008-09-01"))`, not at the midpoint from August.
 
 Area is a **band**, not a filled Line. Every x position has a lower boundary
 `y0` and an upper boundary `y1`:
@@ -18,6 +24,16 @@ Area is a **band**, not a filled Line. Every x position has a lower boundary
 - `.layout("stream")` orders those parts inside-out and applies D3's wiggle
   offset, producing a curved baseline that keeps the stream visually centered;
 - positive and negative values accumulate on opposite sides of the baseline.
+
+Area inspection follows that same model. Moving anywhere across the plot first
+selects the nearest x observation; pointer height then selects a layer in a
+stack. It keeps Line's dashed gray rule and callout, but uses two dots to mark
+the selected band's current `y0` and `y1`. The callout stays beside the band,
+flipping between its left and right sides near an edge. It defaults to the x
+value, layer name when present, and mapped measure. `.tooltip()` adds
+declared fields without exposing Area's internal cell or lineage keys. The
+dots read rendered boundary positions, so they stay aligned during playback
+and progress scrubbing.
 
 Stream defaults to D3's `wiggle` offset and `insideOut` order. Customize either
 with `.layout("stream", { offset, order })`:
@@ -43,8 +59,8 @@ filled band. Use Point when an isolated observation itself should stay visible.
 
 Color is explicit. `.breakdown("industry")` creates stack geometry but does not
 silently assign hues. Pass a color range to `.breakdown()`, or chain
-`.color("industry")`. Area has no default border, so without a color mapping
-adjacent layers intentionally remain one visual fill.
+`.color("industry")`. Area has no contrasting default border, so without a
+color mapping adjacent layers intentionally remain one visual fill.
 
 Split and merge are one transition evaluated in opposite directions. The
 single total stays behind the entering stacked layers. First, a one-pixel
@@ -63,15 +79,25 @@ those exact frames backward, including the changing y scale and axes.
 
 Observation membership also has one rule. Restore and Add place each new keyed
 observation at its target x with zero thickness (`y1 = y0`), then grow it to its
-authored value. This works in the middle and at either endpoint. Filter and
-Remove show those same frames backward: the x position stays fixed while the
-value flattens into the baseline. The polygon stays ordered and never tears into
-crossed triangles.
+authored value while the surviving Area geometry updates over the same progress
+window. This works in the middle and at either endpoint. Filter and Remove show
+those same simultaneous frames backward: leaving cells flatten and fade while
+the connected boundaries update, rather than finishing one action before
+starting the other. The polygon stays ordered and never tears into crossed
+triangles.
 
 Like Line, Area defaults to `.connect("adjacent")`. Filtering observations out
 of the middle leaves separate connected stretches at their original x
 positions. Use `.connect("across")` only when joining the surviving observations
 is the intended statement.
+
+Area cells remain separate SVG paths so their identities and boundaries can be
+animated independently. The renderer covers subpixel antialias seams with a
+one-pixel stroke that always matches each cell's fill. This is a rasterization
+guard, not an authored outline or an additional Appearance encoding. During a
+fade, stable, entering, and exiting cells are composited as isolated cohorts;
+the renderer never applies partial opacity separately to overlapping seam
+strokes.
 
 Area uses the same plain `.curve("curveName")` grammar as Line. The name is an
 exact D3 export such as `curveLinear`, `curveMonotoneX`, `curveNatural`, or

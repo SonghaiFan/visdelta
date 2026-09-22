@@ -16,8 +16,14 @@ const fourCylinderCars = point(rows.filter(row => row.cyl === 4))
   .key("name")
   .tooltip(["name", "cyl", "mpg", "wt", "hp"]);`;
 
+const sampleCategories = {
+  x: 'encoding', y: 'encoding', xy: 'encoding', filter: 'data', add: 'data',
+  data: 'data', highlight: 'attention', color: 'encoding', size: 'encoding',
+  flip: 'coordinate', rollup: 'grain', breakdown: 'grain', focus: 'attention'
+};
+
 function sample(id, label, description, setup, from, to) {
-  return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
 
 const summarySetup = `${base}

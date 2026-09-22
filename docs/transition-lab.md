@@ -1,6 +1,7 @@
 # Bar transition lab
 
-These fourteen scenarios are the executable transition matrix for VisDelta's
+These examples are organized by the seven state-change categories and form the
+executable transition matrix for VisDelta's
 current bar implementation. Edit either endpoint, run the code, scrub any
 frame, reverse playback, and inspect the computed semantic delta.
 

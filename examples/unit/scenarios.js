@@ -57,8 +57,15 @@ const detailed = unit(counts)
   .layout("bar", { columns: 5, radius: 8 })
   .color("species", { title: "Species", range: ${speciesColors} });`;
 
+const sampleCategories = {
+  all: 'data', add: 'data', remove: 'data', filter: 'data', highlight: 'attention',
+  color: 'encoding', columns: 'layout', radius: 'appearance', bar: 'layout',
+  measure: 'encoding', beeswarm: 'layout', force: 'layout', grid: 'layout',
+  'unit-value': 'grain', focus: 'attention'
+};
+
 function sample(id, label, description, setup, from, to) {
-  return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
 
 export const chart = 'unit';

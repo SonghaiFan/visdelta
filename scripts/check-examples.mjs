@@ -5,10 +5,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const examplesDir = join(root, 'examples');
 const labs = await discoverLabs(examplesDir);
-assertLab(labs.get('bar'), 'bar', 14);
+assertLab(labs.get('bar'), 'bar', 15);
 assertLab(labs.get('point'), 'point', 13);
 assertLab(labs.get('line'), 'line', 16);
-assertLab(labs.get('area'), 'area', 15);
+assertLab(labs.get('area'), 'area', 16);
 assertLab(labs.get('unit'), 'unit', 15);
 
 console.log('Area, bar, line, point, and unit example invariants ok.');
@@ -38,9 +38,13 @@ function assertLab(module, chart, expectedCount) {
   }
   const ids = new Set(scenarios.map(scenario => scenario.id));
   if (ids.size !== scenarios.length) throw new Error(`${chart} Lab scenario ids must be unique.`);
+  const categories = new Set(['data', 'grain', 'encoding', 'coordinate', 'layout', 'attention', 'appearance']);
   for (const scenario of scenarios) {
     if (!scenario.label || !scenario.description || !scenario.code.includes('return { from, to };')) {
       throw new Error(`${chart} Lab scenario is incomplete: ${scenario.id || '(missing id)'}`);
+    }
+    if (!categories.has(scenario.category)) {
+      throw new Error(`${chart} Lab scenario must use a state-change category: ${scenario.id}`);
     }
   }
 }

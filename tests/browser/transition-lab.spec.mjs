@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 import { scenarios } from '../../examples/transition/scenarios.js';
 
 const ready = page => expect(page.locator('#status')).toHaveText('Ready');
+const chooseScenario = async (page, id) => {
+  const sample = scenarios.find(candidate => candidate.id === id);
+  await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
+  await page.locator(`[data-scenario="${id}"]`).click();
+};
 const snapshot = page => page.locator('#chart svg').evaluateAll(svgs => svgs.map(svg =>
   Array.from(svg.querySelectorAll('rect.vd-bar, .tick')).map(node => ({
     tag: node.tagName, text: node.textContent,
@@ -21,7 +26,7 @@ for (const sample of scenarios) {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`/docs/.vitepress/dist/transition-lab.html#${sample.id}`);
     await ready(page);
-    await expect(page.locator('#scenario option')).toHaveCount(14);
+    await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
     const start = await snapshot(page);
@@ -72,7 +77,7 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/docs/.vitepress/dist/transition-lab.html#reaggregate');
   await ready(page);
-  await expect(page.locator('#scenario')).toHaveValue('reaggregate');
+  await expect(page.locator('[data-scenario="reaggregate"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
   for (const p of [0, 0.43, 0.79, 1, 0.43, 0]) {
     await page.locator('#progress').fill(String(p));
@@ -103,6 +108,19 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
   await page.locator('#end').click();
   await expect(page.locator('#chart rect.vd-bar')).toHaveCount(2);
   expect(errors).toEqual([]);
+});
+
+test('bar marks are fill-only in simple, grouped, and stacked endpoints', async ({ page }) => {
+  for (const id of ['sort', 'layout', 'split']) {
+    await page.goto(`/docs/.vitepress/dist/transition-lab.html#${id}`);
+    await page.reload();
+    await ready(page);
+    await page.locator('#end').click();
+    const strokes = await page.locator('#chart rect.vd-bar').evaluateAll(nodes =>
+      nodes.map(node => getComputedStyle(node).stroke));
+    expect(strokes.length).toBeGreaterThan(0);
+    expect(strokes.every(stroke => stroke === 'none')).toBe(true);
+  }
 });
 
 test('bar focus moves one camera over the full category scale without filtering bars', async ({ page }) => {
@@ -257,11 +275,11 @@ test('manual run, drafts, switching and playback controls', async ({ page }) => 
   await page.locator('#run').click();
   await ready(page);
   await expect(page.locator('#chart')).toContainText('Region');
-  await page.locator('#scenario').selectOption('grouped-split');
+  await chooseScenario(page, 'grouped-split');
   await ready(page);
   await expect(page.locator('#editor')).toHaveValue(scenarios.find(s => s.id === 'grouped-split').code);
   await page.locator('#end').click();
-  await page.locator('#scenario').selectOption('measure');
+  await chooseScenario(page, 'measure');
   await ready(page);
   await expect(page.locator('#editor')).toHaveValue(edited);
   await expect(page.locator('#value')).toHaveText('0.00');
@@ -283,7 +301,7 @@ test('late async evaluation cannot overwrite a newer edit', async ({ page }) => 
   await page.locator('#editor').fill(`await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code.replaceAll('"State"', '"Stale region"')}`);
   await page.locator('#run').click();
   await expect(page.locator('#status')).toHaveText('Compiling');
-  await page.locator('#scenario').selectOption('filter');
+  await chooseScenario(page, 'filter');
   await ready(page);
   await page.evaluate(() => window.releaseLabRun());
   await page.locator('#end').click();
@@ -395,7 +413,7 @@ for (const [splitId, mergeId] of [['split', 'merge'], ['grouped-split', 'grouped
     const frames = async id => {
       await page.goto('/docs/.vitepress/dist/transition-lab.html');
       await ready(page);
-      await page.locator('#scenario').selectOption(id);
+      await chooseScenario(page, id);
       await expect(page.locator('#editor')).toHaveValue(scenarios.find(scenario => scenario.id === id).code);
       await ready(page);
       const values = [];

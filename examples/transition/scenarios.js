@@ -3,6 +3,7 @@ const population = `const DATA_URL = "./data/us-population-state-age-tidy.csv";
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
 
 const population = bar({ url: DATA_URL })
+  .datumKey(["state", "age"])
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"]);
@@ -17,6 +18,7 @@ const rows = await d3.csv(DATA_URL, d3.autoType);
 const under10 = rows.filter(row => row.age === "<10");
 
 const base = bar(under10.filter(row => INITIAL_STATES.includes(row.state)))
+  .datumKey(["state", "age"])
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"]);`;
@@ -67,8 +69,15 @@ const byLocation = base
   .x("location", { title: "Location" })
   .rollup("location");`;
 
+const sampleCategories = {
+  measure: 'data', filter: 'data', highlight: 'attention', color: 'encoding',
+  sort: 'layout', flip: 'coordinate', data: 'data', split: 'grain', merge: 'grain',
+  layout: 'layout', 'grouped-split': 'grain', 'grouped-merge': 'grain',
+  focus: 'attention', reaggregate: 'grain', appearance: 'appearance'
+};
+
 function sample(id, label, description, setup, from, to) {
-  return { id, label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
 }
 
 export const chart = 'bar';
@@ -90,5 +99,6 @@ export const scenarios = [
   sample('grouped-split', '11 · Split into grouped ages', 'Move six state totals into side-by-side age-band detail.', segmentedFeatured, 'detailed.rollup()', 'detailed.layout("grouped")'),
   sample('grouped-merge', '12 · Merge grouped ages', 'Move the six-state grouped detail back into population totals.', segmentedFeatured, 'detailed.layout("grouped")', 'detailed.rollup()'),
   sample('focus', '13 · Focus the view', 'Fit one camera around New York and Pennsylvania. Keep all 52 observations, the complete ordered state scale, and every state between the two anchors.', populationFocus, 'under10', 'under10.focus({ field: "state", oneOf: FOCUS_ANCHORS })'),
-  sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. VisDelta identifies and composes split, update, and merge stages automatically.', lineageReaggregation, 'byYear', 'byLocation')
+  sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. VisDelta identifies and composes split, update, and merge stages automatically.', lineageReaggregation, 'byYear', 'byLocation'),
+  sample('appearance', '15 · Restyle bars', 'Change one authored constant bar color without changing data, grain, encoding, coordinates, or layout.', population, 'featured.color("#111111")', 'featured.color("#2f64ff")')
 ];

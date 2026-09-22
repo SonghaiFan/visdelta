@@ -377,6 +377,70 @@ test('reaggregation uses the same lineage motion in reverse', async ({ page }) =
   for (const frame of frames) expect(frame.backward).toEqual(frame.forward);
 });
 
+test('play gives every inferred reaggregation stage its own duration', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const change = await sl.transition(
+      root.x('year').rollup('year'),
+      root.x('location').rollup('location'),
+      opts('#a')
+    );
+    // Compile the route once so the test can inspect its actual stage count.
+    change.progress(0.5);
+    const stageCount = change.view.__visDeltaScene.seekSequence.phases.length;
+    change.progress(0);
+    change.play({ duration: 100 });
+    await new Promise(resolve => window.setTimeout(resolve, 160));
+    const afterOneStage = change.value;
+    await new Promise(resolve => window.setTimeout(resolve, stageCount * 100 + 160));
+    const final = change.value;
+    change.play({ duration: 100, from: 1, to: 0 });
+    await new Promise(resolve => window.setTimeout(resolve, 160));
+    const reverseAfterOneStage = change.value;
+    await new Promise(resolve => window.setTimeout(resolve, stageCount * 100 + 160));
+    return { stageCount, afterOneStage, final, reverseAfterOneStage, reverseFinal: change.value };
+  });
+
+  expect(result.stageCount).toBeGreaterThan(1);
+  // The legacy whole-route budget would already be at 1 after 160ms.
+  expect(result.afterOneStage).toBeGreaterThan(0);
+  expect(result.afterOneStage).toBeLessThan(1);
+  expect(result.final).toBe(1);
+  expect(result.reverseAfterOneStage).toBeGreaterThan(0);
+  expect(result.reverseAfterOneStage).toBeLessThan(1);
+  expect(result.reverseFinal).toBe(0);
+});
+
+test('sequence gives inferred stages time without moving authored boundaries', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const byYear = root.x('year').rollup('year');
+    const byLocation = root.x('location').rollup('location');
+    const story = await sl.sequence([byYear, byLocation], opts('#a'));
+    story.play({ duration: 100 });
+    await new Promise(resolve => window.setTimeout(resolve, 160));
+    const afterOneStage = story.value;
+    await new Promise(resolve => window.setTimeout(resolve, 560));
+    return { afterOneStage, final: story.value };
+  });
+
+  expect(result.afterOneStage).toBeGreaterThan(0);
+  expect(result.afterOneStage).toBeLessThan(1);
+  expect(result.final).toBe(1);
+});
+
 test('a reaggregation sequence hands B to B without an empty boundary frame', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

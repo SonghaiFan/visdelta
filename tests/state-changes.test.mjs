@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bar, delta, unit } from '../dist/index.js';
+import { bar, delta, point, unit } from '../dist/index.js';
 
 const rows = [
   { id: 'al-young', state: 'AL', age: 'young', value: 10, other: 2 },
@@ -104,4 +104,59 @@ test('data updates stay unclassified when source identity is only row position',
 
   assert.deepEqual(delta(before, after).stateChanges, []);
   assert.equal(delta(before, after).hasDelta('data'), true);
+});
+
+test('the public ontology vocabulary is covered by reachable state differences', () => {
+  const chart = base();
+  const detailed = chart.breakdown('age');
+  const points = point(rows).datumKey('id').x('value').y('other').key('id');
+  const pairs = [
+    [chart.where({ state: 'AL' }), chart],
+    [chart, chart.where({ state: 'AL' })],
+    [chart, chart.data(rows.map(row => row.id === 'al-young' ? { ...row, value: 11 } : row))],
+    [detailed.rollup(), detailed],
+    [detailed, detailed.rollup()],
+    [chart.rollup('state', { op: 'sum' }), chart.rollup('age', { op: 'sum' })],
+    [chart.rollup('state', { op: 'sum' }), chart.rollup('state', { op: 'mean' })],
+    [chart, chart.color('state')],
+    [chart.color('state'), chart],
+    [chart, chart.y('other')],
+    [chart, chart.x('state', { domain: ['AL', 'NY'] })],
+    [chart, chart.flip()],
+    [chart, chart.sort('value', 'descending')],
+    [detailed, detailed.layout('grouped')],
+    [points, points.connector({ from: 0 })],
+    [chart, chart.focus({ state: 'AL' })],
+    [chart.focus({ state: 'AL' }), chart],
+    [chart.focus({ state: 'AL' }), chart.focus({ state: 'NY' })],
+    [chart.color('#111111'), chart.color('#eeeeee')],
+    [points, points.pointSize(9)]
+  ];
+
+  const vocabulary = new Set(pairs.flatMap(([from, to]) =>
+    delta(from, to).stateChanges.map(change => `${change.category}.${change.action}`)
+  ));
+
+  assert.deepEqual([...vocabulary].sort(), [
+    'appearance.reshape',
+    'appearance.restyle',
+    'attention.enter',
+    'attention.exit',
+    'attention.shift',
+    'coordinate.reorient',
+    'coordinate.rescale',
+    'data.add',
+    'data.remove',
+    'data.update',
+    'encoding.bind',
+    'encoding.remap',
+    'encoding.unbind',
+    'grain.change-reducer',
+    'grain.merge',
+    'grain.reaggregate',
+    'grain.split',
+    'layout.rearrange',
+    'layout.reconnect',
+    'layout.reorder'
+  ]);
 });

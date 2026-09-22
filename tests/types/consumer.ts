@@ -38,6 +38,9 @@ void [rendererShape, legacyRenderer];
 
 const a = bar().data([{ id: 'row-a', key: 'A', value: 1, next: 2 }]).datumKey('id').x('key').y('value');
 const b = a.y('next');
+const themed = a.color('key', { scheme: 'Tableau10' });
+const continuous = a.color('value', { type: 'quantitative', scheme: 'Viridis' });
+void [themed, continuous];
 const semanticChange = delta(a, b);
 semanticChange.stateChanges[0]?.category;
 selectedDelta(a, b).stateChanges[0]?.action;
