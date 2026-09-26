@@ -15,8 +15,14 @@ for (const file of files) {
   for (const match of source.matchAll(/https:\/\/cdn\.jsdelivr\.net\/(?:npm\/visdelta|gh\/SonghaiFan\/visdelta)@(\d+\.\d+\.\d+(?:-[\w.-]+)?)([^\s"'`<>)]*)/g)) {
     const [, version, path] = match;
     if (version !== pkg.version) throw new Error(`${file}: CDN version ${version} differs from candidate ${pkg.version}.`);
-    if (!path.startsWith('/dist/')) throw new Error(`${file}: use the packaged ESM/CSS/global path, not an untested CDN rewrite: ${match[0]}`);
-    const target = resolve(root, path.slice(1));
+    // A package-root npm URL resolves through the manifest's `jsdelivr`
+    // entry. Normalize it to the file it will serve before checking dist.
+    const cdnPath = path || `/${pkg.jsdelivr.replace(/^\.\//, '')}`;
+    if (!cdnPath.startsWith('/dist/')) throw new Error(`${file}: use the packaged ESM/CSS/global path, not an untested CDN rewrite: ${match[0]}`);
+    // jsDelivr's `/+esm` suffix asks the CDN to rewrite a packaged module for
+    // direct browser use. It is not part of the file path in the tarball.
+    const packagedPath = cdnPath.endsWith('/+esm') ? cdnPath.slice(0, -'/+esm'.length) : cdnPath;
+    const target = resolve(root, packagedPath.slice(1));
     if (!target.startsWith(resolve(root, 'dist') + sep) || !(await stat(target).catch(() => null))?.isFile()) {
       throw new Error(`${file}: CDN target is missing from dist: ${path}`);
     }

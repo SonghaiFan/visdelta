@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VisDelta CDN demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
+    <script src="https://cdn.jsdelivr.net/npm/visdelta@0.3.0"></script>
+    <style>
+      body { margin: 24px; font: 14px/1.5 system-ui, sans-serif; }
+      #chart { min-height: 420px; }
+      #progress { width: min(420px, 100%); }
+    </style>
+  </head>
+  <body>
+    <div id="chart"></div>
+    <input id="progress" type="range" min="0" max="1" step="0.01" value="0" aria-label="Transition progress" />
+
+    <script>
+      (async () => {
+        const { bar, transition } = VisDelta;
+        const rows = [
+          { category: "A", revenue: 12, profit: 5 },
+          { category: "B", revenue: 18, profit: 11 },
+          { category: "C", revenue: 9, profit: 7 }
+        ];
+        const from = bar(rows).x("category").y("revenue").key("category");
+        const change = await transition(from, from.y("profit"), { target: "#chart" });
+
+        progress.addEventListener("input", event => {
+          change.progress(event.currentTarget.valueAsNumber);
+        });
+      })();
+    </script>
+  </body>
+</html>

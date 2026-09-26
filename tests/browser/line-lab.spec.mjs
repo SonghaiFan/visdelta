@@ -611,7 +611,7 @@ test('line merge draws its dashed reference before zipper motion', async ({ page
   }));
   expect(preview.opacity).toBeGreaterThan(0.05);
   expect(preview.dash).not.toBe('none');
-  expect(preview.stroke).toBe('rgb(231, 234, 237)');
+  expect(preview.stroke).toBe('rgb(231, 231, 227)');
   expect(await page.locator('#chart path.vd-line').evaluateAll(nodes =>
     nodes.map(node => node.getAttribute('d')))).toEqual(initialSeries);
   const earlyOffset = Number(await page.locator('#chart path.vd-line-reference-mask')
