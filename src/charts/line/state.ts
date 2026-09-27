@@ -1,8 +1,9 @@
+import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit.js';
 import type { CanonicalTransitionPair, EncodingSpec, IntermediateSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
-import { connectedStretches } from '../continuity.js';
+import { connectedStretches, composeCanonicalPolicies } from '../../toolkit.js';
 import { linePointKeyAccessor } from './keys.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
 
@@ -54,21 +55,12 @@ export function canonicalLineTransitionPair<S extends ViewSpec>(
   const nextSeries = next.detailMode === 'series' ||
     (next.detailMode !== 'single' && Boolean(next.seriesField));
 
-  if (previousSeries !== nextSeries && previousSeries) {
-    return { from: nextSpec, to: previousSpec, reverse: true };
-  }
-  if (previous.flipped && !next.flipped) {
-    return { from: nextSpec, to: previousSpec, reverse: true };
-  }
-
-  const observation = lineObservationChange(previousSpec, nextSpec);
-  if (observation?.mode === 'remove') {
-    // Observation membership has one canonical direction: fewer -> more.
-    // Removing or filtering observations therefore reads the exact same
-    // compiled frames backward instead of running a separate exit animation.
-    return { from: nextSpec, to: previousSpec, reverse: true };
-  }
-  return { from: previousSpec, to: nextSpec, reverse: false };
+  const reverse = () => ({ from: nextSpec, to: previousSpec, reverse: true });
+  return composeCanonicalPolicies<S>(
+    () => previousSeries !== nextSeries && previousSeries ? reverse() : null,
+    () => previous.flipped && !next.flipped ? reverse() : null,
+    () => lineObservationChange(previousSpec, nextSpec)?.mode === 'remove' ? reverse() : null
+  )(previousSpec, nextSpec);
 }
 
 export interface LineObservationChange {
@@ -126,14 +118,21 @@ function visibleLineKeys(spec: ViewSpec): Set<string> | null {
   return new Set(rows.map((row, index) => String(key(row, index))));
 }
 
-/** Change the authored first axis, then the second, instead of replacing both at once. */
+/** Prefer the total/series route; otherwise use the authored axis order. */
 export function lineIntermediateSpecs<S extends ViewSpec>(
   previousSpec: S,
   nextSpec: S
 ): IntermediateSpec<S>[] {
-  const detail = lineDetailIntermediateSpecs(previousSpec, nextSpec);
-  if (detail.length) return detail;
+  return composeIntermediatePolicies<S>(
+    (from, to) => {
+      const detail = lineDetailIntermediateSpecs(from, to);
+      return detail.length ? detail : null;
+    },
+    lineAxisIntermediateSpecs
+  )(previousSpec, nextSpec);
+}
 
+function lineAxisIntermediateSpecs<S extends ViewSpec>(previousSpec: S, nextSpec: S): IntermediateSpec<S>[] {
   const next = lineState(nextSpec, nextSpec.encoding);
   if (!next.flipped) return [];
   const previousEncoding = previousSpec.encoding || {};
@@ -149,11 +148,7 @@ export function lineIntermediateSpecs<S extends ViewSpec>(
   const second = changed.find((part) => part !== first);
   if (!second) return [];
 
-  const intermediate = cloneState(nextSpec);
-  intermediate.encoding = {
-    ...cloneState(nextEncoding),
-    [second]: cloneState(previousEncoding[second])
-  };
+  const intermediate = encodingWaypoint(previousSpec, nextSpec, [second]);
   return [{ spec: intermediate, scene: 'axis' }];
 }
 

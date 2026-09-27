@@ -1,7 +1,7 @@
 import { createChartTypeRegistry, normalizeMarkRendererKey, registerChartModules } from '../charts/index.js';
 import type { ChartModule } from '../charts/module.js';
-import type { ChartDeps, ChartType, ChartPlugin, ViewSpec } from '../types/index.js';
-import { CHART_RUNTIME_DEPS } from './chart-deps.js';
+import type { ChartRuntime, ChartType, ChartPlugin, ViewSpec } from '../types/index.js';
+import { DEFAULT_CHART_RUNTIME } from './chart-runtime.js';
 
 // Explicit registrations are shared process-wide. Each transition takes a
 // registry snapshot so a later registration cannot change its compiled frames.
@@ -16,7 +16,7 @@ export function registerChartType(chartType: ChartType<any>): void {
 
 export function registerChartModule(module: { plugin: ChartPlugin<any> } | ChartModule<any>): void {
   if ('plugin' in module) {
-    registerChartModules(chartRegistry, [module], CHART_RUNTIME_DEPS);
+    registerChartModules(chartRegistry, [module], DEFAULT_CHART_RUNTIME);
     const chartType = chartRegistry.get(module.plugin.key)!;
     factories.set(chartType.key, { chartType, plugin: module.plugin });
     return;
@@ -26,15 +26,15 @@ export function registerChartModule(module: { plugin: ChartPlugin<any> } | Chart
   modules.set(key, module);
 }
 
-function instantiate(key: string, deps: ChartDeps) {
+function instantiate(key: string, runtime: ChartRuntime) {
   const chartType = chartRegistry.get(key);
   const factory = chartType && factories.get(chartType.key);
-  return factory && factory.chartType === chartType ? factory.plugin.createChartType(deps) : chartType;
+  return factory && factory.chartType === chartType ? factory.plugin.createChartType(runtime) : chartType;
 }
 
-export function snapshotChartRegistry(deps: ChartDeps) {
+export function snapshotChartRegistry(runtime: ChartRuntime) {
   const registry = createChartTypeRegistry();
-  for (const key of chartRegistry.types()) registry.register(instantiate(key, deps)!);
+  for (const key of chartRegistry.types()) registry.register(instantiate(key, runtime)!);
   return registry;
 }
 
@@ -44,11 +44,11 @@ export function availableChartTypes(): string[] {
 
 export async function transitionRegistry(
   spec: ViewSpec,
-  deps: ChartDeps = CHART_RUNTIME_DEPS,
+  runtime: ChartRuntime = DEFAULT_CHART_RUNTIME,
   localModules: ChartModule<any>[] = []
 ) {
   const key = normalizeMarkRendererKey(spec.mark);
-  let chartType: ChartType<any> | undefined = instantiate(key, deps);
+  let chartType: ChartType<any> | undefined = instantiate(key, runtime);
   if (!chartType) {
     const module = localModules.find(candidate => normalizeMarkRendererKey(candidate.key) === key)
       ?? modules.get(key);
@@ -59,7 +59,7 @@ export async function transitionRegistry(
       throw new Error(`Chart module "${key}" loaded plugin "${pluginKey}".`);
     }
     // Honor an explicit registration made while the module was loading.
-    chartType = instantiate(key, deps) ?? loaded.plugin.createChartType(deps);
+    chartType = instantiate(key, runtime) ?? loaded.plugin.createChartType(runtime);
   }
   const registry = createChartTypeRegistry();
   if (!chartType) throw new Error(`Unsupported chart type: ${key}`);

@@ -6,7 +6,7 @@ import {
 } from './index.js';
 import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
-import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../../runtime/marks.js';
 import type { ChannelSpec, ChartContext, TransitionItemAction } from '../../../types/index.js';
 import type {
@@ -34,8 +34,8 @@ interface StackedGeom {
 /** A bar row with its resolved stack extent. */
 type StackedDatum = BarDatum & { __stack0: number; __stack1: number };
 
-export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, position } = deps;
+export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
+  const { bindTooltip, channelDomain, colorScale, position } = runtime;
 
   return function renderStackedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
@@ -95,7 +95,7 @@ export function createStackedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       y: (d: BarDatum) => horizontal ? position(y, d[categoryField]) : scaled(y, stackMidpoint(d))
     };
 
-    drawBarAxes(chart, x, y, enc, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, runtime, kit.presentation, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });

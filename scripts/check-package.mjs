@@ -44,6 +44,10 @@ const publicExports = {
     types: "./dist/transition-entry.d.ts",
     import: "./dist/transition-entry.js"
   },
+  "./toolkit": {
+    types: "./dist/toolkit.d.ts",
+    import: "./dist/toolkit.js"
+  },
   "./plugins": {
     types: "./dist/plugins.d.ts",
     import: "./dist/plugins.js"

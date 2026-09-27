@@ -20,7 +20,7 @@ export function createViewCompiler(chartTypes: ChartTypeRegistry) {
   for (const key of chartTypes.types()) {
     const chartType = chartTypes.get(key)!;
     const compiler = chartType.createSpecCompiler?.({});
-    if (compiler) entries.set(key, { compiler, scenes: [...chartType.scenes], stateOperations: chartType.stateOperations });
+    if (compiler) entries.set(key, { compiler, scenes: [...chartType.scenes] });
   }
   return { compileEffectiveView, compileTransitionSource };
 
@@ -37,7 +37,7 @@ function compileEffectiveView(viewSpec: ViewSpec, stepTransition: StepTransition
 }
 
 function compileTransitionSource(viewSpec: ViewSpec | null | undefined, stepTransition: StepTransition = {}): CompileResult {
-  if (!viewSpec || !(viewSpec as Record<string, unknown>)['mark'] || (viewSpec as Record<string, unknown>)['mark'] === 'text') {
+  if (!viewSpec || !(viewSpec as Record<string, unknown>)['mark']) {
     return { effectiveViewSpec: null, sceneTransition: { scene: [], selection: null, axis: null, detail: null } };
   }
   return compileEffectiveView(viewSpec, stepTransition);

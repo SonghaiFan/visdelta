@@ -1,8 +1,9 @@
+import { keyFirstTravelMatching } from '../../toolkit.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
 import { specObjectKey, specState, specTransition, specUnit } from '../../spec-meta.js';
 import { defaultTransition } from '../../timing.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../runtime/chart-runtime.js';
 import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/marks.js';
 import { max } from 'd3-array';
 import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force';
@@ -77,22 +78,10 @@ export interface UnitLayoutResult {
 }
 
 export interface UnitLayoutDeps {
-  bandOrLinear: ChartRuntimeDeps['bandOrLinear'];
-  position: ChartRuntimeDeps['position'];
+  bandOrLinear: ChartRuntime['bandOrLinear'];
+  position: ChartRuntime['position'];
 }
 
-export interface TravelPair {
-  sourceIndex: number;
-  targetIndex: number;
-  distance: number;
-  matchedBy?: 'key' | 'travel';
-}
-
-interface TravelSlot {
-  key?: string | number | null;
-  x: number;
-  y: number;
-}
 
 export interface UnitMatchResult {
   units: UnitDatum[];
@@ -194,8 +183,8 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
   return units.slice(0, maxUnits);
 }
 
-export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec, deps: UnitLayoutDeps): UnitLayoutResult {
-  const { bandOrLinear, position } = deps;
+export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec, runtime: UnitLayoutDeps): UnitLayoutResult {
+  const { bandOrLinear, position } = runtime;
   const unit = unitMeta(spec);
   const layout = unit.layout || 'grid';
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
@@ -276,72 +265,7 @@ export function unitSelectionOpacity(unit: UnitDatum, spec: ViewSpec, dimOpacity
 
 // ─── Matching ────────────────────────────────────────────────────────────────
 
-/** Match the remaining identity-free units by the smallest total travel. */
-export function minimumTravelMatching(sources: TravelSlot[], targets: TravelSlot[]): TravelPair[] {
-  if (!sources.length || !targets.length) return [];
-  const sourceIsRows = sources.length <= targets.length;
-  const rows = sourceIsRows ? sources : targets;
-  const columns = sourceIsRows ? targets : sources;
-  const costs = rows.map((row) => columns.map((column) =>
-    sourceIsRows ? travelDistance(row, column) : travelDistance(column, row)));
-  const assignment = hungarian(costs);
-  return assignment.map((columnIndex, rowIndex) => {
-    const sourceIndex = sourceIsRows ? rowIndex : columnIndex;
-    const targetIndex = sourceIsRows ? columnIndex : rowIndex;
-    return {
-      sourceIndex,
-      targetIndex,
-      distance: travelDistance(sources[sourceIndex], targets[targetIndex])
-    };
-  });
-}
-
-/**
- * Identity is the first constraint; distance is only the fallback. A source
- * and target with the same key stay paired even when another unit is closer.
- */
-export function keyFirstTravelMatching(sources: TravelSlot[], targets: TravelSlot[]): TravelPair[] {
-  const pairs: TravelPair[] = [];
-  const usedSources = new Set<number>();
-  const usedTargets = new Set<number>();
-  const sourceByKey = new Map<string, number>();
-
-  sources.forEach((source, sourceIndex) => {
-    if (source.key != null && !sourceByKey.has(String(source.key))) {
-      sourceByKey.set(String(source.key), sourceIndex);
-    }
-  });
-  targets.forEach((target, targetIndex) => {
-    if (target.key == null) return;
-    const sourceIndex = sourceByKey.get(String(target.key));
-    if (sourceIndex == null || usedSources.has(sourceIndex)) return;
-    usedSources.add(sourceIndex);
-    usedTargets.add(targetIndex);
-    pairs.push({
-      sourceIndex,
-      targetIndex,
-      distance: travelDistance(sources[sourceIndex], target),
-      matchedBy: 'key'
-    });
-  });
-
-  const remainingSources = sources
-    .map((source, sourceIndex) => ({ ...source, __sourceIndex: sourceIndex }))
-    .filter((source) => !usedSources.has(source.__sourceIndex));
-  const remainingTargets = targets
-    .map((target, targetIndex) => ({ ...target, __targetIndex: targetIndex }))
-    .filter((target) => !usedTargets.has(target.__targetIndex));
-  minimumTravelMatching(remainingSources, remainingTargets).forEach((pair) => {
-    pairs.push({
-      sourceIndex: remainingSources[pair.sourceIndex].__sourceIndex,
-      targetIndex: remainingTargets[pair.targetIndex].__targetIndex,
-      distance: pair.distance,
-      matchedBy: 'travel'
-    });
-  });
-  return pairs.sort((a, b) => a.targetIndex - b.targetIndex);
-}
-
+/** Preserve keyed units, then minimize travel for the remaining slots. */
 export function matchUnitSlotsByIdentityAndTravel(chart: ChartContext, units: UnitDatum[], layout: UnitLayoutResult): UnitMatchResult {
   if (chart.transitionPlan?.match?.mode !== 'key-first-travel') {
     return { units, maxDistance: 0, totalDistance: 0 };
@@ -473,14 +397,14 @@ function unitXScale(
   units: UnitDatum[],
   channel: ChannelSpec,
   range: [number, number],
-  deps: Pick<UnitLayoutDeps, 'bandOrLinear'>,
+  runtime: Pick<UnitLayoutDeps, 'bandOrLinear'>,
   options: { anchors?: boolean } = {}
 ): RuntimeScale {
   const rows = units.map((d) => d.__row);
   // Force positions are collection anchors. Beeswarm remains a quantitative
   // positional distribution and therefore retains its authored scale type.
   const resolved: RenderChannel = options.anchors ? { ...channel, type: 'nominal' } : channel;
-  return deps.bandOrLinear(rows, resolved, range);
+  return runtime.bandOrLinear(rows, resolved, range);
 }
 
 function fitRadius(chart: ChartContext, requestedRadius: number, { columns = 1, rows = 1 }: { columns?: number; rows?: number } = {}): number {
@@ -497,9 +421,9 @@ function forceLayout(
   requestedRadius: number,
   xChannel: ChannelSpec | null,
   yChannel: ChannelSpec | null,
-  deps: UnitLayoutDeps
+  runtime: UnitLayoutDeps
 ): UnitLayoutResult {
-  const { bandOrLinear, position } = deps;
+  const { bandOrLinear, position } = runtime;
   if (!units.length) {
     return {
       name: 'force', axes: false, axis: null, r: requestedRadius,
@@ -721,66 +645,6 @@ function countBy(values: UnitDatum[], key: (value: UnitDatum) => unknown): Map<u
     counts.set(group, (counts.get(group) || 0) + 1);
   });
   return counts;
-}
-
-/** Minimum-cost assignment of rows to columns (rows ≤ columns). Returns a column index per row. */
-function hungarian(costs: number[][]): number[] {
-  const rowCount = costs.length;
-  const columnCount = costs[0]?.length || 0;
-  const u: number[] = Array(rowCount + 1).fill(0);
-  const v: number[] = Array(columnCount + 1).fill(0);
-  const matchedRow: number[] = Array(columnCount + 1).fill(0);
-  const path: number[] = Array(columnCount + 1).fill(0);
-
-  for (let row = 1; row <= rowCount; row++) {
-    matchedRow[0] = row;
-    const minCost: number[] = Array(columnCount + 1).fill(Infinity);
-    const used: boolean[] = Array(columnCount + 1).fill(false);
-    let column0 = 0;
-    do {
-      used[column0] = true;
-      const row0 = matchedRow[column0];
-      let delta = Infinity;
-      let column1 = 0;
-      for (let column = 1; column <= columnCount; column++) {
-        if (used[column]) continue;
-        const cost = costs[row0 - 1][column - 1] - u[row0] - v[column];
-        if (cost < minCost[column]) {
-          minCost[column] = cost;
-          path[column] = column0;
-        }
-        if (minCost[column] < delta) {
-          delta = minCost[column];
-          column1 = column;
-        }
-      }
-      for (let column = 0; column <= columnCount; column++) {
-        if (used[column]) {
-          u[matchedRow[column]] += delta;
-          v[column] -= delta;
-        } else {
-          minCost[column] -= delta;
-        }
-      }
-      column0 = column1;
-    } while (matchedRow[column0] !== 0);
-
-    do {
-      const column1 = path[column0];
-      matchedRow[column0] = matchedRow[column1];
-      column0 = column1;
-    } while (column0 !== 0);
-  }
-
-  const assignment: number[] = Array(rowCount).fill(-1);
-  for (let column = 1; column <= columnCount; column++) {
-    if (matchedRow[column]) assignment[matchedRow[column] - 1] = column - 1;
-  }
-  return assignment;
-}
-
-function travelDistance(source: Point, target: Point): number {
-  return Math.hypot(Number(source.x) - Number(target.x), Number(source.y) - Number(target.y));
 }
 
 function finiteNumber(value: unknown): number {

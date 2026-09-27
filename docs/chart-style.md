@@ -31,16 +31,15 @@ const compact = defineChartStyle({
   key: "compact",
   tickSpacing: { x: 56, y: 44 },
   legendPosition: "right",
-  charts: {
-    point: { grid: "both", margin: { top: 48, right: 88 } },
-    bar: { grid: "horizontal" }
-  }
+  plot: { grid: "horizontal", margin: { top: 48, right: 88 } }
 });
 ```
 
 A chart-style module can set spacing, margins, grid policy, domain lines, title
-placement, and legend placement. Omitted values inherit the D3-inspired
-default.
+placement, and legend placement. Themes contain no chart-name table. A plugin
+opts into plot presentation with `resolvePlotStyle(localDefaults, theme)` from
+`visdelta/toolkit`. Values merge in order: neutral defaults, plugin defaults,
+then explicit theme overrides, including individual margin fields.
 
 ## Ownership
 

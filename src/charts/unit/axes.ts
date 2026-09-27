@@ -1,5 +1,6 @@
+import { plotStyle } from './style.js';
 import { chartStyle, responsiveTickCount } from '../style.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../runtime/marks.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
@@ -20,28 +21,28 @@ export function drawUnitAxes(
   chart: ChartContext,
   scales: UnitAxisScales,
   channels: EncodingSpec,
-  deps: ChartRuntimeDeps,
+  runtime: ChartRuntime,
   options: UnitAxisOptions = {}
 ): void {
   const transition = chart.transition.base;
-  const style = chartStyle(deps);
-  const rule = style.charts.unit;
+  const style = chartStyle(runtime);
+  const rule = plotStyle(runtime.chartStyle);
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
   const { x = null, y = null } = scales;
   const anchorsOnly = Boolean(options.anchorsOnly);
-  if (rule.grid === 'both') deps.drawGrid(chart, y, transition, { x, xTickCount, yTickCount });
-  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, transition, { x, xTickCount });
-  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, transition, { yTickCount });
-  else deps.updateGrid(chart, null, transition);
+  if (rule.grid === 'both') runtime.drawGrid(chart, y, transition, { x, xTickCount, yTickCount });
+  else if (rule.grid === 'vertical') runtime.drawGrid(chart, null, transition, { x, xTickCount });
+  else if (rule.grid === 'horizontal') runtime.drawGrid(chart, y, transition, { yTickCount });
+  else runtime.updateGrid(chart, null, transition);
   const edgeTitleInset = rule.edgeTitles && !anchorsOnly ? style.edgeTitleInset : undefined;
-  deps.drawXAxis(chart, x, anchorsOnly ? undefined : style.axisTitle(channels.x, 'right'), transition, {
+  runtime.drawXAxis(chart, x, anchorsOnly ? undefined : style.axisTitle(channels.x, 'right'), transition, {
     tickCount: xTickCount,
     tickFormat: channels.x?.format,
     position: options.position,
     edgeTitleInset
   });
-  deps.drawYAxis(chart, y, anchorsOnly ? undefined : style.axisTitle(channels.y, 'up'), transition, {
+  runtime.drawYAxis(chart, y, anchorsOnly ? undefined : style.axisTitle(channels.y, 'up'), transition, {
     tickCount: yTickCount,
     tickFormat: channels.y?.format,
     edgeTitleInset
@@ -57,9 +58,9 @@ export function drawUnitAxes(
   }
 }
 
-export function clearUnitAxes(chart: ChartContext, deps: ChartRuntimeDeps): void {
+export function clearUnitAxes(chart: ChartContext, runtime: ChartRuntime): void {
   const transition = chart.transition.base;
-  deps.updateGrid(chart, null, transition);
-  deps.drawXAxis(chart, null, undefined, transition);
-  deps.drawYAxis(chart, null, undefined, transition);
+  runtime.updateGrid(chart, null, transition);
+  runtime.drawXAxis(chart, null, undefined, transition);
+  runtime.drawYAxis(chart, null, undefined, transition);
 }

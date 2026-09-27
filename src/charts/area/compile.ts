@@ -9,21 +9,23 @@ import {
   identitySpec,
   withObject,
   withSceneState
-} from '../compiler-utils.js';
+} from '../../toolkit.js';
 
 type AnyRecord = Record<string, unknown>;
 
 export function createAreaSpecCompiler(_context: AnyRecord = {}): SpecCompiler {
   return {
+    stateOrder: ["selection","detail","axis"],
     base: identitySpec,
     operations: {
-      filter: compileFilter,
-      focus: compileFocus,
-      highlight: compileHighlight,
-      coordinate: compileCartesianCoordinate,
-      scale: compileCartesianScale,
-      aggregate: compileAreaDetail,
-      layout: compileAreaDetail
+      selection: (spec, value) => {
+        const mode = value?.mode ?? 'filter';
+        const handler = { filter: compileFilter, focus: compileFocus, highlight: compileHighlight }[mode as 'filter' | 'focus' | 'highlight'];
+        if (!handler) throw new Error(`Unsupported selection mode: ${mode}`);
+        return handler(spec, value);
+      },
+      axis: compileCartesianCoordinate,
+      detail: compileAreaDetail
     }
   };
 }

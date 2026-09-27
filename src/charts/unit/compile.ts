@@ -9,21 +9,23 @@ import {
   resolveAxisOrder,
   withObject,
   withSceneState
-} from '../compiler-utils.js';
+} from '../../toolkit.js';
 import { specObjectKey, specUnit, withSpecMeta } from '../../spec-meta.js';
 
 type AnyRecord = Record<string, unknown>;
 
 export function createUnitSpecCompiler(_context: AnyRecord = {}): SpecCompiler {
   return {
+    stateOrder: ["selection","axis"],
     base: compileUnitBase,
     operations: {
-      filter: compileFilter,
-      focus: compileFocus,
-      highlight: compileHighlight,
-      layout: compileUnitLayout,
-      unitLayout: compileUnitLayout,
-      encode: compileUnitEncoding
+      selection: (spec, value) => {
+        const mode = value?.mode ?? 'filter';
+        const handler = { filter: compileFilter, focus: compileFocus, highlight: compileHighlight }[mode as 'filter' | 'focus' | 'highlight'];
+        if (!handler) throw new Error(`Unsupported selection mode: ${mode}`);
+        return handler(spec, value);
+      },
+      axis: compileUnitLayout
     }
   };
 }

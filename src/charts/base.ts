@@ -1,6 +1,6 @@
-import type { ChartRuntimeDeps } from '../runtime/chart-deps.js';
 import type { RenderDatum, RuntimeScale } from '../runtime/marks.js';
-import type { ChartContext, ChartDeps, EncodingSpec, ViewSpec } from '../types/index.js';
+import type { ChartContext, ChartRuntime, EncodingSpec, ViewSpec } from '../types/index.js';
+import type { ChartPresentation } from './style.js';
 
 /** Row accessors a chart publishes for scene helpers (axis cues, focus). */
 export interface ChartPosition {
@@ -9,14 +9,13 @@ export interface ChartPosition {
 }
 
 export abstract class BaseChart<S extends ViewSpec = ViewSpec> {
-  protected readonly deps: ChartRuntimeDeps;
+  protected readonly runtime: ChartRuntime;
+  protected readonly presentation: ChartPresentation;
 
-  /**
-   * Built-in charts always receive the full runtime helper object; the public
-   * `ChartDeps` is the supported subset plugins may depend on.
-   */
-  constructor(deps: ChartDeps) {
-    this.deps = deps as ChartRuntimeDeps;
+  /** Official and external renderers receive the same public services. */
+  constructor(runtime: ChartRuntime, presentation: ChartPresentation) {
+    this.runtime = runtime;
+    this.presentation = presentation;
   }
 
   renderer(): (chart: ChartContext, rows: RenderDatum[], spec: S, tooltip: HTMLElement) => void {
@@ -49,8 +48,8 @@ export abstract class BaseChart<S extends ViewSpec = ViewSpec> {
     options: { duration?: number } = {}
   ): void {
     const transition = chart.transition.base;
-    this.deps.drawGrid(chart, y, transition, options);
-    this.deps.drawXAxis(chart, x, enc.x?.title, transition, options);
-    this.deps.drawYAxis(chart, y, enc.y?.title, transition, options);
+    this.runtime.drawGrid(chart, y, transition, options);
+    this.runtime.drawXAxis(chart, x, enc.x?.title, transition, options);
+    this.runtime.drawYAxis(chart, y, enc.y?.title, transition, options);
   }
 }

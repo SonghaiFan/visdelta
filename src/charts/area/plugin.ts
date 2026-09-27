@@ -1,3 +1,4 @@
+import { areaPresentation } from './style.js';
 import type { ChannelSpec, ChartPlugin } from '../../types/index.js';
 import { createDefaultTransitionPlan } from '../transition-plan.js';
 import { defineChartType } from '../plugin.js';
@@ -5,7 +6,6 @@ import type { AreaViewState } from './authoring.js';
 import { createAreaSpecCompiler } from './compile.js';
 import { createAreaRenderer } from './render.js';
 import { areaObservationChange, areaState, canonicalAreaTransitionPair } from './state.js';
-import { chartStyle } from '../style.js';
 
 /** Area-specific plan fields read by the renderer. */
 export interface AreaTransitionPlanExtension {
@@ -17,9 +17,7 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
   key: 'area',
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
-  defaults: {
-    margin: (_spec, deps) => chartStyle(deps).charts.area.margin
-  },
+  presentation: areaPresentation,
   createRenderer: createAreaRenderer,
   createSpecCompiler: createAreaSpecCompiler,
   transition: {

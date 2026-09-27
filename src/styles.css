@@ -202,18 +202,12 @@
 }
 
 .vd-line-tooltip-rule,
-.vd-line-tooltip-dot,
-.vd-line-tooltip-tail,
-.vd-line-tooltip-box,
-.vd-line-tooltip-text {
+.vd-line-tooltip-dot {
   display: none;
 }
 
 .vd-line-tooltip-layer.is-active .vd-line-tooltip-rule,
-.vd-line-tooltip-layer.is-active .vd-line-tooltip-dot,
-.vd-line-tooltip-layer.is-active .vd-line-tooltip-tail,
-.vd-line-tooltip-layer.is-active .vd-line-tooltip-box,
-.vd-line-tooltip-layer.is-active .vd-line-tooltip-text {
+.vd-line-tooltip-layer.is-active .vd-line-tooltip-dot {
   display: initial;
 }
 
@@ -232,20 +226,6 @@
   vector-effect: non-scaling-stroke;
 }
 
-.vd-line-tooltip-box,
-.vd-line-tooltip-tail {
-  fill: var(--vd-color-on-surface);
-}
-
-.vd-line-tooltip-box {
-  rx: var(--vd-rounded-sm);
-}
-
-.vd-line-tooltip-text {
-  fill: var(--vd-color-surface);
-  font-family: var(--vd-type-family);
-  font-size: 11px;
-}
 
 /* Area keeps the Line inspector's visual language. Two dots distinguish its
    lower and upper boundaries without turning the band into a bar. */
@@ -284,18 +264,12 @@
 }
 
 .vd-area-tooltip-rule,
-.vd-area-tooltip-dot,
-.vd-area-tooltip-tail,
-.vd-area-tooltip-box,
-.vd-area-tooltip-text {
+.vd-area-tooltip-dot {
   display: none;
 }
 
 .vd-area-tooltip-layer.is-active .vd-area-tooltip-rule,
-.vd-area-tooltip-layer.is-active .vd-area-tooltip-dot,
-.vd-area-tooltip-layer.is-active .vd-area-tooltip-tail,
-.vd-area-tooltip-layer.is-active .vd-area-tooltip-box,
-.vd-area-tooltip-layer.is-active .vd-area-tooltip-text {
+.vd-area-tooltip-layer.is-active .vd-area-tooltip-dot {
   display: initial;
 }
 
@@ -306,20 +280,6 @@
   vector-effect: non-scaling-stroke;
 }
 
-.vd-area-tooltip-box,
-.vd-area-tooltip-tail {
-  fill: var(--vd-color-on-surface);
-}
-
-.vd-area-tooltip-box {
-  rx: var(--vd-rounded-sm);
-}
-
-.vd-area-tooltip-text {
-  fill: var(--vd-color-surface);
-  font-family: var(--vd-type-family);
-  font-size: 11px;
-}
 
 .vd-point-connector {
   vector-effect: non-scaling-stroke;

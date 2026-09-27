@@ -13,6 +13,9 @@ export default {
     'home-hero-image': () => h(BarTransitionShowcase, { variant: 'hero' })
   }),
   enhanceApp({ app }) {
+    app.component('OrbitPluginDemo', defineAsyncComponent(
+      () => import('../components/OrbitPluginDemo.vue')
+    ));
     app.component('SyntaxPlayground', defineAsyncComponent(
       () => import('../components/SyntaxPlayground.vue')
     ));

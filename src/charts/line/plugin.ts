@@ -1,3 +1,4 @@
+import { linePresentation } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import { createLineSpecCompiler } from './compile.js';
 import { createLineRenderer } from './render.js';
@@ -6,7 +7,6 @@ import { defineChartType } from '../plugin.js';
 import type { LineViewState } from './authoring.js';
 import { canonicalLineTransitionPair, lineIntermediateSpecs, lineObservationChange } from './state.js';
 import { specState } from '../../spec-meta.js';
-import { chartStyle } from '../style.js';
 
 export interface LineTransitionPlanExtension {
   observation?: {
@@ -20,9 +20,7 @@ export interface LineTransitionPlanExtension {
 export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>({
   key: 'line',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
-  defaults: {
-    margin: (_spec, deps) => chartStyle(deps).charts.line.margin
-  },
+  presentation: linePresentation,
   createRenderer: createLineRenderer,
   createSpecCompiler: createLineSpecCompiler,
   transition: {

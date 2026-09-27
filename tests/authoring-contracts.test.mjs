@@ -9,10 +9,9 @@ import { connectedLineStretches, lineRowsAtTotal } from '../dist/charts/line/sta
 import { pointIntermediateSpecs } from '../dist/charts/point/state.js';
 import { defaultTransition } from '../dist/timing.js';
 import {
-  expandUnits,
-  keyFirstTravelMatching,
-  minimumTravelMatching
+  expandUnits
 } from '../dist/charts/unit/state.js';
+import { keyFirstTravelMatching, minimumTravelMatching } from '../dist/toolkit.js';
 
 test('per-mark delay is opt-in while explicit partial timing keeps safe bounds', () => {
   assert.equal(defaultTransition().stagger, 0);
@@ -69,7 +68,7 @@ test('chart style modules inherit the default grammar without entering chart spe
     edgeTitleInset: { top: 12, right: 2 },
     legendInset: { top: 6 },
     legendPosition: 'right',
-    charts: { bar: { grid: 'horizontal', margin: { left: 32 } } },
+    plot: { grid: 'horizontal', margin: { left: 32 } },
     axisTitle: channel => channel?.title
   });
   const spec = bar([{ id: 'A', value: 2 }]).x('id').y('value').toSpec();
@@ -84,9 +83,10 @@ test('chart style modules inherit the default grammar without entering chart spe
   assert.equal(compact.legendInset.top, 6);
   assert.equal(compact.legendInset.left, d3ChartStyle.legendInset.left);
   assert.equal(compact.legendPosition, 'right');
-  assert.equal(compact.charts.bar.grid, 'horizontal');
-  assert.equal(compact.charts.bar.margin.left, 32);
-  assert.equal(compact.charts.bar.margin.top, d3ChartStyle.charts.bar.margin.top);
+  assert.equal(compact.plot.grid, 'horizontal');
+  assert.equal(compact.plot.margin.left, 32);
+  assert.equal(compact.plot.margin.top, undefined);
+  assert.deepEqual(d3ChartStyle.plot, {});
   assert.equal(spec.chartStyle, undefined);
   assert.throws(() => defineChartStyle({ key: '' }), /require a key/);
 });
@@ -97,15 +97,15 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(chartStylePresets.paper, paperChartStyle);
   assert.equal(chartStylePresets.dark, darkChartStyle);
   assert.equal(paperChartStyle.key, 'paper');
-  assert.equal(paperChartStyle.charts.point.grid, 'horizontal');
-  assert.equal(paperChartStyle.charts.point.edgeTitles, false);
-  assert.equal(paperChartStyle.charts.point.openXDomain, false);
-  assert.equal(paperChartStyle.charts.point.openYDomain, false);
+  assert.equal(paperChartStyle.plot.grid, 'horizontal');
+  assert.equal(paperChartStyle.plot.edgeTitles, false);
+  assert.equal(paperChartStyle.plot.openXDomain, false);
+  assert.equal(paperChartStyle.plot.openYDomain, false);
   assert.equal(paperChartStyle.legendPosition, 'right');
-  assert.ok(paperChartStyle.charts.point.margin.right >= 100);
+  assert.ok(paperChartStyle.plot.margin.right >= 100);
   assert.equal(paperChartStyle.axisTitle({ title: 'Income' }, 'right'), 'Income');
   assert.equal(darkChartStyle.key, 'dark');
-  assert.equal(darkChartStyle.charts.point.grid, 'both');
+  assert.equal(darkChartStyle.plot.grid, 'horizontal');
 });
 
 test('wide bar segments preserve their fold when rolling up to totals', () => {

@@ -36,7 +36,7 @@ export class UnitState extends ChartState<UnitViewState> {
   }
 
   protected override compileSpec(spec: ViewSpec): ViewSpec {
-    return compileViewWithCompiler(spec, { scene: [] }, UNIT_SPEC_COMPILER, { axis: 'layout' });
+    return compileViewWithCompiler(spec, { scene: [] }, UNIT_SPEC_COMPILER);
   }
 
   value(field: string, options: UnitValueOptions = {}): this {

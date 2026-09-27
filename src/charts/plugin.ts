@@ -1,5 +1,5 @@
 import type {
-  ChartDeps,
+  ChartRuntime,
   ChartType,
   ChartPlugin,
   ChartTransitionPolicy,
@@ -7,29 +7,22 @@ import type {
   MarginSpec,
   Renderer,
   SpecCompiler,
-  StateOperations,
   TransitionPlan,
   ViewSpec
 } from '../types/index.js';
-
-export const DEFAULT_SCENES = ['selection', 'axis', 'detail', 'mapping'] as const;
-
-export const DEFAULT_STATE_OPERATIONS: StateOperations = {
-  selection: 'filter',
-  axis: 'coordinate',
-  detail: 'aggregate'
-};
+import { resolveChartPresentation } from './style.js';
+import type { ChartPresentation, ChartStyleRuleDefinition } from './style.js';
 
 export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   key: string;
   transitionEvaluation?: 'cached' | 'reconstruct';
   scenes?: string[];
-  stateOperations?: StateOperations;
   renderer?: Renderer<S>;
-  createRenderer?: (deps: ChartDeps) => Renderer<S>;
-  createChart?: (deps: ChartDeps) => ChartType<S>;
+  presentation?: ChartStyleRuleDefinition;
+  createRenderer?: (runtime: ChartRuntime, presentation: ChartPresentation) => Renderer<S>;
+  createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => ChartType<S>;
   prepareSpec?: (spec: S) => S;
-  defaults?: { margin?: (spec: S, deps: ChartDeps) => Partial<MarginSpec> };
+  defaults?: { margin?: (spec: S, runtime: ChartRuntime) => Partial<MarginSpec> };
   inspect?: Record<string, unknown>;
   transition?: {
     plan?: ChartTransitionPolicy<S>['resolveTransitionPlan'];
@@ -45,13 +38,12 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
   if (!config.key) throw new Error('Chart type plugin requires a key.');
 
   const { createSpecCompiler } = config;
-  const scenes = uniqueStrings(config.scenes ?? [...DEFAULT_SCENES]);
-  const stateOperations: StateOperations = { ...DEFAULT_STATE_OPERATIONS, ...(config.stateOperations ?? {}) };
+  const scenes = uniqueStrings(config.scenes ?? []);
 
-  function createChartType(deps: ChartDeps): ChartType<S> {
+  function createChartType(runtime: ChartRuntime): ChartType<S> {
     const chartType = config.createChart
-      ? config.createChart(deps)
-      : createRuntimeChartType(config, deps);
+      ? config.createChart(runtime, resolveChartPresentation(config.presentation, runtime.theme))
+      : createRuntimeChartType(config, runtime);
 
     return normalizeChartType<S>(
       {
@@ -59,7 +51,6 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
         transitionEvaluation: config.transitionEvaluation ?? chartType.transitionEvaluation,
         key: chartType.key || config.key,
         scenes: chartType.scenes ?? scenes,
-        stateOperations: { ...stateOperations, ...(chartType.stateOperations ?? {}) }
       },
       createSpecCompiler
     );
@@ -68,7 +59,6 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
   return {
     key: config.key,
     scenes,
-    stateOperations,
     createChartType,
     ...(createSpecCompiler ? { createSpecCompiler } : {})
   };
@@ -95,13 +85,11 @@ export function normalizeChartType<S extends ViewSpec = ViewSpec>(
   const renderer = chartType.renderer;
   if (!renderer) throw new Error(`Chart type "${chartType.key}" must provide a renderer function.`);
 
-  const scenes = uniqueStrings([...(chartType.scenes ?? DEFAULT_SCENES)]);
-  const stateOperations: StateOperations = { ...DEFAULT_STATE_OPERATIONS, ...(chartType.stateOperations ?? {}) };
+  const scenes = uniqueStrings([...(chartType.scenes ?? [])]);
 
   return {
     ...chartType,
     scenes,
-    stateOperations,
     renderer,
     prepareSpec,
     resolveTransitionPlan,
@@ -114,10 +102,11 @@ export function normalizeChartType<S extends ViewSpec = ViewSpec>(
 
 function createRuntimeChartType<S extends ViewSpec>(
   config: ChartTypeConfig<S>,
-  deps: ChartDeps
+  runtime: ChartRuntime
 ): Partial<ChartType<S>> & { key: string } {
+  const presentation = resolveChartPresentation(config.presentation, runtime.theme);
   const renderer = config.createRenderer
-    ? config.createRenderer(deps)
+    ? config.createRenderer(runtime, presentation)
     : config.renderer;
 
   return {
@@ -128,11 +117,10 @@ function createRuntimeChartType<S extends ViewSpec>(
     canonicalTransitionPair: config.transition?.canonicalPair,
     intermediateSpecs: config.transition?.intermediateSpecs,
     defaultMargin: config.defaults?.margin
-      ? (spec: S) => config.defaults!.margin!(spec, deps)
-      : defaultMargin,
+      ? (spec: S) => config.defaults!.margin!(spec, runtime)
+      : config.presentation ? () => presentation.plot.margin : defaultMargin,
     inspect: config.inspect ?? {},
     scenes: config.scenes,
-    stateOperations: config.stateOperations
   };
 }
 

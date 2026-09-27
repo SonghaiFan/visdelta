@@ -1,7 +1,5 @@
-import { builtInChartModules } from './charts/builtins.js';
-import { registerChartModule as registerBuiltInChartModule } from './runtime/chart-registry.js';
-
-builtInChartModules.forEach(registerBuiltInChartModule);
+// Convenience exports only. Builders carry their modules; importing this
+// entry never installs a default set of chart types into the runtime.
 
 export {
   availableChartTypes,

@@ -1,3 +1,4 @@
+import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit.js';
 import type { CanonicalTransitionPair, ChannelSpec, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
@@ -78,17 +79,28 @@ export function canonicalPointTransitionPair<S extends ViewSpec>(
   return { from: previousSpec, to: nextSpec, reverse: false };
 }
 
-/** Split a point flip into the authored first axis and then the second axis. */
+/** Prefer the summary/detail route; otherwise use the authored axis order. */
 export function pointIntermediateSpecs<S extends ViewSpec>(
   previousSpec: S,
   nextSpec: S
 ): IntermediateSpec<S>[] {
+  return composeIntermediatePolicies<S>(
+    pointDetailIntermediateSpecs,
+    pointAxisIntermediateSpecs
+  )(previousSpec, nextSpec);
+}
+
+function pointDetailIntermediateSpecs<S extends ViewSpec>(previousSpec: S, nextSpec: S): IntermediateSpec<S>[] | null {
   const previousIsSummary = aggregateGroup(previousSpec).length > 0;
   const nextIsSummary = aggregateGroup(nextSpec).length > 0;
   if (previousIsSummary && !nextIsSummary) {
     return [{ spec: pointSummaryAtDetailView(previousSpec, nextSpec), scene: 'detail' }];
   }
 
+  return null;
+}
+
+function pointAxisIntermediateSpecs<S extends ViewSpec>(previousSpec: S, nextSpec: S): IntermediateSpec<S>[] {
   const axis = pointAxisState(nextSpec);
   if (!axis?.['flip']) return [];
   const previousEncoding = previousSpec.encoding || {};
@@ -102,11 +114,7 @@ export function pointIntermediateSpecs<S extends ViewSpec>(
   const second = changed.find((part) => part !== first);
   if (!second) return [];
 
-  const intermediate = cloneState(nextSpec);
-  intermediate.encoding = {
-    ...cloneState(nextEncoding),
-    [second]: cloneState(previousEncoding[second])
-  };
+  const intermediate = encodingWaypoint(previousSpec, nextSpec, [second]);
   return [{ spec: intermediate, scene: 'axis' }];
 }
 

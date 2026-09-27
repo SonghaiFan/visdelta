@@ -108,7 +108,7 @@ assertSame(actualApi, expectedApi, "public API");
 assertSame(Object.keys(browserApi).sort(), expectedApi, "browser public API");
 assertSame(Object.keys(globalThis.VisDelta).sort(), expectedApi, "browser global API");
 if ("vd" in globalThis) throw new Error("the browser build must define only the VisDelta global");
-assertSame(api.availableChartTypes(), ["area", "bar", "line", "point", "unit"], "chart types");
+assertSame(api.availableChartTypes(), [], "no implicitly registered chart types");
 if (typeof selectedArea !== "function") throw new Error("area subpath did not export area()");
 if (selectedAreaCurveNames.length !== 19) throw new Error("area subpath did not export its D3 curve names");
 if (typeof selectedBar !== "function") throw new Error("bar subpath did not export bar()");

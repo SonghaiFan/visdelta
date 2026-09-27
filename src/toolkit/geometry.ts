@@ -6,7 +6,7 @@ const MIN_SEGMENTS = 32;
 const MAX_SEGMENTS = 160;
 const PIXELS_PER_SEGMENT = 4;
 
-/** Match any two rendered SVG paths by distance, including closed Area paths. */
+/** Match rendered SVG paths by normalized arc length, including closed paths. */
 export function matchRenderedPaths(
   fromNode: SVGPathElement,
   toPath: string | null | undefined
@@ -26,7 +26,7 @@ export function matchRenderedPaths(
     const fromLength = finiteLength(fromNode);
     const toLength = finiteLength(targetNode);
     // A syntactically non-empty path can still have no measurable geometry
-    // (for example an Area cell at a collapsed endpoint). Browsers throw when
+    // (for example a shape at a collapsed endpoint). Browsers throw when
     // getPointAtLength() is called on that path, so keep the readable endpoint
     // frames and step between them instead of inventing sample points.
     if (fromLength === 0 || toLength === 0) {

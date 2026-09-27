@@ -8,7 +8,7 @@ import { loadData } from './runtime/data.js';
 import { createTransitionSurface } from './runtime/transition-surface.js';
 import { transitionRegistry } from './runtime/chart-registry.js';
 import { validateTransforms } from './data/validate.js';
-import { createChartRuntimeDeps } from './runtime/chart-deps.js';
+import { createChartRuntime } from './runtime/chart-runtime.js';
 import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
@@ -98,7 +98,7 @@ export async function transition(
   const [resolvedFrom, resolvedTo] = await Promise.all([resolveData(source), resolveData(target)]);
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
-  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntimeDeps({ root: host, chartStyle }), localModules);
+  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
   const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...options, chartStyle }, chartTypes);
   let value = 0;
   let lastDirection = 1;

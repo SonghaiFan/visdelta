@@ -17,12 +17,18 @@ export interface ChartStyleModule {
   edgeTitleInset: Readonly<{ top: number; right: number; bottom: number; left: number }>;
   legendInset: Readonly<{ top: number; left: number }>;
   legendPosition: ChartLegendPosition;
-  charts: Readonly<Record<'bar' | 'point' | 'line' | 'area' | 'unit', ChartStyleRule>>;
+  plot: Readonly<ChartStyleRuleDefinition>;
   axisTitle(channel: ChannelSpec | undefined, direction: 'right' | 'up'): string | undefined;
 }
 
 export interface ChartStyleRuleDefinition extends Partial<Omit<ChartStyleRule, 'margin'>> {
   margin?: Partial<MarginSpec>;
+}
+
+/** Fully resolved presentation shared by one instantiated chart plugin. */
+export interface ChartPresentation {
+  theme: ChartStyleModule;
+  plot: ChartStyleRule;
 }
 
 export interface ChartStyleDefinition {
@@ -31,7 +37,7 @@ export interface ChartStyleDefinition {
   edgeTitleInset?: Partial<{ top: number; right: number; bottom: number; left: number }>;
   legendInset?: Partial<{ top: number; left: number }>;
   legendPosition?: ChartLegendPosition;
-  charts?: Partial<Record<'bar' | 'point' | 'line' | 'area' | 'unit', ChartStyleRuleDefinition>>;
+  plot?: ChartStyleRuleDefinition;
   axisTitle?: ChartStyleModule['axisTitle'];
 }
 
@@ -40,33 +46,13 @@ const D3_STYLE = {
   // Match the D3 gallery convention: the upward y title lives in the chart's
   // top inset close to the axis, but not on the plot's first tick row.
   edgeTitleInset: { top: 12, right: 0, bottom: 4, left: 0 },
-  legendInset: { top: 8, left: 8 },
-  charts: {
-    // Keep one margin contract across a chart's encoding states. Margin is
-    // geometry: changing color or orientation must not move a clip edge
-    // independently from its marks and axes.
-    bar: { margin: { top: 56, right: 20, bottom: 40, left: 56 }, grid: 'none', openXDomain: false, openYDomain: true, edgeTitles: true },
-    point: { margin: { top: 56, right: 20, bottom: 40, left: 44 }, grid: 'both', openXDomain: true, openYDomain: true, edgeTitles: true },
-    line: { margin: { top: 56, right: 20, bottom: 40, left: 48 }, grid: 'horizontal', openXDomain: false, openYDomain: true, edgeTitles: true },
-    area: { margin: { top: 56, right: 20, bottom: 40, left: 48 }, grid: 'horizontal', openXDomain: false, openYDomain: true, edgeTitles: true },
-    unit: { margin: { top: 28, right: 20, bottom: 40, left: 40 }, grid: 'none', openXDomain: false, openYDomain: true, edgeTitles: true }
-  }
+  legendInset: { top: 8, left: 8 }
 } as const;
 
 /** Define a structural chart-style module. Omitted rules inherit the default. */
 export function defineChartStyle(definition: ChartStyleDefinition): ChartStyleModule {
   const key = String(definition?.key || '').trim();
   if (!key) throw new Error('Chart style modules require a key.');
-  const charts = Object.fromEntries(
-    Object.entries(D3_STYLE.charts).map(([chart, defaults]) => {
-      const override = definition.charts?.[chart as keyof typeof D3_STYLE.charts] || {};
-      return [chart, {
-        ...defaults,
-        ...override,
-        margin: { ...defaults.margin, ...(override.margin || {}) }
-      }];
-    })
-  ) as unknown as ChartStyleModule['charts'];
   return Object.freeze({
     key,
     tickSpacing: Object.freeze({ ...D3_STYLE.tickSpacing, ...(definition.tickSpacing || {}) }),
@@ -76,10 +62,15 @@ export function defineChartStyle(definition: ChartStyleDefinition): ChartStyleMo
     }),
     legendInset: Object.freeze({ ...D3_STYLE.legendInset, ...(definition.legendInset || {}) }),
     legendPosition: definition.legendPosition || 'top',
-    charts: Object.freeze(charts),
+    plot: Object.freeze({ ...definition.plot, ...(definition.plot?.margin ? { margin: Object.freeze({ ...definition.plot.margin }) } : {}) }),
     axisTitle: definition.axisTitle || directionalAxisTitle
   });
 }
+
+const GENERIC_CHART_STYLE: ChartStyleRule = {
+  margin: { top: 20, right: 20, bottom: 20, left: 20 },
+  grid: 'none', openXDomain: false, openYDomain: false, edgeTitles: false
+};
 
 /** Restrained D3-inspired grammar used when no style module is supplied. */
 export const d3ChartStyle = defineChartStyle({ key: 'd3' });
@@ -99,13 +90,7 @@ export const paperChartStyle = defineChartStyle({
   tickSpacing: { x: 92, y: 62 },
   legendPosition: 'right',
   legendInset: { top: 4, left: 16 },
-  charts: {
-    bar: PAPER_CARTESIAN,
-    point: PAPER_CARTESIAN,
-    line: PAPER_CARTESIAN,
-    area: PAPER_CARTESIAN,
-    unit: { margin: { top: 24, right: 112, bottom: 48, left: 54 }, edgeTitles: false }
-  },
+  plot: PAPER_CARTESIAN,
   axisTitle: channel => channel?.title
 });
 
@@ -114,12 +99,7 @@ export const darkChartStyle = defineChartStyle({
   key: 'dark',
   tickSpacing: { x: 66, y: 46 },
   edgeTitleInset: { top: 11 },
-  charts: {
-    bar: { margin: { top: 54, right: 18, bottom: 38, left: 52 }, grid: 'horizontal' },
-    point: { margin: { top: 54, right: 18, bottom: 38, left: 44 }, grid: 'both' },
-    line: { margin: { top: 54, right: 18, bottom: 38, left: 48 }, grid: 'horizontal' },
-    area: { margin: { top: 54, right: 18, bottom: 38, left: 48 }, grid: 'horizontal' }
-  }
+  plot: { margin: { top: 54, right: 18, bottom: 38 }, grid: 'horizontal' }
 });
 
 /** Built-in structural presets. Their matching CSS ships in `visdelta/style.css`. */
@@ -129,8 +109,24 @@ export const chartStylePresets = Object.freeze({
   dark: darkChartStyle
 });
 
-export function chartStyle(deps: { chartStyle?: ChartStyleModule } = {}): ChartStyleModule {
-  return deps.chartStyle || d3ChartStyle;
+/** Compose an optional plot capability: neutral values, local defaults, theme overrides. */
+export function resolvePlotStyle(
+  defaults: ChartStyleRuleDefinition = {},
+  theme?: ChartStyleModule
+): ChartStyleRule {
+  const override = theme?.plot ?? {};
+  return {
+    ...GENERIC_CHART_STYLE, ...defaults, ...override,
+    margin: { ...GENERIC_CHART_STYLE.margin, ...defaults.margin, ...override.margin }
+  };
+}
+
+/** Resolve plugin defaults and the host theme once when the plugin is created. */
+export function resolveChartPresentation(
+  defaults: ChartStyleRuleDefinition = {},
+  theme: ChartStyleModule = d3ChartStyle
+): ChartPresentation {
+  return Object.freeze({ theme, plot: Object.freeze(resolvePlotStyle(defaults, theme)) });
 }
 
 export function responsiveTickCount(length: number, spacing: number): number {

@@ -493,6 +493,7 @@ chart stays visible until the next one is ready. For several adjacent states,
 | `visdelta/area`, `/bar`, `/line`, `/point`, `/unit` | One focused chart builder and module |
 | `visdelta/transition` | Pair and sequence controllers |
 | `visdelta/plugins` | Chart-module definition and registration |
+| `visdelta/toolkit` | Optional compiler tools, renderer base, and plot-style composition |
 | `visdelta/chart-style` | Structural style definition and presets |
 | `visdelta/browser` | Browser-global dependency adapter |
 | `visdelta/style.css` | Required base stylesheet |
@@ -501,6 +502,10 @@ chart stays visible until the next one is ready. For several adjacent states,
 The generic transition runtime has no built-in chart-name switch. A focused
 builder carries its lazy module. Register a module only when a plain spec cannot
 carry that reference.
+
+Importing the convenience entry does not register any chart types. Themes use
+capability-level `plot` overrides, not a table keyed by chart names. Compilers
+declare their complete `stateOrder` and handlers; no default pipeline is added.
 
 ## Current boundary
 

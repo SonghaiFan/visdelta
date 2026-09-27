@@ -7,20 +7,20 @@ import type { BarLayoutRenderer } from './layout/simple.js';
 import { createStackedBarRenderer } from './layout/stacked.js';
 import { semanticBarState } from './semantic.js';
 import { motion } from '../../runtime/recorder.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { BarLayout, ChannelSpec, ChartContext, ChartDeps, Renderer, ViewSpec } from '../../types/index.js';
+import type { BarLayout, ChannelSpec, ChartContext, ChartRuntime, Renderer, ViewSpec } from '../../types/index.js';
+import type { ChartPresentation } from '../style.js';
 
-export function createBarRenderer(deps: ChartDeps): Renderer {
-  return new BarChart(deps).renderer();
+export function createBarRenderer(runtime: ChartRuntime, presentation: ChartPresentation): Renderer {
+  return new BarChart(runtime, presentation).renderer();
 }
 
 class BarChart extends BaseChart {
   private readonly drawBar: BarLayoutRenderer;
 
-  constructor(deps: ChartDeps) {
-    super(deps);
-    this.drawBar = createBarDraw(this.deps);
+  constructor(runtime: ChartRuntime, presentation: ChartPresentation) {
+    super(runtime, presentation);
+    this.drawBar = createBarDraw(this.runtime, this.presentation);
   }
 
   render(chart: ChartContext, rows: RenderDatum[], spec: ViewSpec, tooltip: HTMLElement): void {
@@ -28,20 +28,19 @@ class BarChart extends BaseChart {
   }
 }
 
-function createBarDraw(deps: ChartRuntimeDeps): BarLayoutRenderer {
-  const { drawLegend, fadeNonBarShapes } = deps;
-  const kit = createBarRenderKit(deps);
+function createBarDraw(runtime: ChartRuntime, presentation: ChartPresentation): BarLayoutRenderer {
+  const { drawLegend } = runtime;
+  const kit = createBarRenderKit(runtime, presentation);
   const renderers = {
-    grouped: createGroupedBarRenderer(deps, kit),
-    simple: createSimpleBarRenderer(deps, kit),
-    stacked: createStackedBarRenderer(deps, kit)
+    grouped: createGroupedBarRenderer(runtime, kit),
+    simple: createSimpleBarRenderer(runtime, kit),
+    stacked: createStackedBarRenderer(runtime, kit)
   };
 
   return function drawBar(chart, rows, spec, tooltip) {
     const bar = semanticBarState(spec);
     const renderer = renderers[isSegmentedLayout(bar.layout, bar.segmentField) ? bar.layout : 'simple'];
 
-    fadeNonBarShapes(chart);
     if (renderer !== renderers.stacked) kit.renderBarSeams({ chart });
 
     if (renderer === renderers.simple) {

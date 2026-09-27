@@ -57,13 +57,11 @@ test('a chart-style module changes presentation without entering transition sema
     const compact = sl.defineChartStyle({
       key: 'compact editorial',
       tickSpacing: { x: 48, y: 40 },
-      charts: {
-        bar: {
+      plot: {
           margin: { top: 28, right: 12, bottom: 36, left: 36 },
           grid: 'horizontal',
           openYDomain: false,
           edgeTitles: false
-        }
       },
       axisTitle: channel => channel?.title
     });
@@ -160,7 +158,7 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
     const samples = await page.evaluate(async scenario => {
       const { createTransitionSurface } = await import('/dist/runtime/transition-surface.js');
       const { transitionRegistry } = await import('/dist/runtime/chart-registry.js');
-      const { createChartRuntimeDeps } = await import('/dist/runtime/chart-deps.js');
+      const { createChartRuntime } = await import('/dist/runtime/chart-runtime.js');
       const segmented = sl.bar().data([
         { id: 'A', group: 'one', value: 10 }, { id: 'A', group: 'two', value: 20 },
         { id: 'B', group: 'one', value: 30 }, { id: 'B', group: 'two', value: 15 }
@@ -183,7 +181,7 @@ for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip
       const cached = await sl.transition(source, target, options('#cached'));
       // Test the old deterministic renderer bridge, not another cached pair.
       const referenceHost = document.querySelector('#reference');
-      const chartTypes = await transitionRegistry(source.toSpec(), createChartRuntimeDeps({ root: referenceHost }));
+      const chartTypes = await transitionRegistry(source.toSpec(), createChartRuntime({ root: referenceHost }), [source.chartModule()]);
       const reference = createTransitionSurface(
         source.toSpec(),
         target.toSpec(),

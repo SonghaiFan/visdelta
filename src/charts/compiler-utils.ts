@@ -1,3 +1,4 @@
+import { cloneState } from '../grammar/view-state.js';
 import type {
   ChannelSpec,
   FilterSpec,
@@ -190,6 +191,7 @@ export function aggregateFieldSpec(
 export function cloneViewSpec(viewSpec: ViewSpec): ViewSpec {
   return {
     ...viewSpec,
+    ...(viewSpec.meta ? { meta: cloneState(viewSpec.meta) } : {}),
     transform: [...(viewSpec.transform || [])],
     encoding: cloneEncoding(viewSpec.encoding)
   };

@@ -5,7 +5,7 @@ import {
   geometryBounds, resolveGeometry as resolve, scaled
 } from './index.js';
 import { drawBarAxes } from '../axes.js';
-import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../../runtime/marks.js';
 import type { ChartContext, ViewSpec } from '../../../types/index.js';
 import type {
@@ -35,11 +35,11 @@ interface SimpleGeom {
   valueField: string;
   chart: ChartContext;
   horizontal: boolean;
-  position: ChartRuntimeDeps['position'];
+  position: ChartRuntime['position'];
 }
 
-export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain } = deps;
+export function createSimpleBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
+  const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain } = runtime;
 
   return function renderSimpleBar(chart, rows, spec, tooltip) {
     const enc = spec.encoding || {};
@@ -88,7 +88,7 @@ export function createSimpleBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKi
       y: (d: BarDatum) => horizontal ? position(y, d[categoryField]) : scaled(y, d[valueField])
     };
 
-    drawBarAxes(chart, x, y, enc, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, runtime, kit.presentation, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });

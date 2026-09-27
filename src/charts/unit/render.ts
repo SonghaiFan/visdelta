@@ -15,9 +15,10 @@ import {
 import type { Point, UnitAxis, UnitDatum, UnitLayoutResult, UnitTransitionPlan } from './state.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, ChartSceneContext, ChartSelection, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
+import type { ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { UnitViewState } from './authoring.js';
+import type { ChartPresentation } from '../style.js';
 import { group as groupBy } from 'd3-array';
 import { easeBounceIn, easeBounceOut, easeExpIn, easeExpOut, easeSinInOut } from 'd3-ease';
 import { select } from 'd3-selection';
@@ -45,8 +46,8 @@ type EntryPosition = (unit: UnitDatum, index: number) => Point;
 
 const DEFAULT_UNIT_STAGGER: StaggerSpec = { step: 4, max: 100 };
 
-export function createUnitRenderer(deps: ChartDeps): Renderer<UnitViewState> {
-  return new UnitChart(deps).renderer();
+export function createUnitRenderer(runtime: ChartRuntime, presentation: ChartPresentation): Renderer<UnitViewState> {
+  return new UnitChart(runtime, presentation).renderer();
 }
 
 class UnitChart extends BaseChart<UnitViewState> {
@@ -56,11 +57,10 @@ class UnitChart extends BaseChart<UnitViewState> {
       bindTooltip,
       colorScale,
       drawLegend,
-      fadeNonUnitShapes,
       position,
       staggerDelay,
       themeValue
-    } = this.deps;
+    } = this.runtime;
 
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
@@ -118,15 +118,14 @@ class UnitChart extends BaseChart<UnitViewState> {
       drawUnitAxes(chart, { x: xScale, y: yScale }, {
         x: baseAxes.x?.channel,
         y: baseAxes.y?.channel
-      }, this.deps, {
+      }, this.runtime, this.presentation, {
         position: cameraPosition(chart.innerHeight, camera, 'y'),
         anchorsOnly: layout.name === 'force'
       });
     } else {
-      clearUnitAxes(chart, this.deps);
+      clearUnitAxes(chart, this.runtime);
     }
 
-    fadeNonUnitShapes(chart);
     chart.scales = {
       color,
       layout: layout.name,

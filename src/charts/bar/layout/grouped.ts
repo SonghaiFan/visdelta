@@ -6,7 +6,7 @@ import {
 } from './index.js';
 import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
-import type { ChartRuntimeDeps } from '../../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../../runtime/marks.js';
 import type { ChartContext, TransitionItemAction } from '../../../types/index.js';
 import type {
@@ -34,8 +34,8 @@ interface GroupedGeom {
   horizontal: boolean;
 }
 
-export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, quantitativeDomain } = deps;
+export function createGroupedBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
+  const { bindTooltip, channelDomain, colorScale, quantitativeDomain } = runtime;
 
   return function renderGroupedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};
@@ -103,7 +103,7 @@ export function createGroupedBarRenderer(deps: ChartRuntimeDeps, kit: BarRenderK
       y: (d: BarDatum) => horizontal ? segmentCenter(y, y1, d, geom) : scaled(y, d[valueField])
     };
 
-    drawBarAxes(chart, x, y, enc, deps, horizontal, {
+    drawBarAxes(chart, x, y, enc, runtime, kit.presentation, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });

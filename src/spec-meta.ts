@@ -74,10 +74,6 @@ export function serializeViewSpec(spec: ViewSpec): ViewSpec {
   }
 
   const sceneState: ChartChangeState = { ...(state.sceneState ?? {}) };
-  delete (next as Record<string, unknown>).barLayout;
-  delete (next as Record<string, unknown>).segmentField;
-  delete (next as Record<string, unknown>).segmentDomain;
-  delete (next as Record<string, unknown>).aggregate;
 
   if (Object.keys(sceneState).length) state.sceneState = sceneState;
   if (Object.keys(state).length) meta.state = state;

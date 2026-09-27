@@ -3,7 +3,29 @@
 A chart type is an independent module. Core should work before that module is
 imported and should not change when the module is added.
 
+## Live external plugin: Orbit
+
+This example loads the Orbit plugin through its own module, using the same
+host services as built-in charts. It is an extension example, not a new
+built-in export. Play forward, reverse, or scrub the same transition below.
+
+<OrbitPluginDemo />
+
 ## Module contract
+
+The runtime starts with no registered chart types, including when importing
+the `visdelta` convenience entry. Builders carry their module reference.
+Plain JSON specs require explicit `registerChartModule(module)`.
+`visdelta/plugins` supplies module and builder contracts; `visdelta/toolkit`
+supplies optional compiler utilities, `BaseChart`, and plot-style composition.
+Neither entry imports an official chart implementation.
+
+Plugins inherit no scene vocabulary: declare only the `scenes` your module
+uses. Chart identity is the explicit `mark` key, never inferred from metadata.
+The shared renderer services have no privileged built-in-only subset. Mark
+layers are isolated by plugin key, so Core never cleans up shapes by guessing
+which named chart owns a rectangle, circle, or path.
+
 
 The module owns its builder, compiler, renderer, matching, transition plan,
 axes, examples, and tests.
@@ -13,7 +35,7 @@ import { defineChartModule, defineChartType } from "visdelta/plugins";
 
 export const plugin = defineChartType({
   key: "custom",
-  createRenderer: deps => customRenderer,
+  createRenderer: runtime => customRenderer,
   createSpecCompiler: context => customCompiler,
   prepareSpec: spec => spec,
   scenes: ["selection", "axis", "mapping"]
@@ -26,7 +48,7 @@ export const customModule = defineChartModule({
 ```
 
 `customRenderer` and `customCompiler` are implementations supplied by the chart
-package. Renderer helpers are supplied through `deps`; the module must not reach
+package. Renderer helpers are supplied through `runtime`; the module must not reach
 into another built-in chart.
 
 A renderer does not receive a D3 object. Import the `d3-*` modules the chart
@@ -37,26 +59,50 @@ Selection and interoperates by structure, not by instance.
 
 ## Renderer motion contract
 
+For an independently bundled plugin, prefer `runtime.motion` from
+`createRenderer(runtime)`. This uses the host's recorder even when the plugin bundle
+contains another copy of the SDK. The standalone `motion` export requires the
+renderer and host to share the same recorder module instance.
+
+The same injected services are available to built-in and external renderers:
+
+- Optional plot presentation uses the public pure helper
+  `resolvePlotStyle(localDefaults, runtime.chartStyle)` from `visdelta/toolkit`. It accepts no chart name.
+  Neutral values, plugin defaults, and explicit theme overrides merge field by
+  field. Plugins without axes need not consume grid or domain-line settings.
+- `runtime.tooltip.show(element, { clientX, clientY }, html)`, `move`, and `hide`
+  use the common HTML tooltip. Escape any data inserted into HTML.
+  `runtime.tooltip.svgPosition(frame, x, y)` converts a chart-space anchor to
+  screen coordinates, so tooltip text does not scale with the SVG.
+- `runtime.bindTooltip` provides the ordinary pointer-following tooltip.
+
+Themes declare capabilities rather than chart families, for example
+`defineChartStyle({ key: 'compact', plot: { margin: { left: 24 } } })`.
+Each official chart keeps its own layout defaults in its chart module.
+
 A renderer joins data with D3 as usual, but animates through `motion()`, never
 through `selection.transition()`. VisDelta seeks recorded property tracks;
 D3's scheduler is timer-driven and cannot be sought, so anything it animates is
 interrupted the moment the transition compiles.
 
 ```js
-import { motion } from "visdelta/plugins";
+import { defineChartType } from "visdelta/plugins";
 import { scaleLinear } from "d3-scale";
 
-function customRenderer(chart, rows, spec) {
+const plugin = defineChartType({
+  key: "custom",
+  createRenderer: runtime => (chart, rows, spec) => {
   const x = scaleLinear().domain([0, 100]).range([0, chart.innerWidth]);
   const dots = chart.g.selectAll("circle.dot")
     .data(rows, row => row.id)
     .join("circle")
     .attr("class", "dot");
 
-  motion(dots, chart.transition.base)
+  runtime.motion(dots, chart.transition.base)
     .attr("cx", row => x(row.value))
     .style("opacity", 1);
-}
+  }
+});
 ```
 
 `motion(selection, base)` has the d3-transition authoring surface — `attr`,
@@ -77,6 +123,15 @@ tracks instead of scheduling anything. Three rules follow from seeking:
 direction.
 
 ## Builder contract
+
+A compiler must declare `stateOrder`, for example `['packing', 'projection']`,
+and provide an `operations` handler with the same name for each slot. Inputs
+come from `spec.meta.state`. Execution follows that order; there is no implicit
+selection, detail, or axis pipeline and no separate operation-name mapping.
+Use `stateOrder: []` for a base-only compiler. Duplicate slots or missing
+handlers are errors. Only executed slots are consumed; other metadata remains.
+These slots are not ontology categories and do not automatically emit new
+semantic changes.
 
 A focused builder extends `ChartState`, compiles its own grammar, and returns
 its module reference:
@@ -141,7 +196,7 @@ Other runtime hooks retain their existing responsibilities:
 
 | Hook | Responsibility |
 | --- | --- |
-| `createRenderer(deps)` | Draw marks and chart-owned axes |
+| `createRenderer(runtime)` | Draw marks and chart-owned axes |
 | `createSpecCompiler(context)` | Compile authoring state into a view spec |
 | `prepareSpec(spec)` | Normalize chart-specific defaults |
 | `defaultMargin(spec)` | Reserve chart-owned space |
@@ -151,6 +206,13 @@ Only implement hooks the chart needs. Do not add chart-name switches or empty
 extension hooks to Core.
 
 ## Official chart checklist
+
+The [live Orbit example](#live-external-plugin-orbit), with expandable plugin source, demonstrates
+an external chart using only `visdelta/plugins`, `visdelta/toolkit`, and injected host services.
+Its circles are arranged around a ring and use a declared size field. It is a
+reference for packaging and runtime integration, not a built-in chart or a
+claim of specialized split/merge semantics. Browser tests independently bundle
+it and check seek, reverse seek, resize, disposal, and plain JSON registration.
 
 An official chart folder lives at `src/charts/<name>/` and contains its
 authoring, compile, state, render, plugin, and module files. Then:
@@ -164,3 +226,53 @@ authoring, compile, state, render, plugin, and module files. Then:
 The inventory check keeps built-in lazy loading aligned with chart folders. A
 focused-module browser test must prove that no unrelated built-in chart module
 loads.
+
+## Composable construction tools
+
+`visdelta/toolkit` exposes optional tools, without importing or registering any
+chart family:
+
+- **Geometry:** `interpolatePathPoints` interpolates equal-length point lists;
+  `matchRenderedPaths` and `matchPathStrings` sample SVG geometry and preserve
+  exact endpoint path strings. SVG sampling requires a browser. Empty or
+  unmeasurable geometry uses an endpoint step, not invented points.
+- **Topology:** `connectedStretches` splits visible items at gaps in a reference
+  order. Its default minimum run length is two; unknown keys use visible indices.
+- **Matching:** `minimumTravelMatching` minimizes total Euclidean distance for
+  a one-to-one assignment of the smaller set. `keyFirstTravelMatching` preserves
+  matching keys first and applies that assignment to the remainder. Keys are
+  string-normalized; duplicate keys claim only the first unused indexed source.
+  Coordinates and computed distances must be finite. Returned indices refer to
+  the original inputs; `matchedBy` distinguishes key matches from travel fallback.
+- **Policy:** `composeCanonicalPolicies(...rules)` tries rules in order. A rule
+  returns a complete `{ from, to, reverse }` pair or `null` to decline. A forward
+  decision stops evaluation too; if all decline, authored order is preserved.
+- **Routes:** `composeIntermediatePolicies(...rules)` selects the first rule
+  returning a waypoint array. `null` declines; `[]` explicitly chooses a direct
+  route and stops evaluation. Routes are not concatenated or recursively inferred.
+  Line and Point use this to prioritize structural routes over axis routes.
+- **States:** `encodingWaypoint(from, to, retainedChannels)` deeply clones the
+  complete destination state and retains the specified source channels. A channel
+  absent at the source is removed, not invented. Channel names are unrestricted;
+  the plugin decides whether this mixed state is meaningful and how to render it.
+
+Line and Area use the geometry/topology and policy tools; Unit uses the matching
+tools. These are opt-in building blocks, not default motion rules. Geometric
+proximity does **not** establish semantic identity or justify conserved motion.
+Each plugin still owns the conditions under which a tool is appropriate, its
+complete intermediate states, and its rendering strategy.
+
+For example, a plugin can explicitly prioritize its own structural route over
+its coordinate route:
+
+```js
+import { composeIntermediatePolicies } from 'visdelta/toolkit';
+
+const intermediateSpecs = composeIntermediatePolicies(
+  structuralRoute, // plugin rule: complete waypoints, [] for direct, or null
+  coordinateRoute // considered only if structuralRoute returns null
+);
+```
+
+This selects a route inside one authored pair. It does not turn builder history
+into an animation script or cross the boundaries supplied to `sequence()`.

@@ -1,3 +1,5 @@
+import type { ChartRuntime } from '../../types/index.js';
+import { escapeHtml } from '../../runtime/utils.js';
 import type { ChartContext, ChannelSpec } from '../../types/index.js';
 import type { RenderDatum } from '../../runtime/marks.js';
 import type { LineViewState } from './authoring.js';
@@ -31,9 +33,10 @@ export function drawLineTooltip(
   tooltip: HTMLElement,
   xField: string,
   yField: string,
-  seriesField = ''
+  seriesField = '',
+  service: ChartRuntime['tooltip']
 ): void {
-  tooltip.style.opacity = '0';
+  service.hide(tooltip);
   chart.g.selectAll<SVGCircleElement, RenderDatum>('circle.vd-line-point')
     .on('mouseenter', null)
     .on('mousemove', null)
@@ -49,9 +52,6 @@ export function drawLineTooltip(
         group.append('rect').attr('class', 'vd-line-tooltip-hitbox');
         group.append('line').attr('class', 'vd-line-tooltip-rule');
         group.append('circle').attr('class', 'vd-line-tooltip-dot');
-        group.append('path').attr('class', 'vd-line-tooltip-tail');
-        group.append('rect').attr('class', 'vd-line-tooltip-box');
-        group.append('text').attr('class', 'vd-line-tooltip-text');
         return group;
       },
       (update) => update,
@@ -68,7 +68,10 @@ export function drawLineTooltip(
     .attr('height', chart.innerHeight)
     .attr('aria-label', 'Inspect nearest line observation');
 
-  const hide = () => layer.classed('is-active', false);
+  const hide = () => {
+    layer.classed('is-active', false);
+    service.hide(tooltip);
+  };
   const inspect = (event: PointerEvent) => {
     const frame = chart.g.node();
     if (!frame) return hide();
@@ -84,7 +87,7 @@ export function drawLineTooltip(
     const nearest = sameX.reduce((best, point) =>
       Math.abs(point.y - pointerY) < Math.abs(best.y - pointerY) ? point : best,
     sameX[0]);
-    showLineTooltip(layer, nearest, spec, xField, yField, seriesField, chart.innerWidth, chart.innerHeight);
+    showLineTooltip(layer, nearest, spec, xField, yField, seriesField, tooltip, frame, service, chart.innerHeight);
   };
 
   hitbox
@@ -112,12 +115,15 @@ function showLineTooltip(
   xField: string,
   yField: string,
   seriesField: string,
-  width: number,
+  tooltip: HTMLElement,
+  frame: SVGGraphicsElement,
+  service: ChartRuntime['tooltip'],
   height: number
 ): void {
   const lines = tooltipLines(point.row, spec, xField, yField, seriesField);
   if (!lines.length) {
     layer.classed('is-active', false);
+    service.hide(tooltip);
     return;
   }
 
@@ -132,36 +138,11 @@ function showLineTooltip(
     .attr('cy', point.y)
     .attr('fill', point.node.getAttribute('fill') || 'currentColor');
 
-  const text = layer.select<SVGTextElement>('text.vd-line-tooltip-text');
-  text.selectAll<SVGTSpanElement, { text: string; header: boolean }>('tspan')
-    .data(lines)
-    .join('tspan')
-    .attr('x', 0)
-    .attr('dy', (_, index) => index === 0 ? 0 : '1.35em')
-    .attr('font-weight', (line) => line.header ? 650 : null)
-    .text((line) => line.text);
-
-  const box = text.node()?.getBBox();
-  if (!box) return;
-  const paddingX = 10;
-  const paddingY = 8;
-  const boxWidth = Math.ceil(box.width + paddingX * 2);
-  const boxHeight = Math.ceil(box.height + paddingY * 2);
-  const gap = 15;
-  const above = point.y >= boxHeight + gap + 4;
-  const boxX = clamp(point.x - boxWidth / 2, 4, Math.max(4, width - boxWidth - 4));
-  const boxY = above ? point.y - boxHeight - gap : Math.min(height - boxHeight - 4, point.y + gap);
-  const anchorX = clamp(point.x, boxX + 8, boxX + boxWidth - 8);
-  const tailY = above ? boxY + boxHeight : boxY;
-
-  layer.select<SVGRectElement>('rect.vd-line-tooltip-box')
-    .attr('x', boxX)
-    .attr('y', boxY)
-    .attr('width', boxWidth)
-    .attr('height', boxHeight);
-  layer.select<SVGPathElement>('path.vd-line-tooltip-tail')
-    .attr('d', `M${anchorX - 5},${tailY}L${point.x},${point.y}L${anchorX + 5},${tailY}Z`);
-  text.attr('transform', `translate(${boxX + paddingX - box.x},${boxY + paddingY - box.y})`);
+  const position = service.svgPosition(frame, point.x, point.y);
+  if (!position) { service.hide(tooltip); return; }
+  service.show(tooltip, position, lines.map(line =>
+    line.header ? `<strong>${escapeHtml(line.text)}</strong>` : escapeHtml(line.text)
+  ).join('<br>'));
 }
 
 function tooltipLines(
@@ -215,8 +196,4 @@ function formatTooltipValue(value: unknown, channel: ChannelSpec): string {
 
 function titleize(value: string): string {
   return value.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }

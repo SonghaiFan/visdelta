@@ -9,9 +9,10 @@ import { drawLineAxes } from './axes.js';
 import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, Renderer, SelectionSpec } from '../../types/index.js';
+import type { ChartContext, ChartRuntime, Renderer, SelectionSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { LineViewState } from './authoring.js';
+import type { ChartPresentation } from '../style.js';
 import type { LinePathFrame, LinePathPoint } from './path.js';
 import type { LineSeries } from './state.js';
 import type { LineTransitionPlanExtension } from './plugin.js';
@@ -30,8 +31,8 @@ interface ReferencePath {
 
 type SeriesSelection = Selection<LinePathElement, LineSeries, BaseType, unknown>;
 
-export function createLineRenderer(deps: ChartDeps): Renderer<LineViewState> {
-  return new LineChart(deps).renderer();
+export function createLineRenderer(runtime: ChartRuntime, presentation: ChartPresentation): Renderer<LineViewState> {
+  return new LineChart(runtime, presentation).renderer();
 }
 
 class LineChart extends BaseChart<LineViewState> {
@@ -40,11 +41,10 @@ class LineChart extends BaseChart<LineViewState> {
       bandOrLinear,
       colorScale,
       drawLegend,
-      fadeNonLineShapes,
       position,
       staggerDelay,
       themeValue
-    } = this.deps;
+    } = this.runtime;
 
     const enc = spec.encoding || {};
     const xField = enc.x?.field ?? '';
@@ -153,12 +153,11 @@ class LineChart extends BaseChart<LineViewState> {
       ? Math.max(...entry.rows.map(pointOpacity))
       : 1;
 
-    fadeNonLineShapes(chart);
     this.setCartesianState(chart, enc, { x, y, color }, {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });
-    drawLineAxes(chart, x, y, enc, this.deps, { duration: lineDuration });
+    drawLineAxes(chart, x, y, enc, this.runtime, this.presentation, { duration: lineDuration });
 
     chart.g.selectAll<LinePathElement, LineSeries>('path.vd-line')
       .data(series, lineSeriesKey)
@@ -373,7 +372,7 @@ class LineChart extends BaseChart<LineViewState> {
       );
 
     drawLegend(chart, rows, enc.color);
-    drawLineTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '');
+    drawLineTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '', this.runtime.tooltip);
   }
 }
 

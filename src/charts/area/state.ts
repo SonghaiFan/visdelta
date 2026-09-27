@@ -2,7 +2,7 @@ import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec, Enc
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
-import { connectedStretches } from '../continuity.js';
+import { connectedStretches, composeCanonicalPolicies } from '../../toolkit.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
 import type { AreaStackOffset, AreaStackOrder } from './authoring.js';
 
@@ -361,24 +361,20 @@ export function canonicalAreaTransitionPair<S extends ViewSpec>(
 ): CanonicalTransitionPair<S> {
   const previous = areaState(previousSpec, previousSpec.encoding as Record<string, ChannelSpec>);
   const next = areaState(nextSpec, nextSpec.encoding as Record<string, ChannelSpec>);
-  if (previous.mode === 'stacked' && next.mode === 'stacked') {
-    const previousStack = stackGeometrySignature(previous);
-    const nextStack = stackGeometrySignature(next);
-    if (previousStack !== nextStack) {
+  const reverse = () => ({ from: nextSpec, to: previousSpec, reverse: true });
+  return composeCanonicalPolicies<S>(
+    () => {
+      if (previous.mode !== 'stacked' || next.mode !== 'stacked') return null;
+      const previousStack = stackGeometrySignature(previous);
+      const nextStack = stackGeometrySignature(next);
+      if (previousStack === nextStack) return null;
       return previousStack > nextStack
-        ? { from: nextSpec, to: previousSpec, reverse: true }
+        ? reverse()
         : { from: previousSpec, to: nextSpec, reverse: false };
-    }
-  }
-  if (previous.mode === 'stacked' && next.mode === 'single') {
-    return { from: nextSpec, to: previousSpec, reverse: true };
-  }
-  const observation = areaObservationChange(previousSpec, nextSpec);
-  if (observation?.mode === 'remove') {
-    // Filter/remove is the exact reverse of restore/add: fewer -> more.
-    return { from: nextSpec, to: previousSpec, reverse: true };
-  }
-  return { from: previousSpec, to: nextSpec, reverse: false };
+    },
+    () => previous.mode === 'stacked' && next.mode === 'single' ? reverse() : null,
+    () => areaObservationChange(previousSpec, nextSpec)?.mode === 'remove' ? reverse() : null
+  )(previousSpec, nextSpec);
 }
 
 function stackGeometrySignature(state: AreaSceneState): string {

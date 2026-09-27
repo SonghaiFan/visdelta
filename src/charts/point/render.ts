@@ -8,9 +8,9 @@ import type { PointState } from './state.js';
 import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
-import type { ChannelSpec, ChartContext, ChartDeps, ChartSceneContext, ChartSelection, ConnectorSpec, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
+import type { ChannelSpec, ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, ConnectorSpec, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
 import type { PointViewState } from './authoring.js';
+import type { ChartPresentation } from '../style.js';
 import { group as groupBy } from 'd3-array';
 import { easeCubicOut } from 'd3-ease';
 import { select } from 'd3-selection';
@@ -51,8 +51,8 @@ interface BlendMotion {
 type KeyFn = (d: RenderDatum, i: number) => string | number;
 type PositionOf = (row: RenderDatum) => Point;
 
-export function createPointRenderer(deps: ChartDeps): Renderer<PointViewState> {
-  return new PointChart(deps).renderer();
+export function createPointRenderer(runtime: ChartRuntime, presentation: ChartPresentation): Renderer<PointViewState> {
+  return new PointChart(runtime, presentation).renderer();
 }
 
 class PointChart extends BaseChart<PointViewState> {
@@ -65,14 +65,13 @@ class PointChart extends BaseChart<PointViewState> {
       drawLegend,
       drawXAxis,
       drawYAxis,
-      fadeNonPointShapes,
       bandOrLinear,
       position,
       quantitativeDomain,
       quantitativeScale,
       staggerDelay,
       themeValue
-    } = this.deps;
+    } = this.runtime;
 
     const enc = spec.encoding || {};
     const xField = enc.x?.field ?? '';
@@ -170,12 +169,11 @@ class PointChart extends BaseChart<PointViewState> {
       return nextParentAnchors.get(parent) || chartPosition(row);
     }
 
-    fadeNonPointShapes(chart);
     this.setCartesianState(chart, viewEnc, { x, y, color }, {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });
-    drawPointAxes(chart, x, y, viewEnc, this.deps);
+    drawPointAxes(chart, x, y, viewEnc, this.runtime, this.presentation);
     drawLegend(chart, rows, enc.color);
     drawPointConnectors({
       chart,
@@ -294,7 +292,7 @@ function pointConnectorSegments(
   connector: ResolvedConnector | null,
   chartPosition: PositionOf,
   scales: { x: RuntimeScale; y: RuntimeScale },
-  position: ChartRuntimeDeps['position'],
+  position: ChartRuntime['position'],
   key: KeyFn
 ): ConnectorSegment[] {
   if (!connector) return [];
@@ -357,7 +355,7 @@ function drawPointConnectors({ chart, connectors, transition, themeValue }: {
   chart: ChartContext;
   connectors: ConnectorSegment[];
   transition: MotionTiming;
-  themeValue: ChartRuntimeDeps['themeValue'];
+  themeValue: ChartRuntime['themeValue'];
 }): void {
   const layer = chart.g.selectAll('g.vd-point-connector-layer')
     .data([null])

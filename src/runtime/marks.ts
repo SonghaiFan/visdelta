@@ -1,4 +1,5 @@
 import { specTransition } from '../spec-meta.js';
+import { showTooltip as showSharedTooltip, moveTooltip as moveSharedTooltip, hideTooltip as hideSharedTooltip } from './tooltip.js';
 import { DEFAULT_MARK_DELAY, DEFAULT_TIMING, defaultTransition } from '../timing.js';
 import { renderAxis } from './axis.js';
 import type { AxisOrient } from './axis.js';
@@ -127,6 +128,9 @@ export interface RenderContext {
 
 /** Helpers capture one instance context, including delayed D3 callbacks. */
 export function createMarkHelpers(context: RenderContext = {}) {
+const showTooltip = showSharedTooltip;
+const moveTooltip = moveSharedTooltip;
+const hideTooltip = hideSharedTooltip;
 // ─── Color rules (Stephen Few, "Practical Rules for Using Color in Charts") ───
 //
 // Rule #3  Use color only when it serves a communication goal.
@@ -340,22 +344,6 @@ function staggerDelay(
     if (Number.isFinite(value)) return Math.min(value * step, max);
   }
   return Math.min(index * step, max);
-}
-
-function fadeNonBarShapes(chart: RenderChartContext): void {
-  motion(chart.g.selectAll<SVGElement, unknown>('circle,path:not(.vd-line)'), chart.transition.base).style('opacity', 0);
-}
-
-function fadeNonLineShapes(chart: RenderChartContext): void {
-  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,circle.vd-point,circle.vd-unit'), chart.transition.base).style('opacity', 0);
-}
-
-function fadeNonPointShapes(chart: RenderChartContext): void {
-  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-unit'), chart.transition.base).style('opacity', 0);
-}
-
-function fadeNonUnitShapes(chart: RenderChartContext): void {
-  motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point'), chart.transition.base).style('opacity', 0);
 }
 
 function applyPlotClip(chart: RenderChartContext, enabled: boolean): void {
@@ -812,19 +800,6 @@ function bindTooltip<E extends Element, D extends object, P extends BaseType, PD
     .on('mousemove', (event) => moveTooltip(tooltip, event as MouseEvent))
     .on('mouseleave', () => hideTooltip(tooltip));
 }
-
-function showTooltip(tooltip: HTMLElement, event: MouseEvent, html: string): void {
-  tooltip.innerHTML = html;
-  tooltip.style.opacity = '1';
-  moveTooltip(tooltip, event);
-}
-
-function moveTooltip(tooltip: HTMLElement, event: MouseEvent): void {
-  tooltip.style.left = `${event.clientX + 14}px`;
-  tooltip.style.top = `${event.clientY + 14}px`;
-}
-
-function hideTooltip(tooltip: HTMLElement): void { tooltip.style.opacity = '0'; }
 
 function markAxisInactive(axisGroup: SvgSelection<AxisElement>): void {
   const node = axisGroup.node();
@@ -1297,8 +1272,8 @@ function tooltipHtml(row: RenderDatum, tooltipSpec: unknown): string {
     .join('<br>');
 }
 
-return { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive };
+return { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive };
 }
 
 // Context-free utilities are shared by chart modules through dependency injection.
-export const { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, fadeNonBarShapes, fadeNonLineShapes, fadeNonPointShapes, fadeNonUnitShapes, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive } = createMarkHelpers();
+export const { pickCategoricalColors, themeValue, transitionSpec, effectiveTransitionSpec, easeFor, activeMarkLayer, fadeLayers, staggerDelay, applyPlotClip, drawUnsupported, bandOrLinear, quantitativeScale, position, niceExtent, quantitativeDomain, channelDomain, colorScale, drawXAxis, drawYAxis, drawGrid, updateGrid, drawLegend, bindTooltip, showTooltip, moveTooltip, hideTooltip, markAxisInactive } = createMarkHelpers();

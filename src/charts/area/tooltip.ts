@@ -1,3 +1,5 @@
+import type { ChartRuntime } from '../../types/index.js';
+import { escapeHtml } from '../../runtime/utils.js';
 import type { ChartContext, ChannelSpec } from '../../types/index.js';
 import type { RenderDatum } from '../../runtime/marks.js';
 import type { AreaViewState } from './authoring.js';
@@ -37,9 +39,10 @@ export function drawAreaTooltip(
   tooltip: HTMLElement,
   xField: string,
   yField: string,
-  seriesField = ''
+  seriesField = '',
+  service: ChartRuntime['tooltip']
 ): void {
-  tooltip.style.opacity = '0';
+  service.hide(tooltip);
   chart.g.selectAll<SVGPathElement, AreaCell>('path.vd-area')
     .on('mouseenter', null)
     .on('mousemove', null)
@@ -55,9 +58,6 @@ export function drawAreaTooltip(
         group.append('line').attr('class', 'vd-area-tooltip-rule');
         group.append('circle').attr('class', 'vd-area-tooltip-dot vd-area-tooltip-dot-y0');
         group.append('circle').attr('class', 'vd-area-tooltip-dot vd-area-tooltip-dot-y1');
-        group.append('path').attr('class', 'vd-area-tooltip-tail');
-        group.append('rect').attr('class', 'vd-area-tooltip-box');
-        group.append('text').attr('class', 'vd-area-tooltip-text');
         return group;
       },
       (update) => update,
@@ -74,7 +74,10 @@ export function drawAreaTooltip(
     .attr('height', chart.innerHeight)
     .attr('aria-label', 'Inspect nearest area band');
 
-  const hide = () => layer.classed('is-active', false);
+  const hide = () => {
+    layer.classed('is-active', false);
+    service.hide(tooltip);
+  };
   const inspect = (event: PointerEvent) => {
     const frame = chart.g.node();
     if (!frame) return hide();
@@ -95,7 +98,7 @@ export function drawAreaTooltip(
     );
     showAreaTooltip(
       layer, nearest, spec, xField, yField, seriesField,
-      chart.innerWidth, chart.innerHeight
+      tooltip, frame, service, chart.innerHeight
     );
   };
 
@@ -149,12 +152,15 @@ function showAreaTooltip(
   xField: string,
   yField: string,
   seriesField: string,
-  width: number,
+  tooltip: HTMLElement,
+  frame: SVGGraphicsElement,
+  service: ChartRuntime['tooltip'],
   height: number
 ): void {
   const lines = tooltipLines(band, spec, xField, yField, seriesField);
   if (!lines.length) {
     layer.classed('is-active', false);
+    service.hide(tooltip);
     return;
   }
 
@@ -168,34 +174,11 @@ function showAreaTooltip(
   layer.select<SVGCircleElement>('circle.vd-area-tooltip-dot-y1')
     .attr('cx', band.x).attr('cy', band.y1).attr('fill', band.fill);
 
-  const text = layer.select<SVGTextElement>('text.vd-area-tooltip-text');
-  text.selectAll<SVGTSpanElement, { text: string; header: boolean }>('tspan')
-    .data(lines)
-    .join('tspan')
-    .attr('x', 0)
-    .attr('dy', (_, index) => index === 0 ? 0 : '1.35em')
-    .attr('font-weight', (line) => line.header ? 650 : null)
-    .text((line) => line.text);
-
-  const bounds = text.node()?.getBBox();
-  if (!bounds) return;
-  const paddingX = 11;
-  const paddingY = 9;
-  const boxWidth = Math.ceil(bounds.width + paddingX * 2);
-  const boxHeight = Math.ceil(bounds.height + paddingY * 2);
-  const gap = 15;
-  const centerY = (top + bottom) / 2;
-  const placeRight = band.x + gap + boxWidth <= width - 4;
-  const boxX = placeRight ? band.x + gap : band.x - gap - boxWidth;
-  const boxY = clamp(centerY - boxHeight / 2, 4, Math.max(4, height - boxHeight - 4));
-  const tailX = placeRight ? boxX : boxX + boxWidth;
-  const tailY = clamp(centerY, boxY + 8, boxY + boxHeight - 8);
-
-  layer.select<SVGRectElement>('rect.vd-area-tooltip-box')
-    .attr('x', boxX).attr('y', boxY).attr('width', boxWidth).attr('height', boxHeight);
-  layer.select<SVGPathElement>('path.vd-area-tooltip-tail')
-    .attr('d', `M${tailX},${tailY - 5}L${band.x},${centerY}L${tailX},${tailY + 5}Z`);
-  text.attr('transform', `translate(${boxX + paddingX - bounds.x},${boxY + paddingY - bounds.y})`);
+  const position = service.svgPosition(frame, band.x, (top + bottom) / 2);
+  if (!position) { service.hide(tooltip); return; }
+  service.show(tooltip, position, lines.map(line =>
+    line.header ? `<strong>${escapeHtml(line.text)}</strong>` : escapeHtml(line.text)
+  ).join('<br>'));
 }
 
 function tooltipLines(

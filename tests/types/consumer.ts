@@ -10,10 +10,38 @@ import {
   ChartState,
   defineChartModule,
   defineChartType,
+  defineChartStyle,
   registerChartModule
 } from 'visdelta/plugins';
+import { resolvePlotStyle, composeCanonicalPolicies, composeIntermediatePolicies, encodingWaypoint, minimumTravelMatching, interpolatePathPoints, connectedStretches } from 'visdelta/toolkit';
 import * as browser from 'visdelta/browser';
 import type { ChartTransitionPolicy, IntermediateSpec, Renderer } from 'visdelta/plugins';
+
+defineChartStyle({ key: 'custom-theme', plot: { margin: { left: 24 } } });
+const choosePair = composeCanonicalPolicies<{ mark: string; rank: number }>(
+  (from, to) => from.rank > to.rank ? { from: to, to: from, reverse: true } : null
+);
+choosePair({ mark: 'external', rank: 2 }, { mark: 'external', rank: 1 });
+composeIntermediatePolicies<{ mark: string; rank: number }>(
+  (from, to) => [{ spec: encodingWaypoint(from, to, ['angle']), scene: 'rotation' }]
+)({ mark: 'external', rank: 1 }, { mark: 'external', rank: 2 });
+minimumTravelMatching([{ x: 0, y: 0 }] as const, [{ x: 1, y: 1 }] as const);
+interpolatePathPoints([{ x: 0, y: 0 }], [{ x: 1, y: 1 }])(0.5);
+connectedStretches(['a', 'b'] as const, ['a', 'b', 'c'] as const, key => key);
+defineChartType({
+  key: 'external-services',
+  defaults: { margin: (_spec, runtime) => resolvePlotStyle({ grid: 'none' }, runtime.chartStyle).margin },
+  createSpecCompiler: () => ({
+    stateOrder: ['projection'], base: spec => spec,
+    operations: { projection: spec => spec }
+  }),
+  createRenderer: runtime => (chart, _rows, _spec, tooltip) => {
+    runtime.motion(chart.g, chart.transition.base).style('opacity', 1);
+    runtime.tooltip.hide(tooltip);
+    const frame = chart.g.node();
+    if (frame) runtime.tooltip.svgPosition(frame, 0, 0);
+  }
+});
 
 const waypoint: IntermediateSpec = { spec: { mark: 'custom' } };
 const policy: ChartTransitionPolicy = {

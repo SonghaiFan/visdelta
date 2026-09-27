@@ -1,7 +1,8 @@
 import type { BaseType, Selection } from 'd3-selection';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { DIVIDER_DRAW_PROGRESS } from '../detail-timing.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../runtime/chart-runtime.js';
+import type { ChartPresentation } from '../style.js';
 import type { RenderDatum } from '../../runtime/marks.js';
 import { motion } from '../../runtime/recorder.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
@@ -84,7 +85,7 @@ export interface BarJoinOptions {
   rows: BarDatum[];
   spec: ViewSpec;
   tooltip: HTMLElement;
-  bindTooltip: ChartRuntimeDeps['bindTooltip'];
+  bindTooltip: ChartRuntime['bindTooltip'];
   key: BarKey;
   category: (d: BarDatum) => unknown;
   className: string;
@@ -106,8 +107,8 @@ export type BarRenderKit = ReturnType<typeof createBarRenderKit>;
 
 type MarkGeometry = { x: BarGeometryContract['applyX']; y: BarGeometryContract['applyY'] };
 
-export function createBarRenderKit(deps: ChartRuntimeDeps) {
-  const { easeFor, staggerDelay, themeValue } = deps;
+export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPresentation) {
+  const { easeFor, staggerDelay, themeValue } = runtime;
 
   function steps(chart: ChartContext, rendererOrientation: string): BarSteps | null {
     const plan = chart.transitionPlan;
@@ -163,6 +164,7 @@ export function createBarRenderKit(deps: ChartRuntimeDeps) {
   }
 
   return {
+    presentation,
     applyMarkSteps,
     axisTransition,
     baselineEnterPlan,

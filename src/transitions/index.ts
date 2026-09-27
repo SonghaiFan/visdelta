@@ -1,60 +1,29 @@
-import type { SelectionSpec, DetailSpec, AxisSpec, ViewSpec } from '../types/index.js';
-import {
-  serializeViewSpec,
-  specState
-} from '../spec-meta.js';
+import type { ViewSpec } from '../types/index.js';
+import { getSpecMeta, serializeViewSpec } from '../spec-meta.js';
 import { compileViewWithCompiler } from '../charts/compile-view.js';
 import type { SpecCompilerEntry } from '../charts/index.js';
 
-export const SCENE_TRANSITIONS = ['selection', 'axis', 'detail', 'mapping'] as const;
-export type SceneTransitionType = typeof SCENE_TRANSITIONS[number];
-
 interface SceneTransition {
   scene: string[];
-  selection?: SelectionSpec | null;
-  axis?: AxisSpec | null;
-  detail?: DetailSpec | null;
+  [slot: string]: unknown;
 }
 
-interface StepTransition {
-  scene?: string[];
-}
-
-export function resolveSceneTransition(viewSpec: ViewSpec = {}, stepTransition: StepTransition = {}, compilerEntry?: { scenes: readonly string[] }): SceneTransition {
-  const supportedScenes: readonly string[] = compilerEntry?.scenes ?? SCENE_TRANSITIONS;
-  const state = specState(viewSpec);
-  const scene = uniqueTokens([...(stepTransition.scene || [])]).filter(
-    (token) => SCENE_TRANSITIONS.includes(token as SceneTransitionType) && supportedScenes.includes(token)
-  );
-
-  return {
-    scene,
-    selection: scene.includes('selection') ? (state.selection || null) : null,
-    axis: scene.includes('axis') ? (state.axis || null) : null,
-    detail: scene.includes('detail') ? (state.detail || null) : null
-  };
+export function resolveSceneTransition(
+  viewSpec: ViewSpec = {},
+  stepTransition: { scene?: string[] } = {},
+  compilerEntry?: { scenes: readonly string[] }
+): SceneTransition {
+  const supported = compilerEntry?.scenes ?? [];
+  const scene = [...new Set(stepTransition.scene ?? [])].filter(token => supported.includes(token));
+  const state = getSpecMeta(viewSpec).state ?? {};
+  return { ...Object.fromEntries(scene.map(slot => [slot, state[slot] ?? null])), scene };
 }
 
 export function compileViewSpec(viewSpec: ViewSpec, sceneTransition: SceneTransition, compilerEntry?: SpecCompilerEntry): ViewSpec {
   if (!compilerEntry?.compiler) return viewSpec;
-
-  return serializeViewSpec(compileViewWithCompiler(
-    viewSpec,
-    sceneTransition,
-    compilerEntry.compiler,
-    compilerEntry.stateOperations
-  ));
+  return serializeViewSpec(compileViewWithCompiler(viewSpec, sceneTransition, compilerEntry.compiler));
 }
 
 export function hasScene(sceneTransition: SceneTransition | null | undefined, type: string): boolean {
-  return Boolean(sceneTransition?.scene?.includes(type));
-}
-
-function normalizeToken(value: unknown): string {
-  if (value == null) return '';
-  return String(value).trim();
-}
-
-function uniqueTokens(values: unknown[]): string[] {
-  return [...new Set(values.map(normalizeToken).filter(Boolean))];
+  return Boolean(sceneTransition?.scene.includes(type));
 }

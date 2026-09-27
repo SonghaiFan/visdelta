@@ -58,14 +58,15 @@ test('custom chart compiler runs and an existing pair keeps its renderer after r
     const host = document.createElement('div');
     document.body.append(host);
     // Reuse a public plugin renderer through its normal dependency injection.
-    const { CHART_RUNTIME_DEPS } = await import('/dist/runtime/chart-deps.js');
-    const renderer = barPlugin.createChartType(CHART_RUNTIME_DEPS).renderer;
+    const { DEFAULT_CHART_RUNTIME } = await import('/dist/runtime/chart-runtime.js');
+    const renderer = barPlugin.createChartType(DEFAULT_CHART_RUNTIME).renderer;
     let compiled = 0;
     registerChartModule({ plugin: defineChartType({
       key: 'custom-bar',
       renderer,
       prepareSpec: spec => ({ ...spec, mark: 'bar' }),
       createSpecCompiler: () => ({
+        stateOrder: [],
         base(spec) { compiled++; return { ...spec, encoding: { x: { field: 'id', type: 'nominal' }, y: { field: spec.measure, type: 'quantitative' } } }; },
         operations: {}
       })
@@ -91,8 +92,8 @@ test('the root entry does not overwrite a selected built-in registration', async
   const calls = await page.evaluate(async () => {
     const { registerChartType } = await import('/dist/plugins.js');
     const { plugin } = await import('/dist/charts/bar/plugin.js');
-    const { CHART_RUNTIME_DEPS } = await import('/dist/runtime/chart-deps.js');
-    const chartType = plugin.createChartType(CHART_RUNTIME_DEPS);
+    const { DEFAULT_CHART_RUNTIME } = await import('/dist/runtime/chart-runtime.js');
+    const chartType = plugin.createChartType(DEFAULT_CHART_RUNTIME);
     let calls = 0;
     registerChartType({ ...chartType, renderer(...args) { calls++; return chartType.renderer(...args); } });
     const { bar, transition } = await import('/dist/index.js');

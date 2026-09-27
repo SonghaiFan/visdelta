@@ -1,26 +1,25 @@
 import { createBarRenderer } from './render.js';
 import { cloneSpec, uniqueTokens } from '../../runtime/utils.js';
 import type {
-  ChartDeps,
+  ChartRuntime,
   ChartType,
   IntermediateSpec,
   TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
+import type { ChartPresentation } from '../style.js';
 import {
   canonicalBarTransitionPair,
   barIntermediateSpecs,
   resolveBarTransitionPlan
 } from './state.js';
-import { chartStyle } from '../style.js';
 
 export interface BarSpec extends ViewSpec {
   mark: 'bar';
 }
 
-export function createBarChart(deps: ChartDeps): ChartType<BarSpec> {
-  const renderer = createBarRenderer(deps);
-  const style = chartStyle(deps);
+export function createBarChart(runtime: ChartRuntime, presentation: ChartPresentation): ChartType<BarSpec> {
+  const renderer = createBarRenderer(runtime, presentation);
 
   return {
     key: 'bar',
@@ -29,9 +28,8 @@ export function createBarChart(deps: ChartDeps): ChartType<BarSpec> {
     resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => TransitionPlan,
     canonicalTransitionPair: canonicalBarTransitionPair,
     intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],
-    defaultMargin: () => style.charts.bar.margin,
+    defaultMargin: () => presentation.plot.margin,
     scenes: ['selection', 'axis', 'detail', 'mapping'],
-    stateOperations: { selection: 'filter', axis: 'coordinate', detail: 'aggregate' },
     inspect: { transitionPlanKey: 'barTransitionPlan' }
   };
 }

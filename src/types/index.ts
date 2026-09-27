@@ -220,6 +220,7 @@ export interface ChartChangeState {
 }
 
 export interface ChartStateMeta {
+  [slot: string]: unknown;
   selection?: SelectionSpec | null;
   axis?: AxisSpec | null;
   detail?: DetailSpec | null;
@@ -248,7 +249,7 @@ export interface ResolvedChartState {
 
 // ─── View Spec ────────────────────────────────────────────────────────────────
 
-export type Mark = 'area' | 'bar' | 'line' | 'point' | 'unit' | (string & {});
+export type Mark = string;
 
 export interface ViewSpec {
   mark?: Mark;
@@ -570,7 +571,6 @@ export type Renderer<S extends ViewSpec = ViewSpec> = (
   tooltip: HTMLElement
 ) => void;
 
-export type StateOperations = Record<string, string>;
 
 export interface IntermediateSpec<S extends ViewSpec = ViewSpec> {
   /** A complete chart state between the authored endpoints, not a partial patch. */
@@ -591,25 +591,18 @@ export interface CompilerContext {
 }
 
 export interface SpecCompiler {
+  /** Explicit execution order of state slots; unrelated to ontology categories. */
+  stateOrder: readonly string[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   base(spec: ViewSpec, context: Record<string, unknown>): ViewSpec;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   operations: Record<string, (spec: ViewSpec, operationSpec: any, context: Record<string, unknown>) => ViewSpec>;
 }
 
-/**
- * Runtime helpers a chart plugin may rely on. This is the supported subset of
- * the object every renderer receives; built-in charts use the full internal
- * `ChartRuntimeDeps`. Adding a key here is a public API promise.
- */
-export type ChartDeps = Pick<
-  import('../runtime/chart-deps.js').ChartRuntimeDeps,
-  | 'chartStyle'
-  | 'bandOrLinear' | 'quantitativeScale' | 'position'
-  | 'colorScale' | 'channelDomain' | 'quantitativeDomain' | 'niceExtent'
-  | 'drawXAxis' | 'drawYAxis' | 'drawGrid' | 'updateGrid' | 'drawLegend'
-  | 'bindTooltip' | 'staggerDelay' | 'themeValue' | 'easeFor'
->;
+/** Host capabilities shared by official and external chart renderers.
+ * Adding a key here is a public API promise. Pure construction helpers belong
+ * in `visdelta/toolkit`, not in this object. */
+export type ChartRuntime = import('../runtime/chart-runtime.js').ChartRuntime;
 
 /** Pure endpoint-based policy. Source identity and lineage constrain choices;
  * neither builder history nor a correspondence operation prescribes a route.
@@ -637,7 +630,6 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   prepareSpec(spec: S): S;
   defaultMargin(spec: S): Partial<MarginSpec>;
   readonly scenes: readonly string[];
-  readonly stateOperations: StateOperations;
   inspect?: Record<string, unknown>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;
 }
@@ -645,8 +637,7 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
 export interface ChartPlugin<S extends ViewSpec = ViewSpec> {
   key: string;
   readonly scenes: readonly string[];
-  readonly stateOperations: StateOperations;
-  createChartType(deps: ChartDeps): ChartType<S>;
+  createChartType(runtime: ChartRuntime): ChartType<S>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;
 }
 

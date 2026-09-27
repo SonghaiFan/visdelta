@@ -1,7 +1,7 @@
 import {
   interpolatePathPoints,
   matchRenderedPaths
-} from '../path-interpolation.js';
+} from '../../toolkit.js';
 
 export type LinePathPoint = { x: number; y: number };
 export type LinePathInterpolator = (progress: number) => string;

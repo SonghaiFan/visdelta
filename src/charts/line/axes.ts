@@ -1,5 +1,6 @@
+import { plotStyle } from './style.js';
 import { chartStyle, responsiveTickCount } from '../style.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChartRuntime } from '../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../runtime/marks.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
@@ -13,10 +14,10 @@ export function drawLineAxes(
   x: RuntimeScale,
   y: RuntimeScale,
   enc: EncodingSpec,
-  deps: ChartRuntimeDeps,
+  runtime: ChartRuntime,
   options: LineAxisOptions = {}
 ): void {
-  drawSeriesAxes(chart, x, y, enc, deps, options);
+  drawSeriesAxes(chart, x, y, enc, runtime, options);
 }
 
 function drawSeriesAxes(
@@ -24,27 +25,27 @@ function drawSeriesAxes(
   x: RuntimeScale,
   y: RuntimeScale,
   enc: EncodingSpec,
-  deps: ChartRuntimeDeps,
+  runtime: ChartRuntime,
   options: LineAxisOptions
 ): void {
   const transition = chart.transition.base;
   const axisDuration = options.duration;
-  const style = chartStyle(deps);
-  const rule = style.charts.line;
+  const style = chartStyle(runtime);
+  const rule = plotStyle(runtime.chartStyle);
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
-  if (rule.grid === 'both') deps.drawGrid(chart, y, transition, { x, xTickCount, yTickCount, duration: axisDuration });
-  else if (rule.grid === 'vertical') deps.drawGrid(chart, null, transition, { x, xTickCount, duration: axisDuration });
-  else if (rule.grid === 'horizontal') deps.drawGrid(chart, y, transition, { yTickCount, duration: axisDuration });
-  else deps.updateGrid(chart, null, transition);
+  if (rule.grid === 'both') runtime.drawGrid(chart, y, transition, { x, xTickCount, yTickCount, duration: axisDuration });
+  else if (rule.grid === 'vertical') runtime.drawGrid(chart, null, transition, { x, xTickCount, duration: axisDuration });
+  else if (rule.grid === 'horizontal') runtime.drawGrid(chart, y, transition, { yTickCount, duration: axisDuration });
+  else runtime.updateGrid(chart, null, transition);
   const edgeTitleInset = rule.edgeTitles ? style.edgeTitleInset : undefined;
-  deps.drawXAxis(chart, x, style.axisTitle(enc.x, 'right'), transition, {
+  runtime.drawXAxis(chart, x, style.axisTitle(enc.x, 'right'), transition, {
     tickCount: xTickCount,
     tickFormat: enc.x?.format,
     duration: axisDuration,
     edgeTitleInset
   });
-  deps.drawYAxis(chart, y, style.axisTitle(enc.y, 'up'), transition, {
+  runtime.drawYAxis(chart, y, style.axisTitle(enc.y, 'up'), transition, {
     tickCount: yTickCount,
     tickFormat: enc.y?.format,
     duration: axisDuration,

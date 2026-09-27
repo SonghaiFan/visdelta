@@ -3,7 +3,7 @@ import { cameraScale, focusCamera, matchesSelection, rectBounds } from '../../fo
 import { temporalDate } from '../../data/types.js';
 import { d3Curve } from '../curve.js';
 import type { D3AreaCurveName } from '../curve.js';
-import { matchPathStrings, matchRenderedPaths } from '../path-interpolation.js';
+import { matchPathStrings, matchRenderedPaths } from '../../toolkit.js';
 import { DIVIDER_DRAW_PROGRESS } from '../detail-timing.js';
 import {
   areaCells,
@@ -15,11 +15,11 @@ import { drawAreaAxes } from './axes.js';
 import { drawAreaTooltip } from './tooltip.js';
 import { motion } from '../../runtime/recorder.js';
 import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
-import type { ChartContext, ChartDeps, Renderer, SelectionSpec } from '../../types/index.js';
-import type { ChartRuntimeDeps } from '../../runtime/chart-deps.js';
+import type { ChartContext, ChartRuntime, Renderer, SelectionSpec } from '../../types/index.js';
 import type { Area, Line } from 'd3-shape';
 import type { AreaViewState } from './authoring.js';
 import type { AreaTransitionPlanExtension } from './plugin.js';
+import type { ChartPresentation } from '../style.js';
 import type { AreaCell, AreaLayer, AreaPoint } from './state.js';
 import { interpolateNumber } from 'd3-interpolate';
 import { area as shapeArea, line as shapeLine } from 'd3-shape';
@@ -58,8 +58,8 @@ interface AreaBoundaryRow extends RenderDatum {
   __areaValue: number;
 }
 
-export function createAreaRenderer(deps: ChartDeps): Renderer<AreaViewState> {
-  return new AreaChart(deps).renderer();
+export function createAreaRenderer(runtime: ChartRuntime, presentation: ChartPresentation): Renderer<AreaViewState> {
+  return new AreaChart(runtime, presentation).renderer();
 }
 
 class AreaChart extends BaseChart<AreaViewState> {
@@ -67,7 +67,7 @@ class AreaChart extends BaseChart<AreaViewState> {
     const {
       bandOrLinear, colorScale, drawLegend,
       position, themeValue
-    } = this.deps;
+    } = this.runtime;
     const enc = spec.encoding || {};
     const xField = enc.x?.field;
     const yField = enc.y?.field;
@@ -173,7 +173,7 @@ class AreaChart extends BaseChart<AreaViewState> {
       x: (row) => position(x, row[xField]),
       y: (row) => position(y, row[yField])
     });
-    drawAreaAxes(chart, x, y, enc, this.deps);
+    drawAreaAxes(chart, x, y, enc, this.runtime, this.presentation);
 
     // Composite the complete base Area once. Applying the highlight opacity to
     // every cell separately would make the same-fill seam covers overlap as
@@ -458,7 +458,7 @@ class AreaChart extends BaseChart<AreaViewState> {
       .remove();
 
     drawLegend(chart, rows, enc.color);
-    drawAreaTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '');
+    drawAreaTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '', this.runtime.tooltip);
   }
 }
 
@@ -466,7 +466,7 @@ function areaHighlightXRange(
   selection: SelectionSpec | null,
   xField: string,
   x: RuntimeScale,
-  position: ChartRuntimeDeps['position'],
+  position: ChartRuntime['position'],
   width: number
 ): { x: number; width: number } | null {
   const filters = selection?.filters ?? (selection?.filter ? [selection.filter] : []);
@@ -549,7 +549,7 @@ function areaDividerPaths(
   return paths;
 }
 
-function areaCellBounds(cell: AreaCell, x: RuntimeScale, y: RuntimeScale, position: ChartRuntimeDeps['position']) {
+function areaCellBounds(cell: AreaCell, x: RuntimeScale, y: RuntimeScale, position: ChartRuntime['position']) {
   const project = (point: AreaPoint) => ({
     x: position(x, point.x),
     y0: Number(y(point.y0)),

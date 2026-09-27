@@ -1,12 +1,10 @@
-import { specUnit } from '../spec-meta.js';
 import { normalizeChartType as normalizeChartPlugin } from './plugin.js';
 import type {
-  ChartDeps,
+  ChartRuntime,
   ChartType,
   ChartPlugin,
   CompilerContext,
   SpecCompiler,
-  StateOperations,
   ViewSpec
 } from '../types/index.js';
 
@@ -50,16 +48,15 @@ export function createChartTypeRegistry(): ChartTypeRegistry {
 export interface SpecCompilerEntry {
   compiler: SpecCompiler;
   scenes: string[];
-  stateOperations: StateOperations;
 }
 
 export function registerChartModules(
   registry: ChartTypeRegistry,
   modules: Array<{ plugin: ChartPlugin }>,
-  deps: ChartDeps
+  runtime: ChartRuntime
 ): ChartTypeRegistry {
   for (const module of modules) {
-    const chartType = chartTypeFromModule(module, deps);
+    const chartType = chartTypeFromModule(module, runtime);
     registry.register(chartType);
   }
   return registry;
@@ -80,7 +77,6 @@ export function createSpecCompilerRegistry(
         {
           compiler,
           scenes: [...plugin.scenes],
-          stateOperations: { ...plugin.stateOperations }
         }
       ] as [string, SpecCompilerEntry];
     })
@@ -100,7 +96,6 @@ export function normalizeChartType(type: unknown): string {
 }
 
 export function resolveMarkRendererKey(viewSpec: ViewSpec): string {
-  if (specUnit(viewSpec)) return 'unit';
   return normalizeMarkRendererKey(viewSpec.mark);
 }
 
@@ -122,13 +117,13 @@ function normalizeRegisteredChartType(chartType: ChartType<ViewSpec>): ChartType
 
 function chartTypeFromModule(
   module: { plugin: ChartPlugin },
-  deps: ChartDeps
+  runtime: ChartRuntime
 ): ChartType<ViewSpec> {
   const plugin = pluginFromModule(module);
   if (typeof plugin.createChartType === 'function') {
-    return plugin.createChartType(deps) as ChartType<ViewSpec>;
+    return plugin.createChartType(runtime) as ChartType<ViewSpec>;
   }
-  throw new Error('Chart module must export plugin.createChartType(deps).');
+  throw new Error('Chart module must export plugin.createChartType(runtime).');
 }
 
 function pluginFromModule(module: { plugin?: ChartPlugin }): ChartPlugin {

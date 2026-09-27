@@ -9,22 +9,23 @@ import {
   identitySpec,
   withObject,
   withSceneState
-} from '../compiler-utils.js';
+} from '../../toolkit.js';
 
 type AnyRecord = Record<string, unknown>;
 
 export function createLineSpecCompiler(_context: AnyRecord = {}): SpecCompiler {
   return {
+    stateOrder: ["selection","detail","axis"],
     base: compileLineBase,
     operations: {
-      filter: compileFilter,
-      focus: compileFocus,
-      highlight: compileHighlight,
-      coordinate: compileLineCoordinate,
-      scale: compileLineScale,
-      aggregate: compileLineAggregate,
-      layout: compileLineLayout,
-      series: compileLineSeries
+      selection: (spec, value) => {
+        const mode = value?.mode ?? 'filter';
+        const handler = { filter: compileFilter, focus: compileFocus, highlight: compileHighlight }[mode as 'filter' | 'focus' | 'highlight'];
+        if (!handler) throw new Error(`Unsupported selection mode: ${mode}`);
+        return handler(spec, value);
+      },
+      axis: compileLineCoordinate,
+      detail: compileLineAggregate
     }
   };
 }

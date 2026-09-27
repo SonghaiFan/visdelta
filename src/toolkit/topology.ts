@@ -3,8 +3,8 @@
  * A visible path needs at least two connected observations.
  */
 export function connectedStretches<T>(
-  items: T[],
-  lineage: T[],
+  items: readonly T[],
+  lineage: readonly T[],
   key: (item: T, index: number) => string,
   minimumLength = 2
 ): T[][] {
