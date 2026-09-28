@@ -102,7 +102,7 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(paperChartStyle.plot.openXDomain, false);
   assert.equal(paperChartStyle.plot.openYDomain, false);
   assert.equal(paperChartStyle.legendPosition, 'right');
-  assert.ok(paperChartStyle.plot.margin.right >= 100);
+  assert.equal(paperChartStyle.plot.margin.right, 20); // legend space is allocated from content
   assert.equal(paperChartStyle.axisTitle({ title: 'Income' }, 'right'), 'Income');
   assert.equal(darkChartStyle.key, 'dark');
   assert.equal(darkChartStyle.plot.grid, 'horizontal');

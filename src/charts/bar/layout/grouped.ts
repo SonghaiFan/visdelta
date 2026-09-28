@@ -1,3 +1,4 @@
+import { channelDomain, quantitativeDomain } from '../../../toolkit/scales.js';
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
 import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
@@ -7,7 +8,7 @@ import {
 import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../../runtime/marks.js';
+import type { RuntimeScale } from '../../../runtime/render-types.js';
 import type { ChartContext, TransitionItemAction } from '../../../types/index.js';
 import type {
   BarDatum,
@@ -35,7 +36,7 @@ interface GroupedGeom {
 }
 
 export function createGroupedBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, quantitativeDomain } = runtime;
+  const { bindTooltip, colorScale } = runtime;
 
   return function renderGroupedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};

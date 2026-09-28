@@ -1,7 +1,7 @@
-import { plotStyle } from './style.js';
-import { chartStyle, responsiveTickCount } from '../style.js';
+import { responsiveTickCount } from '../style.js';
+import type { ChartPresentation } from '../style.js';
 import type { ChartRuntime } from '../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../runtime/marks.js';
+import type { RuntimeScale } from '../../runtime/render-types.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
 export interface UnitAxisScales {
@@ -22,11 +22,11 @@ export function drawUnitAxes(
   scales: UnitAxisScales,
   channels: EncodingSpec,
   runtime: ChartRuntime,
+  presentation: ChartPresentation,
   options: UnitAxisOptions = {}
 ): void {
   const transition = chart.transition.base;
-  const style = chartStyle(runtime);
-  const rule = plotStyle(runtime.chartStyle);
+  const { theme: style, plot: rule } = presentation;
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
   const { x = null, y = null } = scales;

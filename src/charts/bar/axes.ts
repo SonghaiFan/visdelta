@@ -1,8 +1,8 @@
-import { plotStyle } from './style.js';
-import { chartStyle, responsiveTickCount } from '../style.js';
+import { responsiveTickCount } from '../style.js';
+import type { ChartPresentation } from '../style.js';
 import type { ChartGridStyle } from '../style.js';
 import type { ChartRuntime } from '../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../runtime/marks.js';
+import type { RuntimeScale } from '../../runtime/render-types.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
@@ -20,12 +20,12 @@ export function drawBarAxes(
   y: RuntimeScale,
   enc: EncodingSpec,
   runtime: ChartRuntime,
+  presentation: ChartPresentation,
   horizontal: boolean,
   options: BarAxisOptions = {}
 ): void {
   const transition = chart.transition.base;
-  const style = chartStyle(runtime);
-  const rule = plotStyle(runtime.chartStyle);
+  const { theme: style, plot: rule } = presentation;
   const xTransition = options.xTransition || transition;
   const yTransition = options.yTransition || transition;
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);

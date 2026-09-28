@@ -10,13 +10,16 @@ import { inferTransition } from '../grammar/infer-transition.js';
 import { canonicalTransitionPair, resolveTransitionRoute } from '../charts/transition-route.js';
 import { captureDomFrame } from './dom-frame.js';
 import type { DomFrame } from './dom-frame.js';
-import { hideTooltip } from './marks.js';
+import { hideTooltip } from './tooltip.js';
 import { clearSceneTransitionProgress } from '../transition-progress.js';
 import type { SceneHostElement } from './scene.js';
 import type { FrameEvaluator } from './tracks.js';
-import type { ChartType, MarginSpec, RuntimeOptions } from '../types/index.js';
+import type { ChartType, MarginSpec, RuntimeOptions, DataRow } from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
 import { select } from 'd3-selection';
+import { viewRows, domainTransforms } from './data.js';
+import { applyTransforms } from '../data/transforms.js';
+import { resolveSpecDataTypes } from '../data/types.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
   height?: number;
@@ -60,12 +63,13 @@ export function createTransitionSurface(
   // A chart may insert complete states inside this one authored pair. They are
   // route stages, not extra authored sequence entries. Their count is known
   // from the same pure route policy that the renderer uses below.
-  const routeStages = resolveTransitionRoute(
+  const route = resolveTransitionRoute(
     chartType,
     source,
     target,
     chartType.intermediateSpecs?.(source, target) ?? []
-  ).legs.length;
+  );
+  const routeStages = route.legs.length;
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;
   const host = resolveTarget(options.target);
   const root = document.createElement('div');
@@ -75,8 +79,7 @@ export function createTransitionSurface(
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
   const config: ViewConfig = {
-    height: options.height ?? from.height ?? to.height ?? 500,
-    margin: invariantTransitionMargin(chartType, source, target)
+    height: options.height ?? from.height ?? to.height ?? 500
   };
   const scenes = { scene: inferTransition(source, target) };
   // Cache only when the selected chart type explicitly opts into reusable-frame
@@ -96,6 +99,9 @@ export function createTransitionSurface(
   };
   let previousChildren: Node[] = Array.from(host.childNodes);
   host.replaceChildren(root);
+  let layoutDirty = true;
+  const layoutStates = [source, ...route.legs.map(leg => leg.to)].map(spec =>
+    compileTransitionSource(spec).effectiveViewSpec!);
 
   function compileFrames(): FrameEvaluator {
     disposeScene();
@@ -161,6 +167,10 @@ export function createTransitionSurface(
     },
     progress(value, direction = 0) {
       hideTooltip(shell.tooltip);
+      if (layoutDirty) {
+        config.margin = invariantTransitionMargin(chartType, layoutStates, node.clientWidth || 720, config.height!);
+        layoutDirty = false;
+      }
       value = canonicalProgress(value);
       const canonicalDirection = (direction || 1) * (canonical.reverse ? -1 : 1);
       if (cacheFrames) {
@@ -185,19 +195,22 @@ export function createTransitionSurface(
         }
       }
     },
-    resize() { cached = null; },
+    resize() { cached = null; layoutDirty = true; },
     destroy() { cached = null; disposeScene(); root.remove(); }
   };
 }
 
 /** One margin for both endpoints, so a clip edge never moves independently of its marks. */
-function invariantTransitionMargin(chartType: ChartType, source: ViewLayoutSpec, target: ViewLayoutSpec): Partial<MarginSpec> {
-  const resolve = (spec: ViewLayoutSpec): Partial<MarginSpec> => ({ ...chartType.defaultMargin(spec), ...(spec.margin || {}) });
-  const a = resolve(source);
-  const b = resolve(target);
+function invariantTransitionMargin(chartType: ChartType, states: ViewLayoutSpec[], width: number, height: number): Partial<MarginSpec> {
+  const margins = states.map(spec => {
+    const sourceRows = viewRows(spec.data, {}) as DataRow[];
+    const prepared = chartType.prepareSpec(resolveSpecDataTypes(spec, sourceRows));
+    const rows = applyTransforms(sourceRows, domainTransforms(prepared.transform || []));
+    return { ...chartType.defaultMargin(prepared, { width, height, rows }), ...(spec.margin || {}) };
+  });
   const sides = ['top', 'right', 'bottom', 'left'] as const;
   return Object.fromEntries(sides.map((side) => [
     side,
-    Math.max(Number(a[side]) || 0, Number(b[side]) || 0)
+    Math.max(...margins.map(margin => Number(margin[side]) || 0))
   ])) as Partial<MarginSpec>;
 }

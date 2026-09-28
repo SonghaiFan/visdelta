@@ -1,3 +1,4 @@
+import { bandOrLinear, channelDomain, position, quantitativeDomain } from '../../../toolkit/scales.js';
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
 import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
@@ -6,7 +7,7 @@ import {
 } from './index.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../../runtime/marks.js';
+import type { RuntimeScale } from '../../../runtime/render-types.js';
 import type { ChartContext, ViewSpec } from '../../../types/index.js';
 import type {
   BarDatum,
@@ -35,11 +36,11 @@ interface SimpleGeom {
   valueField: string;
   chart: ChartContext;
   horizontal: boolean;
-  position: ChartRuntime['position'];
+  position: typeof import('../../../toolkit/scales.js').position;
 }
 
 export function createSimpleBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
-  const { bandOrLinear, bindTooltip, channelDomain, colorScale, position, quantitativeDomain } = runtime;
+  const { bindTooltip, colorScale } = runtime;
 
   return function renderSimpleBar(chart, rows, spec, tooltip) {
     const enc = spec.encoding || {};

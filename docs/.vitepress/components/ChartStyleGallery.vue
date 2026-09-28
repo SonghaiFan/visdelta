@@ -4,12 +4,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 const presetCopy = {
   d3: {
     name: 'D3',
-    note: 'Familiar categorical colors, open axes, and softly rounded marks.',
+    note: 'Familiar categorical colors, open axes, and responsive spacing.',
     importName: 'd3ChartStyle'
   },
   paper: {
     name: 'Paper',
-    note: 'Centered axis titles, a left-side y title, and a right-side legend.',
+    note: 'Centered axis titles, a left-side y title, and a legend that adapts to available space.',
     importName: 'paperChartStyle'
   },
   dark: {

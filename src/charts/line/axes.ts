@@ -1,7 +1,7 @@
-import { plotStyle } from './style.js';
-import { chartStyle, responsiveTickCount } from '../style.js';
+import { responsiveTickCount } from '../style.js';
+import type { ChartPresentation } from '../style.js';
 import type { ChartRuntime } from '../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../runtime/marks.js';
+import type { RuntimeScale } from '../../runtime/render-types.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
 export interface LineAxisOptions {
@@ -15,9 +15,10 @@ export function drawLineAxes(
   y: RuntimeScale,
   enc: EncodingSpec,
   runtime: ChartRuntime,
+  presentation: ChartPresentation,
   options: LineAxisOptions = {}
 ): void {
-  drawSeriesAxes(chart, x, y, enc, runtime, options);
+  drawSeriesAxes(chart, x, y, enc, runtime, presentation, options);
 }
 
 function drawSeriesAxes(
@@ -26,12 +27,12 @@ function drawSeriesAxes(
   y: RuntimeScale,
   enc: EncodingSpec,
   runtime: ChartRuntime,
+  presentation: ChartPresentation,
   options: LineAxisOptions
 ): void {
   const transition = chart.transition.base;
   const axisDuration = options.duration;
-  const style = chartStyle(runtime);
-  const rule = plotStyle(runtime.chartStyle);
+  const { theme: style, plot: rule } = presentation;
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
   if (rule.grid === 'both') runtime.drawGrid(chart, y, transition, { x, xTickCount, yTickCount, duration: axisDuration });

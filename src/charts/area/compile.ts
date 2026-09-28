@@ -1,15 +1,5 @@
 import type { SpecCompiler, ViewSpec } from '../../types/index.js';
-import {
-  aggregateFieldSpec,
-  compileCartesianCoordinate,
-  compileCartesianScale,
-  compileFilter,
-  compileFocus,
-  compileHighlight,
-  identitySpec,
-  withObject,
-  withSceneState
-} from '../../toolkit.js';
+import { aggregateFieldSpec, compileCartesianCoordinate, compileCartesianScale, compileFilter, compileFocus, compileHighlight, identitySpec, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 

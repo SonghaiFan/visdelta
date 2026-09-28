@@ -1,6 +1,6 @@
 import { rectBounds } from '../../../focus.js';
 import type { FocusBounds } from '../../../focus.js';
-import type { RuntimeScale } from '../../../runtime/marks.js';
+import type { RuntimeScale } from '../../../runtime/render-types.js';
 import type { BarLayout, BarOrientation, ChannelSpec, EncodingSpec } from '../../../types/index.js';
 import type { BarDatum, GeometryValue, TargetGeometry } from '../render-pattern.js';
 

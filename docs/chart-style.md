@@ -37,9 +37,43 @@ const compact = defineChartStyle({
 
 A chart-style module can set spacing, margins, grid policy, domain lines, title
 placement, and legend placement. Themes contain no chart-name table. A plugin
-opts into plot presentation with `resolvePlotStyle(localDefaults, theme)` from
-`visdelta/toolkit`. Values merge in order: neutral defaults, plugin defaults,
-then explicit theme overrides, including individual margin fields.
+declares its local defaults once through `presentation`; VisDelta resolves those
+defaults with the active theme when the plugin is instantiated:
+
+```js
+defineChartType({
+  key: "custom",
+  presentation: {
+    plot: {
+      margin: { top: 36, right: 20, bottom: 40, left: 44 },
+      grid: "horizontal"
+    }
+  },
+  createRenderer(runtime, presentation) {
+    // presentation.theme: active structural theme
+    // presentation.plot: complete resolved plot rules
+  }
+});
+```
+
+Values merge in order: neutral defaults, plugin defaults, then explicit theme
+overrides, including individual margin fields. The same resolved presentation
+supplies the chart margin and renderer, so axes do not resolve styles again.
+Both `createRenderer` and `createChart` receive this result. Omitting local
+presentation still resolves neutral defaults and theme overrides, including
+the margin. Authored `spec.margin` remains the final layout override.
+
+Theme margins are preferred spacing, not fixed reservations. At render time,
+horizontal and vertical whitespace adapt independently to the container while
+axis text keeps its font size. Tick-label widths contribute to the left inset.
+A color legend reserves space only when it exists: Paper prefers the right
+side when at least 60% of the width remains for the plot, otherwise the legend
+wraps across the top. Top space accounts for the legend rows and axis title.
+An individual label wider than the available space is not automatically truncated.
+
+Each transition uses the maximum required margins across its endpoints and
+generated intermediate states. Resizing recalculates this shared layout, so
+scrubbing does not change the plot bounds independently of its marks.
 
 ## Ownership
 

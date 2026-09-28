@@ -9,17 +9,7 @@ import {
   barOrientationFromEncoding
 } from './layout/index.js';
 import { barSegmentField } from './semantic.js';
-import {
-  channelFromField,
-  cloneEncoding,
-  compileFilter,
-  compileFocus,
-  compileHighlight,
-  identitySpec,
-  resolveAxisOrder,
-  withObject,
-  withSceneState
-} from '../../toolkit.js';
+import { channelFromField, cloneEncoding, compileFilter, compileFocus, compileHighlight, identitySpec, resolveAxisOrder, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 type Encoding = Record<string, ChannelSpec>;

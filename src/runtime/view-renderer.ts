@@ -3,7 +3,9 @@ import { applyTransforms } from '../data/transforms.js';
 import { resolveTransitionRoute } from '../charts/transition-route.js';
 import { resolveMarkRendererKey } from '../charts/index.js';
 import { serializeViewSpec, specState } from '../spec-meta.js';
-import { activeMarkLayer, applyPlotClip, drawUnsupported, effectiveTransitionSpec, fadeLayers, transitionSpec } from './marks.js';
+import { activeMarkLayer, drawUnsupported, fadeLayers } from './mark-layers.js';
+import { applyPlotClip } from './clipping.js';
+import { effectiveTransitionSpec, transitionSpec } from '../toolkit/motion-timing.js';
 
 import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
@@ -243,7 +245,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
     right: 44,
     bottom: 64,
     left: 68,
-    ...(chartType?.defaultMargin?.(renderSpec) || {}),
+    ...(chartType?.defaultMargin?.(renderSpec, { width, height, rows: domainRows }) || {}),
     ...(layoutSpec.margin || {}),
     ...(viewConfig.margin || {})
   });

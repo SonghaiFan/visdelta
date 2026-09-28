@@ -1,7 +1,7 @@
-import { plotStyle } from './style.js';
-import { chartStyle, responsiveTickCount } from '../style.js';
+import { responsiveTickCount } from '../style.js';
+import type { ChartPresentation } from '../style.js';
 import type { ChartRuntime } from '../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../runtime/marks.js';
+import type { RuntimeScale } from '../../runtime/render-types.js';
 import type { ChartContext, EncodingSpec } from '../../types/index.js';
 
 /** Area-owned presentation: Line-like axes with a quiet horizontal reading grid. */
@@ -10,11 +10,11 @@ export function drawAreaAxes(
   x: RuntimeScale,
   y: RuntimeScale,
   enc: EncodingSpec,
-  runtime: ChartRuntime
+  runtime: ChartRuntime,
+  presentation: ChartPresentation
 ): void {
   const transition = chart.transition.base;
-  const style = chartStyle(runtime);
-  const rule = plotStyle(runtime.chartStyle);
+  const { theme: style, plot: rule } = presentation;
   const xTickCount = responsiveTickCount(chart.innerWidth, style.tickSpacing.x);
   const yTickCount = responsiveTickCount(chart.innerHeight, style.tickSpacing.y);
   if (rule.grid === 'both') runtime.drawGrid(chart, y, transition, { x, xTickCount, yTickCount });

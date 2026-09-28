@@ -1,9 +1,11 @@
+import { bandOrLinear, position } from '../../toolkit/scales.js';
+import { setCartesianState } from '../../toolkit/cartesian.js';
 import { BaseChart } from '../base.js';
 import { cameraScale, focusCamera, matchesSelection, rectBounds } from '../../focus.js';
 import { temporalDate } from '../../data/types.js';
 import { d3Curve } from '../curve.js';
 import type { D3AreaCurveName } from '../curve.js';
-import { matchPathStrings, matchRenderedPaths } from '../../toolkit.js';
+import { matchPathStrings, matchRenderedPaths } from '../../toolkit/geometry.js';
 import { DIVIDER_DRAW_PROGRESS } from '../detail-timing.js';
 import {
   areaCells,
@@ -14,7 +16,7 @@ import {
 import { drawAreaAxes } from './axes.js';
 import { drawAreaTooltip } from './tooltip.js';
 import { motion } from '../../runtime/recorder.js';
-import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import type { RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import type { ChartContext, ChartRuntime, Renderer, SelectionSpec } from '../../types/index.js';
 import type { Area, Line } from 'd3-shape';
 import type { AreaViewState } from './authoring.js';
@@ -64,10 +66,7 @@ export function createAreaRenderer(runtime: ChartRuntime, presentation: ChartPre
 
 class AreaChart extends BaseChart<AreaViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: AreaViewState, tooltip: HTMLElement): void {
-    const {
-      bandOrLinear, colorScale, drawLegend,
-      position, themeValue
-    } = this.runtime;
+    const { colorScale, drawLegend, themeValue } = this.runtime;
     const enc = spec.encoding || {};
     const xField = enc.x?.field;
     const yField = enc.y?.field;
@@ -169,7 +168,7 @@ class AreaChart extends BaseChart<AreaViewState> {
     // Area owns this cleanup locally; Core does not need to know the chart type.
     motion(chart.g.selectAll<SVGElement, unknown>('rect.vd-bar,path.vd-line,circle.vd-line-point,circle.vd-point,circle.vd-unit'),
       chart.transition.base).style('opacity', 0);
-    this.setCartesianState(chart, enc, { x, y, color }, {
+    setCartesianState(chart, enc, { x, y, color }, {
       x: (row) => position(x, row[xField]),
       y: (row) => position(y, row[yField])
     });
@@ -466,7 +465,7 @@ function areaHighlightXRange(
   selection: SelectionSpec | null,
   xField: string,
   x: RuntimeScale,
-  position: ChartRuntime['position'],
+  position: typeof import('../../toolkit/scales.js').position,
   width: number
 ): { x: number; width: number } | null {
   const filters = selection?.filters ?? (selection?.filter ? [selection.filter] : []);
@@ -549,7 +548,7 @@ function areaDividerPaths(
   return paths;
 }
 
-function areaCellBounds(cell: AreaCell, x: RuntimeScale, y: RuntimeScale, position: ChartRuntime['position']) {
+function areaCellBounds(cell: AreaCell, x: RuntimeScale, y: RuntimeScale, position: typeof import('../../toolkit/scales.js').position) {
   const project = (point: AreaPoint) => ({
     x: position(x, point.x),
     y0: Number(y(point.y0)),

@@ -811,8 +811,10 @@
 .style-gallery-chart .vd-figure-header { display: none; }
 .style-gallery-chart .vd-view,
 .style-gallery-chart .vd-view svg {
-  min-height: 180px;
-  height: 180px;
+  /* Match the gallery's render height; squeezing a 250px viewBox into 180px
+     scales the text and adds horizontal letterboxing to narrow previews. */
+  min-height: 250px;
+  height: 250px;
 }
 
 .style-gallery-progress {

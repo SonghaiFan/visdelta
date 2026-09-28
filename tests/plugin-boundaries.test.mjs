@@ -32,3 +32,11 @@ test('compilation detaches custom state inputs and preserves unconsumed state', 
   assert.equal(source.meta.state.packing.gap, 2);
   assert.deepEqual(result.meta.state, { retained: false });
 });
+
+test('pure scale and timing tools have no executable host dependencies', async () => {
+  for (const entry of ['scales', 'motion-timing', 'cartesian']) {
+    const result = await build({ entryPoints: [`dist/toolkit/${entry}.js`], bundle: true, write: false, metafile: true });
+    const host = Object.keys(result.metafile.inputs).filter(path => /dist\/runtime\//.test(path));
+    assert.deepEqual(host, [], entry);
+  }
+});

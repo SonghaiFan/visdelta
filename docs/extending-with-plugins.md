@@ -35,6 +35,7 @@ import { defineChartModule, defineChartType } from "visdelta/plugins";
 
 export const plugin = defineChartType({
   key: "custom",
+  presentation: { plot: { margin: { top: 24, right: 20, bottom: 40, left: 44 } } },
   createRenderer: runtime => customRenderer,
   createSpecCompiler: context => customCompiler,
   prepareSpec: spec => spec,
@@ -66,15 +67,29 @@ renderer and host to share the same recorder module instance.
 
 The same injected services are available to built-in and external renderers:
 
-- Optional plot presentation uses the public pure helper
-  `resolvePlotStyle(localDefaults, runtime.chartStyle)` from `visdelta/toolkit`. It accepts no chart name.
-  Neutral values, plugin defaults, and explicit theme overrides merge field by
-  field. Plugins without axes need not consume grid or domain-line settings.
+- Optional plot defaults are declared once with `presentation`. A renderer that
+  needs them accepts `createRenderer(runtime, presentation)` and reads the active
+  structural theme from `presentation.theme` and the complete merged plot rules
+  from `presentation.plot`. Plugins without axes may omit presentation entirely.
 - `runtime.tooltip.show(element, { clientX, clientY }, html)`, `move`, and `hide`
   use the common HTML tooltip. Escape any data inserted into HTML.
   `runtime.tooltip.svgPosition(frame, x, y)` converts a chart-space anchor to
   screen coordinates, so tooltip text does not scale with the SVG.
 - `runtime.bindTooltip` provides the ordinary pointer-following tooltip.
+
+The runtime contains host services: recorded motion, scoped CSS token access,
+color registries, axes, grids, legends, and tooltips. Scale construction and
+timing calculations are direct imports from `visdelta/toolkit`:
+
+```js
+import { bandOrLinear, position, easeFor, staggerDelay } from 'visdelta/toolkit';
+```
+
+`BaseChart` is an optional class adapter for `render()`. It owns no coordinate
+system or axis defaults. Cartesian renderers may import `setCartesianState`
+to publish their scales and position accessors to shared scene helpers.
+Other coordinate systems can provide their own projection without inheriting
+Cartesian behavior.
 
 Themes declare capabilities rather than chart families, for example
 `defineChartStyle({ key: 'compact', plot: { margin: { left: 24 } } })`.
@@ -91,7 +106,8 @@ import { scaleLinear } from "d3-scale";
 
 const plugin = defineChartType({
   key: "custom",
-  createRenderer: runtime => (chart, rows, spec) => {
+  presentation: { plot: { grid: "none" } },
+  createRenderer: (runtime, presentation) => (chart, rows, spec) => {
   const x = scaleLinear().domain([0, 100]).range([0, chart.innerWidth]);
   const dots = chart.g.selectAll("circle.dot")
     .data(rows, row => row.id)
@@ -196,10 +212,12 @@ Other runtime hooks retain their existing responsibilities:
 
 | Hook | Responsibility |
 | --- | --- |
-| `createRenderer(runtime)` | Draw marks and chart-owned axes |
+| `createRenderer(runtime, presentation)` | Draw marks and chart-owned axes; the second argument is always fully resolved |
+| `createChart(runtime, presentation)` | Construct a chart implementation; the factory supplies its default margin from the same presentation |
 | `createSpecCompiler(context)` | Compile authoring state into a view spec |
 | `prepareSpec(spec)` | Normalize chart-specific defaults |
-| `defaultMargin(spec)` | Reserve chart-owned space |
+| `presentation.plot.margin` | Declare default layout space; the active theme may override individual fields |
+| `layoutChannels(spec)` | Optional: report the channels actually drawn when layout generates or hides axes; defaults to `spec.encoding`. Used only for spacing, never to mutate chart state |
 | `transitionEvaluation` | Opt into cached frame evaluation; safe whenever the renderer animates only through `motion()` |
 
 Only implement hooks the chart needs. Do not add chart-name switches or empty

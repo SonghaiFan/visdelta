@@ -1,4 +1,4 @@
-import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit.js';
+import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit/transition-policy.js';
 import type { CanonicalTransitionPair, ChannelSpec, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';

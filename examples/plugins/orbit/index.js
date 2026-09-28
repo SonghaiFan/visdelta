@@ -1,12 +1,11 @@
 // A separately bundleable chart: only public VisDelta exports are used.
 import { ChartState, defineChartModule, defineChartType } from 'visdelta/plugins';
 
-import { resolvePlotStyle } from 'visdelta/toolkit';
 
 export const plugin = defineChartType({
   key: 'orbit',
   transitionEvaluation: 'cached',
-  defaults: { margin: (_spec, runtime) => resolvePlotStyle({ margin: { top: 20, right: 20, bottom: 20, left: 20 } }, runtime.chartStyle).margin },
+  presentation: { plot: { margin: { top: 20, right: 20, bottom: 20, left: 20 } } },
   createRenderer(runtime) {
     return (chart, rows, spec, tooltip) => {
       const radius = Math.min(chart.innerWidth, chart.innerHeight) / 3;

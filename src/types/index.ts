@@ -622,13 +622,19 @@ export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
   intermediateSpecs?(prev: S, next: S): IntermediateSpec<S>[];
 }
 
+export interface ChartViewport {
+  width: number;
+  height: number;
+  rows: DataRow[];
+}
+
 export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitionPolicy<S> {
   key: string;
   /** Opt in only when all animated SVG properties can be captured and sought. */
   transitionEvaluation?: 'cached' | 'reconstruct';
   renderer: Renderer<S>;
   prepareSpec(spec: S): S;
-  defaultMargin(spec: S): Partial<MarginSpec>;
+  defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;
   readonly scenes: readonly string[];
   inspect?: Record<string, unknown>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;

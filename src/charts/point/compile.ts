@@ -2,18 +2,7 @@ import type { ChannelSpec, SpecCompiler, ViewSpec } from '../../types/index.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { titleize } from '../../labels.js';
 import { colorField } from './encoding.js';
-import {
-  aggregateFieldSpec,
-  compileCartesianCoordinate,
-  compileCartesianScale,
-  compileFilter,
-  compileFocus,
-  compileHighlight,
-  identitySpec,
-  mergeXYChannel,
-  withObject,
-  withSceneState
-} from '../../toolkit.js';
+import { aggregateFieldSpec, compileCartesianCoordinate, compileCartesianScale, compileFilter, compileFocus, compileHighlight, identitySpec, mergeXYChannel, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 

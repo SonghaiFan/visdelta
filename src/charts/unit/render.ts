@@ -1,3 +1,4 @@
+import { staggerDelay } from '../../toolkit/motion-timing.js';
 import { BaseChart } from '../base.js';
 import { cameraPosition, cameraScale, cameraSize, focusCamera, pointBounds, viewSelection } from '../../focus.js';
 import { specTransition } from '../../spec-meta.js';
@@ -14,7 +15,7 @@ import {
 } from './state.js';
 import type { Point, UnitAxis, UnitDatum, UnitLayoutResult, UnitTransitionPlan } from './state.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
-import type { RenderDatum } from '../../runtime/marks.js';
+import type { RenderDatum } from '../../runtime/render-types.js';
 import type { ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { UnitViewState } from './authoring.js';
@@ -52,15 +53,7 @@ export function createUnitRenderer(runtime: ChartRuntime, presentation: ChartPre
 
 class UnitChart extends BaseChart<UnitViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: UnitViewState, tooltip: HTMLElement): void {
-    const {
-      bandOrLinear,
-      bindTooltip,
-      colorScale,
-      drawLegend,
-      position,
-      staggerDelay,
-      themeValue
-    } = this.runtime;
+    const { bindTooltip, colorScale, drawLegend, themeValue } = this.runtime;
 
     const enc = spec.encoding || {};
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
@@ -78,7 +71,7 @@ class UnitChart extends BaseChart<UnitViewState> {
     const grainTransition = originalTransition;
     const stage = isUnitValueSplit ? null : unitStageTiming(chart);
     if (stage) chart.transition.base = transitionFor(chart, stage.viewDuration);
-    const baseLayout = unitLayout(units, chart, spec, { bandOrLinear, position });
+    const baseLayout = unitLayout(units, chart, spec);
     if (baseLayout.trajectory && stage) chart.transition.base = originalTransition;
     const camera = focusCamera(
       units.map((unit, index) => ({

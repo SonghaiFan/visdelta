@@ -1,7 +1,7 @@
 import type { ChartRuntime } from '../../types/index.js';
 import { escapeHtml } from '../../runtime/utils.js';
 import type { ChartContext, ChannelSpec } from '../../types/index.js';
-import type { RenderDatum } from '../../runtime/marks.js';
+import type { RenderDatum } from '../../runtime/render-types.js';
 import type { LineViewState } from './authoring.js';
 import { bisector } from 'd3-array';
 import { format } from 'd3-format';

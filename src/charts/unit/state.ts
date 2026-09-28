@@ -1,10 +1,10 @@
-import { keyFirstTravelMatching } from '../../toolkit.js';
+import { bandOrLinear, position } from '../../toolkit/scales.js';
+import { keyFirstTravelMatching } from '../../toolkit/matching.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
 import { specObjectKey, specState, specTransition, specUnit } from '../../spec-meta.js';
 import { defaultTransition } from '../../timing.js';
-import type { ChartRuntime } from '../../runtime/chart-runtime.js';
-import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import { max } from 'd3-array';
 import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force';
 import { scaleBand } from 'd3-scale';
@@ -77,10 +77,6 @@ export interface UnitLayoutResult {
   trajectoryTimeline?: number[];
 }
 
-export interface UnitLayoutDeps {
-  bandOrLinear: ChartRuntime['bandOrLinear'];
-  position: ChartRuntime['position'];
-}
 
 
 export interface UnitMatchResult {
@@ -183,8 +179,7 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
   return units.slice(0, maxUnits);
 }
 
-export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec, runtime: UnitLayoutDeps): UnitLayoutResult {
-  const { bandOrLinear, position } = runtime;
+export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec): UnitLayoutResult {
   const unit = unitMeta(spec);
   const layout = unit.layout || 'grid';
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
@@ -195,9 +190,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
   const xKey = xChannel?.field;
 
   if (layout === 'force') {
-    return forceLayout(units, chart, requestedRadius, xChannel, yChannel, {
-      bandOrLinear, position
-    });
+    return forceLayout(units, chart, requestedRadius, xChannel, yChannel);
   }
 
   if (layout === 'beeswarm') {
@@ -205,7 +198,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
     let radius = fitRadius(chart, requestedRadius, {
       columns: Math.max(uniqueCount(units, (d) => d.__row[xKey]), 1), rows: 1
     });
-    const x = unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear });
+    const x = unitXScale(units, xChannel, [radius, chart.innerWidth - radius]);
     const placed = dodgeForHeight(units, radius, chart.innerHeight, (d) => position(x, d.__row[xKey]));
     radius = placed.radius;
     const yByKey = new Map(placed.circles.map((circle) => [circle.data.__unitKey, circle.y] as const));
@@ -397,14 +390,13 @@ function unitXScale(
   units: UnitDatum[],
   channel: ChannelSpec,
   range: [number, number],
-  runtime: Pick<UnitLayoutDeps, 'bandOrLinear'>,
   options: { anchors?: boolean } = {}
 ): RuntimeScale {
   const rows = units.map((d) => d.__row);
   // Force positions are collection anchors. Beeswarm remains a quantitative
   // positional distribution and therefore retains its authored scale type.
   const resolved: RenderChannel = options.anchors ? { ...channel, type: 'nominal' } : channel;
-  return runtime.bandOrLinear(rows, resolved, range);
+  return bandOrLinear(rows, resolved, range);
 }
 
 function fitRadius(chart: ChartContext, requestedRadius: number, { columns = 1, rows = 1 }: { columns?: number; rows?: number } = {}): number {
@@ -420,10 +412,8 @@ function forceLayout(
   chart: ChartContext,
   requestedRadius: number,
   xChannel: ChannelSpec | null,
-  yChannel: ChannelSpec | null,
-  runtime: UnitLayoutDeps
+  yChannel: ChannelSpec | null
 ): UnitLayoutResult {
-  const { bandOrLinear, position } = runtime;
   if (!units.length) {
     return {
       name: 'force', axes: false, axis: null, r: requestedRadius,
@@ -440,10 +430,10 @@ function forceLayout(
   const xField = xChannel?.field;
   const yField = yChannel?.field;
   const xScale = xChannel && xField
-    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { bandOrLinear }, { anchors: true })
+    ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { anchors: true })
     : null;
   const yScale = yChannel && yField
-    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { bandOrLinear }, { anchors: true })
+    ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { anchors: true })
     : null;
   const axes = {
     x: forceAxis(xScale, xChannel),

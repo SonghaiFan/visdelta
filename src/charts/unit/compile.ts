@@ -1,15 +1,5 @@
 import type { SpecCompiler, ViewSpec } from '../../types/index.js';
-import {
-  cloneEncoding,
-  compileFilter,
-  compileFocus,
-  compileHighlight,
-  copyDefined,
-  identitySpec,
-  resolveAxisOrder,
-  withObject,
-  withSceneState
-} from '../../toolkit.js';
+import { cloneEncoding, compileFilter, compileFocus, compileHighlight, copyDefined, identitySpec, resolveAxisOrder, withObject, withSceneState } from '../../charts/compiler-utils.js';
 import { specObjectKey, specUnit, withSpecMeta } from '../../spec-meta.js';
 
 type AnyRecord = Record<string, unknown>;

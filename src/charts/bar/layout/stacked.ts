@@ -1,3 +1,4 @@
+import { channelDomain, position } from '../../../toolkit/scales.js';
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
 import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
@@ -7,7 +8,7 @@ import {
 import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
-import type { RuntimeScale } from '../../../runtime/marks.js';
+import type { RuntimeScale } from '../../../runtime/render-types.js';
 import type { ChannelSpec, ChartContext, TransitionItemAction } from '../../../types/index.js';
 import type {
   BarDatum,
@@ -35,7 +36,7 @@ interface StackedGeom {
 type StackedDatum = BarDatum & { __stack0: number; __stack1: number };
 
 export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKit): BarLayoutRenderer {
-  const { bindTooltip, channelDomain, colorScale, position } = runtime;
+  const { bindTooltip, colorScale } = runtime;
 
   return function renderStackedBar(chart, rows, spec, tooltip, segmentFieldName) {
     const enc = spec.encoding || {};

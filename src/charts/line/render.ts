@@ -1,3 +1,6 @@
+import { bandOrLinear, position } from '../../toolkit/scales.js';
+import { staggerDelay } from '../../toolkit/motion-timing.js';
+import { setCartesianState } from '../../toolkit/cartesian.js';
 import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds } from '../../focus.js';
 import { d3Curve } from './curve.js';
@@ -8,7 +11,7 @@ import { connectedLineStretches, lineRowsAtTotal, lineState } from './state.js';
 import { drawLineAxes } from './axes.js';
 import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
-import type { RenderDatum } from '../../runtime/marks.js';
+import type { RenderDatum } from '../../runtime/render-types.js';
 import type { ChartContext, ChartRuntime, Renderer, SelectionSpec } from '../../types/index.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { LineViewState } from './authoring.js';
@@ -37,14 +40,7 @@ export function createLineRenderer(runtime: ChartRuntime, presentation: ChartPre
 
 class LineChart extends BaseChart<LineViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: LineViewState, tooltip: HTMLElement): void {
-    const {
-      bandOrLinear,
-      colorScale,
-      drawLegend,
-      position,
-      staggerDelay,
-      themeValue
-    } = this.runtime;
+    const { colorScale, drawLegend, themeValue } = this.runtime;
 
     const enc = spec.encoding || {};
     const xField = enc.x?.field ?? '';
@@ -153,7 +149,7 @@ class LineChart extends BaseChart<LineViewState> {
       ? Math.max(...entry.rows.map(pointOpacity))
       : 1;
 
-    this.setCartesianState(chart, enc, { x, y, color }, {
+    setCartesianState(chart, enc, { x, y, color }, {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });

@@ -7,7 +7,7 @@ import type { BarLayoutRenderer } from './layout/simple.js';
 import { createStackedBarRenderer } from './layout/stacked.js';
 import { semanticBarState } from './semantic.js';
 import { motion } from '../../runtime/recorder.js';
-import type { RenderDatum } from '../../runtime/marks.js';
+import type { RenderDatum } from '../../runtime/render-types.js';
 import type { BarLayout, ChannelSpec, ChartContext, ChartRuntime, Renderer, ViewSpec } from '../../types/index.js';
 import type { ChartPresentation } from '../style.js';
 

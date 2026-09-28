@@ -18,7 +18,7 @@ export interface BarSpec extends ViewSpec {
   mark: 'bar';
 }
 
-export function createBarChart(runtime: ChartRuntime, presentation: ChartPresentation): ChartType<BarSpec> {
+export function createBarChart(runtime: ChartRuntime, presentation: ChartPresentation): Omit<ChartType<BarSpec>, 'defaultMargin'> {
   const renderer = createBarRenderer(runtime, presentation);
 
   return {
@@ -28,7 +28,6 @@ export function createBarChart(runtime: ChartRuntime, presentation: ChartPresent
     resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => TransitionPlan,
     canonicalTransitionPair: canonicalBarTransitionPair,
     intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],
-    defaultMargin: () => presentation.plot.margin,
     scenes: ['selection', 'axis', 'detail', 'mapping'],
     inspect: { transitionPlanKey: 'barTransitionPlan' }
   };

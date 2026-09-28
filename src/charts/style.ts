@@ -27,8 +27,12 @@ export interface ChartStyleRuleDefinition extends Partial<Omit<ChartStyleRule, '
 
 /** Fully resolved presentation shared by one instantiated chart plugin. */
 export interface ChartPresentation {
-  theme: ChartStyleModule;
-  plot: ChartStyleRule;
+  readonly theme: ChartStyleModule;
+  readonly plot: Readonly<ChartStyleRule>;
+}
+
+export interface ChartPresentationDefinition {
+  plot?: ChartStyleRuleDefinition;
 }
 
 export interface ChartStyleDefinition {
@@ -75,7 +79,7 @@ const GENERIC_CHART_STYLE: ChartStyleRule = {
 /** Restrained D3-inspired grammar used when no style module is supplied. */
 export const d3ChartStyle = defineChartStyle({ key: 'd3' });
 
-const PAPER_MARGIN = { top: 28, right: 112, bottom: 50, left: 62 };
+const PAPER_MARGIN = { top: 28, right: 20, bottom: 50, left: 62 };
 const PAPER_CARTESIAN = {
   margin: PAPER_MARGIN,
   grid: 'horizontal' as const,
@@ -123,10 +127,14 @@ export function resolvePlotStyle(
 
 /** Resolve plugin defaults and the host theme once when the plugin is created. */
 export function resolveChartPresentation(
-  defaults: ChartStyleRuleDefinition = {},
+  defaults: ChartPresentationDefinition = {},
   theme: ChartStyleModule = d3ChartStyle
 ): ChartPresentation {
-  return Object.freeze({ theme, plot: Object.freeze(resolvePlotStyle(defaults, theme)) });
+  const plot = resolvePlotStyle(defaults.plot, theme);
+  return Object.freeze({
+    theme,
+    plot: Object.freeze({ ...plot, margin: Object.freeze({ ...plot.margin }) })
+  });
 }
 
 export function responsiveTickCount(length: number, spacing: number): number {

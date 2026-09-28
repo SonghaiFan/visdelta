@@ -193,7 +193,8 @@ test('stacked filter continuously moves surviving segments onto their new stack 
   expect(result.afterExit).not.toEqual(result.target);
   expect(result.middle.y).toBeGreaterThan(Math.min(result.source.y, result.target.y));
   expect(result.middle.y).toBeLessThan(Math.max(result.source.y, result.target.y));
-  expect(result.middle.height).toBe(result.target.height);
+  // Measured responsive margins can be fractional; allow only arithmetic noise.
+  expect(result.middle.height).toBeCloseTo(result.target.height, 10);
   expect(result.reverseMiddle).toEqual(result.middle);
 });
 

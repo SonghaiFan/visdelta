@@ -1,7 +1,4 @@
-import {
-  interpolatePathPoints,
-  matchRenderedPaths
-} from '../../toolkit.js';
+import { interpolatePathPoints, matchRenderedPaths } from '../../toolkit/geometry.js';
 
 export type LinePathPoint = { x: number; y: number };
 export type LinePathInterpolator = (progress: number) => string;

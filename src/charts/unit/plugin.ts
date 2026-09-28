@@ -1,4 +1,4 @@
-import { unitPresentation } from './style.js';
+import { unitPresentation, unitLayoutChannels } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import { createUnitSpecCompiler } from './compile.js';
 import { createUnitRenderer } from './render.js';
@@ -11,6 +11,7 @@ export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'mapping'],
   presentation: unitPresentation,
+  layoutChannels: unitLayoutChannels,
   createRenderer: createUnitRenderer,
   createSpecCompiler: createUnitSpecCompiler,
   transition: {

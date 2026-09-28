@@ -1,9 +1,10 @@
+import { easeFor, staggerDelay } from '../../toolkit/motion-timing.js';
 import type { BaseType, Selection } from 'd3-selection';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { DIVIDER_DRAW_PROGRESS } from '../detail-timing.js';
 import type { ChartRuntime } from '../../runtime/chart-runtime.js';
 import type { ChartPresentation } from '../style.js';
-import type { RenderDatum } from '../../runtime/marks.js';
+import type { RenderDatum } from '../../runtime/render-types.js';
 import { motion } from '../../runtime/recorder.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
 import { select } from 'd3-selection';
@@ -108,7 +109,7 @@ export type BarRenderKit = ReturnType<typeof createBarRenderKit>;
 type MarkGeometry = { x: BarGeometryContract['applyX']; y: BarGeometryContract['applyY'] };
 
 export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPresentation) {
-  const { easeFor, staggerDelay, themeValue } = runtime;
+  const { themeValue } = runtime;
 
   function steps(chart: ChartContext, rendererOrientation: string): BarSteps | null {
     const plan = chart.transitionPlan;

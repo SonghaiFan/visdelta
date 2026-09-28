@@ -2,7 +2,7 @@ import { keyAccessor } from '../identity/semantic-key.js';
 import { specState } from '../spec-meta.js';
 import { clearSceneTransitionProgress } from '../transition-progress.js';
 import { hasScene } from '../transitions/index.js';
-import { markAxisInactive } from './marks.js';
+import { markAxisInactive } from './axis-motion.js';
 import { motion } from './recorder.js';
 import type { ProgressController } from './tracks.js';
 import type { MotionTiming } from './recorder.js';

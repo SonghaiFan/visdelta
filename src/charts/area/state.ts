@@ -2,7 +2,8 @@ import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec, Enc
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
 import { specObjectKey } from '../../spec-meta.js';
-import { connectedStretches, composeCanonicalPolicies } from '../../toolkit.js';
+import { connectedStretches } from '../../toolkit/topology.js';
+import { composeCanonicalPolicies } from '../../toolkit/transition-policy.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
 import type { AreaStackOffset, AreaStackOrder } from './authoring.js';
 

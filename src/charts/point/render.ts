@@ -1,3 +1,6 @@
+import { bandOrLinear, position, quantitativeDomain } from '../../toolkit/scales.js';
+import { staggerDelay } from '../../toolkit/motion-timing.js';
+import { setCartesianState } from '../../toolkit/cartesian.js';
 import { BaseChart } from '../base.js';
 import { cameraScale, cameraSize, focusCamera, matchesSelection, pointBounds, viewHighlight, viewSelection } from '../../focus.js';
 import { applyTransforms } from '../../data/transforms.js';
@@ -7,7 +10,7 @@ import { defaultPointRadius, parentAnchors, parentKey, pointState, radiusScale }
 import type { PointState } from './state.js';
 import { motion } from '../../runtime/recorder.js';
 import type { MotionTiming } from '../../runtime/recorder.js';
-import type { RenderDatum, RuntimeScale } from '../../runtime/marks.js';
+import type { RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import type { ChannelSpec, ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, ConnectorSpec, EncodingSpec, Renderer, ViewSpec } from '../../types/index.js';
 import type { PointViewState } from './authoring.js';
 import type { ChartPresentation } from '../style.js';
@@ -57,21 +60,7 @@ export function createPointRenderer(runtime: ChartRuntime, presentation: ChartPr
 
 class PointChart extends BaseChart<PointViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: PointViewState, tooltip: HTMLElement): void {
-    const {
-      bindTooltip,
-      chartStyle,
-      colorScale,
-      drawGrid,
-      drawLegend,
-      drawXAxis,
-      drawYAxis,
-      bandOrLinear,
-      position,
-      quantitativeDomain,
-      quantitativeScale,
-      staggerDelay,
-      themeValue
-    } = this.runtime;
+    const { bindTooltip, colorScale, drawLegend, themeValue } = this.runtime;
 
     const enc = spec.encoding || {};
     const xField = enc.x?.field ?? '';
@@ -169,7 +158,7 @@ class PointChart extends BaseChart<PointViewState> {
       return nextParentAnchors.get(parent) || chartPosition(row);
     }
 
-    this.setCartesianState(chart, viewEnc, { x, y, color }, {
+    setCartesianState(chart, viewEnc, { x, y, color }, {
       x: (d) => position(x, d[xField]),
       y: (d) => position(y, d[yField])
     });
@@ -292,7 +281,7 @@ function pointConnectorSegments(
   connector: ResolvedConnector | null,
   chartPosition: PositionOf,
   scales: { x: RuntimeScale; y: RuntimeScale },
-  position: ChartRuntime['position'],
+  position: typeof import('../../toolkit/scales.js').position,
   key: KeyFn
 ): ConnectorSegment[] {
   if (!connector) return [];

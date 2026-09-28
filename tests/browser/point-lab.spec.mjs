@@ -88,7 +88,8 @@ test('point defaults use compact, open correlation axes', async ({ page }) => {
     xTitleAnchor: svg.querySelector('.vd-x-label')?.getAttribute('text-anchor'),
     yTitleAnchor: svg.querySelector('.vd-y-label')?.getAttribute('text-anchor'),
     xAxisTransform: svg.querySelector('.vd-x-axis')?.getAttribute('transform'),
-    yAxisTransform: svg.querySelector('.vd-y-axis')?.getAttribute('transform')
+    yAxisTransform: svg.querySelector('.vd-y-axis')?.getAttribute('transform'),
+    frameTransform: svg.querySelector('.vd-frame')?.getAttribute('transform')
   }));
 
   expect(style.verticalGridLines).toBeGreaterThan(1);
@@ -99,8 +100,11 @@ test('point defaults use compact, open correlation axes', async ({ page }) => {
   expect(style.yTitle).toBe('↑ Fuel economy (mpg)');
   expect(style.xTitleAnchor).toBe('end');
   expect(style.yTitleAnchor).toBe('start');
-  expect(style.xAxisTransform).toMatch(/^translate\(44,/);
-  expect(style.yAxisTransform).toMatch(/^translate\(44,\s*56\)$/);
+  // Responsive spacing is not a fixed 44 × 56 inset. Axes must share the
+  // plot's resolved origin while preserving the open-axis presentation.
+  const translation = value => value.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/).slice(1).map(Number);
+  expect(translation(style.yAxisTransform)).toEqual(translation(style.frameTransform));
+  expect(translation(style.xAxisTransform)[0]).toBe(translation(style.frameTransform)[0]);
 
   await chooseScenario(page, 'color');
   await ready(page);

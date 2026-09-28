@@ -1,9 +1,10 @@
-import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit.js';
+import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit/transition-policy.js';
 import type { CanonicalTransitionPair, EncodingSpec, IntermediateSpec, SelectionSpec, ViewSpec } from '../../types/index.js';
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
-import { connectedStretches, composeCanonicalPolicies } from '../../toolkit.js';
+import { connectedStretches } from '../../toolkit/topology.js';
+import { composeCanonicalPolicies } from '../../toolkit/transition-policy.js';
 import { linePointKeyAccessor } from './keys.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
 

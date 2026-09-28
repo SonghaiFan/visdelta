@@ -4,6 +4,7 @@ import type {
   ChartPlugin,
   ChartTransitionPolicy,
   CompilerContext,
+  EncodingSpec,
   MarginSpec,
   Renderer,
   SpecCompiler,
@@ -11,18 +12,19 @@ import type {
   ViewSpec
 } from '../types/index.js';
 import { resolveChartPresentation } from './style.js';
-import type { ChartPresentation, ChartStyleRuleDefinition } from './style.js';
+import type { ChartPresentation, ChartPresentationDefinition } from './style.js';
 
 export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   key: string;
   transitionEvaluation?: 'cached' | 'reconstruct';
   scenes?: string[];
   renderer?: Renderer<S>;
-  presentation?: ChartStyleRuleDefinition;
+  presentation?: ChartPresentationDefinition;
+  /** Channels actually shown by the renderer (e.g. a layout-generated group axis). */
+  layoutChannels?: (spec: S) => EncodingSpec;
   createRenderer?: (runtime: ChartRuntime, presentation: ChartPresentation) => Renderer<S>;
-  createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => ChartType<S>;
+  createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => Omit<ChartType<S>, 'defaultMargin'>;
   prepareSpec?: (spec: S) => S;
-  defaults?: { margin?: (spec: S, runtime: ChartRuntime) => Partial<MarginSpec> };
   inspect?: Record<string, unknown>;
   transition?: {
     plan?: ChartTransitionPolicy<S>['resolveTransitionPlan'];
@@ -41,13 +43,17 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
   const scenes = uniqueStrings(config.scenes ?? []);
 
   function createChartType(runtime: ChartRuntime): ChartType<S> {
+    const presentation = resolveChartPresentation(config.presentation, runtime.theme);
     const chartType = config.createChart
-      ? config.createChart(runtime, resolveChartPresentation(config.presentation, runtime.theme))
-      : createRuntimeChartType(config, runtime);
+      ? config.createChart(runtime, presentation)
+      : createRuntimeChartType(config, runtime, presentation);
 
     return normalizeChartType<S>(
       {
         ...chartType,
+        defaultMargin: (spec, viewport) => viewport
+          ? runtime.layoutMargins(config.layoutChannels?.(spec) ?? spec.encoding ?? {}, viewport, presentation.plot)
+          : presentation.plot.margin,
         transitionEvaluation: config.transitionEvaluation ?? chartType.transitionEvaluation,
         key: chartType.key || config.key,
         scenes: chartType.scenes ?? scenes,
@@ -102,9 +108,9 @@ export function normalizeChartType<S extends ViewSpec = ViewSpec>(
 
 function createRuntimeChartType<S extends ViewSpec>(
   config: ChartTypeConfig<S>,
-  runtime: ChartRuntime
+  runtime: ChartRuntime,
+  presentation: ChartPresentation
 ): Partial<ChartType<S>> & { key: string } {
-  const presentation = resolveChartPresentation(config.presentation, runtime.theme);
   const renderer = config.createRenderer
     ? config.createRenderer(runtime, presentation)
     : config.renderer;
@@ -116,9 +122,6 @@ function createRuntimeChartType<S extends ViewSpec>(
     resolveTransitionPlan: config.transition?.plan ?? emptyTransitionPlan,
     canonicalTransitionPair: config.transition?.canonicalPair,
     intermediateSpecs: config.transition?.intermediateSpecs,
-    defaultMargin: config.defaults?.margin
-      ? (spec: S) => config.defaults!.margin!(spec, runtime)
-      : config.presentation ? () => presentation.plot.margin : defaultMargin,
     inspect: config.inspect ?? {},
     scenes: config.scenes,
   };
