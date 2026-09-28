@@ -16,7 +16,8 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#f4f3ef' }],
     ['link', {
       rel: 'icon',
-      href: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"%3E%3Cpath d="M12 16h18v12H12zM34 36h18v12H34z" fill="%23111"/%3E%3Cpath d="M26 22h12v20" fill="none" stroke="%232f64ff" stroke-width="5"/%3E%3C/svg%3E'
+      type: 'image/svg+xml',
+      href: `${base}visdelta-logo.svg`
     }]
   ],
   markdown: {
@@ -28,6 +29,7 @@ export default defineConfig({
   },
   themeConfig: {
     siteTitle: 'VisDelta',
+    logo: '/visdelta-logo.svg',
     nav: [
       { text: 'Start', link: '/getting-started' },
       { text: 'Ontology', link: '/language-framework' },

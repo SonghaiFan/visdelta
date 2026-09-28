@@ -62,15 +62,10 @@
 }
 
 .VPNavBarTitle .title::before {
-  content: "";
-  width: 18px;
-  height: 18px;
-  margin-right: 9px;
-  background:
-    linear-gradient(to top, #1c6ae4 0 58%, transparent 58%) 0 100% / 5px 100% no-repeat,
-    linear-gradient(to top, #fa4d1d 0 88%, transparent 88%) 7px 100% / 5px 100% no-repeat,
-    linear-gradient(to top, #03b976 0 42%, transparent 42%) 14px 100% / 5px 100% no-repeat;
+  content: none;
 }
+
+.VPNavBarTitle .logo { width: 34px; height: 22px; margin-right: 9px; object-fit: contain; }
 
 .VPNavBarTitle .title { font-weight: 700; letter-spacing: -0.035em; }
 .VPNavBar { border-bottom-color: var(--vp-c-divider); background: color-mix(in srgb, var(--vp-c-bg) 92%, transparent); backdrop-filter: blur(18px); }
@@ -807,6 +802,59 @@
   pointer-events: none;
 }
 
+.getting-started-demo {
+  margin: 22px 0 30px;
+  overflow: hidden;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+}
+
+.getting-started-demo-head,
+.getting-started-demo-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.getting-started-demo-head {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.getting-started-demo-head div { display: flex; align-items: baseline; gap: 10px; }
+.getting-started-demo-head span,
+.getting-started-demo > p {
+  color: var(--vp-c-text-2);
+  font: 10px/1.4 var(--vp-font-family-mono);
+}
+.getting-started-demo-head strong { color: var(--vp-c-text-1); font-size: 13px; }
+.getting-started-demo-head output { color: var(--vp-c-brand-1); font: 600 12px/1 var(--vp-font-family-mono); }
+.getting-started-demo-chart { min-height: 280px; background: var(--vp-c-bg); }
+.getting-started-demo-chart .vd-figure { border: 0; border-radius: 0; }
+.getting-started-demo-chart .vd-figure-header { display: none; }
+.getting-started-demo-chart .vd-view,
+.getting-started-demo-chart .vd-view svg { min-height: 280px; height: 280px; }
+.getting-started-demo-controls { border-top: 1px solid var(--vp-c-divider); }
+.getting-started-demo-controls input { min-width: 0; flex: 1; accent-color: var(--vp-c-brand-1); }
+.getting-started-demo-controls button {
+  padding: 6px 10px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 5px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: 600 11px/1.2 var(--vp-font-family-mono);
+  cursor: pointer;
+}
+.getting-started-demo > p { margin: 0; padding: 0 16px 12px; }
+
+@media (max-width: 520px) {
+  .getting-started-demo-head div { display: grid; gap: 2px; }
+  .getting-started-demo-controls { display: grid; grid-template-columns: auto auto; }
+  .getting-started-demo-controls input { grid-column: 1 / -1; grid-row: 1; width: 100%; }
+}
+
 .style-gallery-chart .vd-figure { border: 0; }
 .style-gallery-chart .vd-figure-header { display: none; }
 .style-gallery-chart .vd-view,
@@ -1167,11 +1215,7 @@ body { font-feature-settings: "ss01", "kern"; }
 .VPNavBar { background: color-mix(in srgb, var(--vp-c-bg) 95%, transparent); backdrop-filter: blur(14px); }
 .VPNavBarTitle .title { font-weight: 720; letter-spacing: -.045em; }
 .VPNavBarTitle .title::before {
-  width: 19px;
-  height: 19px;
-  margin-right: 10px;
-  background: linear-gradient(var(--vp-c-text-1), var(--vp-c-text-1)) 1px 3px / 8px 7px no-repeat,
-    linear-gradient(var(--vp-c-brand-1), var(--vp-c-brand-1)) 10px 9px / 8px 7px no-repeat;
+  content: none;
 }
 .VPNavBarMenuLink,
 .VPNavBarMenuGroup .text,
@@ -1412,9 +1456,7 @@ body:has(.ontology-home) {
 }
 
 body:has(.ontology-home) .VPNavBarTitle .title::before {
-  background:
-    linear-gradient(#303039, #303039) 1px 3px / 8px 7px no-repeat,
-    linear-gradient(#89898f, #89898f) 10px 9px / 8px 7px no-repeat;
+  content: none;
 }
 
 .product-hero,

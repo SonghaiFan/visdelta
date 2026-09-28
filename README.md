@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/public/visdelta-logo.svg" width="160" alt="VisDelta logo">
+</p>
+
 # VisDelta
 
 VisDelta is a declarative visualization-transition library. Describe a chart
@@ -41,6 +45,21 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 ```sh
 npm install visdelta@0.3.0
 ```
+
+Or import it directly in a browser, using the same jsDelivr `+esm` convention
+as D3:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
+<script type="module">
+  import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.3.0/+esm";
+
+  const state = vd.bar(rows);
+</script>
+```
+
+See the [complete CDN example](docs/for-cdn-users.md) for a slider-controlled
+transition and the optional focused entry points.
 
 VisDelta depends only on the `d3-*` modules it renders with. Declared transforms
 such as `.where()`, `.sort()`, `.breakdown()`, and `.rollup()` run without any

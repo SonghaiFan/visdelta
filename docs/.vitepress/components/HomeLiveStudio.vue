@@ -10,9 +10,7 @@ const rows = [
   { year: 2022, country: 'Sweden', sites: 15 }
 ];
 
-const colors = '["#195fb5", "#f28e2b", "#0fa470"]';
-// One idiom across all five: grain first (breakdown / key), then the explicit
-// color encoding. The showcase is the first VisDelta code most people read.
+// Field-driven color uses the active chart style's default scheme.
 const chartPresets = [
   {
     type: 'bar',
@@ -21,7 +19,7 @@ const chartPresets = [
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
-  .color("country", { range: ${colors} });`
+  .color("country");`
   },
   {
     type: 'line',
@@ -30,7 +28,7 @@ const chartPresets = [
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
-  .color("country", { range: ${colors} })
+  .color("country")
   .curve("curveBumpX");`
   },
   {
@@ -40,7 +38,7 @@ const chartPresets = [
   .x("year", { title: "Year" })
   .y("sites", { title: "World Heritage Sites" })
   .breakdown("country")
-  .color("country", { range: ${colors} })
+  .color("country")
   .layout("stream")
   .curve("curveBumpX");`
   },
@@ -51,14 +49,14 @@ const chartPresets = [
   .x("sites", { title: "World Heritage Sites" })
   .y("country", { title: "Country" })
   .connector({ by: "country", orderBy: "year" })
-  .color("country", { range: ${colors} });`
+  .color("country");`
   },
   {
     type: 'unit',
     label: 'Unit',
     code: `const chart = unit(rows)
   .x("year", { title: "Year" })
-  .color("country", { range: ${colors} })
+  .color("country")
   .value("sites", { unitValue: 2 })
   .layout("force");`
   }

@@ -24,6 +24,32 @@ test('VitePress reference loads the real seekable transition', async ({ page }) 
   await expect(page.locator('.workbench-inspector')).toContainText('semantic');
 });
 
+test('getting started leads with a runnable, reversible first transition', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/getting-started.html');
+  await expect(page).toHaveTitle(/Getting started.*VisDelta/);
+  const logo = page.locator('.VPNavBarTitle img.logo');
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute('src', '/docs/.vitepress/dist/visdelta-logo.svg');
+  expect(await logo.evaluate(node => [node.naturalWidth, node.naturalHeight])).toEqual([640, 380]);
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/docs/.vitepress/dist/visdelta-logo.svg');
+  await expect(page.getByRole('heading', { name: 'See the model first' })).toBeVisible();
+  const demo = page.locator('.getting-started-demo');
+  await expect(demo.locator('rect.vd-bar')).toHaveCount(3);
+  const slider = demo.getByRole('slider', { name: 'First transition progress' });
+  const height = async () => Number(await demo.locator('rect.vd-bar').first().getAttribute('height'));
+  const start = await height();
+  await slider.fill('1');
+  expect(await height()).not.toBe(start);
+  await demo.getByRole('button', { name: '← Reverse' }).click();
+  await expect(demo.locator('output')).toHaveText('0.00', { timeout: 3000 });
+  await expect(page.locator('.VPDoc')).toContainText('https://cdn.jsdelivr.net/npm/visdelta@0.3.0/+esm');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await expect(slider).toBeEnabled();
+});
+
 test('application state controls drive the same transition progress', async ({ page }) => {
   await page.getByRole('button', { name: 'Next state' }).click();
   await expect(page.locator('.workbench-readout output')).toHaveText('0.50');

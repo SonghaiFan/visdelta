@@ -11,7 +11,7 @@ const rows = [
 const code = `import { orbit } from "./orbit/index.js";
 import { transition } from "visdelta/transition";
 
-const from = orbit(rows).size("before").color("#3366ff");
+const from = orbit(rows).size("before");
 const to = from.size("after");
 const change = await transition(from, to, { target: "#orbit" });
 
@@ -33,7 +33,7 @@ onMounted(async () => {
       import('../../../dist/transition-entry.js')
     ]);
     if (disposed) return;
-    const from = orbit(rows).size('before').color('#3366ff');
+    const from = orbit(rows).size('before');
     const candidate = await transition(from, from.size('after'), { target: target.value, height: 300 });
     if (disposed) { candidate.destroy(); return; }
     change = candidate;

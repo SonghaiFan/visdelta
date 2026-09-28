@@ -20,12 +20,9 @@ const samples = {
     code: `const revenue = bar(rows)
   .x("category")
   .y("sales", { title: "Revenue" })
-  .key("category")
-  .color("#1c6ae4");
+  .key("category");
 
-const profit = revenue
-  .y("profit", { title: "Profit" })
-  .color("#03a86c");
+const profit = revenue.y("profit", { title: "Profit" });
 
 return { from: revenue, to: profit };`
   },
@@ -75,9 +72,8 @@ return { from: all, to: focused };`
   .x("category")
   .y("sales")
   .key(["category", "segment"])
-  .breakdown("segment", {
-    color: ["#1c6ae4", "#fa4d1d"]
-  });
+  .breakdown("segment")
+  .color("segment");
 
 const total = detailed.rollup();
 

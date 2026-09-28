@@ -12,12 +12,15 @@ const files = ['README.md', 'llms.txt', 'index.html', ...await walk('docs'), ...
 let urls = 0;
 for (const file of files) {
   const source = await readFile(join(root, file), 'utf8');
-  for (const match of source.matchAll(/https:\/\/cdn\.jsdelivr\.net\/(?:npm\/visdelta|gh\/SonghaiFan\/visdelta)@(\d+\.\d+\.\d+(?:-[\w.-]+)?)([^\s"'`<>)]*)/g)) {
-    const [, version, path] = match;
+  for (const match of source.matchAll(/https:\/\/cdn\.jsdelivr\.net\/(npm\/visdelta|gh\/SonghaiFan\/visdelta)@(\d+\.\d+\.\d+(?:-[\w.-]+)?)([^\s"'`<>)]*)/g)) {
+    const [, packageSource, version, path] = match;
     if (version !== pkg.version) throw new Error(`${file}: CDN version ${version} differs from candidate ${pkg.version}.`);
     // A package-root npm URL resolves through the manifest's `jsdelivr`
-    // entry. Normalize it to the file it will serve before checking dist.
-    const cdnPath = path || `/${pkg.jsdelivr.replace(/^\.\//, '')}`;
+    // entry for a classic script. `/+esm` instead resolves the `module` entry,
+    // just like D3's canonical browser-module URL.
+    const cdnPath = packageSource === 'npm/visdelta' && path === '/+esm'
+      ? `/${pkg.module.replace(/^\.\//, '')}/+esm`
+      : path || `/${pkg.jsdelivr.replace(/^\.\//, '')}`;
     if (!cdnPath.startsWith('/dist/')) throw new Error(`${file}: use the packaged ESM/CSS/global path, not an untested CDN rewrite: ${match[0]}`);
     // jsDelivr's `/+esm` suffix asks the CDN to rewrite a packaged module for
     // direct browser use. It is not part of the file path in the tarball.
@@ -41,6 +44,9 @@ for (const file of files) {
   }
 }
 if (!urls) throw new Error('No versioned CDN examples were checked.');
+if (pkg.module !== pkg.exports?.['.']?.import) {
+  throw new Error('The root jsDelivr +esm entry and package import export must resolve to the same file.');
+}
 console.log(`Release docs: ${pkg.version}, ${urls} CDN references match packaged files; local links resolve.`);
 
 async function walk(dir) {

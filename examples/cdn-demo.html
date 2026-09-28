@@ -6,11 +6,8 @@
     <title>VisDelta CDN demo</title>
     <!-- 1. Stylesheet: required chart styles -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
-    <!-- 2. Script: the self-contained global bundle (~105 KB gzip). The D3 modules
-         VisDelta uses are compiled in, so no other <script> is needed; nothing
-         else (no Arquero) is bundled. Exposes window.VisDelta -->
-
-    <script src="https://cdn.jsdelivr.net/npm/visdelta@0.3.0"></script>
+    <!-- 2. Module: jsDelivr resolves VisDelta's package entry and rewrites its
+         version-pinned d3-* dependencies, following the same convention as D3. -->
     <style>
       body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; max-width: 880px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
@@ -40,10 +37,10 @@
     </div>
     <div id="status" role="alert"></div>
 
-    <script>
-      (async () => {
-        const { bar, transition } = VisDelta;
+    <script type="module">
+      import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.3.0/+esm";
 
+      (async () => {
         const rows = [
           { category: "A", revenue: 12, profit: 5 },
           { category: "B", revenue: 18, profit: 11 },
@@ -52,12 +49,11 @@
         ];
 
         // Chart states are immutable: `profit` branches from `revenue`.
-        // Color is an explicit encoding; without one, marks are neutral black.
-        const revenue = bar(rows).x("category").y("revenue", { title: "Revenue" }).key("category").color("#4e79a7");
+        const revenue = vd.bar(rows).x("category").y("revenue", { title: "Revenue" }).key("category");
         const profit = revenue.y("profit", { title: "Profit" });
 
         try {
-          const change = await transition(revenue, profit, { target: "#chart", height: 420 });
+          const change = await vd.transition(revenue, profit, { target: "#chart", height: 420 });
 
           const slider = document.querySelector("#progress");
           const value = document.querySelector("#value");

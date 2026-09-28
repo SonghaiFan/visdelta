@@ -6,6 +6,7 @@ import BarTransitionShowcase from '../components/BarTransitionShowcase.vue';
 import HeroTransitionDemo from '../components/HeroTransitionDemo.vue';
 import ProductCode from '../components/ProductCode.vue';
 import DocsCodeBlock from '../components/DocsCodeBlock.vue';
+import GettingStartedDemo from '../components/GettingStartedDemo.vue';
 
 export default {
   extends: DefaultTheme,
@@ -26,6 +27,7 @@ export default {
     app.component('HeroTransitionDemo', HeroTransitionDemo);
     app.component('ProductCode', ProductCode);
     app.component('DocsCodeBlock', DocsCodeBlock);
+    app.component('GettingStartedDemo', GettingStartedDemo);
     app.component('StateChangeCatalogue', defineAsyncComponent(
       () => import('../components/StateChangeCatalogue.vue')
     ));

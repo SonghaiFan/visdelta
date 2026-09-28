@@ -41,9 +41,8 @@ const detailed = line(companyRows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
-  .breakdown("ticker", {
-    color: ["#1c6ae4", "#fa4d1d"]
-  });
+  .breakdown("ticker")
+  .color("ticker");
 
 const average = detailed.rollup({ op: "mean" });`;
 

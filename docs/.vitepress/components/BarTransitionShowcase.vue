@@ -43,13 +43,13 @@ onMounted(async () => {
       .tooltip(['category', 'sales', 'profit']);
 
     states = [
-      { label: 'Revenue by category', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5') },
-      { label: 'Revenue regrouped by region', chart: bar(rows).datumKey('id').x('region', { title: 'Region' }).y('sales', { title: 'Revenue' }).rollup('region').color('#7656d6') },
-      { label: 'Profit by category', chart: base.y('profit', { title: 'Profit' }).color('#0fa470') },
-      { label: 'Revenue, ranked', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5').sort('sales', 'descending') },
-      { label: 'Growth categories', chart: base.y('sales', { title: 'Revenue' }).color('#f57c2f').where({ region: 'Growth' }) },
-      { label: 'Core categories highlighted', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5').highlight({ region: 'Core' }) },
-      { label: 'Revenue, horizontal', chart: base.y('sales', { title: 'Revenue' }).color('#195fb5').flip() }
+      { label: 'Revenue by category', chart: base.y('sales', { title: 'Revenue' }) },
+      { label: 'Revenue regrouped by region', chart: bar(rows).datumKey('id').x('region', { title: 'Region' }).y('sales', { title: 'Revenue' }).rollup('region') },
+      { label: 'Profit by category', chart: base.y('profit', { title: 'Profit' }) },
+      { label: 'Revenue, ranked', chart: base.y('sales', { title: 'Revenue' }).sort('sales', 'descending') },
+      { label: 'Growth categories', chart: base.y('sales', { title: 'Revenue' }).where({ region: 'Growth' }) },
+      { label: 'Core categories highlighted', chart: base.y('sales', { title: 'Revenue' }).highlight({ region: 'Core' }) },
+      { label: 'Revenue, horizontal', chart: base.y('sales', { title: 'Revenue' }).flip() }
     ];
 
     await nextTick();

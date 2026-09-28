@@ -2,10 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createChartRuntime } from '../dist/runtime/chart-runtime.js';
 import { resolveChartPresentation, d3ChartStyle, paperChartStyle, darkChartStyle } from '../dist/charts/style.js';
+import { barPresentation } from '../dist/charts/bar/style.js';
 
 const rows = [{ x: 'A', y: 10, group: 'North' }, { x: 'B', y: 30, group: 'South' }];
 const channels = { x: { field: 'x', title: 'Category' }, y: { field: 'y', title: 'Value', type: 'quantitative' } };
 const local = { plot: { margin: { top: 56, right: 20, bottom: 40, left: 56 }, edgeTitles: true } };
+
+test('the default D3 bar presentation keeps categorical x ticks without their domain line', () => {
+  assert.equal(resolveChartPresentation(barPresentation, d3ChartStyle).plot.openXDomain, true);
+  assert.equal(resolveChartPresentation(barPresentation, paperChartStyle).plot.openXDomain, false);
+});
 
 for (const theme of [d3ChartStyle, paperChartStyle, darkChartStyle]) {
   test(`${theme.key}: layout allocates content without mutating theme or text size`, () => {

@@ -63,13 +63,11 @@ onMounted(async () => {
       .x('category', { title: 'Category' })
       .y('sales', { title: 'Revenue' })
       .key('category')
-      .color('#1c6ae4')
       .tooltip(['category', 'sales'])
       .transition({ duration: 720, ease: 'cubicInOut' });
 
     const profitState = base
       .y('profit', { title: 'Profit' })
-      .color('#03a86c')
       .tooltip(['category', 'profit']);
 
     await nextTick();

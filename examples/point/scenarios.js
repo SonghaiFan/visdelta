@@ -31,7 +31,7 @@ const SUMMARY_CARS = ["Datsun 710", "Fiat 128", "Honda Civic", "Duster 360", "Ca
 
 const detailed = cars
   .where({ field: "name", oneOf: SUMMARY_CARS })
-  .color("cyl", { type: "nominal", title: "Cylinders", domain: [4, 8], range: ["#4c78a8", "#f58518"] });
+  .color("cyl", { type: "nominal", title: "Cylinders", domain: [4, 8] });
 const summary = detailed.rollup("cyl", {
   key: "cyl",
   x: { op: "mean" },
@@ -52,7 +52,7 @@ export const pointScenarios = [
   sample('add', '05 · Add a point', 'Add the real Maserati Bora observation at its target position.', base, 'cars.where({ field: "name", notEqual: "Maserati Bora" })', 'cars'),
   sample('data', '06 · Replace observations', 'Replace the four-cylinder rows with the six-cylinder rows from the same CSV.', replacement, 'fourCylinderCars', 'fourCylinderCars.data(rows.filter(row => row.cyl === 6))'),
   sample('highlight', '07 · Highlight points', 'Keep every car visible and dim cars that do not have four cylinders.', base, 'cars', 'cars.highlight({ cyl: 4 }, { opacity: 0.12 })'),
-  sample('color', '08 · Map color', 'Explicitly map cylinder count to a categorical color scale.', base, 'cars', 'cars.color("cyl", { type: "nominal", title: "Cylinders", domain: [4, 6, 8], range: ["#4c78a8", "#f2cf5b", "#f58518"] })'),
+  sample('color', '08 · Map color', 'Map cylinder count with the active style’s default categorical color scheme.', base, 'cars', 'cars.color("cyl", { type: "nominal", title: "Cylinders" })'),
   sample('size', '09 · Map size', 'Explicitly map horsepower to point radius.', base, 'cars.radius(5)', 'cars.size("hp", { title: "Horsepower", range: [5, 18] })'),
   sample('flip', '10 · Swap x and y', 'Swap vehicle weight and fuel economy while preserving car identity.', base, 'cars', 'cars.flip({ order: ["x", "y"] })'),
   sample('rollup', '11 · Combine into summaries', 'Gather the points under one fixed view, then let the view return to the summary scale.', summarySetup, 'detailed', 'summary'),

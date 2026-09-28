@@ -320,7 +320,7 @@ test('bar lab loads tidy population observations with ordered age detail', async
 
   await expect(page.locator('#editor')).toHaveValue(/\.breakdown\("age"\)/);
   await expect(page.locator('#editor')).not.toHaveValue(/\.segment\(\{[\s\S]*fields:/);
-  await expect(page.locator('#editor')).toHaveValue(/\.color\("age", \{ domain: AGE_BANDS, range: AGE_COLORS \}\)/);
+  await expect(page.locator('#editor')).toHaveValue(/\.color\("age", \{ domain: AGE_BANDS \}\)/);
   await expect(page.locator('#chart rect.vd-bar:not(.vd-bar-segment)')).toHaveCount(52);
   await page.locator('#end').click();
   await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);

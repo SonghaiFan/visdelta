@@ -11,13 +11,10 @@ const withHeldOutFlowers = `${base}
 
 const first140 = flowers.data(rows.slice(0, -10));`;
 
-const speciesColors = `["#4c78a8", "#f58518", "#54a24b"]`;
-
 const bars = `${base}
 
 const colored = flowers.color("species", {
-  title: "Species",
-  range: ${speciesColors}
+  title: "Species"
 });
 const bySpecies = colored
   .group("species")
@@ -26,8 +23,7 @@ const bySpecies = colored
 const positioned = `${base}
 
 const colored = flowers.color("species", {
-  title: "Species",
-  range: ${speciesColors}
+  title: "Species"
 });
 const byPetalLength = colored
   .x("petalLength", { title: "Petal length (cm)" })
@@ -36,8 +32,7 @@ const byPetalLength = colored
 const forced = `${base}
 
 const colored = flowers.color("species", {
-  title: "Species",
-  range: ${speciesColors}
+  title: "Species"
 });
 const bySpeciesForce = colored
   .x("species", { title: "Species" })
@@ -55,7 +50,7 @@ const detailed = unit(counts)
   .key("species")
   .group("species")
   .layout("bar", { columns: 5, radius: 8 })
-  .color("species", { title: "Species", range: ${speciesColors} });`;
+  .color("species", { title: "Species" });`;
 
 const sampleCategories = {
   all: 'data', add: 'data', remove: 'data', filter: 'data', highlight: 'attention',
@@ -79,10 +74,10 @@ export const scenarios = [
   sample('remove', '03 · Remove observations', 'Remove those same ten flowers in the exact reverse of Add.', withHeldOutFlowers, 'flowers', 'first140'),
   sample('filter', '04 · Filter observations', 'Keep setosa and versicolor flowers, then reflow the surviving units.', base, 'flowers', 'flowers.where({ field: "species", oneOf: ["setosa", "versicolor"] })'),
   sample('highlight', '05 · Highlight a species', 'Keep every flower visible and dim the species outside setosa.', base, 'flowers', 'flowers.highlight({ species: "setosa" }, { opacity: 0.12 })'),
-  sample('color', '06 · Map species to color', 'Explicitly map the three Iris species to color while position stays in one grid.', base, 'flowers', `flowers.color("species", { title: "Species", range: ${speciesColors} })`),
+  sample('color', '06 · Map species to color', 'Map the three Iris species with the active style’s default categorical scheme.', base, 'flowers', 'flowers.color("species", { title: "Species" })'),
   sample('columns', '07 · Change grid columns', 'Reflow all 150 keyed flowers into a wider grid.', base, 'flowers', 'flowers.layout("grid", { columns: 20, radius: 6 })'),
   sample('radius', '08 · Change unit size', 'Change the size of every equal flower unit without mapping size to a data field.', base, 'flowers', 'flowers.radius(8)'),
-  sample('bar', '09 · Group flowers by species', 'Arrange the same 150 flowers as three explicitly colored unit bars.', bars, 'colored', 'bySpecies'),
+  sample('bar', '09 · Group flowers by species', 'Arrange the same 150 flowers as three unit bars using the default color scheme.', bars, 'colored', 'bySpecies'),
   sample('measure', '10 · Change the measured position', 'Move every flower from its petal-length position to its sepal-length position.', positioned, 'byPetalLength', 'colored.x("sepalLength", { title: "Sepal length (cm)" }).layout("beeswarm")'),
   sample('beeswarm', '11 · Beeswarm by petal length', 'Move flowers across to their measured petal lengths, then use dodge placement to form a non-overlapping swarm.', positioned, 'colored', 'byPetalLength'),
   sample('force', '12 · Gather with forceX', 'Use the explicitly mapped species positions as forceX attractors while collision keeps every flower separate.', forced, 'colored', 'bySpeciesForce'),

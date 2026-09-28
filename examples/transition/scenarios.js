@@ -27,8 +27,7 @@ const populationFocus = `${population}
 const FOCUS_ANCHORS = ["NY", "PA"];`;
 
 const ageConstants = `const DATA_URL = "./data/us-population-state-age-tidy.csv";
-const AGE_BANDS = ["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "≥80"];
-const AGE_COLORS = ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f598", "#abdda4", "#66c2a5", "#3288bd"];`;
+const AGE_BANDS = ["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "≥80"];`;
 
 const segmentedOverview = `${ageConstants}
 
@@ -37,7 +36,7 @@ const detailed = bar({ url: DATA_URL })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS, range: AGE_COLORS });`;
+  .color("age", { domain: AGE_BANDS });`;
 
 const segmentedFeatured = `${ageConstants}
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
@@ -48,7 +47,7 @@ const detailed = bar({ url: DATA_URL })
   .key(["state", "age"])
   .where({ field: "state", oneOf: FEATURE_STATES })
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS, range: AGE_COLORS });`;
+  .color("age", { domain: AGE_BANDS });`;
 
 const lineageReaggregation = `const cases = [
   { id: "r1", year: 2020, location: "A", cases: 10 },
