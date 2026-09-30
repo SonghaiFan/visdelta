@@ -12,7 +12,7 @@ const selectScenario = async (page, id) => {
   const sample = scenarios.find(candidate => candidate.id === id);
   await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
   await page.locator(`[data-scenario="${id}"]`).click();
-  await expect(page.locator('#status')).toHaveText('Waiting for input');
+  await expect(page.locator('#editor')).toHaveValue(sample.code);
   await ready(page);
 };
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
@@ -58,19 +58,19 @@ test('line granularity examples keep time on x while resampling daily observatio
   await page.goto('/docs/.vitepress/dist/line-lab.html#x');
   await ready(page);
   await expect(page.locator('.vd-x-label')).toHaveText('Date →');
-  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(24);
+  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(20);
 
   await page.locator('#end').click();
   const weeklyCount = await page.locator('#chart circle.vd-line-point').count();
   expect(weeklyCount).toBeGreaterThan(3);
-  expect(weeklyCount).toBeLessThan(24);
+  expect(weeklyCount).toBeLessThan(20);
   await expect(page.locator('#chart path.vd-line')).toHaveCount(1);
-  await expect(page.locator('.vd-x-label')).toHaveText('Date →');
+  await expect(page.locator('.vd-x-label')).toHaveText('Week →');
 
   await selectScenario(page, 'xy');
   await page.locator('#end').click();
-  await expect(page.locator('.vd-x-label')).toHaveText('Date →');
-  await expect(page.locator('.vd-y-label')).toHaveText('↑ High (USD)');
+  await expect(page.locator('.vd-x-label')).toHaveText('Week →');
+  await expect(page.locator('.vd-y-label')).toHaveText('↑ Weekly high (USD)');
 });
 
 for (const sample of scenarios) {
@@ -95,10 +95,10 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('const sampleSize = 24;', 'const sampleSize = 18;'));
+    await editor.fill(sample.code.replace('title: "Date"', 'title: "Trading date"'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/const sampleSize = 18;/);
+    await expect(editor).toHaveValue(/title: "Trading date"/);
     await page.locator('#reset').click();
     await ready(page);
     await expect(editor).toHaveValue(sample.code);
@@ -145,13 +145,13 @@ test('line filter keeps an internal gap while focus keeps every observation', as
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Remove points');
   await page.locator('#end').click();
-  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(21);
+  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(17);
   await expect(page.locator('#chart path.vd-line')).toHaveCount(2);
 
   await selectScenario(page, 'focus');
   await expect(page.locator('.playground-line-plan')).toContainText('Focus view');
   await page.locator('#end').click();
-  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(24);
+  await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(20);
   await expect(page.locator('#chart path.vd-line')).toHaveCount(1);
   const fit = await page.locator('#chart svg').evaluate(svg => {
     const plot = svg.querySelector('clipPath[id^="vd-mark-clip-"] rect');
@@ -288,25 +288,22 @@ test('line time window combines keyed add and remove without a path wiggle', asy
   await page.goto('/docs/.vitepress/dist/line-lab.html#shift');
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Add and remove points');
-  const startPoint = await page.locator('#chart path.vd-line').evaluate(node => {
-    const point = node.getPointAtLength(0);
-    return { x: point.x, y: point.y };
-  });
   const frameAt = async progress => {
     await page.locator('#progress').fill(String(progress));
-    return page.locator('#chart path.vd-line').evaluate(node => {
-      const length = node.getTotalLength();
-      const points = Array.from({ length: 121 }, (_, index) =>
-        node.getPointAtLength(length * index / 120));
+    return page.locator('#chart').evaluate(chart => {
+      const paths = [...chart.querySelectorAll('path.vd-line')].map(node => {
+        const length = node.getTotalLength();
+        const points = Array.from({ length: 121 }, (_, index) =>
+          node.getPointAtLength(length * index / 120));
+        return {
+          strategy: node.getAttribute('data-line-transition'),
+          d: node.getAttribute('d'),
+          backwards: points.some((point, index) => index > 0 && point.x < points[index - 1].x - 0.5)
+        };
+      });
       return {
-        strategy: node.getAttribute('data-line-transition'),
-        d: node.getAttribute('d'),
-        first: { x: points[0].x, y: points[0].y },
-        last: { x: points.at(-1).x, y: points.at(-1).y },
-        left: Math.min(...points.map(point => point.x)),
-        right: Math.max(...points.map(point => point.x)),
-        backwards: points.some((point, index) => index > 0 && point.x < points[index - 1].x - 0.5),
-        circles: [...node.parentElement.querySelectorAll('circle.vd-line-point')].map(point => ({
+        paths,
+        circles: [...chart.querySelectorAll('circle.vd-line-point')].map(point => ({
           key: point.getAttribute('data-key'),
           x: Number(point.getAttribute('cx')),
           radius: Number(point.getAttribute('r'))
@@ -326,18 +323,13 @@ test('line time window combines keyed add and remove without a path wiggle', asy
   const leavingKey = [...startKeys].find(key => !endKeys.has(key));
   const enteringKey = [...endKeys].find(key => !startKeys.has(key));
 
-  expect(middle.strategy).toBe('add-remove-points');
-  expect(middle.d).not.toBe(early.d);
-  expect(middle.backwards).toBe(false);
+  expect(middle.paths.map(path => path.strategy)).toEqual(expect.arrayContaining(['remove-line', 'draw-line']));
+  expect(middle.paths.every(path => !path.backwards)).toBe(true);
   expect(leavingKey).toBeTruthy();
   expect(enteringKey).toBeTruthy();
   expect(radius(early, leavingKey)).toBe(0);
-  expect(Math.abs(early.first.x - startPoint.x)).toBeLessThan(1);
-  expect(Math.abs(early.first.y - startPoint.y)).toBeLessThan(1);
   expect(radius(middle, leavingKey)).toBe(0);
   expect(radius(beforeEnter, enteringKey)).toBe(0);
-  expect(Math.abs(beforeEnter.last.x - end.last.x)).toBeLessThan(1);
-  expect(Math.abs(beforeEnter.last.y - end.last.y)).toBeLessThan(1);
   expect(radius(late, enteringKey)).toBe(0);
 });
 

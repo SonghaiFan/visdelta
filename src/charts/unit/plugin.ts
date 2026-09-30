@@ -8,6 +8,7 @@ import type { UnitViewState } from './authoring.js';
 
 export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>({
   key: 'unit',
+  declarationPlanning: true,
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'mapping'],
   presentation: unitPresentation,

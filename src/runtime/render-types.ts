@@ -2,6 +2,7 @@ import type { ChannelSpec, ChartContext, ChartSceneContext, ChartTransitionConte
 import type { ChartStyleModule } from '../charts/style.js';
 import type { BaseType, Selection } from 'd3-selection';
 import type { MotionTiming } from './recorder.js';
+import type { DatumKey, LineageTable } from '../data/lineage.js';
 export type SvgSelection<ElementType extends BaseType, Datum = unknown> =
   Selection<ElementType, Datum, BaseType, unknown>;
 export type MotionTransition = MotionTiming;
@@ -40,6 +41,11 @@ export interface RenderChannel extends ChannelSpec {
 
 export interface RenderDatum extends DataRow {
   __row?: DataRow;
+  __datumIdentity?: {
+    fields: string[];
+    mode: LineageTable['identity']['mode'];
+    keys: DatumKey[];
+  };
 }
 
 export type RenderScene = ChartSceneContext;

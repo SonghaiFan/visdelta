@@ -1,3 +1,5 @@
+import { transitionScenario } from '../scenario.js';
+
 // Keep these pairs aligned with tests/browser/unit-lab.spec.mjs.
 const base = `const DATA_URL = "./data/iris.csv";
 const rows = await d3.csv(DATA_URL, d3.autoType);
@@ -60,7 +62,7 @@ const sampleCategories = {
 };
 
 function sample(id, label, description, setup, from, to) {
-  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return transitionScenario({ id, category: sampleCategories[id], label, description, setup, from, to });
 }
 
 export const chart = 'unit';

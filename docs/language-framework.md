@@ -11,9 +11,10 @@ Two immutable chart states are the endpoints. VisDelta reasons about the change
 between them through four layers that must remain separate:
 
 1. **Identity and correspondence** determine which source records and marks can
-   be related across the endpoints. `.datumKey()` identifies source records;
-   `.key()` identifies marks at the current grain. Lineage and contributions
-   provide additional correspondence evidence.
+   be related across the endpoints. Core infers source-record `datumKey` fields;
+   `.datumKey()` overrides that inference when the data is ambiguous. `.key()`
+   identifies marks at the current grain. Lineage and contributions provide
+   additional correspondence evidence.
 2. **State difference** reports what changed using seven non-exclusive
    categories: Data, Grain, Encoding, Coordinate, Layout, Attention, and
    Appearance. Directional actions such as `remove`, `split`, and `reorient`
@@ -109,14 +110,16 @@ category list.
    correspondence, measure compatibility, retained selector fields, and visual
    constraints. Another route may be valid. Author-supplied states are fixed
    boundaries; automatic states may be inserted only within each adjacent pair.
-   An empty intermediate list means a direct transition, not no animation.
+   An empty chart intermediate list permits the shared declaration planner for
+   opted-in charts; otherwise it means a direct transition, not no animation.
 
 Every generated waypoint is a complete chart state. Each leg derives its own
 difference and motion plan; simultaneous scale/axis/mark changes remain coupled
 when required for a truthful frame. Explicit sequence and automatic waypoints
 share pair/frame execution, while keeping their distinct timeline ownership.
 These contracts do not imply a universal route-search engine: supported paths
-are currently chart-owned policies, with concrete cases documented below.
+combine chart-owned policies with a conservative shared declaration planner,
+with concrete cases documented below.
 
 ## Execution flow
 
@@ -243,9 +246,27 @@ lineage       source records contributing to that mark
 contribution  amount each source record contributes to an additive measure
 ```
 
-In the chart grammar, `.datumKey("id")` declares the first line and `.key()`
-declares the second. They must not be aliases: aggregation can change mark
-identity while datum identity remains stable.
+Core infers the first line from the smallest unique categorical field set,
+preferring identifier-like fields such as `id` and `flowerId`. If no stable
+categorical identity exists, it exposes an explicit row-index fallback;
+`.datumKey("id")` remains an override for ambiguous data. `.key()` declares the
+second line. They must not be aliases: aggregation can change mark identity
+while datum identity remains stable. Every transformed mark retains the mapping
+to all contributing source datum keys, which is also exposed in its tooltip.
+
+Core resolves one-to-one mark correspondence independently of lineage. An
+explicit `.key()` has priority; otherwise each chart module declares its
+default mark key through the chart-type interface. Core validates the resolved
+key at both endpoints and reports `updates`, `enter`, and `exit`. Runtime
+membership timing and ordinary keyed joins consume this same identity
+contract. A chart module may add topology or motion rules, but it must not
+reinterpret datum identity as mark identity.
+
+Default mark keys are semantic declarations by chart modules, not guesses from
+partially matching field values. Shared values can be evidence for a chart's
+special matching policy, but do not by themselves prove object continuity.
+Lineage remains the relation for one-to-many, many-to-one, and many-to-many
+structure; those relations cannot be represented by duplicate D3 join keys.
 
 This lets a change from `sum(case) by year` to `sum(case) by location` compile
 to a many-to-many transport graph through the common refinement
@@ -281,8 +302,17 @@ common-grain marks under A, grouped under A, grouped under B, stacked under B,
 then aggregate B. Other aggregate operators currently keep the ordinary
 fallback transition.
 
+Core also exposes lossless declaration edits through `delta().edits` and
+`applyDeclarationEdits()`. Ordered transform arrays remain indivisible. The
+shared `planDeclarationTransition()` factors changed attention and terminal
+sorts around a central state change, using complete endpoint-derived states.
+It requires the same chart, source data, and datum identity declaration; it
+does not separate data, grain, and bindings or reorder preparation transforms.
+Built-in charts use it when no chart-specific intermediate route applies.
+Chart policies may refine its individual legs without recursive planning.
+
 We solve readable transition routes one concrete case at a time. These
-chart-owned routes are evidence for a future general capability: deriving
+verified routes are evidence for a future general capability: deriving
 intermediate states from shared source atoms, endpoint grains, operation
 compatibility, and visual constraints. That future planner must generalize
 verified cases without treating every builder call as an animation phase or

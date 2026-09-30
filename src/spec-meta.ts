@@ -109,7 +109,7 @@ export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unk
 
   return {
     ...baseSpec,
-    key: object.key ?? (spec.encoding?.key?.field ?? null) as string | null,
+    key: object.key ?? spec.key ?? (spec.encoding?.key?.field ?? null) as string | string[] | null,
     datumKey: meta.lineage?.key ?? null,
     semanticKey: semanticFromMeta(object.semantic) ?? null,
     transition: (meta.transition ?? {}) as TransitionSpec,
@@ -125,7 +125,7 @@ export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unk
 
 export function specObjectKey(spec: ViewSpec): string | string[] | null {
   const meta = getSpecMeta(spec);
-  return meta.object?.key ?? (spec.encoding?.key?.field as string | undefined) ?? null;
+  return meta.object?.key ?? spec.key ?? (spec.encoding?.key?.field as string | undefined) ?? null;
 }
 
 export function specDatumKey(spec: ViewSpec): string | string[] | null {

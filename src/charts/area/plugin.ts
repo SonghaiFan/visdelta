@@ -15,11 +15,13 @@ export interface AreaTransitionPlanExtension {
 
 export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>({
   key: 'area',
+  declarationPlanning: true,
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: areaPresentation,
   createRenderer: createAreaRenderer,
   createSpecCompiler: createAreaSpecCompiler,
+  defaultMarkKey: (spec) => spec.encoding?.x?.field || null,
   transition: {
     canonicalPair: canonicalAreaTransitionPair,
     plan: (previousSpec, nextSpec) => {

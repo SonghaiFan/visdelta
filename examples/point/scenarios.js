@@ -1,3 +1,5 @@
+import { transitionScenario } from '../scenario.js';
+
 // Keep these pairs aligned with tests/browser/point-lab.spec.mjs.
 const base = `const DATA_URL = "./data/mtcars.csv";
 
@@ -23,7 +25,7 @@ const sampleCategories = {
 };
 
 function sample(id, label, description, setup, from, to) {
-  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return transitionScenario({ id, category: sampleCategories[id], label, description, setup, from, to });
 }
 
 const summarySetup = `${base}

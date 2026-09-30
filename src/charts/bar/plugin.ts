@@ -9,6 +9,7 @@ import { createBarSpecCompiler } from './compile.js';
 
 export const plugin: ChartPlugin<BarSpec> = defineChartType<BarSpec>({
   key: 'bar',
+  declarationPlanning: true,
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: barPresentation,

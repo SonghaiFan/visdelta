@@ -258,7 +258,7 @@ export interface ViewSpec {
   transform?: TransformSpec[];
   filter?: FilterSpec;
   key?: string | string[] | null;
-  /** Stable identity of source data records; distinct from the current mark key. */
+  /** Optional override for Core-inferred source identity; distinct from the mark key. */
   datumKey?: string | string[] | null;
   semanticKey?: SemanticKey | null;
   transition?: TransitionSpec;
@@ -407,6 +407,8 @@ export type StateChange =
   | { category: 'appearance'; action: 'restyle' | 'reshape'; property: string };
 
 export interface DiffResult {
+  /** Lossless declaration edits. Their order is not an animation schedule. */
+  edits: import('../grammar/declaration-edits.js').DeclarationEdit[];
   changed: string[];
   has(key: string): boolean;
   deltas: Delta[];
@@ -496,6 +498,8 @@ export interface TransitionPlan {
   membershipTiming?: 'staged' | 'simultaneous';
   /** Datum-provenance evidence, not an instruction to use a particular motion. */
   lineage?: import('../data/lineage.js').LineageCorrespondence;
+  /** One-to-one visual-object continuity; distinct from source-record lineage. */
+  markCorrespondence?: import('../identity/mark-correspondence.js').MarkCorrespondence;
 }
 
 // ─── Chart type ───────────────────────────────────────────────────────────────
@@ -609,6 +613,8 @@ export type ChartRuntime = import('../runtime/chart-runtime.js').ChartRuntime;
  * Hooks must not mutate their inputs. Author-supplied sequence states are fixed
  * boundaries: intermediateSpecs only adds states inside an adjacent pair. */
 export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
+  /** Opt into Core's conservative declaration planner when this chart has no route. */
+  declarationPlanning?: boolean;
   /** Plan motion and timing for one adjacent pair, not all generated waypoints. */
   resolveTransitionPlan(prev: S | null, next: S | null): TransitionPlan;
   /**
@@ -617,7 +623,8 @@ export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
    */
   canonicalTransitionPair?(prev: S, next: S): CanonicalTransitionPair<S>;
   /** Choose a valid default route in authored order, excluding both endpoints.
-   * An empty list keeps the ordinary direct route; it does not mean no motion.
+   * An empty list permits declarationPlanning when enabled, otherwise keeps
+   * the ordinary direct route; it does not mean no motion.
    * Generated waypoints are not recursively sent back to this hook. */
   intermediateSpecs?(prev: S, next: S): IntermediateSpec<S>[];
 }
@@ -635,6 +642,8 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   renderer: Renderer<S>;
   prepareSpec(spec: S): S;
   defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;
+  /** Chart-owned default object identity. Explicit `.key()` overrides it in Core. */
+  defaultMarkKey?(spec: S): import('../identity/mark-correspondence.js').MarkKeySpec | null;
   readonly scenes: readonly string[];
   inspect?: Record<string, unknown>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;

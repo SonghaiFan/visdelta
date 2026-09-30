@@ -74,6 +74,98 @@ test('an application holds a chart at an endpoint and hands it to the next trans
   expect(errors).toEqual([]);
 });
 
+for (const key of ['state', ['state']]) {
+  test(`cohort filters update persistent state bars with key ${JSON.stringify(key)}`, async ({ page }) => {
+    const result = await page.evaluate(async key => {
+      const population = sl.bar([
+        { state: 'CA', age: 'young', population: 10 },
+        { state: 'TX', age: 'young', population: 30 },
+        { state: 'CA', age: 'old', population: 20 },
+        { state: 'TX', age: 'old', population: 15 }
+      ]).datumKey(['state', 'age']).key(key).x('state')
+        .y('population', { domain: [0, 40] });
+      const change = await sl.transition(population.where({ age: 'young' }), population.where({ age: 'old' }), opts('#a'));
+      const nodes = [...change.view.querySelectorAll('rect.vd-bar')];
+      const frame = p => {
+        change.progress(p);
+        return [...change.view.querySelectorAll('rect.vd-bar')].map(node => ({
+          key: node.dataset.key, height: Number(node.getAttribute('height')),
+          opacity: Number(getComputedStyle(node).opacity)
+        }));
+      };
+      const start = frame(0), middle = frame(0.75), end = frame(1), reverse = frame(0.75);
+      return { start, middle, end, reverse, reused: nodes.every(node => change.view.contains(node)) };
+    }, key);
+    expect(result.reused).toBe(true);
+    expect(result.middle).toHaveLength(2);
+    for (let i = 0; i < 2; i++) {
+      expect(result.middle[i].opacity).toBe(1);
+      expect(result.middle[i].height).toBeGreaterThan(Math.min(result.start[i].height, result.end[i].height));
+      expect(result.middle[i].height).toBeLessThan(Math.max(result.start[i].height, result.end[i].height));
+    }
+    expect(result.reverse).toEqual(result.middle);
+  });
+}
+
+test('new bars grow from the zero-value baseline without fading in', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const to = base.data([...rows, { category: 'D', value: 25, other: 12, type: 'two' }]);
+    const change = await sl.transition(base, to, opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      const bar = [...change.view.querySelectorAll('rect.vd-bar')]
+        .find(node => node.dataset.key === 'D');
+      return {
+        opacity: Number(getComputedStyle(bar).opacity),
+        height: Number(bar.getAttribute('height'))
+      };
+    };
+    // The entering node is mounted at the start of its staged enter window,
+    // after the categorical scale has made room for it.
+    return { start: frame(0.5), middle: frame(0.75), end: frame(1) };
+  });
+  expect(result.start.opacity).toBe(1);
+  expect(result.start.height).toBe(0);
+  expect(result.middle.opacity).toBe(1);
+  expect(result.middle.height).toBeGreaterThan(0);
+  expect(result.end.height).toBeGreaterThan(result.middle.height);
+});
+
+test('equal-size data replacement stages keyed exit, scale movement, and enter', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const replacement = [
+      rows[0], rows[1],
+      { category: 'D', value: 25, other: 12, type: 'two' }
+    ];
+    const change = await sl.transition(base, base.data(replacement), opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      const marks = new Map([...change.view.querySelectorAll('rect.vd-bar')]
+        .map(node => [node.dataset.key, {
+          opacity: Number(getComputedStyle(node).opacity),
+          height: Number(node.getAttribute('height'))
+        }]));
+      return { exiting: marks.get('C'), entering: marks.get('D') };
+    };
+    const start = frame(0.001);
+    const exit = frame(0.15);
+    const scale = frame(0.5);
+    const enter = frame(0.85);
+    const reverse = frame(0.15);
+    return { start, exit, scale, enter, reverse };
+  });
+
+  expect(result.exit.exiting.opacity).toBe(1);
+  expect(result.exit.exiting.height).toBeGreaterThan(0);
+  expect(result.exit.exiting.height).toBeLessThan(result.start.exiting.height);
+  expect(result.exit.entering.height).toBe(0);
+  expect(result.scale.exiting.height).toBe(0);
+  expect(result.scale.entering.height).toBe(0);
+  expect(result.enter.entering.opacity).toBe(1);
+  expect(result.enter.entering.height).toBeGreaterThan(0);
+  expect(result.reverse).toEqual(result.exit);
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
   test(`${scenario}: direct seek equals history, endpoints restore, frame stays still`, async ({ page }) => {
     const errors = [];
@@ -175,10 +267,13 @@ test('stacked filter continuously moves surviving segments onto their new stack 
     const change = await sl.transition(stacked, filtered, opts('#a'));
     const frame = progress => {
       change.progress(progress);
-      const node = change.view.querySelector('rect[data-key="B|high"]');
+      const bars = [...change.view.querySelectorAll('rect.vd-bar')];
+      const node = bars
+        .find(candidate => candidate.dataset.key === JSON.stringify(['B', 'high']));
       return {
         y: Number(node?.getAttribute('y')),
-        height: Number(node?.getAttribute('height'))
+        height: Number(node?.getAttribute('height')),
+        keys: bars.map(candidate => candidate.dataset.key)
       };
     };
     const source = frame(0);
@@ -190,6 +285,7 @@ test('stacked filter continuously moves surviving segments onto their new stack 
   });
 
   expect(result.source).not.toEqual(result.target);
+  expect(result.middle.keys).toContain(JSON.stringify(['B', 'high']));
   expect(result.afterExit).not.toEqual(result.target);
   expect(result.middle.y).toBeGreaterThan(Math.min(result.source.y, result.target.y));
   expect(result.middle.y).toBeLessThan(Math.max(result.source.y, result.target.y));

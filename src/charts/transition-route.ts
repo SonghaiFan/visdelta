@@ -1,4 +1,5 @@
 import { inferTransition } from '../grammar/infer-transition.js';
+import { planDeclarationTransition } from '../grammar/declaration-plan.js';
 import type {
   CanonicalTransitionPair,
   ChartTransitionPolicy,
@@ -7,6 +8,29 @@ import type {
 } from '../types/index.js';
 
 type DirectionPolicy<S extends ViewSpec> = Pick<ChartTransitionPolicy<S>, 'canonicalTransitionPair'>;
+
+/** Select once per authored pair. Existing chart routes take precedence;
+ * opt-in charts can refine each Core declaration stage once, without recursion. */
+export function resolveIntermediateSpecs<S extends ViewSpec>(
+  policy: Pick<ChartTransitionPolicy<S>, 'canonicalTransitionPair' | 'intermediateSpecs' | 'declarationPlanning'>,
+  from: S,
+  to: S
+): IntermediateSpec<S>[] {
+  const authored = policy.intermediateSpecs?.(from, to) ?? [];
+  if (authored.length || !policy.declarationPlanning) return authored;
+  const plan = planDeclarationTransition(from, to);
+  if (plan.stages.length < 2) return [];
+  const waypoints: IntermediateSpec<S>[] = [];
+  for (const [index, stage] of plan.stages.entries()) {
+    const a = stage.from as S;
+    const b = stage.to as S;
+    const canonical = canonicalTransitionPair(policy, a, b);
+    const local = policy.intermediateSpecs?.(canonical.from, canonical.to) ?? [];
+    waypoints.push(...(canonical.reverse ? [...local].reverse().map(({ spec }) => ({ spec })) : local));
+    if (index < plan.stages.length - 1) waypoints.push({ spec: b });
+  }
+  return waypoints;
+}
 
 /** One authored leg and the canonical pair used to evaluate its frames. */
 export interface TransitionRouteLeg<S extends ViewSpec = ViewSpec> {

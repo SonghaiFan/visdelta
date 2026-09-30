@@ -1,4 +1,25 @@
 import { test, expect } from '@playwright/test';
+
+test('entering a bar tab does not advance its authored-pair progress', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/transition-lab.html#measure');
+  await expect(page.locator('#status')).toHaveText('Ready');
+  await page.locator('#end').click();
+  await page.getByRole('tab', { name: /^Grain/i }).click();
+  await expect(page.locator('#status')).toHaveText('Switching tabs');
+  const values = await page.evaluate(async () => {
+    const values = [];
+    while (document.querySelector('#status').textContent === 'Switching tabs') {
+      values.push([document.querySelector('#progress').value, document.querySelector('#value').textContent]);
+      await new Promise(requestAnimationFrame);
+    }
+    return values;
+  });
+  expect(values.length).toBeGreaterThan(1);
+  expect(values.every(([progress, label]) => progress === '0' && label === '0.00')).toBe(true);
+  await expect(page.locator('#status')).toHaveText('Ready');
+  await page.locator('#play').click();
+  await expect(page.locator('#value')).toHaveText('1.00');
+});
 import { scenarios } from '../../examples/transition/scenarios.js';
 
 const ready = page => expect(page.locator('#status')).toHaveText('Ready');
@@ -320,7 +341,7 @@ test('bar lab loads tidy population observations with ordered age detail', async
 
   await expect(page.locator('#editor')).toHaveValue(/\.breakdown\("age"\)/);
   await expect(page.locator('#editor')).not.toHaveValue(/\.segment\(\{[\s\S]*fields:/);
-  await expect(page.locator('#editor')).toHaveValue(/\.color\("age", \{ domain: AGE_BANDS \}\)/);
+  await expect(page.locator('#editor')).toHaveValue(/\.color\("age", \{ domain: AGE_BANDS, scheme: "Blues" \}\)/);
   await expect(page.locator('#chart rect.vd-bar:not(.vd-bar-segment)')).toHaveCount(52);
   await page.locator('#end').click();
   await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);

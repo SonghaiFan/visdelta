@@ -19,10 +19,12 @@ export interface LineTransitionPlanExtension {
 
 export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>({
   key: 'line',
+  declarationPlanning: true,
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: linePresentation,
   createRenderer: createLineRenderer,
   createSpecCompiler: createLineSpecCompiler,
+  defaultMarkKey: (spec) => spec.encoding?.x?.field || null,
   transition: {
     canonicalPair: canonicalLineTransitionPair,
     intermediateSpecs: lineIntermediateSpecs,
@@ -33,6 +35,7 @@ export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>
       const observation = previousSpec && nextSpec
         ? lineObservationChange(previousSpec, nextSpec)
         : null;
+      if (observation?.mode === 'add-and-remove') plan.membershipTiming = 'simultaneous';
       if (observation && observation.mode !== 'remove') {
         plan.observation = {
           mode: observation.mode,

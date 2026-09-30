@@ -191,6 +191,7 @@ export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPre
     const applyGeometry = geometry.apply;
     const exitGeometry = geometry.exit;
     const dimOpacity = themeValue('--vd-dim-opacity', 0.22);
+    const structuralEnter = chart.transitionPlan?.enter?.mode === 'parent-child-lineage';
     // A focus change is one rigid camera move. Per-mark staggering would bend
     // the coordinate system: bars would temporarily leave the shared axis
     // baseline even though neither their data nor identity changed.
@@ -209,7 +210,10 @@ export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPre
             .call(options.applyIdentity, spec, key, category)
             .attr('rx', 0)
             .attr('fill', fill)
-            .style('opacity', 0)
+            // A bar's zero-size geometry is its honest enter state. Keep it
+            // visible so entering data grows from the measure-zero baseline
+            // instead of appearing through an unrelated opacity fade.
+            .style('opacity', (d) => structuralEnter ? 0 : barSelectionOpacity(d, spec, dimOpacity))
             .call(bindTooltip, spec, tooltip)
             .each(function(d) { setRectGeometry(select(this), startGeometry(d)); });
           motion(entered, chart.transition.enter || chart.transition.base)
@@ -245,8 +249,9 @@ export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPre
         (exit) => {
           // A filtered/deleted bar leaves in the coordinate system where it
           // was read. Only after it is gone may the shared scale move.
-          const leaving = motion(exit, chart.transition.exit || chart.transition.base).style('opacity', 0);
-          if (exitGeometry && !chart.transition.exitFirst) exitGeometry(leaving);
+          const leaving = motion(exit, chart.transition.exit || chart.transition.base);
+          if (exitGeometry) exitGeometry(leaving);
+          else leaving.style('opacity', 0);
           leaving.remove();
           return exit;
         }

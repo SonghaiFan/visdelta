@@ -317,3 +317,24 @@ test('datum identity rejects duplicates and reports unsafe index fallback', () =
   assert.equal(duplicateIds.identity.mode, 'index');
   assert.equal(duplicateIds.identity.stable, false);
 });
+
+test('datum identity infers the smallest unique categorical field set', () => {
+  const flowers = compileLineage([
+    { flowerId: 'iris-001', species: 'setosa', value: 1 },
+    { flowerId: 'iris-002', species: 'setosa', value: 2 }
+  ]);
+  assert.equal(flowers.identity.mode, 'inferred-fields');
+  assert.equal(flowers.identity.key, 'flowerId');
+  assert.equal(flowers.identity.stable, true);
+
+  const population = compileLineage([
+    { state: 'CA', age: '<10', population: 1 },
+    { state: 'CA', age: '≥80', population: 2 },
+    { state: 'TX', age: '<10', population: 3 },
+    { state: 'TX', age: '≥80', population: 4 }
+  ]);
+  assert.deepEqual(population.identity.key, ['state', 'age']);
+  assert.deepEqual(population.rows.map((row) => row.lineage[0].datumKey), [
+    '["CA","<10"]', '["CA","≥80"]', '["TX","<10"]', '["TX","≥80"]'
+  ]);
+});

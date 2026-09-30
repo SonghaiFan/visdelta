@@ -281,14 +281,17 @@ buildGroupingTree(table)
 correspondLineage(from, to, { fromField?, toField? })
 ```
 
-At chart level, declare source identity with `.datumKey("id")`; `.key()` remains
-the join identity of a mark in the current view. At the low-level compiler,
-`key` identifies immutable source records and `grain` identifies marks in one
-compiled view. They are intentionally separate. Filtering, sorting, limiting,
-binning, time units and folding preserve lineage. `sum` and `count` produce
-additive contribution records. `mean` and non-additive aggregates such as
-`median` retain provenance, but mark arithmetic decomposition as unsafe because
-independently computed subgroup values do not conserve the endpoint value.
+At chart level, source identity is automatic: Core prefers a unique `id`, then
+the smallest unique categorical field set, and finally reports an index
+fallback when the data contains no stable categorical identity. Use
+`.datumKey("id")` only to override ambiguous inference. `.key()` remains the join
+identity of a mark in the current view. At the low-level compiler, `key`
+identifies immutable source records and `grain` identifies marks in one compiled
+view. They are intentionally separate. Filtering, sorting, limiting, binning,
+time units and folding preserve lineage. `sum` and `count` produce additive
+contribution records. `mean` and non-additive aggregates such as `median` retain
+provenance, but mark arithmetic decomposition as unsafe because independently
+computed subgroup values do not conserve the endpoint value.
 
 Bar transitions use lineage topology to communicate only group membership:
 direct splits follow the authored target layout, while a synthetic joint-grain
@@ -414,9 +417,46 @@ The seven `stateChanges` categories describe what changed: `data`, `grain`,
 non-exclusive and their array order is not an animation schedule. Grain entries
 include their previous and next `groupby` and `measures`, including each
 aggregate operator, input field, and output field. Identity remains separate in
-`.datumKey()`, `.key()`, and the optional `lineage` correspondence result.
+Core's inferred datum identity (optionally overridden by `.datumKey()`), `.key()`,
+and the optional `lineage` correspondence result.
+
+Core also exports `resolveMarkIdentity()`, `correspondMarks()`, and
+`markKeyValue()` for chart plugins. `resolveMarkIdentity()` gives an explicit
+`.key()` priority over the plugin's default mark key. `correspondMarks()`
+returns one-to-one `updates`, `enter`, and `exit`; source lineage continues to
+describe split, merge, and reaggregation separately.
+
 When record identity is unavailable, an uncertain Data action is omitted from
 `stateChanges`; the original low-level `data` or `filter` delta remains visible.
+
+`delta().edits` additionally describes exact changes to the serialized chart
+declaration. Each edit has a `path`, `previous`, and `next`; values explicitly
+distinguish absence from `null`, `false`, and zero. Arrays, including ordered
+transform pipelines, are atomic values. Inferred channel types are not added to
+the authored declaration. These are declaration edits, not
+animation commands or additional state-change categories.
+
+```js
+import { applyDeclarationEdits, planDeclarationTransition } from "visdelta/core";
+
+const targetSpec = applyDeclarationEdits(base.toSpec(), change.edits);
+const plan = planDeclarationTransition(base.toSpec(), next.toSpec());
+// plan.stages: complete { from, to, edits, reason } records
+```
+
+Applying edits returns a detached declaration and rejects stale previous values.
+The conservative declaration planner requires the same chart, source data, and
+datum-key declaration. For composite changes it can release changed
+focus/highlight, remove changed terminal sorts, change the central state, then
+apply target sorts and attention. Unchanged attention is retained. Sorts before
+other transforms are not separated; data, grain, and bindings stay together.
+Presentation-only changes remain direct. This is not a universal search for a
+common intermediate grain.
+
+All five built-in charts opt into this fallback. Existing chart-specific routes
+take precedence and may further refine individual generated legs. Third-party
+plugins opt in with `declarationPlanning: true`; authored `sequence()` boundaries
+remain fixed.
 
 ## `transition(from, to, options)`
 

@@ -1,4 +1,5 @@
 import { specObjectKey, specSemanticKey, specState } from '../spec-meta.js';
+import { declarationEdits } from './declaration-edits.js';
 import type {
   Delta,
   DeltaAction,
@@ -34,6 +35,7 @@ export function diffViewStates(
   const semantic = diffSemanticViewStates(prev, curr);
 
   return {
+    edits: declarationEdits(prev, curr),
     changed,
     has: (key) => changed.includes(key),
     deltas: semantic.deltas,

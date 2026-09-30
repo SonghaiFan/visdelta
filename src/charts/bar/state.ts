@@ -53,7 +53,7 @@ export function resolveBarTransitionPlan(
 
   const crossesDetail =
     diff.hasDelta('bar.detail') || previous.hasDetail || next.hasDetail;
-  if (crossesDetail) {
+  if (diff.hasDelta('bar.detail')) {
     plan.match = { mode: 'semantic', reason: 'detail-item-consistency' };
   }
 

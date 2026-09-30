@@ -13,6 +13,7 @@ import {
   barIntermediateSpecs,
   resolveBarTransitionPlan
 } from './state.js';
+import { semanticBarState } from './semantic.js';
 
 export interface BarSpec extends ViewSpec {
   mark: 'bar';
@@ -25,6 +26,10 @@ export function createBarChart(runtime: ChartRuntime, presentation: ChartPresent
     key: 'bar',
     renderer,
     prepareSpec: prepareBarSpec,
+    defaultMarkKey: (spec) => {
+      const state = semanticBarState(spec);
+      return [state.categoryField, state.segmentField].filter((field): field is string => Boolean(field));
+    },
     resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => TransitionPlan,
     canonicalTransitionPair: canonicalBarTransitionPair,
     intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],

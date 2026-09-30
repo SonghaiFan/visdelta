@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as d3 from 'd3';
 import StateChangeIcon from './StateChangeIcon.vue';
+import DataCodeChart from './DataCodeChart.vue';
+import EditableCodeCell from './EditableCodeCell.vue';
 
 const labModules = import.meta.glob('../../../examples/*/scenarios.js', { eager: true });
 
@@ -184,7 +186,9 @@ const initialSample = availableSamples.value[props.initial]
   : Object.keys(availableSamples.value)[0];
 const selected = ref(initialSample);
 const activeCategory = ref(availableSamples.value[initialSample].category);
-const code = ref(availableSamples.value[initialSample].code);
+const initialCells = sampleCells(availableSamples.value[initialSample]);
+const fromCode = ref(initialCells.from);
+const toCode = ref(initialCells.to);
 const status = ref('Loading runtime');
 const error = ref('');
 const progress = ref(isLabMode.value ? 0 : 0.5);
@@ -193,15 +197,26 @@ const pointEffect = ref('blend');
 const hasChange = ref(false);
 const deltaText = ref('Waiting for a valid state pair.');
 const lineTransition = ref('');
+const tableRows = ref([]);
+const tableStatus = ref('Waiting for a valid state pair');
+const tableEndpoint = ref('from');
 
 let api = null;
 let change = null;
+let activePair = null;
+let pendingSource = null;
+let pendingProgress = 0;
+let pendingReason = 'Applying edit';
+let tabBridgeTarget = null;
 let debounceTimer = 0;
 let runVersion = 0;
 let resizeObserver = null;
 let visibilityObserver = null;
 let animationFrame = 0;
+let tableVersion = 0;
+let tableState = null;
 const drafts = new Map();
+const dataCache = new Map();
 
 const statusKind = computed(() => error.value ? 'error' : status.value === 'Ready' ? 'ready' : 'busy');
 const description = computed(() => availableSamples.value[selected.value]?.description ?? '');
@@ -253,23 +268,38 @@ onBeforeUnmount(() => {
   change?.destroy();
 });
 
-watch(code, () => {
-  drafts.set(selected.value, code.value);
+watch([fromCode, toCode], () => {
+  drafts.set(selected.value, { from: fromCode.value, to: toCode.value });
   if (!api) return;
+  queueCurrentEndpoint('Applying edit');
   clearTimeout(debounceTimer);
   status.value = autoRun.value ? 'Waiting for input' : 'Edited · press Run';
   if (autoRun.value) debounceTimer = window.setTimeout(runCode, 450);
 });
 
 watch(selected, (next, previous) => {
-  drafts.set(previous, code.value);
-  code.value = drafts.get(next) ?? availableSamples.value[next].code;
-  activeCategory.value = availableSamples.value[next].category;
+  // A rendered intermediate frame is not an immutable chart state. Bridge
+  // from the nearest authored endpoint, then install the new tab's own pair.
+  pendingSource = isLabMode.value && change
+    ? (tabBridgeTarget ?? (activePair
+      ? (change.value < 0.5 ? activePair.from : activePair.to)
+      : null))
+    : null;
+  pendingProgress = 0;
+  pendingReason = 'Switching tabs';
   progress.value = 0;
+  drafts.set(previous, { from: fromCode.value, to: toCode.value });
+  const cells = drafts.get(next) ?? sampleCells(availableSamples.value[next]);
+  fromCode.value = cells.from;
+  toCode.value = cells.to;
+  activeCategory.value = availableSamples.value[next].category;
   if (isLabMode.value && typeof history !== 'undefined') {
     history.replaceState(null, '', `#${next}`);
   }
-  if (!autoRun.value) runCode();
+  if (api) nextTick(() => {
+    clearTimeout(debounceTimer);
+    runCode();
+  });
 });
 
 function chooseCategory(category) {
@@ -283,13 +313,46 @@ function sampleLabel(label) {
   return label.replace(/^\d+\s*·\s*/, '').replace(/^[^-]+\s+-\s+/, '');
 }
 
+function sampleCells(sample) {
+  if (sample?.toCode != null) {
+    return { from: sample.code ?? '', to: sample.toCode, dataUrl: sample.dataUrl ?? null };
+  }
+  const source = sample?.code ?? '';
+  const match = source.match(/^([\s\S]*?)\n\nconst from = ([\s\S]*?);\nconst to = ([\s\S]*?);\n\nreturn \{ from, to \};\s*$/);
+  if (!match) return { from: source, to: '', dataUrl: null };
+  const [, rawSetup, fromExpression, toExpression] = match;
+  const dataUrl = rawSetup.match(/const DATA_URL = ["']([^"']+)["'];/)?.[1] ?? null;
+  const setup = rawSetup
+    .replace(/^const DATA_URL = ["'][^"']+["'];\s*/m, '')
+    .replace(/^const rows = await d3\.csv\(DATA_URL, d3\.autoType\);\s*/m, '')
+    .replaceAll('{ url: DATA_URL }', 'rows')
+    .trim();
+  return {
+    from: `${setup}${setup ? '\n\n' : ''}const from = ${fromExpression};`,
+    to: `const to = ${toExpression};`,
+    dataUrl
+  };
+}
+
 watch(pointEffect, () => {
-  if (api && showPointEffect.value) runCode();
+  if (api && showPointEffect.value) {
+    queueCurrentEndpoint('Applying effect');
+    runCode();
+  }
 });
+
+function queueCurrentEndpoint(reason) {
+  if (!change || !activePair || pendingSource) return;
+  pendingProgress = change.value < 0.5 ? 0 : 1;
+  pendingSource = tabBridgeTarget ?? (pendingProgress === 0 ? activePair.from : activePair.to);
+  pendingReason = reason;
+}
 
 function reset() {
   drafts.delete(selected.value);
-  code.value = availableSamples.value[selected.value].code;
+  const cells = sampleCells(availableSamples.value[selected.value]);
+  fromCode.value = cells.from;
+  toCode.value = cells.to;
   if (!autoRun.value) runCode();
 }
 
@@ -300,19 +363,24 @@ async function runCode() {
   cancelAnimationFrame(animationFrame);
   error.value = '';
   status.value = 'Compiling';
-  let candidate = null;
-  let nextChange = null;
+  const updateSource = pendingSource;
+  const updateProgress = pendingProgress;
+  const updateReason = pendingReason;
+  pendingSource = null;
 
   try {
     const isLab = isLabMode.value;
+    const cells = sampleCells(availableSamples.value[selected.value]);
+    const sharedRows = isLab ? await loadSampleRows(cells.dataUrl) : null;
+    const source = `${fromCode.value}\n\n${toCode.value}\n\nreturn { from, to };`;
     const evaluate = isLab
-      ? new AsyncFunction(labChart.value, 'd3', `"use strict";\n${code.value}`)
+      ? new AsyncFunction(labChart.value, 'd3', 'rows', `"use strict";\n${source}`)
       : new AsyncFunction(
         'area', 'bar', 'line', 'point', 'unit', 'delta', 'rows', 'segments', 'series', 'units',
-        `"use strict";\n${code.value}`
+        `"use strict";\n${source}`
       );
     const authoredResult = isLab
-      ? await evaluate(await labSamples[props.mode].loadChart(), d3)
+      ? await evaluate(await labSamples[props.mode].loadChart(), d3, sharedRows)
       : await evaluate(
         api.area, api.bar, api.line, api.point, api.unit, api.delta,
         structuredClone(rows), structuredClone(segments), structuredClone(series), structuredClone(units)
@@ -323,13 +391,75 @@ async function runCode() {
       throw new Error('Return an object with { from, to } visualization states.');
     }
 
-    candidate = document.createElement('div');
-    candidate.className = 'playground-candidate';
-    chartTarget.value.append(candidate);
-    nextChange = await api.transition(result.from, result.to, {
-      target: candidate,
-      height: isLab ? 400 : 300
-    });
+    if (updateSource) {
+      await beginUpdateTransition(updateSource, result, updateProgress, updateReason, version, isLab ? 400 : 300);
+      return;
+    }
+    await installPair(result, version, progress.value, isLab ? 400 : 300);
+  } catch (cause) {
+    if (version === runVersion) showError(cause);
+  }
+}
+
+async function loadSampleRows(url) {
+  if (!url) return [];
+  if (!dataCache.has(url)) {
+    dataCache.set(url, /\.json(?:[?#]|$)/i.test(url)
+      ? d3.json(url)
+      : d3.csv(url, d3.autoType));
+  }
+  return structuredClone(await dataCache.get(url));
+}
+
+async function beginUpdateTransition(source, result, targetProgress, reason, version, height) {
+  const candidate = document.createElement('div');
+  candidate.className = 'playground-candidate';
+  chartTarget.value.append(candidate);
+  let bridge = null;
+  try {
+    const target = targetProgress === 0 ? result.from : result.to;
+    bridge = await api.transition(source, target, { target: candidate, height });
+    if (version !== runVersion) {
+      bridge.destroy();
+      candidate.remove();
+      return;
+    }
+    if (!bridge.delta.edits.length) {
+      bridge.destroy();
+      candidate.remove();
+      await installPair(result, version, targetProgress, height);
+      return;
+    }
+    bridge.progress(0);
+    change?.destroy();
+    chartTarget.value.replaceChildren(candidate);
+    candidate.className = '';
+    change = bridge;
+    tabBridgeTarget = target;
+    progress.value = targetProgress;
+    hasChange.value = false;
+    setDeltaText(bridge);
+    status.value = reason;
+    bridge.play({ duration: 600, from: 0, to: 1 });
+    trackPlayback(bridge, 1, version, () => {
+      installPair(result, version, targetProgress, height).catch(cause => {
+        if (version === runVersion) showError(cause);
+      });
+    }, false);
+  } catch (cause) {
+    bridge?.destroy();
+    candidate.remove();
+    throw cause;
+  }
+}
+
+async function installPair(result, version, initialProgress, height) {
+  const candidate = document.createElement('div');
+  candidate.className = 'playground-candidate';
+  chartTarget.value.append(candidate);
+  let nextChange = null;
+  try {
+    nextChange = await api.transition(result.from, result.to, { target: candidate, height });
     if (version !== runVersion) {
       nextChange.destroy();
       candidate.remove();
@@ -338,25 +468,52 @@ async function runCode() {
     // Compile one middle frame so the Line Lab can show which Line-owned path
     // plan was selected, then restore the user's current frame.
     if (labChart.value === 'line') nextChange.progress(0.5);
-    lineTransition.value = lineTransitionLabel(result, candidate);
-    nextChange.progress(progress.value);
+    lineTransition.value = lineTransitionLabel(result, candidate, nextChange.delta);
+    nextChange.progress(initialProgress);
     change?.destroy();
     chartTarget.value.replaceChildren(candidate);
     candidate.className = '';
     change = nextChange;
+    activePair = result;
+    tabBridgeTarget = null;
+    progress.value = initialProgress;
     hasChange.value = true;
-    deltaText.value = JSON.stringify({
-      changed: change.delta.changed,
-      stateChanges: change.delta.stateChanges,
-      deltas: change.delta.deltas,
-      semantic: change.delta.semantic.deltas
-    }, null, 2);
+    setDeltaText(nextChange);
+    await updateDataTable(initialProgress, result, version);
     status.value = 'Ready';
   } catch (cause) {
     nextChange?.destroy();
-    candidate?.remove();
-    if (version === runVersion) showError(cause);
+    candidate.remove();
+    throw cause;
   }
+}
+
+function setDeltaText(controller) {
+  deltaText.value = JSON.stringify({
+    changed: controller.delta.changed,
+    stateChanges: controller.delta.stateChanges,
+    deltas: controller.delta.deltas,
+    semantic: controller.delta.semantic.deltas
+  }, null, 2);
+}
+
+function trackPlayback(controller, to, version, finished = null, reportProgress = true) {
+  cancelAnimationFrame(animationFrame);
+  const update = () => {
+    if (version !== runVersion || change !== controller) return;
+    // Entering a tab is not part of that tab's authored from → to timeline.
+    if (reportProgress) {
+      progress.value = controller.value;
+      updateDataTable(controller.value, activePair, version);
+    }
+    if (Math.abs(controller.value - to) > 0.001) {
+      animationFrame = requestAnimationFrame(update);
+    } else {
+      animationFrame = 0;
+      finished?.();
+    }
+  };
+  animationFrame = requestAnimationFrame(update);
 }
 
 function pointLabPair(result) {
@@ -409,7 +566,7 @@ function readLineTransition(root) {
   return names.map(name => labels[name] || name).join(' + ');
 }
 
-function lineTransitionLabel(result, root) {
+function lineTransitionLabel(result, root, delta) {
   if (labChart.value !== 'line') return '';
   const specs = [result?.from, result?.to].map(state =>
     typeof state?.toSpec === 'function' ? state.toSpec() : state);
@@ -417,6 +574,11 @@ function lineTransitionLabel(result, root) {
     spec?.meta?.state?.scopes?.focus?.mode === 'focus' ||
     spec?.meta?.state?.sceneState?.selection?.mode === 'focus');
   if (focusesView) return 'Focus view';
+  const dataActions = new Set((delta?.stateChanges ?? [])
+    .filter(change => change.category === 'data').map(change => change.action));
+  if (dataActions.has('add') && dataActions.has('remove')) return 'Add and remove points';
+  if (dataActions.has('add')) return 'Add points';
+  if (dataActions.has('remove')) return 'Remove points';
   const counts = specs.map(lineObservationCount);
   if (counts.every(Number.isFinite) && counts[0] !== counts[1]) {
     return counts[0] < counts[1] ? 'Add points' : 'Remove points';
@@ -453,18 +615,44 @@ function playgroundFilterMatch(row, filter) {
 function setProgress(value) {
   progress.value = Math.max(0, Math.min(1, Number(value) || 0));
   change?.progress(progress.value);
+  updateDataTable(progress.value, activePair, runVersion);
+}
+
+async function updateDataTable(value, pair = activePair, version = runVersion) {
+  if (!pair) return;
+  const endpoint = value < 0.5 ? 'from' : 'to';
+  const state = pair[endpoint];
+  if (state === tableState && tableRows.value.length) return;
+  const request = ++tableVersion;
+  tableState = state;
+  tableEndpoint.value = endpoint;
+  tableStatus.value = `Loading ${endpoint} state`;
+  try {
+    const spec = state.toSpec();
+    let source;
+    if (Array.isArray(spec.data)) source = spec.data;
+    else if (Array.isArray(spec.data?.values)) source = spec.data.values;
+    else if (spec.data?.url) {
+      const type = spec.data.type ?? spec.data.format?.type;
+      source = type === 'json' || /\.json(?:[?#]|$)/i.test(spec.data.url)
+        ? await d3.json(spec.data.url)
+        : await d3.csv(spec.data.url, d3.autoType);
+    }
+    const rows = state.rows(source);
+    if (request !== tableVersion || version !== runVersion) return;
+    tableRows.value = rows;
+    tableStatus.value = `${endpoint} state · ${rows.length} row${rows.length === 1 ? '' : 's'}`;
+  } catch {
+    if (request !== tableVersion || version !== runVersion) return;
+    tableRows.value = [];
+    tableStatus.value = `${endpoint} state · data unavailable`;
+  }
 }
 
 function play(to) {
   if (!change) return;
   change.play({ duration: 800, from: change.value, to });
-  cancelAnimationFrame(animationFrame);
-  const update = () => {
-    if (!change) return;
-    progress.value = change.value;
-    if (Math.abs(change.value - to) > 0.001) animationFrame = requestAnimationFrame(update);
-  };
-  animationFrame = requestAnimationFrame(update);
+  trackPlayback(change, to, runVersion);
 }
 
 function pause() {
@@ -473,22 +661,6 @@ function pause() {
   if (change) progress.value = change.value;
 }
 
-function handleEditorKeydown(event) {
-  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-    event.preventDefault();
-    runCode();
-  }
-  if (event.key === 'Tab') {
-    event.preventDefault();
-    const input = event.currentTarget;
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    code.value = `${code.value.slice(0, start)}  ${code.value.slice(end)}`;
-    nextTick(() => {
-      input.selectionStart = input.selectionEnd = start + 2;
-    });
-  }
-}
 </script>
 
 <template>
@@ -527,7 +699,18 @@ function handleEditorKeydown(event) {
         >{{ sampleLabel(sample.label) }}</button>
       </div>
     </nav>
-    <div class="playground-grid">
+    <DataCodeChart
+      id="lab-workspace"
+      :rows="tableRows"
+      :data-status="tableStatus"
+      data-title="Data at nearest authored state"
+      code-title="Two immutable states"
+      chart-title="Transition frame"
+    >
+      <template #code-status>
+        <span :id="isLabMode ? 'status' : undefined" class="playground-status" :data-kind="statusKind">{{ status }}</span>
+      </template>
+      <template #code>
       <div class="playground-editor-pane">
         <div class="playground-toolbar">
           <label v-if="showPointEffect" class="playground-effect">
@@ -544,25 +727,38 @@ function handleEditorKeydown(event) {
           </label>
           <button :id="isLabMode ? 'run' : undefined" type="button" @click="runCode">Run <kbd>⌘↵</kbd></button>
           <button :id="isLabMode ? 'reset' : undefined" type="button" @click="reset">Reset</button>
-          <span :id="isLabMode ? 'status' : undefined" class="playground-status" :data-kind="statusKind">{{ status }}</span>
         </div>
-        <div class="playground-pane-label">Two immutable states</div>
-        <textarea
-          v-model="code"
-          :id="isLabMode ? 'editor' : undefined"
-          class="playground-editor"
-          aria-label="Editable VisDelta code"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-          @keydown="handleEditorKeydown"
-        ></textarea>
-        <p v-if="isLabMode" class="playground-contract"><code>{{ labChart }}</code> and <code>d3</code> are provided. Define the data and both states, then end with <code>return { from, to };</code>. Code runs locally in this page.</p>
-        <p v-else class="playground-contract">Available: <code>area</code>, <code>bar</code>, <code>line</code>, <code>point</code>, <code>unit</code>, <code>delta</code>, plus <code>rows</code>, <code>segments</code>, <code>series</code>, and <code>units</code>. End with <code>return { from, to };</code>. Categories describe the difference, not playback order.</p>
+        <div class="playground-code-cells">
+          <label class="playground-code-cell">
+            <span>From</span>
+            <EditableCodeCell
+              v-model="fromCode"
+              :editor-id="isLabMode ? 'editor' : undefined"
+              aria-label="Editable VisDelta code"
+              @run="runCode"
+            />
+          </label>
+          <label class="playground-code-cell">
+            <span>To</span>
+            <EditableCodeCell
+              v-model="toCode"
+              :editor-id="isLabMode ? 'to-editor' : undefined"
+              aria-label="Editable VisDelta to state code"
+              @run="runCode"
+            />
+          </label>
+        </div>
+        <p v-if="isLabMode" class="playground-contract"><code>{{ labChart }}</code>, <code>d3</code>, and the loaded <code>rows</code> are provided. The To cell continues in the From cell's scope, so it can reuse any variable declared there.</p>
+        <p v-else class="playground-contract">The To cell continues in the From cell's scope. Categories describe the difference, not playback order.</p>
       </div>
+      </template>
 
+      <template #chart-status>
+        <output>progress {{ progress.toFixed(2) }}</output>
+      </template>
+      <template #chart>
       <div class="playground-output-pane">
-        <div class="playground-pane-label">Transition frame · progress <output :id="isLabMode ? 'value' : undefined">{{ progress.toFixed(2) }}</output></div>
+        <output v-if="isLabMode" id="value" class="playground-progress-value">{{ progress.toFixed(2) }}</output>
         <div v-if="lineTransition" class="playground-line-plan">Line transition <strong>{{ lineTransition }}</strong></div>
         <div :id="isLabMode ? 'chart' : undefined" ref="chartTarget" class="playground-chart" aria-label="Editable syntax output"></div>
         <p v-if="description" class="playground-description">{{ description }}</p>
@@ -590,6 +786,7 @@ function handleEditorKeydown(event) {
           <DocsCodeBlock :code="deltaText" language="json" />
         </details>
       </div>
-    </div>
+      </template>
+    </DataCodeChart>
   </div>
 </template>

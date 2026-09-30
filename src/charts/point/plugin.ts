@@ -9,12 +9,14 @@ import { canonicalPointTransitionPair, pointIntermediateSpecs } from './state.js
 
 export const plugin: ChartPlugin<PointViewState> = defineChartType<PointViewState>({
   key: 'point',
+  declarationPlanning: true,
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   // Two readable header rows: legend first, then the upward y-axis title.
   presentation: pointPresentation,
   createRenderer: createPointRenderer,
   createSpecCompiler: createPointSpecCompiler,
+  defaultMarkKey: (spec) => spec.encoding?.x?.field || spec.encoding?.y?.field || null,
   transition: {
     canonicalPair: canonicalPointTransitionPair,
     intermediateSpecs: pointIntermediateSpecs,

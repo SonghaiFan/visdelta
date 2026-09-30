@@ -98,11 +98,13 @@ test('stable datum identity distinguishes value updates from membership changes'
   ]);
 });
 
-test('data updates stay unclassified when source identity is only row position', () => {
+test('an inferred categorical datum identity classifies value updates', () => {
   const before = bar([{ category: 'A', value: 1 }]).x('category').y('value');
   const after = before.data([{ category: 'A', value: 2 }]);
 
-  assert.deepEqual(delta(before, after).stateChanges, []);
+  assert.deepEqual(summary(delta(before, after).stateChanges), [
+    { category: 'data', action: 'update' }
+  ]);
   assert.equal(delta(before, after).hasDelta('data'), true);
 });
 

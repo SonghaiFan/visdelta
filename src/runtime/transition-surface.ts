@@ -7,7 +7,7 @@ import { createViewRenderer } from './view-renderer.js';
 import type { ViewConfig, ViewLayoutSpec, ViewRuntimeScene } from './view-renderer.js';
 import { resolveTarget } from './target.js';
 import { inferTransition } from '../grammar/infer-transition.js';
-import { canonicalTransitionPair, resolveTransitionRoute } from '../charts/transition-route.js';
+import { canonicalTransitionPair, resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
 import { captureDomFrame } from './dom-frame.js';
 import type { DomFrame } from './dom-frame.js';
 import { hideTooltip } from './tooltip.js';
@@ -67,7 +67,7 @@ export function createTransitionSurface(
     chartType,
     source,
     target,
-    chartType.intermediateSpecs?.(source, target) ?? []
+    resolveIntermediateSpecs(chartType, source, target)
   );
   const routeStages = route.legs.length;
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;

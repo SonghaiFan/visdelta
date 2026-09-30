@@ -10,7 +10,7 @@ instead of toy A/B/C rows. Its 468 observations have only three fields:
 `state`, `age`, and `population`. The supplied wide source was reshaped before
 it entered VisDelta; data cleaning is not part of the visualization runtime.
 Segmented examples use `.breakdown("age")`, then explicitly encode
-`.color("age", ...)` with an ordered domain and the active style's default palette.
+`.color("age", ...)` with an ordered domain and the sequential `Blues` spectrum.
 
 The ranked and stacked overviews keep all 52 regions. Examples that need wider
 marks name a fixed six- or eight-state subset in the editable code, keeping the

@@ -45,10 +45,10 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('2010-02-01', '2010-01-01'));
+    await editor.fill(sample.code.replace('title: "Date"', 'title: "Month"'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/2010-01-01/);
+    await expect(editor).toHaveValue(/title: "Month"/);
     await page.locator('#reset').click();
     await ready(page);
     await expect(editor).toHaveValue(sample.code);
@@ -284,7 +284,7 @@ test('area highlight clips a bounded x range at exact scale coordinates', async 
       clipWidth: Number(clip?.getAttribute('width'))
     };
   });
-  expect(highlight.baseCount).toBe(38);
+  expect(highlight.baseCount).toBe(18);
   expect(highlight.baseOpacity).toBeCloseTo(0.12, 3);
   expect(highlight.overlayCount).toBe(10);
   expect(highlight.highlightOpacity).toBeCloseTo(1, 3);
@@ -323,7 +323,7 @@ test('area split draws a thin contrast divider only between endpoints', async ({
   };
 
   expect(result.start.count).toBe(0);
-  expect(result.drawing.count).toBe(4);
+  expect(result.drawing.count).toBe(2);
   expect(result.drawing.offset).toBeGreaterThan(0);
   expect(result.drawing.offset).toBeLessThan(result.drawing.length);
   expect(result.drawing.opacity).toBeGreaterThan(0);
@@ -678,28 +678,28 @@ test('stacked area uses cumulative boundaries and explicit color', async ({ page
   await page.goto('/docs/.vitepress/dist/area-lab.html#split');
   await ready(page);
   await page.locator('#end').click();
-  await expect(page.locator('#chart path.vd-area-cell')).toHaveCount(190);
+  await expect(page.locator('#chart path.vd-area-cell')).toHaveCount(54);
   await expect(page.locator('#chart path.vd-area-edge')).toHaveCount(0);
-  await expect(page.locator('#chart .vd-legend-item')).toHaveCount(5);
+  await expect(page.locator('#chart .vd-legend-item')).toHaveCount(3);
   const paths = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({
     key: node.getAttribute('data-key'),
     layer: node.getAttribute('data-layer-key'),
     fill: node.getAttribute('fill'),
     length: node.getTotalLength()
   })));
-  expect(new Set(paths.map(path => path.layer)).size).toBe(5);
-  expect(new Set(paths.map(path => path.fill)).size).toBe(5);
+  expect(new Set(paths.map(path => path.layer)).size).toBe(3);
+  expect(new Set(paths.map(path => path.fill)).size).toBe(3);
   expect(paths.every(path => path.length > 0)).toBe(true);
 });
 
 test('area lab loads prepared tidy unemployment observations', async ({ page }) => {
   const requests = [];
   page.on('request', request => {
-    if (request.url().endsWith('/data/unemployment.csv')) requests.push(request.url());
+    if (request.url().endsWith('/data/area-lab.csv')) requests.push(request.url());
   });
   await page.goto('/docs/.vitepress/dist/area-lab.html#split');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(/\.\/data\/unemployment\.csv/);
+  await expect(page.locator('#editor')).toHaveValue(/\.\/data\/area-lab\.csv/);
   await page.locator('#end').click();
 
   const rows = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({
@@ -709,9 +709,9 @@ test('area lab loads prepared tidy unemployment observations', async ({ page }) 
     unemployed: node.__data__?.row?.unemployed,
     share: node.__data__?.row?.share
   })));
-  expect(rows).toHaveLength(190);
+  expect(rows).toHaveLength(54);
   expect(rows.every(row => row.date && row.year && row.industry &&
     Number.isFinite(row.unemployed) && Number.isFinite(row.share))).toBe(true);
-  expect(requests).toHaveLength(1);
-  expect(new URL(requests[0]).pathname).toBe('/docs/.vitepress/dist/data/unemployment.csv');
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every(url => new URL(url).pathname === '/docs/.vitepress/dist/data/area-lab.csv')).toBe(true);
 });

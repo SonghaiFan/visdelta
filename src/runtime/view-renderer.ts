@@ -1,8 +1,8 @@
 import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
-import { resolveTransitionRoute } from '../charts/transition-route.js';
+import { resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
 import { resolveMarkRendererKey } from '../charts/index.js';
-import { serializeViewSpec, specState } from '../spec-meta.js';
+import { serializeViewSpec, specDatumKey, specState } from '../spec-meta.js';
 import { activeMarkLayer, drawUnsupported, fadeLayers } from './mark-layers.js';
 import { applyPlotClip } from './clipping.js';
 import { effectiveTransitionSpec, transitionSpec } from '../toolkit/motion-timing.js';
@@ -30,6 +30,10 @@ import { viewLineageCorrespondence } from '../data/view-lineage.js';
 import { motion } from './recorder.js';
 import type { MotionTiming } from './recorder.js';
 import type { RuntimeScene, SceneHostElement } from './scene.js';
+import { correspondMarks, resolveMarkIdentity } from '../identity/mark-correspondence.js';
+import type { MarkCorrespondence } from '../identity/mark-correspondence.js';
+import { compileLineage } from '../data/lineage.js';
+import type { RenderDatum } from './render-types.js';
 
 type DatasetMap = Record<string, DataRow[]>;
 type SceneTransition = CompileResult['sceneTransition'];
@@ -217,7 +221,11 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
     : scene.previousSpec;
   const previousSpec = prepareChartSpec(chartType, previousRawSpec, datasets);
   const source = viewRows(renderSpec.data, datasets) as DataRow[];
-  const rows = applyTransforms(source, renderSpec.transform || []);
+  const transforms = renderSpec.transform || [];
+  const rows = applyTransforms(source, transforms) as RenderDatum[];
+  attachDatumIdentity(rows, compileLineage(source, transforms, {
+    key: specDatumKey(renderSpec) ?? undefined
+  }));
   const domainRows = applyTransforms(source, domainTransforms(renderSpec.transform || []));
   if (!rows.length) {
     const emptyTransition = transitionSpec(renderSpec, previousSpec);
@@ -261,7 +269,18 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const transitionPlan = { ...(chartType?.resolveTransitionPlan?.(previousSpec, renderSpec) || {}) };
   const lineage = previousSpec ? viewLineageCorrespondence(previousSpec, renderSpec) : null;
   if (lineage) transitionPlan.lineage = lineage;
-  const observationChange = observationMembershipChange(previousSpec, renderSpec, previousRows, rows);
+  const markCorrespondence = previousSpec
+    ? correspondMarks(
+        previousRows,
+        rows,
+        resolveMarkIdentity(previousSpec, chartType?.defaultMarkKey?.(previousSpec)),
+        resolveMarkIdentity(renderSpec, chartType?.defaultMarkKey?.(renderSpec))
+      )
+    : null;
+  if (markCorrespondence) transitionPlan.markCorrespondence = markCorrespondence;
+  const observationChange = observationMembershipChange(
+    previousSpec, renderSpec, previousRows, rows, markCorrespondence
+  );
   const chartTransition = observationTransition(
     transitionSpec(renderSpec, previousSpec),
     observationChange,
@@ -305,6 +324,20 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   scene.previousSpec = renderSpec;
 }
 
+function attachDatumIdentity(rows: RenderDatum[], table: ReturnType<typeof compileLineage>): void {
+  if (rows.length !== table.rows.length) return;
+  const fields = typeof table.identity.key === 'string'
+    ? [table.identity.key]
+    : Array.isArray(table.identity.key) ? [...table.identity.key] : [];
+  rows.forEach((row, index) => {
+    row.__datumIdentity = {
+      fields,
+      mode: table.identity.mode,
+      keys: table.rows[index].lineage.map((atom) => atom.datumKey)
+    };
+  });
+}
+
 /**
  * A row-preserving change may remove observations without changing what a
  * remaining observation means. Keep the old coordinate system while those
@@ -315,11 +348,22 @@ function observationMembershipChange(
   previousSpec: ViewSpec | null,
   nextSpec: ViewSpec,
   previousRows: DataRow[],
-  nextRows: DataRow[]
+  nextRows: DataRow[],
+  correspondence: MarkCorrespondence | null
 ): MembershipChange {
   if (!previousSpec || previousSpec.mark !== nextSpec?.mark) return { exit: false, enter: false };
   if ((previousSpec.transform || []).some((transform) => transform?.aggregate) ||
       (nextSpec.transform || []).some((transform) => transform?.aggregate)) return { exit: false, enter: false };
+
+  if (correspondence?.stable) {
+    return {
+      exit: correspondence.exit.length > 0,
+      enter: correspondence.enter.length > 0
+    };
+  }
+
+  // Without stable endpoint identity, cardinality can establish a one-way
+  // membership change but cannot safely invent correspondence between rows.
   return {
     exit: previousRows.length > nextRows.length,
     enter: nextRows.length > previousRows.length
@@ -418,7 +462,7 @@ function intermediateRenderPhases(
   targetSpec: ViewSpec | null
 ): IntermediatePhase[] {
   if (!chartType || !sourceSpec || !targetSpec) return [];
-  const raw = chartType?.intermediateSpecs?.(sourceSpec, targetSpec) ?? [];
+  const raw = resolveIntermediateSpecs(chartType, sourceSpec, targetSpec);
   const phases = Array.isArray(raw) ? raw : [raw];
   return phases
     .map((phase): IntermediatePhase => ({

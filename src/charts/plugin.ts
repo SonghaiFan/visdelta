@@ -17,11 +17,13 @@ import type { ChartPresentation, ChartPresentationDefinition } from './style.js'
 export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   key: string;
   transitionEvaluation?: 'cached' | 'reconstruct';
+  declarationPlanning?: boolean;
   scenes?: string[];
   renderer?: Renderer<S>;
   presentation?: ChartPresentationDefinition;
   /** Channels actually shown by the renderer (e.g. a layout-generated group axis). */
   layoutChannels?: (spec: S) => EncodingSpec;
+  defaultMarkKey?: ChartType<S>['defaultMarkKey'];
   createRenderer?: (runtime: ChartRuntime, presentation: ChartPresentation) => Renderer<S>;
   createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => Omit<ChartType<S>, 'defaultMargin'>;
   prepareSpec?: (spec: S) => S;
@@ -55,6 +57,8 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
           ? runtime.layoutMargins(config.layoutChannels?.(spec) ?? spec.encoding ?? {}, viewport, presentation.plot)
           : presentation.plot.margin,
         transitionEvaluation: config.transitionEvaluation ?? chartType.transitionEvaluation,
+        declarationPlanning: config.declarationPlanning ?? chartType.declarationPlanning,
+        defaultMarkKey: chartType.defaultMarkKey ?? config.defaultMarkKey,
         key: chartType.key || config.key,
         scenes: chartType.scenes ?? scenes,
       },
@@ -124,6 +128,7 @@ function createRuntimeChartType<S extends ViewSpec>(
     intermediateSpecs: config.transition?.intermediateSpecs,
     inspect: config.inspect ?? {},
     scenes: config.scenes,
+    defaultMarkKey: config.defaultMarkKey,
   };
 }
 

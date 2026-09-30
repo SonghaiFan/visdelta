@@ -22,9 +22,14 @@ export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, pape
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from "./charts/style.js";
 export { transition } from "./transition.js";
 export { sequence } from "./sequence.js";
-export { buildGroupingTree, compileLineage, correspondLineage, delta, diffViewStates, lineageMarkKey, viewLineageCorrespondence, visualizationSpec } from "./core.js";
+export { buildGroupingTree, compileLineage, correspondLineage, correspondMarks, delta, diffViewStates, lineageMarkKey, markKeyValue, resolveMarkIdentity, viewLineageCorrespondence, visualizationSpec } from "./core.js";
 export { detectDataTypes, resolveEncodingTypes } from "./data/types.js";
 export type { Visualization } from "./core.js";
+export { declarationEdits, applyDeclarationEdits } from './core.js';
+export type { DeclarationEdit, DeclarationValue } from './core.js';
+export { planDeclarationTransition } from './core.js';
+export type { DeclarationPlan, DeclarationStage } from './core.js';
+export type { MarkCorrespondence, MarkEndpoint, MarkIdentity, MarkKeySpec, MarkMatch } from "./core.js";
 export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, LineageAtom, LineageCapability, LineageCompileOptions, LineageComponent, LineageContribution, LineageCorrespondence, LineageEdge, LineageOperation, LineageRow, LineageTable } from "./core.js";
 export type { ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
 export type { TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";

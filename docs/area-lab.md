@@ -1,7 +1,8 @@
 # Area transition lab
 
-These sixteen editable scenarios use a bundled tidy US unemployment dataset
-to exercise VisDelta's Area module. Each source row is one month and industry.
+These sixteen editable scenarios use one 54-row tidy US unemployment dataset
+to exercise VisDelta's Area module. Each source row is one month and industry;
+the sample contains eighteen months for three industries.
 The demo asset adds `year` and the industry's `share` of that month's total
 before it enters VisDelta; the library receives tidy rows and performs no data
 cleaning. The scenarios cover scales, mappings, keyed observations, filtering,

@@ -36,7 +36,7 @@ export interface LineageTable {
   grain: string[];
   identity: {
     key: DatumKeySpec;
-    mode: 'explicit' | 'inferred-id' | 'index';
+    mode: 'explicit' | 'inferred-id' | 'inferred-fields' | 'index';
     stable: boolean;
   };
   capability: LineageCapability;
@@ -264,18 +264,91 @@ function resolveIdentity(source: DataRow[], requested?: DatumKeySpec) {
   const hasUniqueIds = source.length > 0 &&
     inferredIds.every((value) => value != null) &&
     new Set(inferredIds.map(canonicalKey)).size === source.length;
+  const inferredFields = requested == null && !hasUniqueIds
+    ? inferCategoricalIdentity(source)
+    : null;
   const mode = requested != null
     ? 'explicit' as const
     : hasUniqueIds
       ? 'inferred-id' as const
-      : 'index' as const;
-  const key: DatumKeySpec = requested ?? (mode === 'inferred-id' ? 'id' : (_row: DataRow, index: number) => index);
+      : inferredFields
+        ? 'inferred-fields' as const
+        : 'index' as const;
+  const key: DatumKeySpec = requested ?? (mode === 'inferred-id'
+    ? 'id'
+    : inferredFields ?? ((_row: DataRow, index: number) => index));
   const accessor = typeof key === 'function'
     ? key
     : Array.isArray(key)
       ? (row: DataRow) => canonicalKey(key.map((field) => row[field]))
       : (row: DataRow) => row[key] as DatumKey;
   return { key, mode, accessor };
+}
+
+/** Infer the smallest categorical field set that uniquely names source rows. */
+function inferCategoricalIdentity(source: DataRow[]): string | string[] | null {
+  if (!source.length) return null;
+  const fields = [...new Set(source.flatMap((row) => Object.keys(row)))]
+    .filter((field) => !field.startsWith('__'))
+    .filter((field) => source.every((row) => categoricalValue(row[field])));
+  if (!fields.length) return null;
+
+  // Conventional identifiers are stronger evidence than a coincidentally
+  // unique category, while declaration order breaks ties deterministically.
+  const ordered = [
+    ...fields.filter((field) => /(^id$|id$)/i.test(field)),
+    ...fields.filter((field) => !/(^id$|id$)/i.test(field))
+  ];
+  const exactLimit = 12;
+  if (ordered.length <= exactLimit) {
+    for (let size = 1; size <= ordered.length; size += 1) {
+      const combination = firstUniqueCombination(source, ordered, size);
+      if (combination) return combination.length === 1 ? combination[0] : combination;
+    }
+    return null;
+  }
+
+  // Avoid exponential work on unusually wide tables. This retains the
+  // strongest exact cases, then grows a deterministic composite key only
+  // while each added field increases its discriminatory power.
+  const single = firstUniqueCombination(source, ordered, 1);
+  if (single) return single[0];
+  const pair = firstUniqueCombination(source, ordered, 2);
+  if (pair) return pair;
+  const selected: string[] = [];
+  let distinct = 1;
+  for (const field of ordered) {
+    const candidate = [...selected, field];
+    const nextDistinct = distinctCount(source, candidate);
+    if (nextDistinct <= distinct) continue;
+    selected.push(field);
+    distinct = nextDistinct;
+    if (distinct === source.length) return selected;
+  }
+  return null;
+}
+
+function categoricalValue(value: unknown): boolean {
+  return value != null && (typeof value === 'string' || typeof value === 'boolean' || value instanceof Date);
+}
+
+function firstUniqueCombination(
+  source: DataRow[],
+  values: string[],
+  size: number,
+  start = 0,
+  prefix: string[] = []
+): string[] | null {
+  if (prefix.length === size) return distinctCount(source, prefix) === source.length ? prefix : null;
+  for (let index = start; index <= values.length - (size - prefix.length); index += 1) {
+    const result = firstUniqueCombination(source, values, size, index + 1, [...prefix, values[index]]);
+    if (result) return result;
+  }
+  return null;
+}
+
+function distinctCount(source: DataRow[], fields: string[]): number {
+  return new Set(source.map((row) => canonicalKey(fields.map((field) => row[field])))).size;
 }
 
 function keyFields(key: DatumKeySpec): string[] {

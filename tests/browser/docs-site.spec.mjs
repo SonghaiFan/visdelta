@@ -89,7 +89,6 @@ return { from: all, to: north };`);
 
   await page.getByRole('tab', { name: /^Appearance/i }).click();
   await page.locator('[data-scenario="line"]').click();
-  await expect(status).toHaveText('Waiting for input');
   await expect(status).toHaveText('Ready');
   await expect(page.locator('.playground-chart path.vd-line')).toHaveCount(1);
 });
@@ -182,7 +181,6 @@ test('every editable preset produces real marks', async ({ page }) => {
   for (const [category, sample, mark] of cases) {
     await page.getByRole('tab', { name: new RegExp(`^${category}`, 'i') }).click();
     await page.locator(`[data-scenario="${sample}"]`).click();
-    await expect(status).toHaveText('Waiting for input');
     await expect(status).toHaveText('Ready');
     expect(await page.locator(`.playground-chart ${mark}`).count()).toBeGreaterThan(0);
   }

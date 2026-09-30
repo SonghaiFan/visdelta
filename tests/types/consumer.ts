@@ -1,6 +1,6 @@
 import { bar, compileLineage, correspondLineage, delta, sequence } from 'visdelta';
 import { sequence as selectedSequence, transition } from 'visdelta/transition';
-import { delta as selectedDelta } from 'visdelta/core';
+import { delta as selectedDelta, applyDeclarationEdits, planDeclarationTransition } from 'visdelta/core';
 import { bar as selectedBar, barModule } from 'visdelta/bar';
 import { area as selectedArea, areaModule } from 'visdelta/area';
 import { point as selectedPoint, pointModule } from 'visdelta/point';
@@ -49,7 +49,13 @@ defineChartType({
 });
 
 const waypoint: IntermediateSpec = { spec: { mark: 'custom' } };
+const declarationChange = selectedDelta({ mark: 'custom', width: 10 }, { mark: 'custom', width: 20 });
+applyDeclarationEdits({ mark: 'custom', width: 10 }, declarationChange.edits);
+planDeclarationTransition({ mark: 'custom' }, { mark: 'custom', width: 20 }).stages.forEach(stage => {
+  applyDeclarationEdits(stage.from, stage.edits);
+});
 const policy: ChartTransitionPolicy = {
+  declarationPlanning: true,
   resolveTransitionPlan: () => ({}),
   intermediateSpecs: () => [waypoint],
   canonicalTransitionPair: (from, to) => ({ from, to, reverse: false })

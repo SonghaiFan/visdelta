@@ -4,6 +4,7 @@ import type { ChartContext, ChannelSpec } from '../../types/index.js';
 import type { RenderDatum } from '../../runtime/render-types.js';
 import type { AreaViewState } from './authoring.js';
 import type { AreaCell } from './state.js';
+import { tooltipIdentityHtml } from '../../runtime/mark-tooltip.js';
 import { bisector } from 'd3-array';
 import { format } from 'd3-format';
 import { pointer, select } from 'd3-selection';
@@ -176,9 +177,13 @@ function showAreaTooltip(
 
   const position = service.svgPosition(frame, band.x, (top + bottom) / 2);
   if (!position) { service.hide(tooltip); return; }
-  service.show(tooltip, position, lines.map(line =>
+  const content = lines.map(line =>
     line.header ? `<strong>${escapeHtml(line.text)}</strong>` : escapeHtml(line.text)
-  ).join('<br>'));
+  ).join('<br>');
+  service.show(tooltip, position, [
+    content,
+    tooltipIdentityHtml(band.row, spec, band.cell.observationKey, xField)
+  ].filter(Boolean).join('<br>'));
 }
 
 function tooltipLines(

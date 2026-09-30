@@ -1,17 +1,13 @@
 import type { SemanticKey, ViewSpec } from '../types/index.js';
-import { specObjectKey, specSemanticKey } from '../spec-meta.js';
+import { specSemanticKey } from '../spec-meta.js';
+import { markKeyValue, resolveMarkIdentity } from './mark-correspondence.js';
 
 type KeyFn = (d: Record<string, unknown>, i: number) => string | number;
 
 export function keyAccessor(spec: ViewSpec, fallbackField: string | string[] = 'id'): KeyFn {
-  const key = specObjectKey(spec) || fallbackField;
-  if (Array.isArray(key)) {
-    return (d: Record<string, unknown>, i: number) =>
-      (key as string[]).map((field) => d[field]).join('|') || String(i);
-  }
-  if (typeof key === 'function') return key as KeyFn;
+  const identity = resolveMarkIdentity(spec, fallbackField)!;
   return (d: Record<string, unknown>, i: number) =>
-    (d[key as string] ?? d['__unitKey'] ?? i) as string | number;
+    (d['__unitKey'] as string | number | null | undefined) ?? markKeyValue(d, identity, i);
 }
 
 export function semanticKeyForDatum(datum: Record<string, unknown> | null, spec: ViewSpec = {}): string | null {
@@ -24,7 +20,7 @@ export function semanticKeyForDatum(datum: Record<string, unknown> | null, spec:
   ];
 
   if (!parts.length || parts.some((part) => part == null || part === '')) return null;
-  return parts.map((part) => String(part)).join('|');
+  return parts.length === 1 ? String(parts[0]) : JSON.stringify(parts);
 }
 
 export function semanticMeasureForDatum(datum: Record<string, unknown> | null, spec: ViewSpec = {}): unknown {

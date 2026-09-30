@@ -47,6 +47,43 @@ for (const sample of pointScenarios) {
   });
 }
 
+for (const width of [1100, 390]) {
+test(`switching tabs animates only the chart, not the tab progress, at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 });
+  await page.goto('/docs/.vitepress/dist/point-lab.html#x');
+  await page.locator('#chart').scrollIntoViewIfNeeded();
+  await ready(page);
+  await page.locator('#end').click();
+
+  await page.locator('[data-scenario="color"]').click();
+  await expect(page.locator('#status')).toHaveText('Switching tabs');
+  await expect(page.locator('#progress')).toBeDisabled();
+  const frames = await page.evaluate(async () => {
+    const frames = [];
+    while (document.querySelector('#status').textContent === 'Switching tabs') {
+      frames.push({
+        progress: document.querySelector('#progress').value,
+        label: document.querySelector('#value').textContent,
+        positions: [...document.querySelectorAll('#chart circle.vd-point')].map(node => node.getAttribute('cx')).join(',')
+      });
+      await new Promise(requestAnimationFrame);
+    }
+    return frames;
+  });
+  expect(frames.length).toBeGreaterThan(1);
+  expect(new Set(frames.map(frame => frame.positions)).size).toBeGreaterThan(1);
+  expect(frames.every(frame => frame.progress === '0' && frame.label === '0.00')).toBe(true);
+
+  await ready(page);
+  await expect(page.locator('#value')).toHaveText('0.00');
+  await expect(page.locator('#progress')).toBeEnabled();
+  await expect(page.locator('#editor')).toHaveValue(pointScenarios.find(sample => sample.id === 'color').code);
+
+  await page.locator('#play').click();
+  await expect(page.locator('#value')).toHaveText('1.00');
+});
+}
+
 test('point radius, highlight, and cached node identity are real renderer behavior', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/point-lab.html#highlight');
   await ready(page);

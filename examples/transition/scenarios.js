@@ -1,3 +1,5 @@
+import { transitionScenario } from '../scenario.js';
+
 // Keep these pairs aligned with tests/browser/transition.spec.mjs.
 const population = `const DATA_URL = "./data/us-population-state-age-tidy.csv";
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
@@ -36,7 +38,7 @@ const detailed = bar({ url: DATA_URL })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS });`;
+  .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
 
 const segmentedFeatured = `${ageConstants}
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
@@ -47,7 +49,7 @@ const detailed = bar({ url: DATA_URL })
   .key(["state", "age"])
   .where({ field: "state", oneOf: FEATURE_STATES })
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS });`;
+  .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
 
 const lineageReaggregation = `const cases = [
   { id: "r1", year: 2020, location: "A", cases: 10 },
@@ -76,7 +78,7 @@ const sampleCategories = {
 };
 
 function sample(id, label, description, setup, from, to) {
-  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return transitionScenario({ id, category: sampleCategories[id], label, description, setup, from, to });
 }
 
 export const chart = 'bar';

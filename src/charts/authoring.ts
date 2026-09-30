@@ -98,7 +98,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     return this.with({ key: value } as Partial<S>);
   }
 
-  /** Declare stable source-row identity independently of the current mark grain. */
+  /** Override Core's inferred source-row identity independently of the mark grain. */
   datumKey(fields: string | string[]): this {
     const value = Array.isArray(fields) && fields.length === 1 ? fields[0] : fields;
     return this.with({ datumKey: value } as Partial<S>);
