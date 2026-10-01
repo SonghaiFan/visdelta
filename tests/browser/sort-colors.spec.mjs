@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode } from './code-editor.mjs';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
@@ -370,7 +371,7 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
   await page.getByRole('tab', { name: /^Grain/i }).click();
   await page.locator('[data-scenario="split"]').click();
   await expect(page.locator('#status')).toHaveText('Ready');
-  await expect(page.locator('#editor')).toHaveValue(/\.color\("age"/);
+  await expectEditorCode(page.locator('#editor'), /\.color\("age"/);
   await page.locator('#end').click();
   await expect(page.locator('#chart .vd-legend-item')).toHaveCount(9);
   const segmentFills = await page.locator('#chart rect.vd-bar').evaluateAll(nodes =>

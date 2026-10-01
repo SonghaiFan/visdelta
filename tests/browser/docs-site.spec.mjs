@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setCells, setEditorCode } from './code-editor.mjs';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/reference.html');
@@ -71,18 +72,16 @@ test('ontology playground recompiles live, reports errors, and switches state di
   await expect(status).toHaveText('Ready');
   await expect(editor).toContainText('.y("sales"');
 
-  await editor.fill(`const all = bar(rows)
+  await setCells(page, `const all = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
-const north = all.where({ region: "North" });
-return { from: all, to: north };`);
+  .y("sales");
+const from = all;`, 'const to = all.where({ region: "North" });');
   await expect(status).toHaveText('Waiting for input');
   await expect(status).toHaveText('Ready');
   await page.getByRole('slider', { name: 'Playground transition progress' }).fill('1');
   await expect(page.locator('.playground-chart rect.vd-bar')).toHaveCount(2);
 
-  await editor.fill('const broken = ;');
+  await setEditorCode(editor, 'const broken = ;');
   await expect(status).toHaveText('Waiting for input');
   await expect(status).toHaveText('Error');
   await expect(page.getByRole('alert')).toContainText('Unexpected token');
@@ -144,7 +143,7 @@ test('lab controls belong to code and the scenario description follows the chart
   await expect(output.locator('.playground-description')).toHaveCount(1);
   const order = await page.evaluate(() => {
     const toolbar = document.querySelector('.playground-toolbar');
-    const codeLabel = document.querySelector('.playground-editor-pane .playground-pane-label');
+    const codeLabel = document.querySelector('.playground-editor-pane .playground-code-cell');
     const chart = document.querySelector('.playground-chart');
     const description = document.querySelector('.playground-description');
     const progress = document.querySelector('.playground-output-pane input[type="range"]');

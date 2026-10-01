@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/line/scenarios.js';
 
 const ready = async page => {
@@ -12,7 +13,7 @@ const selectScenario = async (page, id) => {
   const sample = scenarios.find(candidate => candidate.id === id);
   await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
   await page.locator(`[data-scenario="${id}"]`).click();
-  await expect(page.locator('#editor')).toHaveValue(sample.code);
+  await expectEditorCode(page.locator('#editor'), sample.code);
   await ready(page);
 };
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
@@ -81,7 +82,7 @@ for (const sample of scenarios) {
     await ready(page);
     await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -95,13 +96,13 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('title: "Date"', 'title: "Trading date"'));
+    await setEditorCode(editor, sample.code.replace('title: "Date"', 'title: "Trading date"'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/title: "Trading date"/);
+    await expectEditorCode(editor, /title: "Trading date"/);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }

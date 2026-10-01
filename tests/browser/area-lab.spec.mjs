@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/area/scenarios.js';
 
 const ready = async page => {
@@ -24,7 +25,7 @@ for (const sample of scenarios) {
     await ready(page);
     await expect(page.getByRole('tab')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -45,13 +46,13 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('title: "Date"', 'title: "Month"'));
+    await setEditorCode(editor, sample.code.replace('title: "Date"', 'title: "Month"'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/title: "Month"/);
+    await expectEditorCode(editor, /title: "Month"/);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }
@@ -699,7 +700,8 @@ test('area lab loads prepared tidy unemployment observations', async ({ page }) 
   });
   await page.goto('/docs/.vitepress/dist/area-lab.html#split');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(/\.\/data\/area-lab\.csv/);
+  // The lab loads the CSV once and the authored code reads the shared rows.
+  await expectEditorCode(page.locator('#editor'), /\barea\(rows\)/);
   await page.locator('#end').click();
 
   const rows = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({
