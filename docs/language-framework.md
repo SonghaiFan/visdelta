@@ -86,12 +86,9 @@ This ontology changes only when implementation evidence requires it:
 
 ## Run a state difference
 
-Edit a pair of immutable states below. This is the documentation's single
-general-purpose playground: it renders a real transition and exposes the
-computed delta, but it does not promise a particular playback order from the
-category list.
-
-<SyntaxPlayground initial="filter" />
+Use the unified [Playground](/playground) to edit a pair of immutable states,
+render the real transition, and inspect the computed delta across all five
+chart modules. The category list does not prescribe playback order.
 
 ## Transition contracts
 
@@ -397,4 +394,4 @@ examples, tests, and documentation change together. Do not keep aliases in this
 greenfield release.
 
 The detailed signatures live in the [API reference](/reference). Working
-behavior lives in the five transition labs.
+behavior lives in the unified Playground.

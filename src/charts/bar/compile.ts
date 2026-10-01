@@ -169,15 +169,21 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
     delete (newEncoding as AnyRecord)['yOffset'];
   }
 
+  const markFields = [...new Set([categoryField, segmentField].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const semantic = (detailSpec['semantic'] as SemanticKey | undefined) ||
+    (detailSpec['semanticKey'] as SemanticKey | undefined) ||
+    (fields.length
+      ? semanticKeyFromParts({ field: categoryField }, { field: sourceField })
+      : semanticKeyFromParts(markFields.map((field) => ({ field })), { value: valueField }));
+
   return withSceneState(withObject({
     ...spec,
     transform,
     encoding: newEncoding as ViewSpec['encoding']
   }, {
-    key: (detailSpec['key'] as string | string[] | undefined) || [categoryField, segmentField],
-    semantic: (detailSpec['semantic'] as SemanticKey | undefined) ||
-      (detailSpec['semanticKey'] as SemanticKey | undefined) ||
-      semanticKeyFromParts({ field: categoryField }, { field: sourceField })
+    key: (detailSpec['key'] as string | string[] | undefined) || markFields,
+    semantic
   }), {
     detail: {
       layout,

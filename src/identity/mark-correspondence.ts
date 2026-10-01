@@ -37,7 +37,10 @@ export function resolveMarkIdentity(
   const explicit = specObjectKey(spec);
   const key = explicit ?? chartDefault;
   if (key == null) return null;
-  const fields = (Array.isArray(key) ? key : [key]).map(String).filter(Boolean);
+  // A compound mark identity is a field set. Declaration order may describe
+  // presentation grain, but it cannot make the same conjunction a new object.
+  const fields = [...new Set((Array.isArray(key) ? key : [key]).map(String).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
   return fields.length ? { fields, source: explicit == null ? 'chart-default' : 'explicit' } : null;
 }
 

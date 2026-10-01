@@ -312,7 +312,7 @@ test('explicit color changes are still allowed during sorting', async ({ page })
 });
 
 test('sort lab keeps the same colors at both endpoints', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#sort');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/sort');
   await expect(page.locator('#status')).toHaveText('Ready');
   const read = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => Object.fromEntries(
     nodes.map(node => [node.dataset.category, {
@@ -365,7 +365,7 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
   expect(result.splitLegends).toBe(0);
   expect(result.segments).toBe(4);
 
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#sort');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/sort');
   await expect(page.locator('#status')).toHaveText('Ready');
   await page.getByRole('tab', { name: /^Grain/i }).click();
   await page.locator('[data-scenario="split"]').click();

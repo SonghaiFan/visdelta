@@ -55,7 +55,7 @@ test('line infers an ISO date x field and places every mark on its time scale', 
 });
 
 test('line granularity examples keep time on x while resampling daily observations', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#x');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/x');
   await ready(page);
   await expect(page.locator('.vd-x-label')).toHaveText('Date →');
   await expect(page.locator('#chart circle.vd-line-point')).toHaveCount(20);
@@ -77,9 +77,9 @@ for (const sample of scenarios) {
   test(`line lab ${sample.id}: editable pair and reversible seek`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`/docs/.vitepress/dist/line-lab.html#${sample.id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#line/${sample.id}`);
     await ready(page);
-    await expect(page.getByRole('tab')).toHaveCount(7);
+    await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 
@@ -95,7 +95,7 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('title: "Date"', 'title: "Trading date"'));
+    await editor.fill(sample.code.replace('.x("date")', '.x("date", { title: "Trading date" })'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     await expect(editor).toHaveValue(/title: "Trading date"/);
@@ -107,7 +107,7 @@ for (const sample of scenarios) {
 }
 
 test('line highlight and style are real renderer behavior', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#highlight');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/highlight');
   await ready(page);
   await page.locator('#end').click();
   const highlightedLines = await page.locator('#chart path.vd-line').evaluateAll(nodes =>
@@ -141,7 +141,7 @@ test('line highlight and style are real renderer behavior', async ({ page }) => 
 });
 
 test('line filter keeps an internal gap while focus keeps every observation', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#filter');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/filter');
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Remove points');
   await page.locator('#end').click();
@@ -174,7 +174,7 @@ test('line filter keeps an internal gap while focus keeps every observation', as
 });
 
 test('line lab names the authored observation direction', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#restore');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/restore');
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Add points');
   await selectScenario(page, 'add');
@@ -184,7 +184,7 @@ test('line lab names the authored observation direction', async ({ page }) => {
 });
 
 test('line axis ticks and grid lines share one scale transition', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#add');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/add');
   await ready(page);
 
   for (const progress of [0.05, 0.25, 0.5, 0.75, 0.95]) {
@@ -260,7 +260,7 @@ test('all exact D3 curve names render through the Line module', async ({ page })
 });
 
 test('line y scale changes from linear to base-2 logarithmic without changing x', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#log');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/log');
   await ready(page);
   const positions = async () => page.locator('#chart circle.vd-line-point').evaluateAll(nodes =>
     nodes.map(node => ({
@@ -285,7 +285,7 @@ test('line y scale changes from linear to base-2 logarithmic without changing x'
 });
 
 test('line time window combines keyed add and remove without a path wiggle', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#shift');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/shift');
   await ready(page);
   await expect(page.locator('.playground-line-plan')).toContainText('Add and remove points');
   const frameAt = async progress => {
@@ -582,7 +582,7 @@ test('line split and merge are one transition in reverse', async ({ page }) => {
 });
 
 test('line merge draws its dashed reference before zipper motion', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#merge');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/merge');
   await ready(page);
 
   const visibleDots = () => page.locator('#chart circle.vd-line-point').evaluateAll(nodes =>
@@ -638,7 +638,7 @@ test('line merge draws its dashed reference before zipper motion', async ({ page
 });
 
 test('line lab fits a narrow viewport and keeps progress after resize', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/line-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#line/split');
   await ready(page);
   await page.locator('#progress').fill('0.37');
   await page.setViewportSize({ width: 390, height: 844 });

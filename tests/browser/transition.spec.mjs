@@ -383,6 +383,58 @@ test('reaggregation composes split, update, and merge between unrelated grouping
   expect(errors).toEqual([]);
 });
 
+test('field color stays an encoding while reaggregation uses its common grain', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const from = root.x('year').color('year').rollup('year');
+    const to = root.x('location').rollup('location');
+    const change = await sl.transition(from, to, opts('#a'));
+    change.progress(0.5);
+    const visible = [...change.view.querySelectorAll('rect.vd-bar')]
+      .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
+    return {
+      mode: change.delta.lineage.mode,
+      bars: visible.length,
+      grouped: visible.every(node => node.classList.contains('vd-bar-grouped')),
+      colors: new Set(visible.map(node => getComputedStyle(node).fill)).size
+    };
+  });
+
+  expect(result).toEqual({ mode: 'reaggregate', bars: 4, grouped: true, colors: 2 });
+});
+
+test('authored common-refinement bars regroup before merging by the other field', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const from = root.x('year').breakdown('location').color('location');
+    const to = root.x('location').rollup('location');
+    const change = await sl.transition(from, to, opts('#a'));
+    change.progress(0.5);
+    const visible = [...change.view.querySelectorAll('rect.vd-bar')]
+      .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
+    return {
+      mode: change.delta.lineage.mode,
+      bars: visible.length,
+      grouped: visible.every(node => node.classList.contains('vd-bar-grouped')),
+      keys: new Set(visible.map(node => node.dataset.key)).size
+    };
+  });
+
+  expect(result).toEqual({ mode: 'merge', bars: 4, grouped: true, keys: 4 });
+});
+
 test('additive reaggregation bridges the grouped common grain through stacked totals', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const cases = [

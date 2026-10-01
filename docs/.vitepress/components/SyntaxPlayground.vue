@@ -12,7 +12,8 @@ const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const props = defineProps({
   initial: { type: String, default: 'measure' },
   compact: { type: Boolean, default: false },
-  mode: { type: String, default: 'all' }
+  mode: { type: String, default: 'all' },
+  hashPrefix: { type: String, default: '' }
 });
 
 const samples = {
@@ -230,7 +231,10 @@ const showPointEffect = computed(() =>
 
 onMounted(() => {
   if (isLabMode.value) {
-    const requested = location.hash.slice(1);
+    const hash = location.hash.slice(1);
+    const requested = props.hashPrefix && hash.startsWith(`${props.hashPrefix}/`)
+      ? hash.slice(props.hashPrefix.length + 1)
+      : hash;
     if (availableSamples.value[requested]) selected.value = requested;
   }
   if (!('IntersectionObserver' in window)) {
@@ -294,7 +298,7 @@ watch(selected, (next, previous) => {
   toCode.value = cells.to;
   activeCategory.value = availableSamples.value[next].category;
   if (isLabMode.value && typeof history !== 'undefined') {
-    history.replaceState(null, '', `#${next}`);
+    history.replaceState(null, '', `#${props.hashPrefix ? `${props.hashPrefix}/` : ''}${next}`);
   }
   if (api) nextTick(() => {
     clearTimeout(debounceTimer);
@@ -328,10 +332,16 @@ function sampleCells(sample) {
     .replaceAll('{ url: DATA_URL }', 'rows')
     .trim();
   return {
-    from: `${setup}${setup ? '\n\n' : ''}const from = ${fromExpression};`,
-    to: `const to = ${toExpression};`,
+    from: isolatedStateCell('from', setup, fromExpression),
+    to: isolatedStateCell('to', setup, toExpression),
     dataUrl
   };
+}
+
+function isolatedStateCell(name, setup, expression) {
+  if (!setup) return `const ${name} = ${expression};`;
+  const body = setup.split('\n').map(line => `  ${line}`).join('\n');
+  return `const ${name} = (() => {\n${body}\n\n  return ${expression};\n})();`;
 }
 
 watch(pointEffect, () => {
@@ -372,23 +382,26 @@ async function runCode() {
     const isLab = isLabMode.value;
     const cells = sampleCells(availableSamples.value[selected.value]);
     const sharedRows = isLab ? await loadSampleRows(cells.dataUrl) : null;
-    const source = `${fromCode.value}\n\n${toCode.value}\n\nreturn { from, to };`;
-    const evaluate = isLab
-      ? new AsyncFunction(labChart.value, 'd3', 'rows', `"use strict";\n${source}`)
-      : new AsyncFunction(
-        'area', 'bar', 'line', 'point', 'unit', 'delta', 'rows', 'segments', 'series', 'units',
-        `"use strict";\n${source}`
-      );
-    const authoredResult = isLab
-      ? await evaluate(await labSamples[props.mode].loadChart(), d3, sharedRows)
-      : await evaluate(
+    const parameterNames = isLab
+      ? [labChart.value, 'd3', 'rows']
+      : ['area', 'bar', 'line', 'point', 'unit', 'delta', 'rows', 'segments', 'series', 'units'];
+    const evaluateFrom = compileCell('From', parameterNames, fromCode.value, 'from');
+    const evaluateTo = compileCell('To', parameterNames, toCode.value, 'to');
+    const chartFactory = isLab ? await labSamples[props.mode].loadChart() : null;
+    const sharedArguments = isLab
+      ? [chartFactory, d3, sharedRows]
+      : [
         api.area, api.bar, api.line, api.point, api.unit, api.delta,
         structuredClone(rows), structuredClone(segments), structuredClone(series), structuredClone(units)
-      );
+      ];
+    const authoredResult = {
+      from: await evaluateCell('From', evaluateFrom, sharedArguments),
+      to: await evaluateCell('To', evaluateTo, sharedArguments)
+    };
     const result = pointLabPair(authoredResult);
     if (version !== runVersion) return;
     if (!result?.from || !result?.to) {
-      throw new Error('Return an object with { from, to } visualization states.');
+      throw new Error('From and To must each assign a visualization state.');
     }
 
     if (updateSource) {
@@ -399,6 +412,27 @@ async function runCode() {
   } catch (cause) {
     if (version === runVersion) showError(cause);
   }
+}
+
+function compileCell(label, parameterNames, source, resultName) {
+  try {
+    return new AsyncFunction(...parameterNames, `"use strict";\n${source}\nreturn ${resultName};`);
+  } catch (cause) {
+    throw cellError(label, cause);
+  }
+}
+
+async function evaluateCell(label, evaluate, args) {
+  try {
+    return await evaluate(...args);
+  } catch (cause) {
+    throw cellError(label, cause);
+  }
+}
+
+function cellError(label, cause) {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return new Error(`${label}: ${message}`);
 }
 
 async function loadSampleRows(url) {
@@ -748,8 +782,8 @@ function pause() {
             />
           </label>
         </div>
-        <p v-if="isLabMode" class="playground-contract"><code>{{ labChart }}</code>, <code>d3</code>, and the loaded <code>rows</code> are provided. The To cell continues in the From cell's scope, so it can reuse any variable declared there.</p>
-        <p v-else class="playground-contract">The To cell continues in the From cell's scope. Categories describe the difference, not playback order.</p>
+        <p v-if="isLabMode" class="playground-contract"><code>{{ labChart }}</code>, <code>d3</code>, and the same loaded <code>rows</code> are provided to both cells. From and To execute independently and do not share declarations.</p>
+        <p v-else class="playground-contract">From and To execute independently with the same supplied data. Categories describe the difference, not playback order.</p>
       </div>
       </template>
 
@@ -760,9 +794,20 @@ function pause() {
       <div class="playground-output-pane">
         <output v-if="isLabMode" id="value" class="playground-progress-value">{{ progress.toFixed(2) }}</output>
         <div v-if="lineTransition" class="playground-line-plan">Line transition <strong>{{ lineTransition }}</strong></div>
-        <div :id="isLabMode ? 'chart' : undefined" ref="chartTarget" class="playground-chart" aria-label="Editable syntax output"></div>
+        <div class="playground-chart-stage" :class="{ 'is-error': error }">
+          <div
+            :id="isLabMode ? 'chart' : undefined"
+            ref="chartTarget"
+            class="playground-chart"
+            aria-label="Editable syntax output"
+            :aria-hidden="error ? 'true' : undefined"
+          ></div>
+          <div v-if="error" class="playground-runtime-error" role="alert">
+            <strong>Code error</strong>
+            <span>{{ error }}</span>
+          </div>
+        </div>
         <p v-if="description" class="playground-description">{{ description }}</p>
-        <div v-if="error" class="playground-runtime-error" role="alert">{{ error }}</div>
         <input
           type="range"
           :id="isLabMode ? 'progress' : undefined"

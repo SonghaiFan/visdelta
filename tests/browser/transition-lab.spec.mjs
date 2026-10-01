@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('entering a bar tab does not advance its authored-pair progress', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#measure');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/measure');
   await expect(page.locator('#status')).toHaveText('Ready');
   await page.locator('#end').click();
   await page.getByRole('tab', { name: /^Grain/i }).click();
@@ -35,19 +35,19 @@ const snapshot = page => page.locator('#chart svg').evaluateAll(svgs => svgs.map
   }))));
 
 function editedScenario(sample) {
-  if (sample.code.includes('"State"')) {
-    return { code: sample.code.replaceAll('"State"', '"Region"'), label: 'Region' };
+  if (sample.code.includes('.x("state")')) {
+    return { code: sample.code.replace('.x("state")', '.x("state", { title: "Region" })'), label: 'Region' };
   }
-  return { code: sample.code.replace('"Year"', '"Calendar year"'), label: 'Calendar year' };
+  return { code: sample.code.replace('.x("year")', '.x("year", { title: "Calendar year" })'), label: 'Calendar year' };
 }
 
 for (const sample of scenarios) {
   test(`lab ${sample.id}: editable pair, reversible seek, working endpoints`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`/docs/.vitepress/dist/transition-lab.html#${sample.id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#bar/${sample.id}`);
     await ready(page);
-    await expect(page.getByRole('tab')).toHaveCount(7);
+    await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
     const start = await snapshot(page);
@@ -76,7 +76,7 @@ for (const sample of scenarios) {
 }
 
 test('invalid code and invalid pairs preserve preview; reset recovers', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/');
   await ready(page);
   const editor = page.locator('#editor');
   const original = await snapshot(page);
@@ -85,18 +85,21 @@ test('invalid code and invalid pairs preserve preview; reset recovers', async ({
     await editor.fill(code);
     await expect(page.locator('#status')).toHaveText('Error');
     await expect(page.getByRole('alert')).toContainText('last successful preview');
+    await expect(page.locator('.playground-chart-stage')).toHaveClass(/is-error/);
+    await expect(page.locator('#chart')).toHaveCSS('filter', /blur\(6px\)/);
     expect(await snapshot(page)).toEqual(original);
     await expect(page.locator('#chart > div')).toHaveCount(1);
   }
   await page.locator('#reset').click();
   await ready(page);
   await expect(page.getByRole('alert')).toBeHidden();
+  await expect(page.locator('.playground-chart-stage')).not.toHaveClass(/is-error/);
 });
 
 test('bar lab exposes the planned split, move, and merge stages', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#reaggregate');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/reaggregate');
   await ready(page);
   await expect(page.locator('[data-scenario="reaggregate"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
@@ -133,7 +136,7 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
 
 test('bar marks are fill-only in simple, grouped, and stacked endpoints', async ({ page }) => {
   for (const id of ['sort', 'layout', 'split']) {
-    await page.goto(`/docs/.vitepress/dist/transition-lab.html#${id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#bar/${id}`);
     await page.reload();
     await ready(page);
     await page.locator('#end').click();
@@ -145,7 +148,7 @@ test('bar marks are fill-only in simple, grouped, and stacked endpoints', async 
 });
 
 test('bar focus moves one camera over the full category scale without filtering bars', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#focus');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/focus');
   await ready(page);
   const start = await page.locator('#chart rect.vd-bar').evaluateAll(nodes =>
     nodes.map(node => ({
@@ -233,7 +236,7 @@ test('bar focus moves one camera over the full category scale without filtering 
 });
 
 test('grouped split keeps aggregate bars on the visible baseline while the legend enters', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#grouped-split');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/grouped-split');
   await ready(page);
 
   for (const progress of ['0', '0.01', '0.03', '0.23', '0.43']) {
@@ -264,7 +267,7 @@ test('grouped split keeps aggregate bars on the visible baseline while the legen
 });
 
 test('additive grouped split reaches stacked detail before opening into grouped bars', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#grouped-split');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/grouped-split');
   await ready(page);
   const visibleLayouts = async progress => {
     await page.locator('#progress').fill(String(progress));
@@ -286,10 +289,10 @@ test('additive grouped split reaches stacked detail before opening into grouped 
 });
 
 test('manual run, drafts, switching and playback controls', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/');
   await ready(page);
   await page.locator('#auto-run').uncheck();
-  const edited = scenarios[0].code.replaceAll('"State"', '"Region"');
+  const edited = scenarios[0].code.replace('.x("state")', '.x("state", { title: "Region" })');
   await page.locator('#editor').fill(edited);
   await expect(page.locator('#status')).toHaveText('Edited · press Run');
   await expect(page.locator('#chart')).not.toContainText('Region');
@@ -316,10 +319,10 @@ test('manual run, drafts, switching and playback controls', async ({ page }) => 
 });
 
 test('late async evaluation cannot overwrite a newer edit', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/');
   await ready(page);
   await page.locator('#auto-run').uncheck();
-  await page.locator('#editor').fill(`await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code.replaceAll('"State"', '"Stale region"')}`);
+  await page.locator('#editor').fill(`await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code.replace('.x("state")', '.x("state", { title: "Stale region" })')}`);
   await page.locator('#run').click();
   await expect(page.locator('#status')).toHaveText('Compiling');
   await chooseScenario(page, 'filter');
@@ -336,7 +339,7 @@ test('bar lab loads tidy population observations with ordered age detail', async
   page.on('request', request => {
     if (request.url().endsWith('/data/us-population-state-age-tidy.csv')) requests.push(request.url());
   });
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
   await ready(page);
 
   await expect(page.locator('#editor')).toHaveValue(/\.breakdown\("age"\)/);
@@ -356,25 +359,28 @@ for (const op of ['sum', 'count']) {
   test(`real population ${op}: sorted detail restores detail order before rollup`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+    await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
     await ready(page);
     const sample = scenarios.find(scenario => scenario.id === 'split');
     const baseCode = sample.code
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('const from = detailed.rollup();', 'const from = detailed;')
-      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+      .replace('return detailed.rollup();', 'return detailed;');
+    const toCode = sample.toCode
+      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
+      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`);
     const geometry = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => nodes.map(node => ({
       key: node.dataset.key,
       attrs: ['x', 'y', 'width', 'height', 'fill'].map(name => node.getAttribute(name))
     })).sort((a, b) => a.key.localeCompare(b.key)));
     await page.locator('#editor').fill(baseCode);
+    await page.locator('#to-editor').fill(toCode);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     const detailFrame = await geometry();
     await page.locator('#end').click();
     const totalFrame = await geometry();
-    await page.locator('#editor').fill(baseCode.replace('const from = detailed;',
-      'const from = detailed.sort("population");'));
+    await page.locator('#editor').fill(baseCode.replace('return detailed;',
+      'return detailed.sort("population");'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     // Editing preserves the slider's current value (the preceding endpoint).
@@ -396,14 +402,17 @@ for (const op of ['sum', 'count']) {
   test(`real population ${op}: focused detail merges before the camera returns`, async ({ page }, testInfo) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+    await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
     await ready(page);
     const sample = scenarios.find(scenario => scenario.id === 'split');
     const code = sample.code
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('const from = detailed.rollup();', 'const from = detailed.focus({ state: "AL" });')
-      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+      .replace('return detailed.rollup();', 'return detailed.focus({ state: "AL" });');
+    const toCode = sample.toCode
+      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
+      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`);
     await page.locator('#editor').fill(code);
+    await page.locator('#to-editor').fill(toCode);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
@@ -432,7 +441,7 @@ for (const [splitId, mergeId] of [['split', 'merge'], ['grouped-split', 'grouped
   test(`real population ${splitId} and ${mergeId} use the same frames in reverse`, async ({ page }) => {
     const progressValues = [0, 0.17, 0.5, 0.83, 1];
     const frames = async id => {
-      await page.goto('/docs/.vitepress/dist/transition-lab.html');
+      await page.goto('/docs/.vitepress/dist/playground.html#bar/');
       await ready(page);
       await chooseScenario(page, id);
       await expect(page.locator('#editor')).toHaveValue(scenarios.find(scenario => scenario.id === id).code);
@@ -474,7 +483,7 @@ for (const [splitId, mergeId] of [['split', 'merge'], ['grouped-split', 'grouped
 }
 
 test('narrow layout fits and resize preserves progress', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
   await ready(page);
   await page.locator('#progress').fill('0.37');
   await page.setViewportSize({ width: 390, height: 844 });

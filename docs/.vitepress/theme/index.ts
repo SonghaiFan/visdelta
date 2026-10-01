@@ -20,6 +20,9 @@ export default {
     app.component('SyntaxPlayground', defineAsyncComponent(
       () => import('../components/SyntaxPlayground.vue')
     ));
+    app.component('ChartPlayground', defineAsyncComponent(
+      () => import('../components/ChartPlayground.vue')
+    ));
     app.component('TransitionWorkbench', defineAsyncComponent(
       () => import('../components/TransitionWorkbench.vue')
     ));

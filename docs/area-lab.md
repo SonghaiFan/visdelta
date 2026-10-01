@@ -1,4 +1,6 @@
-# Area transition lab
+# Area transition behavior
+
+Try these scenarios in the unified [Playground](/playground#area/split).
 
 These sixteen editable scenarios use one 54-row tidy US unemployment dataset
 to exercise VisDelta's Area module. Each source row is one month and industry;
@@ -106,8 +108,6 @@ exact D3 export such as `curveLinear`, `curveMonotoneX`, `curveNatural`, or
 exception because it does not implement the Area curve interface. When the
 curve changes, VisDelta matches points along the rendered SVG paths so the
 boundary does not switch shape abruptly at progress zero.
-
-<SyntaxPlayground mode="area-lab" initial="split" />
 
 Every example imports only the focused Area module and the generic transition
 entry. The Area builder, compiler, stack geometry, renderer, and transition

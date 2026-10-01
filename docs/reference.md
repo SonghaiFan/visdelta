@@ -11,7 +11,7 @@ direction and inspect the resolved endpoints and semantic difference.
 
 ## Run the grammar against a real transition
 
-Use the [ontology playground](/language-framework#run-a-state-difference) to
+Use the [Playground](/playground) to
 edit a pair of immutable states, inspect its directional `stateChanges`, and
 scrub the generated transition. This reference stays focused on the API shape.
 

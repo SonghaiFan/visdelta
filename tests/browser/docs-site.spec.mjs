@@ -108,7 +108,7 @@ test('ontology presents seven responsive category icons', async ({ page }) => {
 });
 
 test('lab category icons and case rail keep the content position stable', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#x');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/x');
   const tabs = page.locator('.playground-category-tabs');
   const cases = page.locator('.playground-example-list');
   const toolbar = page.locator('.playground-toolbar');
@@ -137,7 +137,7 @@ test('lab category icons and case rail keep the content position stable', async 
 });
 
 test('lab controls belong to code and the scenario description follows the chart', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#y');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/y');
   const editor = page.locator('.playground-editor-pane');
   const output = page.locator('.playground-output-pane');
   await expect(editor.locator('.playground-toolbar')).toHaveCount(1);

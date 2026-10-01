@@ -67,7 +67,10 @@ export function barLayoutState(
 
   if (stateLayout) return stateLayout;
   if (enc.xOffset?.field || enc.yOffset?.field) return 'grouped';
-  if ((enc.detail?.field || enc.color?.field) && aggregate) return 'stacked';
+  // Color is an encoding, not grain. Only an explicit detail channel can turn
+  // aggregate rows into stacked segments; a field color on one row per
+  // category must remain a simple Bar.
+  if (enc.detail?.field && aggregate) return 'stacked';
   return 'simple';
 }
 
@@ -140,7 +143,6 @@ export function barSegmentField(
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.detail?.field ??
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.xOffset?.field ??
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.yOffset?.field ??
-    (spec.encoding as Record<string, ChannelSpec | undefined>)?.color?.field ??
     null
   );
 }

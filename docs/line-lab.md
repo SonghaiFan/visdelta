@@ -1,4 +1,6 @@
-# Line transition lab
+# Line transition behavior
+
+Try these scenarios in the unified [Playground](/playground#line/x).
 
 These sixteen scenarios are the executable transition matrix for VisDelta's
 line chart. They cover temporal granularity, y mappings, filtering, data
@@ -61,8 +63,6 @@ keeps a gap. Focus keeps all observations and the full line, fits one 2D camera,
 and clips what falls outside it. Line and Area share the same connected-stretch
 rule: a stretch needs at least two observations. An isolated Line observation
 keeps its point mark but does not create a line path.
-
-<SyntaxPlayground mode="line-lab" initial="x" />
 
 Every example imports the focused Line module and the generic transition entry.
 It does not load the complete chart collection.

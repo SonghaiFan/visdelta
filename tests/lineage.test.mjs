@@ -8,6 +8,7 @@ import {
   delta
 } from '../dist/index.js';
 import {
+  barState,
   barIntermediateSpecs,
   barReaggregationIntermediateSpecs
 } from '../dist/charts/bar/state.js';
@@ -119,6 +120,42 @@ test('bar reaggregation plans split, update, and merge through one stable refine
     'year',
     null
   ]);
+});
+
+test('field color remains encoding and does not disable the reaggregation route', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const byYear = base.x('year').color('year').rollup('year').toSpec();
+  const byLocation = base.x('location').rollup('location').toSpec();
+  const state = barState(byYear);
+  const phases = barIntermediateSpecs(byYear, byLocation);
+
+  assert.equal(state.barLayout, 'simple');
+  assert.equal(state.hasDetail, false);
+  assert.equal(state.segmentField, null);
+  assert.equal(phases.length, 4);
+  assert.deepEqual(phases.map(phase => phase.spec.meta.state.sceneState.detail.layout), [
+    'stacked', 'grouped', 'grouped', 'stacked'
+  ]);
+});
+
+test('authored common refinement regroups before merging into its other field', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const detailed = base.x('year').breakdown('location').color('location').toSpec();
+  const byLocation = base.x('location').rollup('location').toSpec();
+  const phases = barIntermediateSpecs(detailed, byLocation);
+
+  assert.deepEqual(detailed.meta.object.key, ['location', 'year']);
+  assert.deepEqual(detailed.meta.object.semantic, phases[0].spec.meta.object.semantic);
+  assert.deepEqual(phases.map(phase => [
+    phase.spec.encoding.x.field,
+    phase.spec.encoding.detail?.field,
+    phase.spec.meta.state.sceneState.detail.layout
+  ]), [
+    ['year', 'location', 'grouped'],
+    ['location', 'year', 'grouped'],
+    ['location', 'year', 'stacked']
+  ]);
+  assert.ok(phases.every(phase => phase.spec.meta.object.key.length === 2));
 });
 
 test('additive grouped split first reaches detail grain as a stack', () => {

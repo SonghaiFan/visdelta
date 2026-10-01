@@ -34,8 +34,9 @@ export default defineConfig({
       { text: 'Start', link: '/getting-started' },
       { text: 'Ontology', link: '/language-framework' },
       { text: 'API', link: '/reference' },
+      { text: 'Playground', link: '/playground' },
       { text: 'Explore', items: [
-        { text: 'Run a state difference', link: '/language-framework#run-a-state-difference' },
+        { text: 'Run a state difference', link: '/playground' },
         { text: 'Chart types', link: '/chart-types' },
         { text: 'Data and transforms', link: '/data-sources-and-transforms' },
         { text: 'Transition runtime', link: '/runtime-api' },
@@ -66,19 +67,9 @@ export default defineConfig({
       {
         text: 'Inspect and run a transition',
         items: [
-          { text: 'Ontology playground', link: '/language-framework#run-a-state-difference' },
+          { text: 'Playground', link: '/playground' },
           { text: 'API reference', link: '/reference' },
           { text: 'Transition runtime', link: '/runtime-api' }
-        ]
-      },
-      {
-        text: 'Chart-specific labs',
-        items: [
-          { text: 'Bar transition lab', link: '/transition-lab' },
-          { text: 'Point transition lab', link: '/point-lab' },
-          { text: 'Line transition lab', link: '/line-lab' },
-          { text: 'Area transition lab', link: '/area-lab' },
-          { text: 'Unit transition lab', link: '/unit-lab' }
         ]
       },
       {

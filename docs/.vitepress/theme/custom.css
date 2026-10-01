@@ -919,6 +919,15 @@
   border-radius: 12px;
   background: var(--vp-c-bg-soft);
 }
+.chart-playground { margin: 30px 0 52px; }
+.chart-playground .syntax-playground { margin-top: 0; border-radius: 0 0 12px 12px; }
+.chart-playground-tabs { overflow: hidden; border-radius: 12px 12px 0 0; background: var(--vp-c-bg-soft); }
+.chart-playground-tabs > span { display: block; padding: 11px 12px 7px; color: var(--vp-c-text-3); font: 700 9px/1.4 var(--vp-font-family-mono); letter-spacing: .09em; text-transform: uppercase; }
+.chart-playground-tabs > div { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--vp-c-divider); border-bottom: 1px solid var(--vp-c-divider); }
+.chart-playground-tabs button { min-height: 44px; border: 0; border-right: 1px solid var(--vp-c-divider); background: transparent; color: var(--vp-c-text-2); font-size: 11px; font-weight: 650; cursor: pointer; }
+.chart-playground-tabs button:last-child { border-right: 0; }
+.chart-playground-tabs button:hover { background: var(--vp-c-bg); color: var(--vp-c-text-1); }
+.chart-playground-tabs button.is-active { background: var(--vp-c-bg); color: var(--vp-c-brand-1); box-shadow: inset 0 -3px var(--vp-c-brand-1); }
 
 /* Let interactive examples use the page while keeping prose at a readable
    measure. Components may fill the container; paragraphs and list items do not. */
@@ -1172,7 +1181,9 @@
 .editable-code-cell .cm-editor { height: 100%; }
 .editable-code-cell .cm-scroller { overflow: auto; }
 .playground-contract { margin: 9px 2px 0 !important; color: var(--vp-c-text-3); font-size: 10px !important; line-height: 1.55 !important; }
-.playground-chart { position: relative; min-height: 300px; overflow: hidden; background: var(--vp-c-bg); }
+.playground-chart-stage { position: relative; min-height: 300px; overflow: hidden; background: var(--vp-c-bg); }
+.playground-chart { position: relative; min-height: 300px; overflow: hidden; background: var(--vp-c-bg); transition: filter 160ms ease, opacity 160ms ease; }
+.playground-chart-stage.is-error .playground-chart { filter: blur(6px); opacity: 0.38; pointer-events: none; user-select: none; }
 .playground-candidate { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
 .playground-description {
   max-width: none !important;
@@ -1187,13 +1198,16 @@
 .playground-output-actions { display: flex; gap: 6px; margin: 7px 0 12px; }
 .playground-output-actions button { flex: 1; }
 .playground-output-actions button:disabled { cursor: default; opacity: 0.4; }
-.playground-runtime-error { margin-top: 8px; padding: 9px 11px; border-left: 3px solid #fa4d1d; background: rgba(250, 77, 29, 0.08); color: #d83e13; font: 10px/1.5 var(--vp-font-family-mono); overflow-wrap: anywhere; }
+.playground-runtime-error { position: absolute; top: 50%; left: 50%; z-index: 2; display: grid; width: min(420px, calc(100% - 32px)); gap: 5px; box-sizing: border-box; padding: 13px 15px; border: 1px solid color-mix(in srgb, #fa4d1d 48%, var(--vp-c-divider)); border-radius: 8px; background: color-mix(in srgb, var(--vp-c-bg) 94%, #fa4d1d); box-shadow: 0 10px 30px rgba(20, 20, 24, 0.14); color: #d83e13; font: 10px/1.5 var(--vp-font-family-mono); overflow-wrap: anywhere; transform: translate(-50%, -50%); white-space: pre-wrap; }
+.playground-runtime-error strong { color: inherit; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.playground-runtime-error span { color: var(--vp-c-text-1); }
 .playground-output-pane details { border-top: 1px solid var(--vp-c-divider); }
 .playground-output-pane summary { padding: 10px 0; color: var(--vp-c-text-2); cursor: pointer; font-size: 11px; }
 .playground-output-pane details pre { max-height: 210px; margin: 0; overflow: auto; background: #101621; color: #dbe7ff; font-size: 10px; }
 
 .syntax-playground.is-compact { margin: 18px 0 34px; }
 .syntax-playground.is-compact .editable-code-cell { min-height: 74px; }
+.syntax-playground.is-compact .playground-chart-stage,
 .syntax-playground.is-compact .playground-chart { min-height: 250px; }
 .syntax-playground.is-compact .playground-contract { display: none; }
 

@@ -1,9 +1,5 @@
 # Live syntax examples moved
 
-The general-purpose editor now belongs to
-[Ontology and transition contracts](/language-framework#run-a-state-difference).
-There, every editable pair is framed as a state difference with directional
-facts, identity evidence, and a transition contract.
-
-For a chart-module-specific route, use the corresponding
-[chart lab](/chart-types#transition-labs).
+All editable examples now live in the unified [Playground](/playground). Choose
+a chart module and state-change category there; the inspector reports every
+emitted change for the pair.

@@ -28,7 +28,7 @@ pageClass: ontology-home
 
   <nav class="product-next" aria-label="Documentation paths">
     <a href="./getting-started.html"><strong>Build your first transition</strong><span>Getting started</span></a>
-    <a href="./language-framework.html#run-a-state-difference"><strong>Inspect a state difference</strong><span>Ontology playground</span></a>
+    <a href="./playground.html"><strong>Inspect a state difference</strong><span>Playground</span></a>
     <a href="./chart-types.html"><strong>Explore chart behavior</strong><span>Five chart modules</span></a>
     <a href="./language-framework.html"><strong>Read the underlying model</strong><span>Ontology and contracts</span></a>
   </nav>

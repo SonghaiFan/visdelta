@@ -178,4 +178,4 @@ VisDelta does not infer record updates from row position.
 | Filter, sort, aggregate, or load data | [Data and transforms](/data-sources-and-transforms) |
 | Understand state differences and routes | [Ontology and contracts](/language-framework) |
 | Connect play, seek, resize, and lifecycle | [Transition runtime](/runtime-api) |
-| Try editable examples | [Transition labs](/examples) |
+| Try editable examples | [Playground](/playground) |

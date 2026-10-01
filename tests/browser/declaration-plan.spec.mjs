@@ -88,13 +88,13 @@ for (const width of [1100, 390]) {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.setViewportSize({ width, height: 850 });
-    await page.goto('/docs/.vitepress/dist/point-lab.html#x');
+    await page.goto('/docs/.vitepress/dist/playground.html#point/x');
     await page.locator('#chart').scrollIntoViewIfNeeded();
     await expect(page.locator('#status')).toHaveText('Ready');
-    await page.locator('#editor').fill(`const cars = point({ url: './data/mtcars.csv' }).key('name').x('wt').y('mpg');
-const from = cars.focus({ cyl: 4 });
-const to = cars.y('hp').highlight({ cyl: 8 });
-return { from, to };`);
+    await page.locator('#editor').fill(`const cars = point(rows).key('name').x('wt').y('mpg');
+const from = cars.focus({ cyl: 4 });`);
+    await page.locator('#to-editor').fill(`const cars = point(rows).key('name').x('wt').y('mpg');
+const to = cars.y('hp').highlight({ cyl: 8 });`);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await expect(page.locator('#status')).toHaveText('Ready');
     const snapshot = () => page.locator('#chart circle.vd-point').evaluateAll(nodes => nodes.map(node => [node.getAttribute('cx'), node.getAttribute('cy'), node.style.opacity]));
@@ -117,7 +117,7 @@ return { from, to };`);
 
 for (const scenario of ['focus', 'highlight']) {
   test(`tab switching does not skip an attention-only ${scenario} difference`, async ({ page }) => {
-    await page.goto(`/docs/.vitepress/dist/point-lab.html#${scenario}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#point/${scenario}`);
     await expect(page.locator('#status')).toHaveText('Ready');
     await page.locator('#end').click();
     await page.getByRole('tab', { name: /^encoding/i }).click();

@@ -4,6 +4,7 @@ import type { BaseType, Selection } from 'd3-selection';
 import type { ViewSpec } from '../types/index.js';
 import type { RenderDatum } from './render-types.js';
 import { specDatumKey, specObjectKey } from '../spec-meta.js';
+import { resolveMarkIdentity } from '../identity/mark-correspondence.js';
 import type { MarkKeySpec } from '../identity/mark-correspondence.js';
 
 export function bindTooltip<E extends Element, D extends object, P extends BaseType, PD>(
@@ -48,6 +49,7 @@ export function tooltipIdentityHtml(
 ): string {
   const source = row?.__row && typeof row.__row === 'object' ? row.__row : row;
   const datumIdentity = row?.__datumIdentity ?? (source as RenderDatum)?.__datumIdentity;
+  const markIdentity = resolveMarkIdentity(spec, defaultMarkKey);
   const identity = (label: string, key: MarkKeySpec | null, actual?: string | null) => {
     const fields = key == null ? [] : Array.isArray(key) ? key : [key];
     const values = fields.map(field => source[field]);
@@ -61,7 +63,7 @@ export function tooltipIdentityHtml(
     datumIdentity
       ? datumIdentityHtml(datumIdentity)
       : identity('datumKey', specDatumKey(spec)),
-    identity('key', specObjectKey(spec) ?? defaultMarkKey, markKey)
+    identity('key', markIdentity?.fields ?? specObjectKey(spec) ?? defaultMarkKey, markKey)
   ].join('<br>');
 }
 

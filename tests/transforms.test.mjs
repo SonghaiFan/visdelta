@@ -32,6 +32,24 @@ test('domain inference preserves data-shaping transforms and explicit execution 
   assert.deepEqual(transforms, before);
 });
 
+test('domain inference preserves subsets that define aggregate values', () => {
+  const source = [
+    { week: 'one', ticker: 'AAPL', close: 10 },
+    { week: 'one', ticker: 'GOOG', close: 90 },
+    { week: 'two', ticker: 'AAPL', close: 20 },
+    { week: 'two', ticker: 'GOOG', close: 80 }
+  ];
+  const transforms = [
+    { filter: { field: 'ticker', equal: 'AAPL' } },
+    { aggregate: { groupby: ['week'], fields: [{ op: 'mean', field: 'close', as: 'close' }] } }
+  ];
+
+  assert.deepEqual(run(domainTransforms(transforms), source), [
+    { week: 'one', close: 10 },
+    { week: 'two', close: 20 }
+  ]);
+});
+
 test('zero limit is empty; transforms run in declared order without mutating input', () => {
   assert.deepEqual(run([{ limit: 0 }]), []);
   assert.deepEqual(run([{ sort: { field: 'value', order: 'descending' } }, { limit: 1 }]), [rows[2]]);

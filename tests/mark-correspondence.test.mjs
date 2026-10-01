@@ -48,3 +48,16 @@ test('compound mark keys are collision-safe and duplicate identities are unsuppo
   assert.deepEqual(duplicate.exit, []);
   assert.match(duplicate.reasons.join(' '), /duplicate mark key/);
 });
+
+test('compound mark identity is independent of field declaration order', () => {
+  const row = { year: 2020, location: 'B' };
+  const yearLocation = resolveMarkIdentity({ key: ['year', 'location'] });
+  const locationYear = resolveMarkIdentity({ key: ['location', 'year'] });
+  const correspondence = correspondMarks([row], [row], yearLocation, locationYear);
+
+  assert.deepEqual(yearLocation.fields, ['location', 'year']);
+  assert.deepEqual(locationYear.fields, ['location', 'year']);
+  assert.equal(markKeyValue(row, yearLocation), markKeyValue(row, locationYear));
+  assert.equal(correspondence.stable, true);
+  assert.equal(correspondence.updates.length, 1);
+});

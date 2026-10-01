@@ -18,9 +18,9 @@ for (const sample of scenarios) {
   test(`unit lab ${sample.id}: editable pair and reproducible seek`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`/docs/.vitepress/dist/unit-lab.html#${sample.id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#unit/${sample.id}`);
     await ready(page);
-    await expect(page.getByRole('tab')).toHaveCount(7);
+    await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
     await expect(editor).toHaveValue(sample.code);
 
@@ -48,7 +48,7 @@ for (const sample of scenarios) {
 }
 
 test('unit bar uses category position while every unit keeps equal size', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#bar');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/bar');
   await ready(page);
   await page.locator('#end').click();
 
@@ -86,7 +86,7 @@ test('unit bar uses category position while every unit keeps equal size', async 
 });
 
 test('Unit forceX uses the declared species scale and keeps one deterministic path', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#force');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/force');
   await ready(page);
   const readPositions = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
@@ -272,7 +272,7 @@ test('Unit force endpoints preserve update identity and support enter and exit',
 });
 
 test('Unit bar sets horizontal positions before units fall', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#bar');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/bar');
   await ready(page);
   const geometry = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     Object.fromEntries(nodes.map(node => [node.dataset.key, {
@@ -297,7 +297,7 @@ test('Unit bar sets horizontal positions before units fall', async ({ page }) =>
 });
 
 test('Unit fall uses the direction inferred from successive progress values', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#beeswarm');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/beeswarm');
   await ready(page);
   const progress = page.locator('#progress');
   const positions = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
@@ -315,7 +315,7 @@ test('Unit fall uses the direction inferred from successive progress values', as
 });
 
 test('Unit uses a light bounded per-mark delay by default', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#radius');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/radius');
   await ready(page);
   await page.locator('#progress').fill('0.5');
 
@@ -325,7 +325,7 @@ test('Unit uses a light bounded per-mark delay by default', async ({ page }) => 
 });
 
 test('unit focus keeps every unit and uses the shared 2D camera', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#focus');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/focus');
   await ready(page);
   await page.locator('#end').click();
 
@@ -354,7 +354,7 @@ test('unit lab loads the tidy Iris data and keeps one keyed unit per flower', as
   page.on('request', request => {
     if (new URL(request.url()).pathname.endsWith('/data/iris.csv')) dataRequests.push(request.url());
   });
-  await page.goto('/docs/.vitepress/dist/unit-lab.html#all');
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/all');
   await ready(page);
   await page.locator('#end').click();
 
