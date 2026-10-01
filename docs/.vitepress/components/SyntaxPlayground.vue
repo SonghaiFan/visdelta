@@ -21,8 +21,7 @@ const samples = {
     category: 'encoding',
     code: `const revenue = bar(rows)
   .x("category")
-  .y("sales", { title: "Revenue" })
-  .key("category");
+  .y("sales", { title: "Revenue" });
 
 const profit = revenue.y("profit", { title: "Profit" });
 
@@ -33,8 +32,7 @@ return { from: revenue, to: profit };`
     category: 'data',
     code: `const all = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const northOnly = all.where({ region: "North" });
 
@@ -45,8 +43,7 @@ return { from: all, to: northOnly };`
     category: 'attention',
     code: `const all = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const northView = all.focus({ region: "North" });
 
@@ -57,8 +54,7 @@ return { from: all, to: northView };`
     category: 'attention',
     code: `const all = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const focused = all.highlight(
   { category: "Software" },
@@ -73,7 +69,6 @@ return { from: all, to: focused };`
     code: `const detailed = bar(segments)
   .x("category")
   .y("sales")
-  .key(["category", "segment"])
   .breakdown("segment")
   .color("segment");
 
@@ -86,8 +81,7 @@ return { from: total, to: detailed };`
     category: 'coordinate',
     code: `const vertical = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const horizontal = vertical.flip();
 
@@ -99,7 +93,6 @@ return { from: vertical, to: horizontal };`
     code: `const sales = line(series)
   .x("quarter")
   .y("sales")
-  .key("quarter")
   .curve("curveMonotoneX")
   .pointSize(4);
 

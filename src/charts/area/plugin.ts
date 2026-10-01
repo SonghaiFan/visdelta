@@ -21,7 +21,12 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
   presentation: areaPresentation,
   createRenderer: createAreaRenderer,
   createSpecCompiler: createAreaSpecCompiler,
-  defaultMarkKey: (spec) => spec.encoding?.x?.field || null,
+  // One observation per x within each stacked series.
+  defaultMarkKey: (spec) => {
+    const x = spec.encoding?.x?.field;
+    const series = areaState(spec, spec.encoding).seriesField;
+    return x ? (series ? [x, series] : x) : null;
+  },
   transition: {
     canonicalPair: canonicalAreaTransitionPair,
     plan: (previousSpec, nextSpec) => {

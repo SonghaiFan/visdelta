@@ -1,8 +1,7 @@
 <script setup>
 const snippet = `const from = bar(rows)
   .x("category")
-  .y("revenue")
-  .key("category");
+  .y("revenue");
 
 const to = from
   .y("profit")

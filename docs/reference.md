@@ -20,8 +20,7 @@ scrub the generated transition. This reference stays focused on the API shape.
 ```js
 const base = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const next = base.y("profit");
 ```
@@ -191,7 +190,7 @@ It adds filter transforms to the returned state, so `state.rows()` also returns
 only matching rows. The source state is unchanged.
 
 ```js
-const all = bar(rows).x("country").y("sites").key("country");
+const all = bar(rows).x("country").y("sites");
 const nordic = all.where({ country: ["Norway", "Sweden"] });
 
 all.rows();    // every row

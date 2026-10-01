@@ -36,7 +36,6 @@ const segmentedOverview = `${ageConstants}
 const detailed = bar({ url: DATA_URL })
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
-  .key(["state", "age"])
   .breakdown("age")
   .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
 
@@ -46,7 +45,6 @@ const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
 const detailed = bar({ url: DATA_URL })
   .x("state", { title: "State" })
   .y("population", { title: "Population", format: "~s" })
-  .key(["state", "age"])
   .where({ field: "state", oneOf: FEATURE_STATES })
   .breakdown("age")
   .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;

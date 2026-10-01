@@ -5,7 +5,7 @@ import { createLineRenderer } from './render.js';
 import { createDefaultTransitionPlan } from '../transition-plan.js';
 import { defineChartType } from '../plugin.js';
 import type { LineViewState } from './authoring.js';
-import { canonicalLineTransitionPair, lineIntermediateSpecs, lineObservationChange } from './state.js';
+import { canonicalLineTransitionPair, lineIntermediateSpecs, lineObservationChange, lineSeriesKey, lineState } from './state.js';
 import { specState } from '../../spec-meta.js';
 
 export interface LineTransitionPlanExtension {
@@ -24,7 +24,12 @@ export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>
   presentation: linePresentation,
   createRenderer: createLineRenderer,
   createSpecCompiler: createLineSpecCompiler,
-  defaultMarkKey: (spec) => spec.encoding?.x?.field || null,
+  // One observation per x within each series.
+  defaultMarkKey: (spec) => {
+    const x = spec.encoding?.x?.field;
+    const series = lineSeriesKey(lineState(spec, spec.encoding));
+    return x ? (series ? [x, series] : x) : null;
+  },
   transition: {
     canonicalPair: canonicalLineTransitionPair,
     intermediateSpecs: lineIntermediateSpecs,
