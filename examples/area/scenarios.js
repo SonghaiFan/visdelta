@@ -9,14 +9,13 @@ const industries = area({ url: DATA_URL })
 
 const base = industries
   .where({ industry: "Manufacturing" })
-  .connect("across")
-  .key("date");`;
+  .connect("across");`;
 
 const stacked = `const DATA_URL = "./data/area-lab.csv";
 
 const detailed = area({ url: DATA_URL })
-  .x("date")
-  .y("unemployed")
+  .x("date", { title: "Date" })
+  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");
@@ -55,7 +54,7 @@ export const scenarios = [
   sample('restore', '04 · Restore observations', 'Restore the same 2008 observations and their part of the area.', filtered, 'filtered', 'base'),
   sample('add', '05 · Add an observation', 'Extend the manufacturing area to February 2010.', added, 'withoutLatest', 'withLatest'),
   sample('remove', '06 · Remove an observation', 'Remove February 2010 in the exact reverse of Add.', added, 'withLatest', 'withoutLatest'),
-  sample('data', '07 · Compare industries', 'Keep the monthly dates and mapping, but move from manufacturing to construction unemployment.', base, 'base', 'industries.where({ industry: "Construction" }).connect("across").key("date")'),
+  sample('data', '07 · Compare industries', 'Keep the monthly dates and mapping, but move from manufacturing to construction unemployment.', base, 'base', 'industries.where({ industry: "Construction" }).connect("across")'),
   sample('highlight', '08 · Highlight one industry', 'Keep all three industry layers and dim every layer except Construction.', stacked, 'detailed', 'detailed.highlight({ industry: "Construction" }, { opacity: 0.12 })'),
   sample('highlight-range', '09 · Highlight an x range', 'Keep the complete manufacturing series and emphasize the recession interval from September 2008 through June 2009.', base, 'base', 'base.highlight({ field: "date", gte: new Date("2008-09-01"), lte: new Date("2009-06-01") }, { opacity: 0.12 })'),
   sample('color', '10 · Change fill color', 'Change a constant fill without changing manufacturing data or geometry.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),

@@ -18,7 +18,6 @@ const chartTypes = [
       'const chart = bar(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [
@@ -34,7 +33,6 @@ const chartTypes = [
       'const chart = line(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [
@@ -50,7 +48,6 @@ const chartTypes = [
       'const chart = area(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [

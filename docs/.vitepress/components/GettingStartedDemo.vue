@@ -19,7 +19,7 @@ onMounted(async () => {
       { category: 'Software', revenue: 18, profit: 11 },
       { category: 'Services', revenue: 9, profit: 7 }
     ];
-    const revenue = bar(rows).x('category').y('revenue', { title: 'Revenue' }).key('category');
+    const revenue = bar(rows).x('category').y('revenue', { title: 'Revenue' });
     const profit = revenue.y('profit', { title: 'Profit' });
     await nextTick();
     change = await transition(revenue, profit, { target: target.value, height: 280 });

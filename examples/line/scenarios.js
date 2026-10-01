@@ -8,27 +8,26 @@ const stocks = line({ url: DATA_URL })
   .y("close");
 
 const base = stocks
-  .where({ ticker: "AAPL" })
-  .key("date");`;
+  .where({ ticker: "AAPL" });`;
 
 const timeGrain = `${base}
 
 const weekly = base
-  .x("week")
+  .x("week", { title: "Week" })
   .key("week")
   .rollup({ op: "mean" });
 
 const weeklyHigh = base
-  .x("week")
-  .y("high")
+  .x("week", { title: "Week" })
+  .y("high", { title: "Weekly high (USD)", format: "$.2f" })
   .key("week")
   .rollup({ op: "max" });`;
 
 const series = `const DATA_URL = "./data/line-lab.csv";
 
 const detailed = line({ url: DATA_URL })
-  .x("date")
-  .y("close")
+  .x("date", { title: "Date" })
+  .y("close", { title: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker");
@@ -84,7 +83,7 @@ export const scenarios = [
   sample('restore', '05 · Restore observations', 'Restore the same AAPL days in exact reverse: the line reaches each observation before its point appears.', filtered, 'filtered', 'base'),
   sample('add', '06 · Add an observation', 'Extend the AAPL line to the latest trading day first, then reveal its point.', added, 'withoutLatest', 'withLatest'),
   sample('remove', '07 · Remove an observation', 'Remove the latest AAPL trading day in exact reverse: hide the point first, then retract the line.', added, 'withLatest', 'withoutLatest'),
-  sample('data', '08 · Replace the data', 'Keep the same dates and close-price mapping, but move from AAPL observations to GOOG observations.', base, 'base', 'stocks.where({ ticker: "GOOG" }).key("date")'),
+  sample('data', '08 · Replace the data', 'Keep the same dates and close-price mapping, but move from AAPL observations to GOOG observations.', base, 'base', 'stocks.where({ ticker: "GOOG" })'),
   sample('highlight', '09 · Highlight one series', 'Keep both company lines and dim GOOG without filtering it out.', series, 'detailed', 'detailed.highlight({ ticker: "AAPL" }, { opacity: 0.12 })'),
   sample('color', '10 · Change line color', 'Change a constant color without changing AAPL data or position.', base, 'base.color("#1c6ae4")', 'base.color("#fa4d1d")'),
   sample('style', '11 · Change line style', 'Change the D3 curve, line width, and point size as one visual state change.', base, 'base.curve("curveLinear").strokeWidth(2).pointSize(3)', 'base.curve("curveStep").strokeWidth(6).pointSize(7)'),

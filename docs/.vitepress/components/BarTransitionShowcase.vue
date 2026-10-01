@@ -39,7 +39,6 @@ onMounted(async () => {
     const base = bar(rows)
       .datumKey('id')
       .x('category', { title: 'Category' })
-      .key('category')
       .tooltip(['category', 'sales', 'profit']);
 
     states = [

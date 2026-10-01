@@ -8,8 +8,7 @@ import { line } from "visdelta/line";
 
 const chart = line(rows)
   .x("date", { type: "temporal" })
-  .y("close")
-  .key("date");
+  .y("close");
 ```
 
 Every chain creates a new immutable state. `.toSpec()` returns a detached plain

@@ -60,7 +60,6 @@ const demos = [
       const from = api.bar(barRows)
         .x('category', { title: 'Category' })
         .y('value', { title: 'Value' })
-        .key('category')
         .color('region');
       return [from, from.y('next', { title: 'Next value' })];
     }
@@ -85,8 +84,7 @@ const demos = [
     states(api) {
       const from = api.line(seriesRows)
         .x('period', { title: 'Period' })
-        .y('sales', { title: 'Sales' })
-        .key('id');
+        .y('sales', { title: 'Sales' });
       return [from, from.y('next', { title: 'Forecast' })];
     }
   },
@@ -97,8 +95,7 @@ const demos = [
     states(api) {
       const from = api.area(seriesRows)
         .x('period', { title: 'Period' })
-        .y('sales', { title: 'Sales' })
-        .key('id');
+        .y('sales', { title: 'Sales' });
       return [from, from.y('next', { title: 'Forecast' })];
     }
   },

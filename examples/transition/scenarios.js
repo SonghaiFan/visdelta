@@ -34,8 +34,8 @@ const AGE_BANDS = ["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", 
 const segmentedOverview = `${ageConstants}
 
 const detailed = bar({ url: DATA_URL })
-  .x("state")
-  .y("population")
+  .x("state", { title: "State" })
+  .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
   .breakdown("age")
   .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
@@ -44,8 +44,8 @@ const segmentedFeatured = `${ageConstants}
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
 
 const detailed = bar({ url: DATA_URL })
-  .x("state")
-  .y("population")
+  .x("state", { title: "State" })
+  .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: FEATURE_STATES })
   .breakdown("age")

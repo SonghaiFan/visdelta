@@ -50,8 +50,7 @@ VisDelta's ESM entry and rewrites its version-pinned `d3-*` dependencies.
 
       const revenue = vd.bar(rows)
         .x("category")
-        .y("revenue", { title: "Revenue" })
-        .key("category");
+        .y("revenue", { title: "Revenue" });
 
       const profit = revenue.y("profit", { title: "Profit" });
       const change = await vd.transition(revenue, profit, { target: "#chart" });
@@ -112,8 +111,7 @@ single convenient entry is preferable.
 ```js
 const revenue = bar(rows)
   .x("category")
-  .y("revenue", { title: "Revenue" })
-  .key("category");
+  .y("revenue", { title: "Revenue" });
 ```
 
 A state describes facts: its data, grain, encodings, layout, attention, and

@@ -25,7 +25,7 @@ plugin imports. This template creates a transition controlled by a slider.
         { category: "C", revenue: 9, profit: 7 }
       ];
 
-      const from = vd.bar(rows).x("category").y("revenue").key("category");
+      const from = vd.bar(rows).x("category").y("revenue");
       const to = from.y("profit");
       const change = await vd.transition(from, to, { target: "#chart" });
 
