@@ -14,12 +14,14 @@ This deliberately keeps **VisDelta chart plugins** and **ChatGPT plugins** separ
 
 ## Run locally
 
-Requires Node.js 18+.
+Use Node.js 22+ for the full validation workflow (including browser tooling).
 
 ```bash
 cd integrations/chatgpt
-npm install
+npm ci
 npm test
+npx playwright install chromium
+npm run test:browser
 npm start
 ```
 
@@ -36,6 +38,23 @@ npx @modelcontextprotocol/inspector@latest
 ```
 
 Choose **Streamable HTTP** and connect to `http://localhost:8787/mcp`.
+
+For repeatable CLI checks with Inspector 2.9.0, keep the server running and use:
+
+```bash
+npx @modelcontextprotocol/inspector@2.9.0 --cli http://localhost:8787/mcp --method tools/list --format json
+npx @modelcontextprotocol/inspector@2.9.0 --cli http://localhost:8787/mcp --method tools/call --tool-name render_visdelta_transition --format json
+npx @modelcontextprotocol/inspector@2.9.0 --cli http://localhost:8787/mcp --method resources/read --uri ui://visdelta/transition-demo-v1.html --format json
+```
+
+`npm test` builds the widget and checks the real HTTP tool/resource contract as
+well as the JSON fixtures. `npm run test:browser` loads the resource in a sandboxed
+iframe with a controlled MCP Apps host and checks rendering, seek/reverse seek,
+and replay. It is **not** ChatGPT iframe verification. Set `VISDELTA_CHROME_PATH`
+to use an existing Chromium executable when the Playwright download is unavailable.
+
+The integration has a separate CI job and lockfile. It consumes published
+`visdelta@0.3.0`; the root release tests independently validate this checkout.
 
 ## Connect to ChatGPT
 
