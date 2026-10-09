@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setCells, setEditorCode } from './code-editor.mjs';
 
 test('entering a bar tab does not advance its authored-pair progress', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/playground.html#bar/measure');
@@ -49,7 +50,7 @@ for (const sample of scenarios) {
     await ready(page);
     await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
     const direct = await snapshot(page);
@@ -63,13 +64,13 @@ for (const sample of scenarios) {
     expect(await snapshot(page)).toEqual(start);
 
     const edited = editedScenario(sample);
-    await editor.fill(edited.code);
+    await setEditorCode(editor, edited.code);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     await expect(page.locator('#chart')).toContainText(edited.label);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     await expect(page.locator('#chart')).not.toContainText('Region');
     expect(errors).toEqual([]);
   });
@@ -82,7 +83,7 @@ test('invalid code and invalid pairs preserve preview; reset recovers', async ({
   const original = await snapshot(page);
   for (const code of ['const broken = ;', 'return {};', 'return { from: { mark: "line" }, to: { mark: "line" } };',
     'const from = bar().data("missing-dataset").x("category").y("value"); return { from, to: from };']) {
-    await editor.fill(code);
+    await setEditorCode(editor, code);
     await expect(page.locator('#status')).toHaveText('Error');
     await expect(page.getByRole('alert')).toContainText('last successful preview');
     await expect(page.locator('.playground-chart-stage')).toHaveClass(/is-error/);
@@ -102,7 +103,7 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
   await page.goto('/docs/.vitepress/dist/playground.html#bar/reaggregate');
   await ready(page);
   await expect(page.locator('[data-scenario="reaggregate"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#editor')).toHaveValue(/\.datumKey\("id"\)/);
+  await expectEditorCode(page.locator('#editor'), /\.datumKey\("id"\)/);
   for (const p of [0, 0.43, 0.79, 1, 0.43, 0]) {
     await page.locator('#progress').fill(String(p));
     await expect(page.locator('#chart .vd-legend-item')).toHaveCount(0);
@@ -292,8 +293,10 @@ test('manual run, drafts, switching and playback controls', async ({ page }) => 
   await page.goto('/docs/.vitepress/dist/playground.html#bar/');
   await ready(page);
   await page.locator('#auto-run').uncheck();
-  const edited = scenarios[0].code.replace('.x("state")', '.x("state", { title: "Region" })');
-  await page.locator('#editor').fill(edited);
+  const edited = scenarios[0].code
+    .replace('.x("state")', '.x("state", { title: "Region" })')
+    .replaceAll('"State"', '"Region"');
+  await setEditorCode(page.locator('#editor'), edited);
   await expect(page.locator('#status')).toHaveText('Edited · press Run');
   await expect(page.locator('#chart')).not.toContainText('Region');
   await page.locator('#run').click();
@@ -301,11 +304,11 @@ test('manual run, drafts, switching and playback controls', async ({ page }) => 
   await expect(page.locator('#chart')).toContainText('Region');
   await chooseScenario(page, 'grouped-split');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(scenarios.find(s => s.id === 'grouped-split').code);
+  await expectEditorCode(page.locator('#editor'), scenarios.find(s => s.id === 'grouped-split').code);
   await page.locator('#end').click();
   await chooseScenario(page, 'measure');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(edited);
+  await expectEditorCode(page.locator('#editor'), edited);
   await expect(page.locator('#value')).toHaveText('0.00');
   await page.locator('#play').click();
   await expect(page.locator('#value')).toHaveText('1.00');
@@ -322,7 +325,9 @@ test('late async evaluation cannot overwrite a newer edit', async ({ page }) => 
   await page.goto('/docs/.vitepress/dist/playground.html#bar/');
   await ready(page);
   await page.locator('#auto-run').uncheck();
-  await page.locator('#editor').fill(`await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code.replace('.x("state")', '.x("state", { title: "Stale region" })')}`);
+  await setEditorCode(page.locator('#editor'), `await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code
+    .replace('.x("state")', '.x("state", { title: "Stale region" })')
+    .replaceAll('"State"', '"Stale region"')}`);
   await page.locator('#run').click();
   await expect(page.locator('#status')).toHaveText('Compiling');
   await chooseScenario(page, 'filter');
@@ -342,9 +347,9 @@ test('bar lab loads tidy population observations with ordered age detail', async
   await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
   await ready(page);
 
-  await expect(page.locator('#editor')).toHaveValue(/\.breakdown\("age"\)/);
-  await expect(page.locator('#editor')).not.toHaveValue(/\.segment\(\{[\s\S]*fields:/);
-  await expect(page.locator('#editor')).toHaveValue(/\.color\("age", \{ domain: AGE_BANDS, scheme: "Blues" \}\)/);
+  await expectEditorCode(page.locator('#editor'), /\.breakdown\("age"\)/);
+  await expectEditorCode(page.locator('#editor'), /\.segment\(\{[\s\S]*fields:/, { not: true });
+  await expectEditorCode(page.locator('#editor'), /\.color\("age", \{ domain: AGE_BANDS, scheme: "Blues" \}\)/);
   await expect(page.locator('#chart rect.vd-bar:not(.vd-bar-segment)')).toHaveCount(52);
   await page.locator('#end').click();
   await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
@@ -364,23 +369,25 @@ for (const op of ['sum', 'count']) {
     const sample = scenarios.find(scenario => scenario.id === 'split');
     const baseCode = sample.code
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed.rollup();', 'return detailed;');
+      .replace('return detailed.rollup();', 'return detailed;')
+      .replace('const from = detailed.rollup();', 'const from = detailed;');
     const toCode = sample.toCode
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`);
+      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`)
+      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
     const geometry = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => nodes.map(node => ({
       key: node.dataset.key,
       attrs: ['x', 'y', 'width', 'height', 'fill'].map(name => node.getAttribute(name))
     })).sort((a, b) => a.key.localeCompare(b.key)));
-    await page.locator('#editor').fill(baseCode);
-    await page.locator('#to-editor').fill(toCode);
+    await setCells(page, baseCode, toCode);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     const detailFrame = await geometry();
     await page.locator('#end').click();
     const totalFrame = await geometry();
-    await page.locator('#editor').fill(baseCode.replace('return detailed;',
-      'return detailed.sort("population");'));
+    await setEditorCode(page.locator('#editor'), baseCode
+      .replace('return detailed;', 'return detailed.sort("population");')
+      .replace('const from = detailed;', 'const from = detailed.sort("population");'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     // Editing preserves the slider's current value (the preceding endpoint).
@@ -407,12 +414,13 @@ for (const op of ['sum', 'count']) {
     const sample = scenarios.find(scenario => scenario.id === 'split');
     const code = sample.code
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed.rollup();', 'return detailed.focus({ state: "AL" });');
+      .replace('return detailed.rollup();', 'return detailed.focus({ state: "AL" });')
+      .replace('const from = detailed.rollup();', 'const from = detailed.focus({ state: "AL" });');
     const toCode = sample.toCode
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`);
-    await page.locator('#editor').fill(code);
-    await page.locator('#to-editor').fill(toCode);
+      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`)
+      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+    await setCells(page, code, toCode);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
@@ -444,7 +452,7 @@ for (const [splitId, mergeId] of [['split', 'merge'], ['grouped-split', 'grouped
       await page.goto('/docs/.vitepress/dist/playground.html#bar/');
       await ready(page);
       await chooseScenario(page, id);
-      await expect(page.locator('#editor')).toHaveValue(scenarios.find(scenario => scenario.id === id).code);
+      await expectEditorCode(page.locator('#editor'), scenarios.find(scenario => scenario.id === id).code);
       await ready(page);
       const values = [];
       for (const progress of progressValues) {

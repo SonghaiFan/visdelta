@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { pointScenarios } from '../../examples/point/scenarios.js';
 
 const ready = page => expect(page.locator('#status')).toHaveText('Ready');
@@ -22,7 +23,7 @@ for (const sample of pointScenarios) {
     await ready(page);
     await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -36,13 +37,15 @@ for (const sample of pointScenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('.x("wt")', '.x("wt", { title: "Vehicle weight" })'));
+    await setEditorCode(editor, sample.code
+      .replace('.x("wt")', '.x("wt", { title: "Vehicle weight" })')
+      .replace('Weight (1,000 lb)', 'Vehicle weight'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/Vehicle weight/);
+    await expectEditorCode(editor, /Vehicle weight/);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }
@@ -77,7 +80,7 @@ test(`switching tabs animates only the chart, not the tab progress, at ${width}p
   await ready(page);
   await expect(page.locator('#value')).toHaveText('0.00');
   await expect(page.locator('#progress')).toBeEnabled();
-  await expect(page.locator('#editor')).toHaveValue(pointScenarios.find(sample => sample.id === 'color').code);
+  await expectEditorCode(page.locator('#editor'), pointScenarios.find(sample => sample.id === 'color').code);
 
   await page.locator('#play').click();
   await expect(page.locator('#value')).toHaveText('1.00');
@@ -169,7 +172,8 @@ test('point lab loads the tidy mtcars dataset without inventing observations', a
   });
   await page.goto('/docs/.vitepress/dist/playground.html#point/x');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(/point\(rows\)/);
+  // The lab loads the CSV once and the authored code reads the shared rows.
+  await expectEditorCode(page.locator('#editor'), /\bpoint\(rows\)/);
   await expect(page.locator('#editor')).not.toHaveValue(/DATA_URL|mtcars\.csv/);
   await expect(page.locator('#chart circle.vd-point')).toHaveCount(32);
   expect(requests).toHaveLength(1);

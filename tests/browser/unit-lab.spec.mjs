@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/unit/scenarios.js';
 
 const ready = async page => {
@@ -22,7 +23,7 @@ for (const sample of scenarios) {
     await ready(page);
     await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -36,13 +37,13 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('radius: 6', 'radius: 5'));
+    await setEditorCode(editor, sample.code.replace('radius: 6', 'radius: 5'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/radius: 5/);
+    await expectEditorCode(editor, /radius: 5/);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setCells } from './code-editor.mjs';
 
 test('all built-in peers opt into the shared compound declaration route', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
@@ -91,9 +92,8 @@ for (const width of [1100, 390]) {
     await page.goto('/docs/.vitepress/dist/playground.html#point/x');
     await page.locator('#chart').scrollIntoViewIfNeeded();
     await expect(page.locator('#status')).toHaveText('Ready');
-    await page.locator('#editor').fill(`const cars = point(rows).key('name').x('wt').y('mpg');
-const from = cars.focus({ cyl: 4 });`);
-    await page.locator('#to-editor').fill(`const cars = point(rows).key('name').x('wt').y('mpg');
+    await setCells(page, `const cars = point(rows).key('name').x('wt').y('mpg');
+const from = cars.focus({ cyl: 4 });`, `const cars = point(rows).key('name').x('wt').y('mpg');
 const to = cars.y('hp').highlight({ cyl: 8 });`);
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await expect(page.locator('#status')).toHaveText('Ready');

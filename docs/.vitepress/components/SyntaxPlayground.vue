@@ -438,13 +438,22 @@ async function loadSampleRows(url) {
   return structuredClone(await dataCache.get(url));
 }
 
+function declaredMark(state) {
+  return (typeof state?.toSpec === 'function' ? state.toSpec() : state)?.mark ?? null;
+}
+
 async function beginUpdateTransition(source, result, targetProgress, reason, version, height) {
+  const target = targetProgress === 0 ? result.from : result.to;
+  // A bridge animates one chart's states; switching chart type installs the new pair directly.
+  if (declaredMark(source) !== declaredMark(target)) {
+    await installPair(result, version, targetProgress, height);
+    return;
+  }
   const candidate = document.createElement('div');
   candidate.className = 'playground-candidate';
   chartTarget.value.append(candidate);
   let bridge = null;
   try {
-    const target = targetProgress === 0 ? result.from : result.to;
     bridge = await api.transition(source, target, { target: candidate, height });
     if (version !== runVersion) {
       bridge.destroy();
