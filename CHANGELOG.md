@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added `editorialChartStyle`, an opt-in ink-on-paper chart style: warm
+  neutral ink for undeclared marks, 0.75px hairline grids, 1px Point
+  connectors, a flat figure and tabular tick numerals. It keeps the default
+  categorical palette; `d3ChartStyle` remains the default.
 - Reorganized the documentation site into four sections: Home (the live code →
   chart demo), Docs (philosophy and syntax tracks), Playground and a new
   Gallery of visual idioms grouped by mark. Each idiom is drawn live from

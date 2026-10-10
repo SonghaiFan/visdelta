@@ -25,7 +25,7 @@ export const idiomGroups = [
 export const idioms = [
   // Bar ------------------------------------------------------------------
   {
-    id: 'vertical-bars', mark: 'bar', title: 'Vertical bar chart', data: POPULATION,
+    id: 'vertical-bars', mark: 'bar', title: 'Vertical bar chart', note: 'one bar = one state · height = residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { title: "Residents under 10" })
@@ -34,7 +34,7 @@ export const idioms = [
   .where({ field: "state", oneOf: ${FEATURE_STATES} });`
   },
   {
-    id: 'horizontal-bars', mark: 'bar', title: 'Horizontal bar chart', data: POPULATION,
+    id: 'horizontal-bars', mark: 'bar', title: 'Horizontal bar chart', note: 'one bar = one state · length = residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { title: "Residents under 10" })
@@ -44,7 +44,7 @@ export const idioms = [
   .flip();`
   },
   {
-    id: 'ranked-bars', mark: 'bar', title: 'Ranked bar chart', data: POPULATION,
+    id: 'ranked-bars', mark: 'bar', title: 'Ranked bar chart', note: 'one bar = one state or territory · sorted by residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { title: "Residents under 10" })
@@ -53,7 +53,7 @@ export const idioms = [
   .sort("population", "descending");`
   },
   {
-    id: 'ranked-horizontal-bars', mark: 'bar', title: 'Ranked horizontal bars', data: CARS,
+    id: 'ranked-horizontal-bars', mark: 'bar', title: 'Ranked horizontal bars', note: 'one bar = one car · sorted by horsepower', data: CARS,
     code: `const chart = bar(rows)
   .x("name", { title: "Car" })
   .y("hp", { title: "Horsepower" })
@@ -62,7 +62,7 @@ export const idioms = [
   .flip();`
   },
   {
-    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', data: POPULATION,
+    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', note: 'one segment = one age band in one state · bar = state total', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
@@ -72,7 +72,7 @@ export const idioms = [
   .color("age", { domain: ${AGES}, scheme: "Blues" });`
   },
   {
-    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked bars, many categories', data: POPULATION,
+    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked bars, many categories', note: 'nine age bands stacked for every state and territory', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
@@ -81,7 +81,7 @@ export const idioms = [
   .color("age", { domain: ${AGES}, scheme: "Blues" });`
   },
   {
-    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', data: POPULATION,
+    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', note: 'one segment = one age band · bar length = state total', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
@@ -92,7 +92,7 @@ export const idioms = [
   .flip();`
   },
   {
-    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', data: POPULATION,
+    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', note: 'one bar = one age band · grouped by state', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
@@ -103,14 +103,14 @@ export const idioms = [
   .layout("grouped");`
   },
   {
-    id: 'aggregated-bars', mark: 'bar', title: 'Aggregated bars', data: POPULATION,
+    id: 'aggregated-bars', mark: 'bar', title: 'Aggregated bars', note: 'one bar = one age band · height = sum across all states', data: POPULATION,
     code: `const chart = bar(rows)
   .x("age", { title: "Age band" })
   .y("population", { title: "Total residents", format: "~s" })
   .rollup("age");`
   },
   {
-    id: 'color-scaled-bars', mark: 'bar', title: 'Color-scaled bars', data: POPULATION,
+    id: 'color-scaled-bars', mark: 'bar', title: 'Color-scaled bars', note: 'height and shade both = residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population")
@@ -120,7 +120,7 @@ export const idioms = [
   .color({ field: "population", type: "quantitative" });`
   },
   {
-    id: 'highlighted-bars', mark: 'bar', title: 'Highlighted bars', data: POPULATION,
+    id: 'highlighted-bars', mark: 'bar', title: 'Highlighted bars', note: 'two states in ink · the rest stay as context', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
   .y("population")
@@ -132,7 +132,7 @@ export const idioms = [
 
   // Line -----------------------------------------------------------------
   {
-    id: 'line', mark: 'line', title: 'Line chart', data: STOCKS,
+    id: 'line', mark: 'line', title: 'Line chart', note: 'one vertex = one trading day · AAPL close', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -140,7 +140,7 @@ export const idioms = [
   .where({ ticker: "AAPL" });`
   },
   {
-    id: 'multi-series-line', mark: 'line', title: 'Multi-series line chart', data: STOCKS,
+    id: 'multi-series-line', mark: 'line', title: 'Multi-series line chart', note: 'one line = one ticker · daily close', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -149,7 +149,7 @@ export const idioms = [
   .color("ticker");`
   },
   {
-    id: 'many-series-line', mark: 'line', title: 'Many series', data: UNEMPLOYMENT,
+    id: 'many-series-line', mark: 'line', title: 'Many series', note: 'one line = one industry · monthly unemployed', data: UNEMPLOYMENT,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)" })
@@ -158,7 +158,7 @@ export const idioms = [
   .color("industry");`
   },
   {
-    id: 'long-line', mark: 'line', title: 'Daily time series', data: STOCK_YEAR,
+    id: 'long-line', mark: 'line', title: 'Daily time series', note: 'one line = one ticker · a year of daily closes', data: STOCK_YEAR,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.0f" })
@@ -168,7 +168,7 @@ export const idioms = [
   .strokeWidth(1.5);`
   },
   {
-    id: 'line-with-points', mark: 'line', title: 'Line with points', data: STOCKS,
+    id: 'line-with-points', mark: 'line', title: 'Line with points', note: 'one dot = one trading day · GOOG close', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -177,7 +177,7 @@ export const idioms = [
   .pointSize(4);`
   },
   {
-    id: 'step-line', mark: 'line', title: 'Step line', data: STOCKS,
+    id: 'step-line', mark: 'line', title: 'Step line', note: 'each step holds the close until the next trading day', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -187,7 +187,7 @@ export const idioms = [
   .strokeWidth(2);`
   },
   {
-    id: 'smooth-line', mark: 'line', title: 'Smoothed line', data: STOCKS,
+    id: 'smooth-line', mark: 'line', title: 'Smoothed line', note: 'monotone curve through each daily close · never overshoots', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -197,7 +197,7 @@ export const idioms = [
   .curve("curveMonotoneX");`
   },
   {
-    id: 'weekly-mean-line', mark: 'line', title: 'Aggregated line', data: STOCKS,
+    id: 'weekly-mean-line', mark: 'line', title: 'Aggregated line', note: 'one dot = one week · mean of its daily closes', data: STOCKS,
     code: `const chart = line(rows)
   .x("week", { title: "Week" })
   .y("close", { title: "Mean close (USD)", format: "$.2f" })
@@ -206,7 +206,7 @@ export const idioms = [
   .pointSize(4);`
   },
   {
-    id: 'log-line', mark: 'line', title: 'Log-scale line', data: STOCKS,
+    id: 'log-line', mark: 'line', title: 'Log-scale line', note: 'equal vertical steps = doubling trading volume', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("volume", { title: "Volume", scale: { type: "log", base: 2 } })
@@ -214,7 +214,7 @@ export const idioms = [
   .where({ ticker: "AAPL" });`
   },
   {
-    id: 'highlighted-line', mark: 'line', title: 'Highlighted series', data: STOCKS,
+    id: 'highlighted-line', mark: 'line', title: 'Highlighted series', note: 'AAPL in focus · GOOG kept faint for comparison', data: STOCKS,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
@@ -226,7 +226,7 @@ export const idioms = [
 
   // Area -----------------------------------------------------------------
   {
-    id: 'area', mark: 'area', title: 'Area chart', data: INDUSTRIES,
+    id: 'area', mark: 'area', title: 'Area chart', note: 'filled from zero · monthly unemployed in manufacturing', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -234,7 +234,7 @@ export const idioms = [
   .where({ industry: "Manufacturing" });`
   },
   {
-    id: 'baseline-area', mark: 'area', title: 'Area with a baseline', data: INDUSTRIES,
+    id: 'baseline-area', mark: 'area', title: 'Area with a baseline', note: 'filled from 1,000 · the band shows the excess', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -243,7 +243,7 @@ export const idioms = [
   .baseline(1000);`
   },
   {
-    id: 'step-area', mark: 'area', title: 'Stepped area', data: INDUSTRIES,
+    id: 'step-area', mark: 'area', title: 'Stepped area', note: 'each month holds its value until the next', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -252,7 +252,7 @@ export const idioms = [
   .curve("curveStep");`
   },
   {
-    id: 'stacked-area', mark: 'area', title: 'Stacked area chart', data: INDUSTRIES,
+    id: 'stacked-area', mark: 'area', title: 'Stacked area chart', note: 'one layer = one industry · top edge = their total', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -261,7 +261,7 @@ export const idioms = [
   .color("industry");`
   },
   {
-    id: 'many-layer-area', mark: 'area', title: 'Stacked area, many layers', data: UNEMPLOYMENT,
+    id: 'many-layer-area', mark: 'area', title: 'Stacked area, many layers', note: 'fourteen industries stacked · top edge = total unemployed', data: UNEMPLOYMENT,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
@@ -270,7 +270,7 @@ export const idioms = [
   .color("industry");`
   },
   {
-    id: 'normalized-area', mark: 'area', title: 'Normalized stacked area', data: UNEMPLOYMENT,
+    id: 'normalized-area', mark: 'area', title: 'Normalized stacked area', note: 'one layer = one industry · each month sums to 100%', data: UNEMPLOYMENT,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Share of unemployed" })
@@ -280,7 +280,7 @@ export const idioms = [
   .layout("stream", { offset: "expand", order: "none" });`
   },
   {
-    id: 'streamgraph', mark: 'area', title: 'Streamgraph', data: UNEMPLOYMENT,
+    id: 'streamgraph', mark: 'area', title: 'Streamgraph', note: 'layers centred on a moving baseline · thickness = unemployed', data: UNEMPLOYMENT,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
@@ -290,7 +290,7 @@ export const idioms = [
   .layout("stream");`
   },
   {
-    id: 'smooth-stream', mark: 'area', title: 'Smoothed streamgraph', data: INDUSTRIES,
+    id: 'smooth-stream', mark: 'area', title: 'Smoothed streamgraph', note: 'silhouette offset · thickness = unemployed per industry', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -301,7 +301,7 @@ export const idioms = [
   .curve("curveBasis");`
   },
   {
-    id: 'highlighted-range', mark: 'area', title: 'Highlighted range', data: INDUSTRIES,
+    id: 'highlighted-range', mark: 'area', title: 'Highlighted range', note: 'Sep 2008 – Jun 2009 in ink · the rest as context', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -312,14 +312,14 @@ export const idioms = [
 
   // Point ----------------------------------------------------------------
   {
-    id: 'scatterplot', mark: 'point', title: 'Scatterplot', data: CARS,
+    id: 'scatterplot', mark: 'point', title: 'Scatterplot', note: 'one dot = one car · weight against fuel economy', data: CARS,
     code: `const chart = point(rows)
   .x("wt", { title: "Weight (1000 lb)" })
   .y("mpg", { title: "Miles per gallon" })
   .key("name");`
   },
   {
-    id: 'categorical-scatterplot', mark: 'point', title: 'Categorical scatterplot', data: IRIS,
+    id: 'categorical-scatterplot', mark: 'point', title: 'Categorical scatterplot', note: 'one dot = one flower · hue = species', data: IRIS,
     code: `const chart = point(rows)
   .x("petalLength", { title: "Petal length" })
   .y("petalWidth", { title: "Petal width" })
@@ -327,7 +327,7 @@ export const idioms = [
   .color("species");`
   },
   {
-    id: 'bubble-chart', mark: 'point', title: 'Bubble chart', data: CARS,
+    id: 'bubble-chart', mark: 'point', title: 'Bubble chart', note: 'one dot = one car · area = horsepower · hue = cylinders', data: CARS,
     code: `const chart = point(rows)
   .x("wt", { title: "Weight (1000 lb)" })
   .y("mpg", { title: "Miles per gallon" })
@@ -336,7 +336,7 @@ export const idioms = [
   .color("cyl", { type: "nominal" });`
   },
   {
-    id: 'dot-plot', mark: 'point', title: 'Dot plot', data: POPULATION,
+    id: 'dot-plot', mark: 'point', title: 'Dot plot', note: 'one dot = one state · position = residents under 10', data: POPULATION,
     code: `const chart = point(rows)
   .x("population", { title: "Residents under 10", format: "~s" })
   .y("state")
@@ -345,7 +345,7 @@ export const idioms = [
   .where({ field: "state", oneOf: ${FEATURE_STATES} });`
   },
   {
-    id: 'lollipop', mark: 'point', title: 'Lollipop chart', data: POPULATION,
+    id: 'lollipop', mark: 'point', title: 'Lollipop chart', note: 'one stem = one state · from zero to residents under 10', data: POPULATION,
     code: `const chart = point(rows)
   .x("state")
   .y("population", { title: "Residents under 10", format: "~s" })
@@ -355,7 +355,7 @@ export const idioms = [
   .connector({ from: 0 });`
   },
   {
-    id: 'dumbbell', mark: 'point', title: 'Dumbbell chart', data: POPULATION,
+    id: 'dumbbell', mark: 'point', title: 'Dumbbell chart', note: 'one rule = one state · youngest band against oldest', data: POPULATION,
     code: `const chart = point(rows)
   .x("population", { title: "Residents", format: "~s" })
   .y("state")
@@ -366,7 +366,7 @@ export const idioms = [
   .connector({ by: "state" });`
   },
   {
-    id: 'strip-plot', mark: 'point', title: 'Strip plot', data: IRIS,
+    id: 'strip-plot', mark: 'point', title: 'Strip plot', note: 'one dot = one flower · sepal length by species', data: IRIS,
     code: `const chart = point(rows)
   .x("sepalLength", { title: "Sepal length" })
   .y("species")
@@ -375,7 +375,7 @@ export const idioms = [
   .radius(4);`
   },
   {
-    id: 'aggregated-points', mark: 'point', title: 'Aggregated points', data: CARS,
+    id: 'aggregated-points', mark: 'point', title: 'Aggregated points', note: 'one dot = one cylinder count · area = number of cars', data: CARS,
     code: `const chart = point(rows)
   .x("wt", { title: "Mean weight" })
   .y("mpg", { title: "Mean mpg" })
@@ -389,7 +389,7 @@ export const idioms = [
   });`
   },
   {
-    id: 'highlighted-points', mark: 'point', title: 'Highlighted points', data: CARS,
+    id: 'highlighted-points', mark: 'point', title: 'Highlighted points', note: 'four-cylinder cars in ink · the rest as context', data: CARS,
     code: `const chart = point(rows)
   .x("hp", { title: "Horsepower" })
   .y("mpg", { title: "Miles per gallon" })
@@ -399,14 +399,14 @@ export const idioms = [
 
   // Unit -----------------------------------------------------------------
   {
-    id: 'unit-grid', mark: 'unit', title: 'Unit chart', data: IRIS,
+    id: 'unit-grid', mark: 'unit', title: 'Unit chart', note: 'one circle = one flower · hue = species', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
   .layout("grid", { columns: 15, radius: 6 });`
   },
   {
-    id: 'unit-bars', mark: 'unit', title: 'Unit bar chart', data: IRIS,
+    id: 'unit-bars', mark: 'unit', title: 'Unit bar chart', note: 'one circle = one flower · stacked by species', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
@@ -414,7 +414,7 @@ export const idioms = [
   .layout("bar", { columns: 10 });`
   },
   {
-    id: 'beeswarm', mark: 'unit', title: 'Beeswarm', data: IRIS,
+    id: 'beeswarm', mark: 'unit', title: 'Beeswarm', note: 'one circle = one flower · x = petal length', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
@@ -422,7 +422,7 @@ export const idioms = [
   .layout("beeswarm");`
   },
   {
-    id: 'force-clusters', mark: 'unit', title: 'Force-clustered units', data: IRIS,
+    id: 'force-clusters', mark: 'unit', title: 'Force-clustered units', note: 'one circle = one flower · pulled toward its species', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
@@ -430,7 +430,7 @@ export const idioms = [
   .layout("force");`
   },
   {
-    id: 'quantity-units', mark: 'unit', title: 'Quantity units', data: CARS,
+    id: 'quantity-units', mark: 'unit', title: 'Quantity units', note: 'one circle = 50 horsepower · grouped by cylinders', data: CARS,
     code: `const chart = unit(rows)
   .key("name")
   .value("hp", { unitValue: 50, maxUnits: 200 })
@@ -439,7 +439,7 @@ export const idioms = [
   .layout("bar", { columns: 6, radius: 5 });`
   },
   {
-    id: 'highlighted-units', mark: 'unit', title: 'Highlighted units', data: IRIS,
+    id: 'highlighted-units', mark: 'unit', title: 'Highlighted units', note: 'virginica in ink · the other flowers as context', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
   .layout("grid", { columns: 25, radius: 5 })

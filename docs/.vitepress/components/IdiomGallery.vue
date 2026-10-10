@@ -23,7 +23,7 @@ const viewerStatus = ref('');
 const filtered = computed(() => {
   const terms = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return idioms.filter(idiom => terms.every(term =>
-    `${idiom.title} ${idiom.mark} ${datasetName(idiom.data)}`.toLowerCase().includes(term)));
+    `${idiom.title} ${idiom.note} ${idiom.mark} ${datasetName(idiom.data)}`.toLowerCase().includes(term)));
 });
 const groups = computed(() => idiomGroups
   .map(group => ({ ...group, idioms: filtered.value.filter(idiom => idiom.mark === group.mark) }))
@@ -278,6 +278,7 @@ onBeforeUnmount(() => {
             <span v-else-if="tileStatus[idiom.id] !== 'ready'" class="idiom-thumb-status">Drawing…</span>
           </span>
           <span class="idiom-title">{{ idiom.title }}</span>
+          <span class="idiom-note">{{ idiom.note }}</span>
         </button>
       </div>
     </section>
@@ -294,6 +295,7 @@ onBeforeUnmount(() => {
         <header class="idiom-viewer-head">
           <span class="ui-label">{{ currentGroup?.title }} · {{ currentIndex + 1 }} / {{ filtered.length }}</span>
           <h2>{{ current.title }}</h2>
+          <p class="idiom-note">{{ current.note }}</p>
           <div class="idiom-viewer-nav">
             <button type="button" class="ui-button" aria-label="Previous idiom" @click="step(-1)">←</button>
             <button type="button" class="ui-button" aria-label="Next idiom" @click="step(1)">→</button>
@@ -311,6 +313,7 @@ onBeforeUnmount(() => {
               <span class="ui-label">rows</span>
               <a :href="current.data" target="_blank" rel="noopener">{{ datasetName(current.data) }}.csv</a>
             </p>
+            <p class="idiom-source">{{ current.title }} · {{ currentGroup?.title }} · {{ datasetName(current.data) }}</p>
             <a class="ui-button is-primary" :href="`./playground.html#${current.mark}/idiom=${current.id}`">Edit in Playground →</a>
           </aside>
         </div>

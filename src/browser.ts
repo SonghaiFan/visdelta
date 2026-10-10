@@ -6,7 +6,7 @@ export { applyDeclarationEdits, declarationEdits, planDeclarationTransition,
 export type { DeclarationEdit, DeclarationValue, DeclarationPlan, DeclarationPlanOptions, DeclarationStage, CanonicalDeclarationOperation, DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec } from './index.js';
 
 export { area, availableChartTypes, bar, buildGroupingTree, compileLineage, correspondLineage, createBarGrainDeclarationOperationCodec, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, delta, detectDataTypes, diffViewStates, defineChartType, lineageMarkKey,
-  chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, line, paperChartStyle, point, registerChartType, registerChartModule, unit,
+  chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, line, paperChartStyle, point, registerChartType, registerChartModule, unit,
   resolveEncodingTypes, UNIT_LAYOUTS, viewLineageCorrespondence, visualizationSpec } from './index.js';
 
 export function transition(from: Visualization, to: Visualization, options: TransitionOptions) {

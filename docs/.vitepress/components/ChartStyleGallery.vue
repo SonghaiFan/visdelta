@@ -16,6 +16,11 @@ const presetCopy = {
     name: 'Dark',
     note: 'Compact mono labels, a blueprint surface, and a monochrome blue scale.',
     importName: 'darkChartStyle'
+  },
+  editorial: {
+    name: 'Editorial',
+    note: 'Warm neutral ink, hairline grids, a flat figure, and the default palette.',
+    importName: 'editorialChartStyle'
   }
 };
 

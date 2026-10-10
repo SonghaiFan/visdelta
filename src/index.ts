@@ -19,7 +19,7 @@ export {
 export { createBarGrainDeclarationOperationCodec } from './charts/bar/declaration-operations.js';
 export type { AreaLayout, AreaStackOffset, AreaStackOrder, AreaStreamOptions, AreaViewState, D3AreaCurveName, D3CurveName, UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from "./grammar/index.js";
 export { defineChartType } from "./charts/plugin.js";
-export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, paperChartStyle } from "./charts/style.js";
+export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, paperChartStyle } from "./charts/style.js";
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from "./charts/style.js";
 export { transition } from "./transition.js";
 export { sequence } from "./sequence.js";

@@ -24,6 +24,25 @@ light or dark appearance.
 
 <DesignTokens />
 
+## Taste
+
+The tokens encode a few rules. Follow them before adding a value:
+
+- **Brand colors stay fixed.** The accent and the categorical palette are the
+  logo's colors; tokens build on them rather than replacing them.
+- **Flat.** No gradients, glow or decorative shadows. Only surfaces that float
+  over content (the Playground preview, dialogs) cast a shadow.
+- **Hairlines.** Structure is drawn with one 1px line tone; data carries the
+  weight.
+- **Say what a mark is.** A figure pairs its name with one plain line that
+  states the unit ("one dot = one car · area = horsepower") and a quiet
+  uppercase source line (`--ui-type-source`).
+- **Small, geometric corners.** 2–8px radii; bars in charts stay square.
+
+For charts, the opt-in [Editorial style](/chart-style#editorial-style) applies
+the same restraint (ink on paper, hairlines, flat figure) while keeping the
+default palette.
+
 ## Shared primitives
 
 A few classes compose the tokens for new UI:

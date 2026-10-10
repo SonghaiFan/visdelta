@@ -27,6 +27,7 @@ const expectedApi = [
   "delta",
   "detectDataTypes",
   "diffViewStates",
+  "editorialChartStyle",
   "line",
   "lineageMarkKey",
   "markKeyValue",

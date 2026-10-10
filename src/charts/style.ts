@@ -106,11 +106,19 @@ export const darkChartStyle = defineChartStyle({
   plot: { margin: { top: 54, right: 18, bottom: 38 }, grid: 'horizontal' }
 });
 
+/** Ink-on-paper spacing paired with the scoped `.vd-style-editorial` CSS preset. */
+export const editorialChartStyle = defineChartStyle({
+  key: 'editorial',
+  tickSpacing: { x: 88, y: 52 },
+  plot: { margin: { top: 32, right: 18, bottom: 40 }, grid: 'horizontal' }
+});
+
 /** Built-in structural presets. Their matching CSS ships in `visdelta/style.css`. */
 export const chartStylePresets = Object.freeze({
   d3: d3ChartStyle,
   paper: paperChartStyle,
-  dark: darkChartStyle
+  dark: darkChartStyle,
+  editorial: editorialChartStyle
 });
 
 /** Compose an optional plot capability: neutral values, local defaults, theme overrides. */

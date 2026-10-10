@@ -1,6 +1,6 @@
 /** Plugin registration without importing built-in chart renderers. */
 export { defineChartType } from './charts/plugin.js';
-export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, paperChartStyle } from './charts/style.js';
+export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, paperChartStyle } from './charts/style.js';
 export { defineChartModule } from './charts/module.js';
 export {
   ChartState,

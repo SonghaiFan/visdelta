@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as d3 from 'd3';
-import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
+import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, editorialChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
 import { applyTransforms } from '../dist/data/transforms.js';
 import { areaCells, areaLayers } from '../dist/charts/area/state.js';
 import { interpolateAreaCellFrames } from '../dist/charts/area/render.js';
@@ -115,7 +115,7 @@ test('chart style modules inherit the default grammar without entering chart spe
 });
 
 test('built-in chart-style presets expose stable structural and CSS keys', () => {
-  assert.deepEqual(Object.keys(chartStylePresets), ['d3', 'paper', 'dark']);
+  assert.deepEqual(Object.keys(chartStylePresets), ['d3', 'paper', 'dark', 'editorial']);
   assert.equal(chartStylePresets.d3, d3ChartStyle);
   assert.equal(chartStylePresets.paper, paperChartStyle);
   assert.equal(chartStylePresets.dark, darkChartStyle);
@@ -129,6 +129,10 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(paperChartStyle.axisTitle({ title: 'Income' }, 'right'), 'Income');
   assert.equal(darkChartStyle.key, 'dark');
   assert.equal(darkChartStyle.plot.grid, 'horizontal');
+  assert.equal(chartStylePresets.editorial, editorialChartStyle);
+  assert.equal(editorialChartStyle.key, 'editorial');
+  assert.equal(editorialChartStyle.plot.grid, 'horizontal');
+  assert.equal(editorialChartStyle.legendPosition, 'top');
 });
 
 test('wide bar segments preserve their fold when rolling up to totals', () => {

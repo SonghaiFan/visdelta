@@ -28,6 +28,7 @@ const publicApi = [
   'defineChartStyle',
   'defineChartType',
   'diffViewStates',
+  'editorialChartStyle',
   'line',
   'lineageMarkKey',
   'markKeyValue',

@@ -4,7 +4,7 @@ for (const width of [1100, 390]) {
   test(`style gallery fits at ${width}px in every theme`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto('/docs/.vitepress/dist/chart-style.html');
-    for (const name of ['Paper', 'Dark', 'D3']) {
+    for (const name of ['Paper', 'Dark', 'Editorial', 'D3']) {
       await page.locator('.style-gallery-picker button').filter({ hasText: name }).click();
       await expect(page.locator('.style-gallery-status')).toContainText(`${name} active`);
       const plots = await page.locator('.style-gallery-chart svg.vd-chart').evaluateAll(nodes => nodes.map(svg => {
@@ -22,7 +22,7 @@ for (const width of [1100, 390]) {
   });
 }
 
-for (const theme of ['d3', 'paper', 'dark']) {
+for (const theme of ['d3', 'paper', 'dark', 'editorial']) {
   test(`${theme}: compact plots retain space, readable labels and reversible resize`, async ({ page }) => {
     await page.goto('/tests/fixtures/runtime.html');
     await page.waitForSelector('rect.vd-bar');

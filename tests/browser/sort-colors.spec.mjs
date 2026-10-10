@@ -174,6 +174,43 @@ test('dark chart style uses white neutral ink without changing authored color', 
   expect([...new Set(samples[1].colors)]).toEqual(['#cc3366']);
 });
 
+test('editorial chart style keeps the logo palette and uses warm ink, hairlines and a flat figure', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const vd = await import('/dist/visdelta.esm.js');
+    const rows = ['A', 'B', 'C'].map((category, index) => ({ category, value: 10 + index, group: `g${index}` }));
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const read = async view => {
+      const change = await vd.transition(view, view, { target: host, height: 400, chartStyle: vd.editorialChartStyle });
+      change.progress(1);
+      const root = host.firstElementChild;
+      const figure = root.querySelector('.vd-figure');
+      const sample = {
+        rootClass: root.className,
+        fills: [...host.querySelectorAll('rect.vd-bar')].map(node => d3.color(getComputedStyle(node).fill).formatHex()),
+        gridWidth: getComputedStyle(root.querySelector('.vd-grid line')).strokeWidth,
+        figureBorder: getComputedStyle(figure).borderTopStyle,
+        tickNumerals: getComputedStyle(root.querySelector('.vd-axis text')).fontVariantNumeric
+      };
+      change.destroy();
+      return sample;
+    };
+    const base = vd.bar(rows).x('category').y('value').key('category');
+    const neutral = await read(base);
+    const colored = await read(base.color('group'));
+    host.remove();
+    return { neutral, colored };
+  });
+  expect(result.neutral.rootClass).toContain('vd-style-editorial');
+  expect([...new Set(result.neutral.fills)]).toEqual(['#1f1e1b']);
+  // The categorical palette is VisDelta's own (the logo colours) in every light style.
+  expect(result.colored.fills).toEqual(['#4269d0', '#efb118', '#ff725c']);
+  expect(result.neutral.gridWidth).toBe('0.75px');
+  expect(result.neutral.figureBorder).toBe('none');
+  expect(result.neutral.tickNumerals).toBe('tabular-nums');
+});
+
 test('reaggregation never invents color meaning across phases or reverse seeks', async ({ page }) => {
   const samples = await page.evaluate(async () => {
     const vd = await import('/dist/visdelta.esm.js');

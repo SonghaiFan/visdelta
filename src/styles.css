@@ -427,3 +427,43 @@
   --vd-figure-radius: 0;
   --vd-figure-shadow: none;
 }
+
+/* Editorial: ink on paper. It keeps VisDelta's categorical palette (the logo
+   colours) and changes only surface, neutral ink, line weight and type. */
+.vd-style-editorial {
+  color-scheme: light;
+  --vd-color-surface: #fbfaf7;
+  --vd-color-bg: #f3f2ee;
+  --vd-color-on-surface: #22221f;
+  --vd-color-on-surface-variant: #9a9891;
+  --vd-color-mark-default: #1f1e1b;
+  --vd-color-muted: #6d6c66;
+  --vd-color-border: #dedcd5;
+  --vd-color-outline: #a7a59e;
+  --vd-color-outline-variant: #e4e2db;
+  --vd-axis-title: #22221f;
+  --vd-axis-text: #6d6c66;
+  --vd-axis: #a7a59e;
+  --vd-grid: #e4e2db;
+  --vd-grid-width: 0.75px;
+  --vd-legend-text: #6d6c66;
+  --vd-type-label-weight: 500;
+  --vd-mark-stroke: #fbfaf7;
+  --vd-point-connector: #9a9891;
+  --vd-point-connector-width: 1px;
+  --vd-line-width: 1.5;
+  --vd-figure-bg: #fbfaf7;
+  --vd-figure-border: none;
+  --vd-figure-radius: 0;
+  --vd-figure-shadow: none;
+}
+
+.vd-style-editorial .vd-axis text {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Sub-pixel hairlines must antialias; crisp edges would round them away. */
+.vd-style-editorial .vd-grid line {
+  shape-rendering: auto;
+}

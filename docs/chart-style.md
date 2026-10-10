@@ -6,8 +6,9 @@ Style changes presentation, never data meaning or transition meaning.
 
 ## Use a preset
 
-The built-in structural presets are `d3ChartStyle`, `paperChartStyle`, and
-`darkChartStyle`. Pass one to the transition; both endpoints use the same style.
+The built-in structural presets are `d3ChartStyle` (the default),
+`paperChartStyle`, `darkChartStyle`, and `editorialChartStyle`. Pass one to the
+transition; both endpoints use the same style.
 
 ```js
 import { paperChartStyle } from "visdelta/chart-style";
@@ -21,6 +22,31 @@ const change = await transition(from, to, {
 Import `visdelta/style.css` once. The runtime scopes the selected preset to its
 own `.vd-style-*` root, so multiple transitions can use different styles on one
 page.
+
+## Editorial style
+
+`editorialChartStyle` is an opt-in preset that treats a chart as ink on paper.
+The default remains `d3ChartStyle`.
+
+```js
+import { editorialChartStyle } from "visdelta/chart-style";
+
+await transition(from, to, { target: "#chart", chartStyle: editorialChartStyle });
+```
+
+- **Neutral ink.** Undeclared marks use a warm near-black (`#1f1e1b`) on a warm
+  paper surface (`#fbfaf7`).
+- **The same palette.** Declared categorical colors keep VisDelta's palette,
+  the colors of the logo. Editorial changes surface and ink, not data hues.
+- **Hairline structure.** Grid lines are 0.75px, axis rules use a light outline
+  tone, and Point connectors such as lollipop stems are 1px quiet ink, so the
+  data carries the visual weight.
+- **Flat figure.** No border, radius or shadow; whitespace separates the chart
+  from surrounding content.
+- **Readable numerals.** Tick labels use a medium weight and tabular figures, so
+  values stay aligned while they change during a transition.
+
+Bars keep square corners in every style.
 
 ## Define a structural style
 
@@ -86,8 +112,8 @@ palette for an already-declared color mapping; it cannot decide to map a field
 to color.
 
 Without a color declaration, marks use the style's neutral ink and no color
-legend: black (`#000000`) in the default and Paper presets, and white
-(`#ffffff`) in the Dark preset. Declare `.color(...)` explicitly when color
+legend: warm near-black (`#1f1e1b`) in the default preset, black (`#000000`)
+in Paper, and white (`#ffffff`) in the Dark preset. Declare `.color(...)` explicitly when color
 should encode a field or a specific authored color is required.
 
 The standalone theme CSS entries—`default.css`, `dark.css`, and `paper.css`—are
