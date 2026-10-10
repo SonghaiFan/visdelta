@@ -18,8 +18,7 @@ let watchFrame = 0;
 
 const codeText = `const base = bar(rows)
   .x("category")
-  .y("sales")
-  .key("category");
+  .y("sales");
 
 const profit = base.y("profit");
 
@@ -62,7 +61,6 @@ onMounted(async () => {
     const base = bar(rows)
       .x('category', { title: 'Category' })
       .y('sales', { title: 'Revenue' })
-      .key('category')
       .tooltip(['category', 'sales'])
       .transition({ duration: 720, ease: 'cubicInOut' });
 

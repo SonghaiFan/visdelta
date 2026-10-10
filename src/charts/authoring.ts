@@ -43,9 +43,9 @@ export function normalizeDataSource(data: unknown): unknown {
 // ─── ChartState ───────────────────────────────────────────────────────────────
 
 export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
-  override toSpec(): Omit<S, '__grammar'> {
+  override toSpec(): S {
     const compiled = this.compileSpec(serializeViewSpec(super.toSpec() as ViewSpec));
-    return compileAuthoredView(resolveInlineDataTypes(compiled)) as Omit<S, '__grammar'>;
+    return compileAuthoredView(resolveInlineDataTypes(compiled)) as S;
   }
 
   /** Chart subclasses override this without importing the global chart manifest. */
@@ -57,8 +57,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     // A data binding replaces the old source (including URL/inline metadata).
     const spec = cloneState(this.state);
     (spec as ViewSpec).data = normalizeDataSource(data) as ViewSpec['data'];
-    const Ctor = this.constructor as new (state: S) => this;
-    return new Ctor(spec as S);
+    return this.derive(spec as S);
   }
 
   /** Materialize the tidy rows represented by this immutable chart state. */
@@ -86,7 +85,8 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   }
 
   color(valueOrField: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
-    return this.with({ encoding: { color: colorFrom(valueOrField, options) } } as Partial<S>);
+    const encoding = { ...(this.state.encoding as EncodingSpec | undefined), color: colorFrom(valueOrField, options) };
+    return this.replaceState('encoding' as keyof S, encoding as S[keyof S]);
   }
 
   size(field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
@@ -98,7 +98,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     return this.with({ key: value } as Partial<S>);
   }
 
-  /** Declare stable source-row identity independently of the current mark grain. */
+  /** Override Core's inferred source-row identity independently of the mark grain. */
   datumKey(fields: string | string[]): this {
     const value = Array.isArray(fields) && fields.length === 1 ? fields[0] : fields;
     return this.with({ datumKey: value } as Partial<S>);
@@ -136,7 +136,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
         (this.state as ViewSpec).transform ?? [],
         selectorsFrom(selector)
       )
-    } as Partial<S>, 'selection');
+    } as Partial<S>, { captureResetBaseline: true });
   }
 
   /** Fit one camera around selected marks without changing rows or mark identity. */
@@ -147,7 +147,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
         ...scopes,
         focus: appendScopeFilters(scopes.focus, selectorsFrom(selector), 'focus')
       }
-    } as Partial<S>, 'selection');
+    } as Partial<S>, { captureResetBaseline: true });
   }
 
   highlight(
@@ -160,12 +160,12 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
         ...scopes,
         highlight: appendScopeFilters(scopes.highlight, selectorsFrom(selector), 'highlight', options)
       }
-    } as Partial<S>, 'selection');
+    } as Partial<S>, { captureResetBaseline: true });
   }
 
   /** Configure the chart axes, scales, orientation, and transition order. */
   axis(config: Partial<AxisSpec> = {}): this {
-    return this.with({ axis: cloneState(config) } as Partial<S>, 'axis');
+    return this.with({ axis: cloneState(config) } as Partial<S>, { captureResetBaseline: true });
   }
 }
 

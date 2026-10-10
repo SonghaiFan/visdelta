@@ -44,6 +44,13 @@ export function lineState(spec: ViewSpec = {}, enc: EncodingSpec = {}): LineStat
   };
 }
 
+/** Series field that splits observations into separate lines, if any. */
+export function lineSeriesKey(state: LineState): string | null {
+  const split = state.detailMode === 'series' ||
+    (state.detailMode !== 'single' && Boolean(state.seriesField));
+  return split ? state.seriesField : null;
+}
+
 /** Use one canonical direction for detail, flip, and observation membership changes. */
 export function canonicalLineTransitionPair<S extends ViewSpec>(
   previousSpec: S,
@@ -51,10 +58,8 @@ export function canonicalLineTransitionPair<S extends ViewSpec>(
 ): CanonicalTransitionPair<S> {
   const previous = lineState(previousSpec, previousSpec.encoding);
   const next = lineState(nextSpec, nextSpec.encoding);
-  const previousSeries = previous.detailMode === 'series' ||
-    (previous.detailMode !== 'single' && Boolean(previous.seriesField));
-  const nextSeries = next.detailMode === 'series' ||
-    (next.detailMode !== 'single' && Boolean(next.seriesField));
+  const previousSeries = Boolean(lineSeriesKey(previous));
+  const nextSeries = Boolean(lineSeriesKey(next));
 
   const reverse = () => ({ from: nextSpec, to: previousSpec, reverse: true });
   return composeCanonicalPolicies<S>(

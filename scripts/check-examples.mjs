@@ -40,8 +40,13 @@ function assertLab(module, chart, expectedCount) {
   if (ids.size !== scenarios.length) throw new Error(`${chart} Lab scenario ids must be unique.`);
   const categories = new Set(['data', 'grain', 'encoding', 'coordinate', 'layout', 'attention', 'appearance']);
   for (const scenario of scenarios) {
-    if (!scenario.label || !scenario.description || !scenario.code.includes('return { from, to };')) {
+    if (!scenario.label || !scenario.description ||
+        !scenario.code.includes('const from =') || !scenario.toCode?.includes('const to =')) {
       throw new Error(`${chart} Lab scenario is incomplete: ${scenario.id || '(missing id)'}`);
+    }
+    if (scenario.code.includes('DATA_URL') || scenario.code.includes('return { from, to }') ||
+        scenario.toCode.includes('DATA_URL') || scenario.toCode.includes('return { from, to }')) {
+      throw new Error(`${chart} Lab scenario leaks hidden data or pair plumbing: ${scenario.id}`);
     }
     if (!categories.has(scenario.category)) {
       throw new Error(`${chart} Lab scenario must use a state-change category: ${scenario.id}`);

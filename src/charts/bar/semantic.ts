@@ -7,7 +7,6 @@ import type {
   BarSemanticState,
   ChannelSignature,
   ChannelSpec,
-  EncodingSpec,
   FilterSpec,
   DetailSpec,
   AxisSpec,
@@ -36,7 +35,7 @@ export function semanticBarState(
   const segmentField = barSegmentField(spec, state);
   const axis = barAxisState({ orientation, layout, state });
   const detail = barDetailState({ layout, categoryField, measureField, segmentField, state });
-  const geometry = barGeometryState({ enc, filters: resolveFilters(spec, state), layout, orientation, categoryField, measureField, segmentField });
+  const geometry = barGeometryState({ enc, filters: resolveFilters(spec), layout, orientation, categoryField, measureField, segmentField });
 
   return {
     orientation,
@@ -67,7 +66,10 @@ export function barLayoutState(
 
   if (stateLayout) return stateLayout;
   if (enc.xOffset?.field || enc.yOffset?.field) return 'grouped';
-  if ((enc.detail?.field || enc.color?.field) && aggregate) return 'stacked';
+  // Color is an encoding, not grain. Only an explicit detail channel can turn
+  // aggregate rows into stacked segments; a field color on one row per
+  // category must remain a simple Bar.
+  if (enc.detail?.field && aggregate) return 'stacked';
   return 'simple';
 }
 
@@ -140,7 +142,6 @@ export function barSegmentField(
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.detail?.field ??
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.xOffset?.field ??
     (spec.encoding as Record<string, ChannelSpec | undefined>)?.yOffset?.field ??
-    (spec.encoding as Record<string, ChannelSpec | undefined>)?.color?.field ??
     null
   );
 }
@@ -159,7 +160,7 @@ function semanticStateFromSpec(spec: ViewSpec): ResolvedChartState & { filters: 
   };
 }
 
-function resolveFilters(spec: ViewSpec, state: Partial<ResolvedChartState>): FilterSpec[] {
+function resolveFilters(spec: ViewSpec): FilterSpec[] {
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
   return [
     ...(spec.filter ? [spec.filter as FilterSpec] : []),
@@ -185,17 +186,13 @@ function barGeometryState({
   segmentField: string | null;
 }): { x: BarGeometryState; y: BarGeometryState } {
   const category = { role: 'category' as const, field: categoryField, filters };
-  // Filtering a stacked view changes more than membership: every surviving
-  // segment above a removed row receives a new stack interval. Keep that
-  // dependency in the measure geometry so the transition plan animates the
-  // recomputed __stack0/__stack1 bounds instead of correcting them only at the
-  // terminal frame. Simple and grouped bars do not derive their measure
-  // position from neighbouring rows, so their existing filter plan stays
-  // unchanged.
+  // A filter can replace the observation behind a persistent mark key (for
+  // example another age cohort for the same state). Its measure must animate
+  // too, even in simple/grouped layouts; stacks also recompute their intervals.
   const measure = {
     role: 'measure' as const,
     field: measureField,
-    ...(layout === 'stacked' ? { filters } : {})
+    filters
   };
   const segment = segmentField
     ? { field: segmentField, color: channelSignature(enc.color) }

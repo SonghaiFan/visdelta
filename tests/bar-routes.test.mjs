@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bar } from '../dist/bar.js';
 import { barIntermediateSpecs, canonicalBarTransitionPair } from '../dist/charts/bar/state.js';
+import { delta } from '../dist/core.js';
 import { viewSelection } from '../dist/focus.js';
 import { sameValue } from '../dist/grammar/diff.js';
 
@@ -133,6 +134,19 @@ test('input sorts are not isolated across membership-changing operations', () =>
 test('a shared input sort stays in place without unnecessary unsort and re-sort legs', () => {
   const sorted = detail().sort('value');
   assert.deepEqual(phases(sorted, sorted.rollup()), []);
+});
+
+test('sum-to-count reducer changes do not take the conserved merge route', () => {
+  const summedDetail = detail('sum');
+  const summedTotal = summedDetail.rollup({ op: 'sum' });
+  const countedTotal = summedDetail.rollup({ op: 'count' });
+
+  const detailToCount = delta(summedDetail, countedTotal).stateChanges;
+  const totalToCount = delta(summedTotal, countedTotal).stateChanges;
+  assert.ok(detailToCount.some(change => change.category === 'grain' && change.action === 'change-reducer'));
+  assert.ok(totalToCount.some(change => change.category === 'grain' && change.action === 'change-reducer'));
+  assert.deepEqual(phases(summedDetail, countedTotal), []);
+  assert.deepEqual(phases(summedTotal, countedTotal), []);
 });
 
 test('non-additive measures, changed rows/preparation/identity and lost focus fields keep direct fallback', () => {

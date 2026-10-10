@@ -6,6 +6,7 @@ import type { ChartModule } from './charts/module.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import { analyzeViewLineage } from './data/view-lineage.js';
 import { classifyStateChanges } from './grammar/state-changes.js';
+import { declarationEdits } from './grammar/declaration-edits.js';
 
 export type Visualization = ViewSpec | {
   toSpec(): ViewSpec;
@@ -21,12 +22,19 @@ export function visualizationChartModule(input: Visualization): ChartModule<any>
 
 /** Resolve an immutable builder or plain spec into a detached view spec. */
 export function visualizationSpec(input: Visualization): ViewSpec {
+  return withInferredTypes(declaredSpec(input));
+}
+
+function declaredSpec(input: Visualization): ViewSpec {
   if (!input || typeof input !== 'object') {
     throw new Error('Expected a visualization instance or view spec.');
   }
-  const spec = serializeViewSpec(cloneState(
+  return serializeViewSpec(cloneState(
     typeof input.toSpec === 'function' ? input.toSpec() : input as ViewSpec
   ));
+}
+
+function withInferredTypes(spec: ViewSpec): ViewSpec {
   const data = spec.data as { values?: unknown[] } | unknown[] | undefined;
   const rows = Array.isArray(data) ? data : Array.isArray(data?.values) ? data.values : null;
   return rows ? resolveSpecDataTypes(spec, rows) : spec;
@@ -34,12 +42,17 @@ export function visualizationSpec(input: Visualization): ViewSpec {
 
 /** Compute the declarative difference between two states of the same chart type. */
 export function delta(from: Visualization, to: Visualization): DeltaResult {
-  const source = visualizationSpec(from);
-  const target = visualizationSpec(to);
+  const sourceDeclaration = declaredSpec(from);
+  const targetDeclaration = declaredSpec(to);
+  const source = withInferredTypes(sourceDeclaration);
+  const target = withInferredTypes(targetDeclaration);
   if (!source.mark || source.mark !== target.mark) {
     throw new Error('delta() requires two states of the same chart type.');
   }
   const diff = diffViewStates(source, target);
+  // Semantic classification uses resolved types; replayable edits describe
+  // the actual authored declaration, never fields inferred during analysis.
+  diff.edits = declarationEdits(sourceDeclaration, targetDeclaration);
   const analysis = analyzeViewLineage(source, target);
   const lineage = analysis?.correspondence;
   const stateChanges = classifyStateChanges(source, target, diff.semantic, analysis);
@@ -47,9 +60,16 @@ export function delta(from: Visualization, to: Visualization): DeltaResult {
 }
 
 export { diffViewStates };
+export { declarationEdits, applyDeclarationEdits } from './grammar/declaration-edits.js';
+export type { DeclarationEdit, DeclarationValue } from './grammar/declaration-edits.js';
+export { planDeclarationTransition } from './grammar/declaration-plan.js';
+export type { DeclarationPlan, DeclarationPlanOptions, DeclarationStage } from './grammar/declaration-plan.js';
+export type { CanonicalDeclarationOperation, DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec } from './types/index.js';
 export { detectDataTypes, resolveEncodingTypes } from './data/types.js';
 export { buildGroupingTree, compileLineage, correspondLineage, lineageMarkKey } from './data/lineage.js';
 export { viewLineageCorrespondence } from './data/view-lineage.js';
+export { correspondMarks, markKeyValue, resolveMarkIdentity } from './identity/mark-correspondence.js';
+export type { MarkCorrespondence, MarkEndpoint, MarkIdentity, MarkKeySpec, MarkMatch } from './identity/mark-correspondence.js';
 export type {
   CorrespondenceOptions,
   DatumKey,

@@ -16,8 +16,7 @@ import {
 import type { Point, UnitAxis, UnitDatum, UnitLayoutResult, UnitTransitionPlan } from './state.js';
 import type { Motion, MotionTiming } from '../../runtime/recorder.js';
 import type { RenderDatum } from '../../runtime/render-types.js';
-import type { ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, Renderer, StaggerSpec, ViewSpec } from '../../types/index.js';
-import type { BaseType, Selection } from 'd3-selection';
+import type { ChartContext, ChartRuntime, ChartSceneContext, ChartSelection, Renderer, StaggerSpec } from '../../types/index.js';
 import type { UnitViewState } from './authoring.js';
 import type { ChartPresentation } from '../style.js';
 import { group as groupBy } from 'd3-array';
@@ -42,7 +41,6 @@ interface UnitNode extends SVGCircleElement {
 }
 
 type UnitMotion = Motion<SVGCircleElement, UnitDatum>;
-type UnitSelection = Selection<SVGCircleElement, UnitDatum, BaseType, unknown>;
 type EntryPosition = (unit: UnitDatum, index: number) => Point;
 
 const DEFAULT_UNIT_STAGGER: StaggerSpec = { step: 4, max: 100 };

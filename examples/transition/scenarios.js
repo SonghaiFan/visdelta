@@ -1,11 +1,13 @@
+import { transitionScenario } from '../scenario.js';
+
 // Keep these pairs aligned with tests/browser/transition.spec.mjs.
 const population = `const DATA_URL = "./data/us-population-state-age-tidy.csv";
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"];
 
 const population = bar({ url: DATA_URL })
   .datumKey(["state", "age"])
-  .x("state", { title: "State" })
-  .y("population", { title: "Population", format: "~s" })
+  .x("state")
+  .y("population")
   .key(["state", "age"]);
 
 const under10 = population.where({ age: "<10" });
@@ -19,8 +21,8 @@ const under10 = rows.filter(row => row.age === "<10");
 
 const base = bar(under10.filter(row => INITIAL_STATES.includes(row.state)))
   .datumKey(["state", "age"])
-  .x("state", { title: "State" })
-  .y("population", { title: "Population", format: "~s" })
+  .x("state")
+  .y("population")
   .key(["state", "age"]);`;
 
 const populationFocus = `${population}
@@ -36,7 +38,7 @@ const detailed = bar({ url: DATA_URL })
   .y("population", { title: "Population", format: "~s" })
   .key(["state", "age"])
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS });`;
+  .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
 
 const segmentedFeatured = `${ageConstants}
 const FEATURE_STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
@@ -47,7 +49,7 @@ const detailed = bar({ url: DATA_URL })
   .key(["state", "age"])
   .where({ field: "state", oneOf: FEATURE_STATES })
   .breakdown("age")
-  .color("age", { domain: AGE_BANDS });`;
+  .color("age", { domain: AGE_BANDS, scheme: "Blues" });`;
 
 const lineageReaggregation = `const cases = [
   { id: "r1", year: 2020, location: "A", cases: 10 },
@@ -58,14 +60,14 @@ const lineageReaggregation = `const cases = [
 
 const base = bar(cases)
   .datumKey("id")
-  .y("cases", { title: "Cases" });
+  .y("cases");
 
 const byYear = base
-  .x("year", { title: "Year" })
+  .x("year")
   .rollup("year");
 
 const byLocation = base
-  .x("location", { title: "Location" })
+  .x("location")
   .rollup("location");`;
 
 const sampleCategories = {
@@ -76,7 +78,7 @@ const sampleCategories = {
 };
 
 function sample(id, label, description, setup, from, to) {
-  return { id, category: sampleCategories[id], label, description, code: `${setup}\n\nconst from = ${from};\nconst to = ${to};\n\nreturn { from, to };` };
+  return transitionScenario({ id, category: sampleCategories[id], label, description, setup, from, to });
 }
 
 export const chart = 'bar';
@@ -88,7 +90,7 @@ export const scenarios = [
   sample('measure', '01 · Compare age groups', 'For eight major states, change the observed cohort from residents under 10 to residents aged 80 and over.', population, 'featured', 'population.where({ age: "≥80" }).where({ field: "state", oneOf: FEATURE_STATES })'),
   sample('filter', '02 · Filter states', 'Keep four of the eight explicitly listed states; drag back to restore the others.', population, 'featured', 'featured.where({ field: "state", oneOf: ["CA", "TX", "FL", "NY"] })'),
   sample('highlight', '03 · Highlight states', 'Emphasize California and Texas while retaining all eight state bars.', population, 'featured', 'featured.highlight({ field: "state", oneOf: ["CA", "TX"] })'),
-  sample('color', '04 · Change color measure', 'Change the quantitative color encoding from uniform black to the explicitly declared population scale.', population, 'featured', 'featured.color({ field: "population", type: "quantitative", title: "Population" })'),
+  sample('color', '04 · Change color measure', 'Change the quantitative color encoding from uniform black to the explicitly declared population scale.', population, 'featured', 'featured.color({ field: "population", type: "quantitative" })'),
   sample('sort', '05 · Rank all regions', 'Reorder all 52 regions by their under-10 population, largest first.', population, 'under10', 'under10.sort("population", "descending")'),
   sample('flip', '06 · Flip orientation', 'Move the eight-state comparison from vertical to horizontal bars.', population, 'featured', 'featured.flip()'),
   sample('data', '07 · Add real rows', 'Replace a six-state extract with an eight-state extract from the same tidy CSV, without changing any values.', populationDataChange, 'base', 'base.data(under10.filter(row => EXPANDED_STATES.includes(row.state)))'),

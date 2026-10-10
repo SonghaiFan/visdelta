@@ -1,11 +1,12 @@
 import { areaPresentation } from './style.js';
-import type { ChannelSpec, ChartPlugin } from '../../types/index.js';
+import type { ChartPlugin } from '../../types/index.js';
 import { createDefaultTransitionPlan } from '../transition-plan.js';
 import { defineChartType } from '../plugin.js';
 import type { AreaViewState } from './authoring.js';
 import { createAreaSpecCompiler } from './compile.js';
 import { createAreaRenderer } from './render.js';
 import { areaObservationChange, areaState, canonicalAreaTransitionPair } from './state.js';
+import { createAreaDeclarationOperationCodec } from './declaration-operations.js';
 
 /** Area-specific plan fields read by the renderer. */
 export interface AreaTransitionPlanExtension {
@@ -15,13 +16,22 @@ export interface AreaTransitionPlanExtension {
 
 export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>({
   key: 'area',
+  declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: areaPresentation,
   createRenderer: createAreaRenderer,
   createSpecCompiler: createAreaSpecCompiler,
+  // One observation per x within each stacked series.
+  defaultMarkKey: (spec) => {
+    const x = spec.encoding?.x?.field;
+    const series = areaState(spec, spec.encoding).seriesField;
+    return x ? (series ? [x, series] : x) : null;
+  },
   transition: {
     canonicalPair: canonicalAreaTransitionPair,
+    declarationOperations: createAreaDeclarationOperationCodec(),
     plan: (previousSpec, nextSpec) => {
       const plan = createDefaultTransitionPlan(previousSpec, nextSpec, {
         reason: 'area-default-plan'

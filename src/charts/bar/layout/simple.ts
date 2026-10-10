@@ -18,7 +18,7 @@ import type {
   RectGeometry,
   TargetGeometry
 } from '../render-pattern.js';
-import type { TransitionItemAction } from '../../../types/index.js';
+import type { BarTransitionItemAction } from '../plan.js';
 import { scaleBand, scaleLinear } from 'd3-scale';
 
 export type BarLayoutRenderer = (
@@ -110,7 +110,7 @@ function simpleBarGeometryContract(
   geom: SimpleGeom,
   collapseLineage: LineageStart | null,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
-  exitPlan: TransitionItemAction | null
+  exitPlan: BarTransitionItemAction | null
 ): BarGeometryContract {
   return {
     start: (d) => collapseLineage?.start(d) || simpleBarEnterGeometry(d, geom),
@@ -184,7 +184,7 @@ function applySimpleBarExitGeometry(
   selection: BarMotion,
   geom: SimpleGeom,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
-  exitPlan: TransitionItemAction | null
+  exitPlan: BarTransitionItemAction | null
 ): BarMotion {
   return sourceBaselineExit(selection, { horizontal: geom.horizontal, plan: exitPlan, value: (d) => d[geom.valueField] });
 }

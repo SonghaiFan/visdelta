@@ -1,4 +1,6 @@
-# Unit transition lab
+# Unit transition behavior
+
+Try these scenarios in the unified [Playground](/playground#unit/bar).
 
 These fifteen editable scenarios use the 150-observation Iris dataset to define
 the first complete transition matrix for VisDelta's Unit module. Each flower is
@@ -89,8 +91,6 @@ marks by travel distance, so short moves start first; other Unit changes use
 data order with a 4 ms step capped at 100 ms. Write
 `.transition({ stagger: 0 })` when every unit should move together, or provide
 an explicit `stagger` object to replace the Unit default.
-
-<SyntaxPlayground mode="unit-lab" initial="bar" />
 
 Every example imports only `visdelta/unit` and the generic transition entry.
 The Unit builder, compiler, layouts, key-first matching, renderer,

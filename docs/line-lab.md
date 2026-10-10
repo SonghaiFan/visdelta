@@ -1,23 +1,22 @@
-# Line transition lab
+# Line transition behavior
+
+Try these scenarios in the unified [Playground](/playground#line/x).
 
 These sixteen scenarios are the executable transition matrix for VisDelta's
 line chart. They cover temporal granularity, y mappings, filtering, data
 changes, highlighting, focus, color, line style, coordinate scale, sliding time
 windows, and reversible single-line/series changes.
 
-Every scenario uses the same tidy stock dataset. Each row is one trading day
-for one company, with explicit `date`, `ticker`, `open`, `high`, `low`, `close`,
-and `volume` fields. The lab selects short AAPL and GOOG windows so individual
-observations and intermediate frames remain readable. The source files were
-reshaped before being added to the demo; VisDelta receives tidy rows and does
-not clean or reshape them at runtime.
+Every scenario uses the same 40-row tidy stock dataset. Each row is one trading
+day for one company, with explicit `date`, `week`, `ticker`, `open`, `high`,
+`low`, `close`, and `volume` fields. The small AAPL and GOOG sample keeps
+individual observations and intermediate frames readable. VisDelta receives
+these tidy rows directly; the editor contains only visualization declarations.
 
-The first example keeps `date` on x and changes the temporal grain from daily
-observations to weekly OHLC summaries. Each weekly row uses the first open, the
-highest high, the lowest low, the final close, and summed volume; its x position
-is the week's final trading date. The combined example changes daily close to
-weekly high without turning the time-series line into a price-versus-price
-trajectory.
+The first example changes the temporal grain from daily observations to the
+mean close for each `week`. The combined example changes daily close to each
+week's maximum high. Both transformations are authored with `.x()` and
+`.rollup()`, so the example stays focused on transition behavior.
 
 Edit either state, run the code, scrub any frame, or play it in both directions.
 Observations are matched by `.key()`. A Line chart is path-first: ordinary
@@ -64,8 +63,6 @@ keeps a gap. Focus keeps all observations and the full line, fits one 2D camera,
 and clips what falls outside it. Line and Area share the same connected-stretch
 rule: a stretch needs at least two observations. An isolated Line observation
 keeps its point mark but does not create a line path.
-
-<SyntaxPlayground mode="line-lab" initial="x" />
 
 Every example imports the focused Line module and the generic transition entry.
 It does not load the complete chart collection.

@@ -1,0 +1,47 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      # npm trusted publishing requires npm 11.5.1 or newer.
+      - run: npm install --global npm@latest
+
+      - name: Verify tag matches package version
+        run: |
+          node --input-type=module -e '
+            import packageJson from "./package.json" with { type: "json" };
+            const tag = process.env.GITHUB_REF_NAME;
+            if (tag !== `v${packageJson.version}`) {
+              throw new Error(`${tag} does not match package.json version ${packageJson.version}`);
+            }
+          '
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run release:check
+
+      # release:check already builds and validates the package. OIDC trusted
+      # publishing generates provenance automatically and needs no npm token.
+      - run: npm publish --ignore-scripts

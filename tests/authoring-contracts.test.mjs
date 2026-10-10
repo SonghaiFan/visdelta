@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as d3 from 'd3';
-import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
+import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, editorialChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
 import { applyTransforms } from '../dist/data/transforms.js';
 import { areaCells, areaLayers } from '../dist/charts/area/state.js';
-import { matchAreaFramePoints } from '../dist/charts/area/render.js';
+import { interpolateAreaCellFrames } from '../dist/charts/area/render.js';
 import { connectedLineStretches, lineRowsAtTotal } from '../dist/charts/line/state.js';
 import { pointIntermediateSpecs } from '../dist/charts/point/state.js';
 import { defaultTransition } from '../dist/timing.js';
+import { titleize } from '../dist/labels.js';
 import {
   expandUnits
 } from '../dist/charts/unit/state.js';
@@ -29,6 +30,28 @@ test('documented filtering uses where, not a nonexistent filter method', () => {
     assert.doesNotThrow(() => declaration.where({ field: 'y', gte: 2 }).toSpec());
     assert.throws(() => declaration.where('datum.y >= 2'), /string expressions are not supported/);
   }
+});
+
+test('reset baseline is private, immutable across branches, and survives data replacement', () => {
+  const base = bar([{ id: 'a', region: 'North', value: 1 }]).x('id').y('value');
+  const changed = base.where({ region: 'North' });
+  const sibling = base.highlight({ region: 'North' });
+
+  assert.equal(Object.hasOwn(changed.state, '__grammar'), false);
+  assert.equal(typeof changed.operations, 'undefined');
+  assert.equal(typeof changed.capabilities, 'undefined');
+  assert.deepEqual(changed.reset().toSpec(), base.toSpec());
+  assert.deepEqual(sibling.reset().toSpec(), base.toSpec());
+  assert.deepEqual(
+    changed.data([{ id: 'b', region: 'South', value: 2 }]).reset().toSpec(),
+    base.toSpec()
+  );
+});
+
+test('field titles use generic title casing for weather-like names', () => {
+  assert.equal(titleize('tmin'), 'Tmin');
+  assert.equal(titleize('tmax'), 'Tmax');
+  assert.equal(titleize('daily_high'), 'Daily high');
 });
 
 test('core detects tidy field types and resolves missing channel types', () => {
@@ -92,7 +115,7 @@ test('chart style modules inherit the default grammar without entering chart spe
 });
 
 test('built-in chart-style presets expose stable structural and CSS keys', () => {
-  assert.deepEqual(Object.keys(chartStylePresets), ['d3', 'paper', 'dark']);
+  assert.deepEqual(Object.keys(chartStylePresets), ['d3', 'paper', 'dark', 'editorial']);
   assert.equal(chartStylePresets.d3, d3ChartStyle);
   assert.equal(chartStylePresets.paper, paperChartStyle);
   assert.equal(chartStylePresets.dark, darkChartStyle);
@@ -106,6 +129,10 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(paperChartStyle.axisTitle({ title: 'Income' }, 'right'), 'Income');
   assert.equal(darkChartStyle.key, 'dark');
   assert.equal(darkChartStyle.plot.grid, 'horizontal');
+  assert.equal(chartStylePresets.editorial, editorialChartStyle);
+  assert.equal(editorialChartStyle.key, 'editorial');
+  assert.equal(editorialChartStyle.plot.grid, 'horizontal');
+  assert.equal(editorialChartStyle.legendPosition, 'top');
 });
 
 test('wide bar segments preserve their fold when rolling up to totals', () => {
@@ -547,24 +574,22 @@ test('area filters keep separate connected stretches unless the author connects 
   assert.deepEqual(areaCells(isolatedLayers, lineageLayers), []);
 });
 
-test('area observations enter and exit at zero thickness without moving x', () => {
-  const fewer = [
-    { key: 'Q1', x: 10, y0: 100, y1: 70 },
-    { key: 'Q3', x: 30, y0: 100, y1: 40 }
+test('added Area cells grow from zero thickness at their authored x positions', () => {
+  const to = [
+    { key: 'left', x: 15, y0: 100, y1: 100 },
+    { key: 'center', x: 20, y0: 100, y1: 55 },
+    { key: 'right', x: 25, y0: 100, y1: 100 }
   ];
-  const more = [
-    { key: 'Q1', x: 10, y0: 100, y1: 70 },
-    { key: 'Q2', x: 20, y0: 100, y1: 55 },
-    { key: 'Q3', x: 30, y0: 100, y1: 40 }
-  ];
-  const enter = matchAreaFramePoints(fewer, more).find(pair => pair.key === 'Q2');
-  assert.deepEqual(enter.from, { x: 20, y0: 100, y1: 100 });
-  assert.equal(enter.to.x, 20);
-  assert.equal(enter.to.y1, 55);
+  const from = to.map(point => ({ ...point, y1: point.y0 }));
+  const shape = points => points.map(({ x, y0, y1 }) => `${x}:${y0}:${y1}`).join(';');
+  const tween = interpolateAreaCellFrames(from, to, shape);
+  const reverse = interpolateAreaCellFrames(to, from, shape);
 
-  const exit = matchAreaFramePoints(more, fewer).find(pair => pair.key === 'Q2');
-  assert.equal(exit.from.x, 20);
-  assert.deepEqual(exit.to, { x: 20, y0: 100, y1: 100 });
+  assert.equal(tween(0), '15:100:100;20:100:100;25:100:100');
+  assert.equal(tween(0.5), '15:100:100;20:100:77.5;25:100:100');
+  assert.equal(tween(1), '15:100:100;20:100:55;25:100:100');
+  assert.equal(reverse(0.5), tween(0.5));
+  assert.equal(reverse(1), tween(0));
 });
 
 test('color is an explicit encoding, including for bar breakdowns', () => {
@@ -661,6 +686,32 @@ test('point connector grammar distinguishes baselines from grouped endpoints', (
     /cannot combine a constant from value with by grouping/
   );
   assert.throws(() => base.connector({ orderBy: 'year' }), /orderBy requires by grouping/);
+  assert.deepEqual(base.connector({ from: 0 }).connector({ by: 'country' }).toSpec().connector, { by: 'country' });
+});
+
+test('exclusive encoding variants replace each other and published state is deeply frozen', () => {
+  const base = bar([{ id: 'a', region: 'North', value: 1 }]).x('id').y('value').key('id');
+  const fieldColor = base.color('#ff0000').color('region').toSpec().encoding.color;
+  assert.equal(fieldColor.field, 'region');
+  assert.equal(fieldColor.value, undefined);
+  const fixedColor = base.color('region').color('#ff0000').toSpec().encoding.color;
+  assert.equal(fixedColor.value, '#ff0000');
+  assert.equal(fixedColor.field, undefined);
+
+  const state = base.state;
+  assert.throws(() => { state.encoding.x.field = 'mutated'; }, TypeError);
+  assert.equal(base.toSpec().encoding.x.field, 'id');
+});
+
+test('reset returns to the original state after a replacement-style chart operation', () => {
+  const rows = [{ id: 'a', region: 'North', year: 2020, value: 2 }];
+  for (const chart of [
+    line(rows).x('year').y('value').key('id'),
+    area(rows).x('year').y('value').key('id'),
+    point(rows).x('year').y('value').key('id')
+  ]) {
+    assert.deepEqual(chart.rollup('region').reset().toSpec(), chart.toSpec());
+  }
 });
 
 test('point detail first sets the target view while keeping summary marks', () => {
@@ -753,7 +804,11 @@ test('a JSON-safe chart state survives JSON round-tripping with identical meanin
   assert.deepEqual(revived, spec, 'the serialized spec is the spec');
   // Plain JSON specs are accepted wherever a state is, with the same delta and the same rows.
   const other = state.y('sales', { title: 'Sales' });
-  assert.deepEqual(delta(revived, other.toSpec()).changes, delta(state, other).changes);
+  const revivedDelta = delta(revived, other.toSpec());
+  const authoredDelta = delta(state, other);
+  assert.deepEqual(revivedDelta.changed, authoredDelta.changed);
+  assert.deepEqual(revivedDelta.deltas, authoredDelta.deltas);
+  assert.deepEqual(revivedDelta.stateChanges, authoredDelta.stateChanges);
   assert.deepEqual(applyTransforms(rows, revived.transform), state.rows());
   // Temporal fields are ISO strings in JSON and detected as temporal after revival.
   assert.equal(detectDataTypes(rows).date, 'temporal');

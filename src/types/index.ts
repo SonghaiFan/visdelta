@@ -258,7 +258,7 @@ export interface ViewSpec {
   transform?: TransformSpec[];
   filter?: FilterSpec;
   key?: string | string[] | null;
-  /** Stable identity of source data records; distinct from the current mark key. */
+  /** Optional override for Core-inferred source identity; distinct from the mark key. */
   datumKey?: string | string[] | null;
   semanticKey?: SemanticKey | null;
   transition?: TransitionSpec;
@@ -320,14 +320,6 @@ export interface BarSemanticState {
   segmentField: string | null;
   xGeometry: BarGeometryState;
   yGeometry: BarGeometryState;
-}
-
-// ─── Grammar internal ─────────────────────────────────────────────────────────
-
-export interface GrammarMeta {
-  operations?: string[];
-  /** Per-chart-type scene capabilities (e.g. bar opts out of `mapping`). */
-  capabilities?: Record<string, boolean>;
 }
 
 // ─── Diff ─────────────────────────────────────────────────────────────────────
@@ -407,6 +399,8 @@ export type StateChange =
   | { category: 'appearance'; action: 'restyle' | 'reshape'; property: string };
 
 export interface DiffResult {
+  /** Lossless declaration edits. Their order is not an animation schedule. */
+  edits: import('../grammar/declaration-edits.js').DeclarationEdit[];
   changed: string[];
   has(key: string): boolean;
   deltas: Delta[];
@@ -431,71 +425,24 @@ export interface DeltaResult extends DiffResult {
 export type ChartPart = 'x' | 'y' | 'view' | 'marks';
 export type TransitionChange = 'scale' | 'axis' | 'marks' | 'enter' | 'exit';
 
-export interface TransitionMatch {
-  mode: string;
-  reason: string;
-}
-
 export interface TransitionStep {
   /** Built-in Core part, or a plain chart-plugin part such as "fall". */
   part?: ChartPart | (string & {});
   changes: Array<TransitionChange | (string & {})>;
 }
 
-export interface TransitionMotion {
-  mode: string;
-}
-
-export interface TransitionPlanBaseline {
-  name: string;
-  anchor?: string;
-  value?: number;
-  meaning: string;
-}
-
-export interface TransitionItemAction {
-  mode: string;
-  reason: string;
-  from?: string;
-  to?: string;
-  target?: string;
-  source?: string;
-  baseline?: TransitionPlanBaseline;
-  parentKey?: string | null;
-  childKey?: Array<string | null>;
-  targetLayout?: BarLayout;
-  sourceLayout?: BarLayout;
-  sourceOrientation?: BarOrientation;
-  categoryKey?: string | null;
-  segmentKey?: string | null;
-  valueKey?: string | null;
-}
-
-export interface TransitionPlanDiffEntry {
-  type: string;
-  action: DeltaAction;
-  previous: unknown;
-  next: unknown;
-}
-
-/** Execution decisions for one adjacent pair, not the complete waypoint route.
- * Difference and lineage are evidence; steps and timing are chart-owned choices. */
+/** Core-owned evidence and controls shared by chart transition plans. */
 export interface TransitionPlan {
-  diff?: TransitionPlanDiffEntry[];
+  mode?: string;
   reason?: string;
-  source?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
-  target?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
-  match?: TransitionMatch;
-  motion?: TransitionMotion;
-  enter?: TransitionItemAction;
-  exit?: TransitionItemAction;
+  /** Ordered parts are retained as diagnostics and generic frame phases. */
   steps?: TransitionStep[];
-  timing?: TransitionSpec;
-  totalDuration?: number;
   /** Whether row membership and the surviving view share one progress window. */
   membershipTiming?: 'staged' | 'simultaneous';
   /** Datum-provenance evidence, not an instruction to use a particular motion. */
   lineage?: import('../data/lineage.js').LineageCorrespondence;
+  /** One-to-one visual-object continuity; distinct from source-record lineage. */
+  markCorrespondence?: import('../identity/mark-correspondence.js').MarkCorrespondence;
 }
 
 // ─── Chart type ───────────────────────────────────────────────────────────────
@@ -579,6 +526,46 @@ export interface IntermediateSpec<S extends ViewSpec = ViewSpec> {
   scene?: string;
 }
 
+/** One canonical endpoint-derived declaration operation. The meaning of an
+ * operation ID is owned by its chart plugin; Core treats it as an opaque slot. */
+export interface CanonicalDeclarationOperation {
+  id: string;
+  path: string[];
+  value: { present: false } | { present: true; value: unknown };
+  /** Ordered sequence family; sequence order is the array order from decompose(). */
+  sequence?: string;
+}
+
+export type DeclarationCodecResult<T> =
+  | { status: 'ok'; value: T }
+  | { status: 'unsupported'; reason: string };
+
+export interface DeclarationOperationChange {
+  id: string;
+  action: 'insert' | 'delete' | 'update';
+  previous?: CanonicalDeclarationOperation;
+  next?: CanonicalDeclarationOperation;
+  /** Sequence positions affected by this insert, delete, or update; updates use the same index for both. */
+  fromIndex?: number;
+  toIndex?: number;
+}
+
+/** Chart-owned codec for complete, valid states along a one-operation route. */
+export interface DeclarationOperationCodec<S extends ViewSpec = ViewSpec> {
+  /** Optional endpoint-pair boundary for chart-owned operation subsets. */
+  supportsTransition?(from: S, to: S): string | void;
+  decompose(spec: S): DeclarationCodecResult<CanonicalDeclarationOperation[]>;
+  /** Evaluate an operation set into a complete state, including derived fields. */
+  evaluate(template: S, operations: readonly CanonicalDeclarationOperation[]): DeclarationCodecResult<S>;
+  normalize(spec: S): DeclarationCodecResult<S>;
+  validate(spec: S): DeclarationCodecResult<void>;
+  /** Optional route-edge constraint over complete valid states and stable canonical endpoints.
+   * Called only in canonical search direction; reverse planning/playback reuse the accepted route.
+   * Constraints must be stable and direction-symmetric or defined by the canonical pair,
+   * never builder history. Rejecting an edge does not make either chart state invalid. */
+  validateStep?(from: S, to: S, endpoints: Readonly<{ from: S; to: S }>): DeclarationCodecResult<void>;
+}
+
 export interface CanonicalTransitionPair<S extends ViewSpec = ViewSpec> {
   from: S;
   to: S;
@@ -609,6 +596,12 @@ export type ChartRuntime = import('../runtime/chart-runtime.js').ChartRuntime;
  * Hooks must not mutate their inputs. Author-supplied sequence states are fixed
  * boundaries: intermediateSpecs only adds states inside an adjacent pair. */
 export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
+  /** Opt into Core's conservative declaration planner when this chart has no route. */
+  declarationPlanning?: boolean;
+  /** Choose whether canonical declaration operations run before or after whole-pair chart routes. */
+  declarationPlanningOrder?: 'before-chart' | 'after-chart';
+  /** Canonical semantic operation vocabulary for endpoint-based route search. */
+  declarationOperations?: DeclarationOperationCodec<S>;
   /** Plan motion and timing for one adjacent pair, not all generated waypoints. */
   resolveTransitionPlan(prev: S | null, next: S | null): TransitionPlan;
   /**
@@ -617,7 +610,8 @@ export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
    */
   canonicalTransitionPair?(prev: S, next: S): CanonicalTransitionPair<S>;
   /** Choose a valid default route in authored order, excluding both endpoints.
-   * An empty list keeps the ordinary direct route; it does not mean no motion.
+   * An empty list permits declarationPlanning when enabled, otherwise keeps
+   * the ordinary direct route; it does not mean no motion.
    * Generated waypoints are not recursively sent back to this hook. */
   intermediateSpecs?(prev: S, next: S): IntermediateSpec<S>[];
 }
@@ -635,8 +629,9 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   renderer: Renderer<S>;
   prepareSpec(spec: S): S;
   defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;
+  /** Chart-owned default object identity. Explicit `.key()` overrides it in Core. */
+  defaultMarkKey?(spec: S): import('../identity/mark-correspondence.js').MarkKeySpec | null;
   readonly scenes: readonly string[];
-  inspect?: Record<string, unknown>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;
 }
 
@@ -657,7 +652,6 @@ export type AnyRecord = Record<string, any>;
 export interface RuntimeOptions {
   /** Where the chart renders. Required: the library never guesses a host element. */
   target: Target;
-  debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;
 }

@@ -1,42 +1,29 @@
-import { keyAccessor } from '../identity/semantic-key.js';
 import { specState } from '../spec-meta.js';
 import { clearSceneTransitionProgress } from '../transition-progress.js';
-import { hasScene } from '../transitions/index.js';
 import { markAxisInactive } from './axis-motion.js';
-import { motion } from './recorder.js';
 import type { ProgressController } from './tracks.js';
-import type { MotionTiming } from './recorder.js';
-import { clamp } from './utils.js';
 import { select } from 'd3-selection';
 import type {
   ChartContext,
   ChartSceneContext,
   ChartSelection,
-  DataRow,
-  EncodingSpec,
   ViewSpec
 } from '../types/index.js';
-
-type RootTransition = MotionTiming;
 
 export type SceneProgressController = ProgressController;
 
 export interface SceneHostElement extends HTMLElement {
   __visDeltaScene?: RuntimeScene;
-  __visDeltaMarkName?: Element;
 }
 
 export interface RuntimeScene extends ChartSceneContext {
   node: SceneHostElement;
   /** The library-owned D3 runtime; motion() reads it through the mount element. */
   frame: ChartSelection<SVGGElement>;
-  detailLayer: ChartSelection<SVGGElement>;
-  axisLayer: ChartSelection<SVGGElement>;
   empty: ChartSelection<HTMLDivElement>;
   previousSpec: ViewSpec | null;
   width: number;
   height: number;
-  phaseTimer?: number | null;
   transitionProgress?: SceneProgressController | null;
   seekSequence?: unknown;
 }
@@ -45,37 +32,9 @@ interface SceneViewConfig {
   height?: number;
 }
 
-interface SceneSelector {
-  index?: number;
-  select?: 'first' | 'last' | 'min' | 'max';
-  by?: string;
-  field?: string;
-  equal?: unknown;
-  value?: unknown;
-  oneOf?: unknown[];
-  gte?: unknown;
-  gt?: unknown;
-  lte?: unknown;
-  lt?: unknown;
-}
-
-interface ScenePoint {
-  row: DataRow;
-  x: number;
-  y: number;
-}
-
-interface LineAttributes {
-  x1: number;
-  x2: number;
-  y1: number;
-  y2: number;
-}
-
 interface SceneChart extends ChartContext {
   scene: RuntimeScene;
   sceneTransition?: { scene: string[] };
-  position?: { x(row: DataRow): number; y(row: DataRow): number };
 }
 
 let sceneIdentity = 0;
@@ -93,7 +52,6 @@ export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig): R
   const grid = frame.append('g').attr('class', 'vd-grid');
   const markRoot = frame.append('g').attr('class', 'vd-mark-root');
   const scene: RuntimeScene = {
-    
     clipIdentity: ++sceneIdentity,
     node,
     svg: svg as ChartSelection<SVGSVGElement>,
@@ -109,8 +67,6 @@ export function getScene(node: SceneHostElement, viewConfig: SceneViewConfig): R
     previousSpec: null,
     width,
     height,
-    detailLayer: markRoot.append('g').attr('class', 'vd-scene-layer vd-detail-layer') as ChartSelection<SVGGElement>,
-    axisLayer: frame.append('g').attr('class', 'vd-scene-layer vd-axis-layer') as ChartSelection<SVGGElement>,
     empty: select(node).append('div').attr('class', 'vd-empty').style('display', 'none') as ChartSelection<HTMLDivElement>
   };
   node.__visDeltaScene = scene;
@@ -134,13 +90,11 @@ export function resetSceneToEmptySource(scene: RuntimeScene): void {
   scene.xLabel.style('opacity', 0).text('');
   scene.yLabel.style('opacity', 0).text('');
   scene.legend.style('opacity', 0).selectAll('*').remove();
-  scene.axisLayer?.selectAll('*').remove();
-  scene.detailLayer?.selectAll('*').remove();
   scene.markLayers?.forEach((layer) => { layer.selectAll('*').remove(); });
   scene.previousSpec = null;
 }
 
-export function applySceneTransitions(chart: SceneChart, rows: DataRow[], spec: ViewSpec): void {
+export function recordSceneDiagnostics(chart: SceneChart, spec: ViewSpec): void {
   const sceneTypes = chart.sceneTransition?.scene || [];
   const state = specState(spec);
   chart.scene.node.dataset.sceneTransition = sceneTypes.join(' ');
@@ -148,128 +102,4 @@ export function applySceneTransitions(chart: SceneChart, rows: DataRow[], spec: 
   chart.scene.node.dataset.transitionSteps = chart.transitionPlan?.steps
     ? chart.transitionPlan.steps.map((step) => step.part).filter(Boolean).join(' ')
     : '';
-  clearSceneLayer(chart.scene.detailLayer, chart.transition.base);
-  applyAxisScene(chart, rows, spec);
-}
-
-function applyAxisScene(chart: SceneChart, rows: DataRow[], spec: ViewSpec): void {
-  const enabled = hasScene(chart.sceneTransition, 'axis');
-  const cue = specState(spec).axis?.['cue'];
-  const layer = chart.scene.axisLayer;
-  if (!enabled || !cue || !chart.position || !rows.length) { clearSceneLayer(layer, chart.transition.base); return; }
-  const axisSpec: SceneSelector = cue === true
-    ? { select: 'max', by: spec.encoding?.y?.field }
-    : cue as SceneSelector;
-  const row = pickSceneRow(rows, axisSpec, spec.encoding || {});
-  const x = row ? chart.position.x(row) : NaN;
-  const y = row ? chart.position.y(row) : NaN;
-  const data: ScenePoint[] = row && Number.isFinite(x) && Number.isFinite(y) ? [{ row, x, y }] : [];
-  layer.raise().style('opacity', 1);
-  joinAxisLine(layer, 'vd-axis-rule-x', data, chart.transition.base, (d) => ({ x1: d.x, x2: d.x, y1: 0, y2: chart.innerHeight }));
-  joinAxisLine(layer, 'vd-axis-rule-y', data, chart.transition.base, (d) => ({ x1: 0, x2: chart.innerWidth, y1: d.y, y2: d.y }));
-  layer.selectAll<SVGCircleElement, ScenePoint>('circle.vd-axis-dot')
-    .data(data, (d) => sceneRowKey(d.row, spec))
-    .join(
-      (enter) => {
-        const entered = enter.append('circle').attr('class', 'vd-axis-dot')
-          .attr('cx', (d) => d.x).attr('cy', (d) => d.y).attr('r', 0);
-        motion(entered, chart.transition.base).attr('r', 5);
-        return entered;
-      },
-      (update) => {
-        motion(update, chart.transition.base).attr('cx', (d) => d.x).attr('cy', (d) => d.y).attr('r', 5);
-        return update;
-      },
-      (exit) => { motion(exit, chart.transition.base).attr('r', 0).remove(); }
-    );
-}
-
-function joinAxisLine(
-  layer: ChartSelection<SVGGElement>,
-  className: string,
-  data: ScenePoint[],
-  transition: RootTransition,
-  attrs: (datum: ScenePoint) => LineAttributes
-): void {
-  layer.selectAll<SVGLineElement, ScenePoint>(`line.${className}`)
-    .data(data, (d) => sceneRowKey(d.row))
-    .join(
-      (enter) => {
-        const entered = enter.append('line').attr('class', `vd-axis-rule ${className}`)
-          .attr('x1', (d) => attrs(d).x1).attr('x2', (d) => attrs(d).x2)
-          .attr('y1', (d) => attrs(d).y1).attr('y2', (d) => attrs(d).y2)
-          .style('opacity', 0);
-        motion(entered, transition).style('opacity', 1);
-        return entered;
-      },
-      (update) => {
-        motion(update, transition)
-          .attr('x1', (d) => attrs(d).x1).attr('x2', (d) => attrs(d).x2)
-          .attr('y1', (d) => attrs(d).y1).attr('y2', (d) => attrs(d).y2)
-          .style('opacity', 1);
-        return update;
-      },
-      (exit) => { motion(exit, transition).style('opacity', 0).remove(); }
-    );
-}
-
-function clearSceneLayer(layer: ChartSelection<SVGGElement>, transition: RootTransition): void {
-  layer.style('opacity', 1);
-  motion(layer.selectAll('*'), transition).style('opacity', 0).remove();
-}
-
-function pickSceneRow(rows: DataRow[], selector: SceneSelector = {}, encoding: EncodingSpec = {}): DataRow | null {
-  if (!rows.length) return null;
-  if (Number.isFinite(selector.index)) return rows[clamp(selector.index!, 0, rows.length - 1)];
-  if (selector.select === 'first') return rows[0];
-  if (selector.select === 'last') return rows[rows.length - 1];
-  if (selector.field || selector.equal != null || selector.value != null || selector.oneOf) {
-    return rows.find((row) => rowMatchesScene(row, selector)) || null;
-  }
-  const field = selector.by || encoding.y?.field || encoding.x?.field;
-  if (field && selector.select === 'min') {
-    return rows.reduce((best, row) => (Number(row[field]) < Number(best[field]) ? row : best), rows[0]);
-  }
-  if (field) {
-    return rows.reduce((best, row) => (Number(row[field]) > Number(best[field]) ? row : best), rows[0]);
-  }
-  return rows[rows.length - 1];
-}
-
-function rowMatchesScene(row: DataRow | null, selector: SceneSelector = {}, selectedRow: DataRow | null = null): boolean {
-  if (!row) return false;
-  if (selector.field) {
-    const value = row[selector.field];
-    if ('equal' in selector) return value === selector.equal;
-    if ('value' in selector) return value === selector.value;
-    if ('oneOf' in selector) return Boolean(selector.oneOf?.includes(value));
-    if ('gte' in selector && compareValues(value, selector.gte) < 0) return false;
-    if ('gt' in selector && compareValues(value, selector.gt) <= 0) return false;
-    if ('lte' in selector && compareValues(value, selector.lte) > 0) return false;
-    if ('lt' in selector && compareValues(value, selector.lt) >= 0) return false;
-    return Boolean(value);
-  }
-  return selectedRow ? row === selectedRow : false;
-}
-
-/**
- * JavaScript's relational rule, spelled out: two strings compare lexically,
- * anything else numerically (Dates by their time). NaN never orders.
- */
-function compareValues(a: unknown, b: unknown): number {
-  const left = a instanceof Date ? a.getTime() : a;
-  const right = b instanceof Date ? b.getTime() : b;
-  if (typeof left === 'string' && typeof right === 'string') {
-    return left < right ? -1 : left > right ? 1 : 0;
-  }
-  const x = Number(left);
-  const y = Number(right);
-  if (Number.isNaN(x) || Number.isNaN(y)) return NaN;
-  return x < y ? -1 : x > y ? 1 : 0;
-}
-
-function sceneRowKey(row: DataRow | null, spec: ViewSpec = {}): string {
-  if (!row) return 'axis';
-  const key = keyAccessor(spec, spec.encoding?.x?.field || spec.encoding?.y?.field);
-  return String(key(row, 0));
 }

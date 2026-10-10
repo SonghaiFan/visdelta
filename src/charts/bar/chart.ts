@@ -4,7 +4,6 @@ import type {
   ChartRuntime,
   ChartType,
   IntermediateSpec,
-  TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
 import type { ChartPresentation } from '../style.js';
@@ -13,6 +12,8 @@ import {
   barIntermediateSpecs,
   resolveBarTransitionPlan
 } from './state.js';
+import { semanticBarState } from './semantic.js';
+import type { BarTransitionPlan } from './plan.js';
 
 export interface BarSpec extends ViewSpec {
   mark: 'bar';
@@ -25,11 +26,14 @@ export function createBarChart(runtime: ChartRuntime, presentation: ChartPresent
     key: 'bar',
     renderer,
     prepareSpec: prepareBarSpec,
-    resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => TransitionPlan,
+    defaultMarkKey: (spec) => {
+      const state = semanticBarState(spec);
+      return [state.categoryField, state.segmentField].filter((field): field is string => Boolean(field));
+    },
+    resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => BarTransitionPlan,
     canonicalTransitionPair: canonicalBarTransitionPair,
     intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],
-    scenes: ['selection', 'axis', 'detail', 'mapping'],
-    inspect: { transitionPlanKey: 'barTransitionPlan' }
+    scenes: ['selection', 'axis', 'detail', 'mapping']
   };
 }
 
@@ -71,7 +75,7 @@ function timeUnitTransformsFromEncoding(
 function inferChannelTypes(
   encoding: Record<string, { field?: string; type?: string; aggregate?: string | boolean }>
 ): void {
-  for (const [channelName, channel] of Object.entries(encoding)) {
+  for (const channel of Object.values(encoding)) {
     if (!channel || typeof channel !== 'object' || !channel.field || channel.type) continue;
     if (channel.aggregate) {
       channel.type = 'quantitative';

@@ -1,9 +1,5 @@
 import { defaultTransition } from './timing.js';
 import type {
-  FilterSpec,
-  SelectionSpec,
-  DetailSpec,
-  AxisSpec,
   ObjectMeta,
   ChartChangeState,
   SpecMeta,
@@ -11,7 +7,6 @@ import type {
   ResolvedChartState,
   ViewScopes,
   SemanticKey,
-  TransformSpec,
   TransitionSpec,
   ViewSpec
 } from './types/index.js';
@@ -80,7 +75,7 @@ export function serializeViewSpec(spec: ViewSpec): ViewSpec {
 
   const metaTransforms = meta.transform;
   if (metaTransforms?.length) {
-    next.transform = dedupeArray([...(next.transform ?? []), ...metaTransforms]) as TransformSpec[];
+    next.transform = [...(next.transform ?? []), ...metaTransforms];
     delete meta.transform;
   }
 
@@ -97,35 +92,9 @@ export function serializeViewSpec(spec: ViewSpec): ViewSpec {
   return next;
 }
 
-export function normalizeViewSpec(spec: ViewSpec): ViewSpec & Record<string, unknown> {
-  const meta = getSpecMeta(spec);
-  const state: ChartStateMeta = meta.state ?? {};
-  const object: ObjectMeta = meta.object ?? {};
-  const transforms: TransformSpec[] = [
-    ...(spec.transform ?? []),
-    ...(meta.transform ?? [])
-  ];
-  const { meta: _meta, ...baseSpec } = spec as ViewSpec & { meta?: SpecMeta };
-
-  return {
-    ...baseSpec,
-    key: object.key ?? (spec.encoding?.key?.field ?? null) as string | null,
-    datumKey: meta.lineage?.key ?? null,
-    semanticKey: semanticFromMeta(object.semantic) ?? null,
-    transition: (meta.transition ?? {}) as TransitionSpec,
-    unit: meta.unit ?? null,
-    selection: state.selection ?? null,
-    axis: state.axis ?? null,
-    detail: state.detail ?? null,
-    sceneState: state.sceneState ?? {},
-    scopes: state.scopes ?? {},
-    ...(transforms.length ? { transform: dedupeArray(transforms) as TransformSpec[] } : {})
-  };
-}
-
 export function specObjectKey(spec: ViewSpec): string | string[] | null {
   const meta = getSpecMeta(spec);
-  return meta.object?.key ?? (spec.encoding?.key?.field as string | undefined) ?? null;
+  return meta.object?.key ?? spec.key ?? (spec.encoding?.key?.field as string | undefined) ?? null;
 }
 
 export function specDatumKey(spec: ViewSpec): string | string[] | null {
@@ -156,6 +125,22 @@ export function specState(spec: ViewSpec): ResolvedChartState {
     detail: state.detail ?? null,
     sceneState: state.sceneState ?? {},
     scopes: (state.scopes ?? {}) as ViewScopes
+  };
+}
+
+/** Resolve attention scopes with the same precedence used by renderer code. */
+export function specScopes(spec: ViewSpec): ViewScopes {
+  const state = specState(spec);
+  const selections = [state.sceneState?.selection, state.selection, spec.selection];
+  const scopes = state.scopes ?? {};
+  const resolve = (target: 'focus' | 'highlight') =>
+    Object.prototype.hasOwnProperty.call(scopes, target)
+      ? scopes[target] ?? null
+      : selections.find((selection) => selection?.mode === target) ?? null;
+  return {
+    ...scopes,
+    focus: resolve('focus'),
+    highlight: resolve('highlight')
   };
 }
 
@@ -191,7 +176,7 @@ function mergePlain<T extends Record<string, unknown>>(
   return merged;
 }
 
-function semanticToMeta(semanticKey: SemanticKey = {}): Record<string, unknown> {
+export function semanticToMeta(semanticKey: SemanticKey = {}): Record<string, unknown> {
   return {
     ...(semanticKey.entity !== undefined ? { entity: semanticPartToMeta(semanticKey.entity) } : {}),
     ...(semanticKey.entities !== undefined ? { entity: semanticPartToMeta(semanticKey.entities) } : {}),
@@ -208,7 +193,7 @@ function semanticFromMeta(semantic: Record<string, unknown> | null | undefined):
   };
 }
 
-function semanticPartToMeta(part: unknown): unknown {
+export function semanticPartToMeta(part: unknown): unknown {
   if (Array.isArray(part)) return part.map(semanticPartToMeta);
   if (typeof part === 'string') return { field: part };
   return clonePlain(part);
@@ -272,16 +257,6 @@ function sameValue(a: unknown, b: unknown): boolean {
 function clonePlain<T>(value: T): T {
   if (value == null || typeof value !== 'object') return value;
   return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function dedupeArray<T>(values: T[]): T[] {
-  const seen = new Set<string>();
-  return values.filter((value) => {
-    const key = JSON.stringify(value ?? null);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

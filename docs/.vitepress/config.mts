@@ -13,7 +13,7 @@ export default defineConfig({
   cleanUrls: false,
   lastUpdated: true,
   head: [
-    ['meta', { name: 'theme-color', content: '#f4f3ef' }],
+    ['meta', { name: 'theme-color', content: '#f4f4f2' }],
     ['link', {
       rel: 'icon',
       type: 'image/svg+xml',
@@ -30,17 +30,13 @@ export default defineConfig({
   themeConfig: {
     siteTitle: 'VisDelta',
     logo: '/visdelta-logo.svg',
+    // Four destinations: the live demo, the documentation (syntax and
+    // philosophy), the editor, and the gallery of expressible idioms.
     nav: [
-      { text: 'Start', link: '/getting-started' },
-      { text: 'Ontology', link: '/language-framework' },
-      { text: 'API', link: '/reference' },
-      { text: 'Explore', items: [
-        { text: 'Run a state difference', link: '/language-framework#run-a-state-difference' },
-        { text: 'Chart types', link: '/chart-types' },
-        { text: 'Data and transforms', link: '/data-sources-and-transforms' },
-        { text: 'Transition runtime', link: '/runtime-api' },
-        { text: 'Chart style', link: '/chart-style' }
-      ] },
+      { text: 'Home', link: '/', activeMatch: '^/$' },
+      { text: 'Docs', link: '/overview', activeMatch: '^/(?!playground|gallery|$)' },
+      { text: 'Playground', link: '/playground' },
+      { text: 'Gallery', link: '/gallery' },
       { text: '0.3.0', items: [
         { text: 'Changelog', link: 'https://github.com/SonghaiFan/visdelta/blob/main/CHANGELOG.md' },
         { text: 'npm package', link: 'https://www.npmjs.com/package/visdelta' }
@@ -48,44 +44,50 @@ export default defineConfig({
     ],
     sidebar: [
       {
-        text: 'Learn the model',
+        text: 'Documentation',
         items: [
-          { text: 'Overview', link: '/' },
-          { text: 'Getting started', link: '/getting-started' },
+          { text: 'Overview', link: '/overview' },
+          { text: 'Getting started', link: '/getting-started' }
+        ]
+      },
+      {
+        text: 'Philosophy',
+        items: [
           { text: 'Ontology and contracts', link: '/language-framework' }
         ]
       },
       {
-        text: 'Build a chart state',
+        text: 'Syntax',
         items: [
           { text: 'Data and transforms', link: '/data-sources-and-transforms' },
           { text: 'Chart types', link: '/chart-types' },
-          { text: 'Appearance and style', link: '/chart-style' }
+          { text: 'Appearance and style', link: '/chart-style' },
+          { text: 'API reference', link: '/reference' }
         ]
       },
       {
-        text: 'Inspect and run a transition',
+        text: 'Chart behavior',
+        collapsed: true,
         items: [
-          { text: 'Ontology playground', link: '/language-framework#run-a-state-difference' },
-          { text: 'API reference', link: '/reference' },
+          { text: 'Bar', link: '/transition-lab' },
+          { text: 'Line', link: '/line-lab' },
+          { text: 'Area', link: '/area-lab' },
+          { text: 'Point', link: '/point-lab' },
+          { text: 'Unit', link: '/unit-lab' }
+        ]
+      },
+      {
+        text: 'Runtime',
+        items: [
           { text: 'Transition runtime', link: '/runtime-api' }
         ]
       },
       {
-        text: 'Chart-specific labs',
+        text: 'Integrate',
         items: [
-          { text: 'Bar transition lab', link: '/transition-lab' },
-          { text: 'Point transition lab', link: '/point-lab' },
-          { text: 'Line transition lab', link: '/line-lab' },
-          { text: 'Area transition lab', link: '/area-lab' },
-          { text: 'Unit transition lab', link: '/unit-lab' }
-        ]
-      },
-      {
-        text: 'Integration',
-        items: [
+          { text: 'Use a CDN', link: '/for-cdn-users' },
           { text: 'Add a chart type', link: '/extending-with-plugins' },
-          { text: 'Use a CDN', link: '/for-cdn-users' }
+          { text: 'Site design tokens', link: '/design-tokens' }
         ]
       }
     ],

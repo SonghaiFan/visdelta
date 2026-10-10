@@ -25,6 +25,7 @@ import type { ChartPresentation } from '../style.js';
 import type { AreaCell, AreaLayer, AreaPoint } from './state.js';
 import { interpolateNumber } from 'd3-interpolate';
 import { area as shapeArea, line as shapeLine } from 'd3-shape';
+import { areaGrainError } from './grain.js';
 
 /** One boundary sample in pixel space. */
 export interface AreaBoundaryPoint {
@@ -73,6 +74,8 @@ class AreaChart extends BaseChart<AreaViewState> {
     if (!xField || !yField) return;
 
     const state = areaState(spec, enc);
+    const grainError = areaGrainError(spec, rows);
+    if (grainError) throw new Error(grainError);
     const pointKey = areaPointKeyAccessor(spec, xField);
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const domainLayers = areaLayers(domainRows, xField, yField, state, pointKey);
@@ -505,7 +508,7 @@ function areaDividerPaths(
     const index = layerIndex.get(cell.layerKey);
     const direction = stackDirection(cell.center);
     if (index == null || direction === 0) return false;
-    return layers.slice(index + 1).some((layer, offset) => {
+    return layers.slice(index + 1).some((_, offset) => {
       const point = pointByLayerAndX[index + offset + 1].get(String(cell.center.x));
       return point && stackDirection(point) === direction &&
         Math.abs(point.y0 - cell.center.y1) < 1e-9;
@@ -662,90 +665,8 @@ function flattenAreaFrame(frame: AreaCellFrame): AreaCellFrame {
   return frame.map((point) => flattenAreaPoint(point));
 }
 
-/**
- * Match keyed observations before interpolating either Area boundary.
- *
- * A new observation is represented in the old frame at its target x position
- * with zero thickness (`y1 === y0`). It grows away from the lower boundary;
- * removal uses these exact frames backward and therefore flattens the value
- * into the baseline without borrowing Line's horizontal retraction behavior.
- */
-export function interpolateAreaFrames(
-  from: AreaFramePoint[],
-  to: AreaFramePoint[],
-  shape: AreaShape
-): (progress: number) => string {
-  const pairs = matchAreaFramePoints(from, to);
-  return (progress) => shape(pairs.map((pair) => ({
-    key: pair.key,
-    x: safeInterpolate(pair.from.x, pair.to.x, progress),
-    y0: safeInterpolate(pair.from.y0, pair.to.y0, progress),
-    y1: safeInterpolate(pair.from.y1, pair.to.y1, progress)
-  }))) || '';
-}
-
-/** Pure keyed topology matching, exported for direct tests. */
-export function matchAreaFramePoints(
-  from: AreaFramePoint[],
-  to: AreaFramePoint[]
-): Array<{ key: string; from: AreaBoundaryPoint; to: AreaBoundaryPoint }> {
-  const fromKeys = from.map((point) => point.key);
-  const toKeys = to.map((point) => point.key);
-  const fromSet = new Set(fromKeys);
-  const toSet = new Set(toKeys);
-  const sharedFrom = fromKeys.filter((key) => toSet.has(key));
-  const sharedTo = toKeys.filter((key) => fromSet.has(key));
-
-  // If shared observations changed order, prefer the target order. This still
-  // produces a valid band, while ordinary add/remove/restore uses the more
-  // precise merged observation order below.
-  const order = sameKeysInOrder(sharedFrom, sharedTo)
-    ? mergeObservationOrder(fromKeys, toKeys, sharedFrom)
-    : toKeys;
-  const fromByKey = pointMap(from);
-  const toByKey = pointMap(to);
-  const ordered = order.flatMap((key) => {
-    const point = fromByKey.get(key) || toByKey.get(key);
-    return point ? [point] : [];
-  });
-
-  return ordered.map((point) => ({
-    key: point.key,
-    from: fromByKey.get(point.key) || flattenAreaPoint(toByKey.get(point.key) || point),
-    to: toByKey.get(point.key) || flattenAreaPoint(fromByKey.get(point.key) || point)
-  }));
-}
-
-function mergeObservationOrder(from: string[], to: string[], shared: string[]): string[] {
-  const order: string[] = [];
-  let fromIndex = 0;
-  let toIndex = 0;
-  const append = (key: string) => {
-    if (order[order.length - 1] !== key) order.push(key);
-  };
-
-  for (const sharedKey of shared) {
-    while (from[fromIndex] !== sharedKey) append(from[fromIndex++]);
-    while (to[toIndex] !== sharedKey) append(to[toIndex++]);
-    append(sharedKey);
-    fromIndex += 1;
-    toIndex += 1;
-  }
-  while (fromIndex < from.length) append(from[fromIndex++]);
-  while (toIndex < to.length) append(to[toIndex++]);
-  return order;
-}
-
 function flattenAreaPoint(point: AreaBoundaryPoint): AreaBoundaryPoint {
   return { x: point.x, y0: point.y0, y1: point.y0 };
-}
-
-function pointMap(points: AreaFramePoint[]): Map<string, AreaFramePoint> {
-  return new Map(points.map((point) => [point.key, point] as const));
-}
-
-function sameKeysInOrder(from: string[], to: string[]): boolean {
-  return from.length === to.length && from.every((key, index) => key === to[index]);
 }
 
 function safeInterpolate(from: number, to: number, progress: number): number {

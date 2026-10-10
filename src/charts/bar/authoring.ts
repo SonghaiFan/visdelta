@@ -35,9 +35,8 @@ export class BarState extends ChartState<BarViewState> {
     return barModule;
   }
 
-  override toSpec(): Omit<BarViewState, '__grammar'> {
-    const spec = cloneState(this.state) as BarViewState & { __grammar?: unknown };
-    delete spec.__grammar;
+  override toSpec(): BarViewState {
+    const spec = cloneState(this.state) as BarViewState;
 
     const filters: FilterSpec[] = spec.filter ? [spec.filter as FilterSpec] : [];
     if (filters.length) {
@@ -54,7 +53,7 @@ export class BarState extends ChartState<BarViewState> {
 
     return resolveInlineDataTypes(pruneAuthoringState(
       compileViewWithCompiler(serializeViewSpec(spec as ViewSpec), { scene: [] }, BAR_SPEC_COMPILER)
-    )) as Omit<BarViewState, '__grammar'>;
+    )) as BarViewState;
   }
 
   override x(field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
@@ -277,12 +276,12 @@ export class BarState extends ChartState<BarViewState> {
       ...(config.tooltip
         ? { encoding: { tooltip: cloneState(config.tooltip) } }
         : {})
-    } as Partial<BarViewState>, 'detail');
+    } as Partial<BarViewState>, { captureResetBaseline: true });
   }
 
   layout(layout: BarLayout, options: TransitionOrder = {}): this {
     const state = this.state as BarViewState;
-    const next = this.with({
+    return this.with({
       detail: state.detail
         ? { ...state.detail, layout }
         : undefined,
@@ -293,8 +292,7 @@ export class BarState extends ChartState<BarViewState> {
         ...(options.duration != null ? { duration: options.duration } : {}),
         ...(options.stagger ? { stagger: options.stagger } : {})
       } as AxisSpec
-    } as Partial<BarViewState>);
-    return next.with({} as Partial<BarViewState>, 'axis');
+    } as Partial<BarViewState>, { captureResetBaseline: true });
   }
 
 }
@@ -354,7 +352,7 @@ function aggregateBarState<T extends BarState>(
         op: normalized.op
       } as DetailSpec,
       ...(normalized.tooltip ? { encoding: { tooltip: cloneState(normalized.tooltip) } } : {})
-    } as Partial<BarViewState>, 'detail');
+    } as Partial<BarViewState>, { captureResetBaseline: true });
   }
 
   return view.with({
@@ -371,7 +369,7 @@ function aggregateBarState<T extends BarState>(
         }
       }
     ]
-  } as Partial<BarViewState>, 'detail');
+  } as Partial<BarViewState>, { captureResetBaseline: true });
 }
 
 function normalizeAggregation(

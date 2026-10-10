@@ -39,12 +39,28 @@ export function viewRows(
 }
 
 export function domainTransforms(transforms: TransformSpec[] = []): TransformSpec[] {
-  // Domain inference uses the full, unsorted data lineage. Display-only
-  // filtering/limiting/sorting must not reassign categorical palette slots or
-  // reorder the legend. Marks still use the complete transform pipeline.
-  // Keep fold/bin/timeUnit/aggregate: these define the values being encoded.
-  return transforms.filter((transform) => {
+  // Domain inference uses the full, unsorted data lineage. A trailing
+  // filter/limit/sort is display-only and must not reassign categorical
+  // palette slots or reorder the legend. Upstream subsets are different:
+  // aggregate and bin derive new values from their input population, so their
+  // filters and limits are part of the value definition and must survive.
+  const populationTransformAfter = (index: number) => transforms
+    .slice(index + 1)
+    .some((transform) => {
+      const value = transform as AnyRecord;
+      return 'aggregate' in value || 'bin' in value;
+    });
+  const consequentialLimitAfter = (index: number) => transforms
+    .slice(index + 1)
+    .some((transform, offset) => {
+      const value = transform as AnyRecord;
+      return 'limit' in value && populationTransformAfter(index + offset + 1);
+    });
+
+  return transforms.filter((transform, index) => {
     const t = transform as AnyRecord;
-    return !('filter' in t) && !('limit' in t) && !('sort' in t);
+    if ('filter' in t || 'limit' in t) return populationTransformAfter(index);
+    if ('sort' in t) return consequentialLimitAfter(index);
+    return true;
   });
 }

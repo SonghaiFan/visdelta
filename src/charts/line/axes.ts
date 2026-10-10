@@ -48,7 +48,7 @@ function drawSeriesAxes(
   });
   runtime.drawYAxis(chart, y, style.axisTitle(enc.y, 'up'), transition, {
     tickCount: yTickCount,
-    tickFormat: enc.y?.format,
+    tickFormat: enc.y?.format ?? (enc.y?.scale?.type === 'log' ? '~s' : undefined),
     duration: axisDuration,
     edgeTitleInset
   });

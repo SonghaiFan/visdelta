@@ -1,7 +1,7 @@
 import type { CanonicalTransitionPair, ChannelSpec, SelectionSpec, ViewSpec, EncodingSpec } from '../../types/index.js';
 import { hasRowFilter, matchesFilter, normalizeFilter } from '../../data/filter.js';
 import { specState } from '../../spec-meta.js';
-import { specObjectKey } from '../../spec-meta.js';
+import { markKeyValue, resolveMarkIdentity } from '../../identity/mark-correspondence.js';
 import { connectedStretches } from '../../toolkit/topology.js';
 import { composeCanonicalPolicies } from '../../toolkit/transition-policy.js';
 import { viewHighlight, viewSelection } from '../../focus.js';
@@ -348,11 +348,8 @@ export function areaPointKeyAccessor(
   spec: ViewSpec,
   fallbackField: string
 ): (row: Record<string, unknown>, index: number) => string {
-  const configured = (spec as ViewSpec & { key?: string | string[] }).key || specObjectKey(spec) || fallbackField;
-  const fields = Array.isArray(configured) ? configured : [configured];
-  return (row, index) => fields.length
-    ? fields.map((field) => String(row[String(field)] ?? '')).join('\u0000')
-    : String(index);
+  const identity = resolveMarkIdentity(spec, fallbackField)!;
+  return (row, index) => markKeyValue(row, identity, index);
 }
 
 /** Detail and observation membership each have one canonical direction. */

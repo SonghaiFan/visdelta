@@ -6,7 +6,7 @@ import type {
   SemanticKey,
   ViewSpec
 } from '../types/index.js';
-import { specObjectKey, withSpecMeta } from '../spec-meta.js';
+import { semanticToMeta, specObjectKey, withSpecMeta } from '../spec-meta.js';
 import { titleize } from '../labels.js';
 import { normalizeFilter } from '../data/filter.js';
 
@@ -78,10 +78,6 @@ export function compileCartesianCoordinate(spec: ViewSpec, operationSpec: AnyRec
   });
 }
 
-export function compileCartesianScale(spec: ViewSpec, operationSpec: AnyRecord = {}): ViewSpec {
-  return compileCartesianCoordinate(spec, operationSpec);
-}
-
 export function identitySpec(spec: ViewSpec): ViewSpec {
   return spec;
 }
@@ -97,22 +93,7 @@ export function withSceneState(spec: ViewSpec, sceneStatePatch: AnyRecord = {}):
   return withSpecMeta(spec, { state: { sceneState: sceneStatePatch } });
 }
 
-export function semanticToMeta(semanticKey: SemanticKey = {}): AnyRecord {
-  const sk = semanticKey as AnyRecord;
-  return {
-    ...(sk['entity'] !== undefined ? { entity: semanticPartToMeta(sk['entity']) } : {}),
-    ...(sk['entities'] !== undefined ? { entity: semanticPartToMeta(sk['entities']) } : {}),
-    ...(sk['measure'] !== undefined ? { measure: semanticPartToMeta(sk['measure']) } : {}),
-    ...(sk['measures'] !== undefined ? { measure: semanticPartToMeta(sk['measures']) } : {})
-  };
-}
-
-export function semanticPartToMeta(part: unknown): unknown {
-  if (Array.isArray(part)) return part.map(semanticPartToMeta);
-  if (typeof part === 'string') return { field: part };
-  if (part == null || typeof part !== 'object') return part;
-  return { ...(part as AnyRecord) };
-}
+export { semanticToMeta, semanticPartToMeta } from '../spec-meta.js';
 
 export function selectorToFilter(selector: AnyRecord = {}): FilterSpec | null {
   if (!selector['field']) return null;
@@ -189,12 +170,7 @@ export function aggregateFieldSpec(
 }
 
 export function cloneViewSpec(viewSpec: ViewSpec): ViewSpec {
-  return {
-    ...viewSpec,
-    ...(viewSpec.meta ? { meta: cloneState(viewSpec.meta) } : {}),
-    transform: [...(viewSpec.transform || [])],
-    encoding: cloneEncoding(viewSpec.encoding)
-  };
+  return cloneState(viewSpec);
 }
 
 export function cloneEncoding(encoding: ViewSpec['encoding'] = {}): Record<string, ChannelSpec | ChannelSpec[]> {

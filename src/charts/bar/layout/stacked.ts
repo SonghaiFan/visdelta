@@ -9,7 +9,8 @@ import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../../runtime/render-types.js';
-import type { ChannelSpec, ChartContext, TransitionItemAction } from '../../../types/index.js';
+import type { ChannelSpec, ChartContext } from '../../../types/index.js';
+import type { BarTransitionItemAction } from '../plan.js';
 import type {
   BarDatum,
   BarGeometryContract,
@@ -136,8 +137,8 @@ function stackMidpoint(d: BarDatum): number {
 function stackedSegmentGeometryContract(
   geom: StackedGeom,
   splitLineage: LineageStart | null,
-  stackBaseEnter: TransitionItemAction | null,
-  stackBaseExit: TransitionItemAction | null,
+  stackBaseEnter: BarTransitionItemAction | null,
+  stackBaseExit: BarTransitionItemAction | null,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit']
 ): BarGeometryContract {
   const target = stackedSegmentGeometry(geom);
@@ -163,7 +164,7 @@ function materializeRect(geometry: TargetGeometry, datum: BarDatum): RectGeometr
   };
 }
 
-function stackedSegmentEnterGeometry(d: BarDatum, geom: StackedGeom, enterPlan: TransitionItemAction | null = null): RectGeometry {
+function stackedSegmentEnterGeometry(d: BarDatum, geom: StackedGeom, enterPlan: BarTransitionItemAction | null = null): RectGeometry {
   const { x, y, categoryField, horizontal } = geom;
   const base = stackSegmentBase(d, enterPlan);
   if (horizontal) {
@@ -223,13 +224,13 @@ function applyStackedSegmentY(selection: BarMotion, geom: StackedGeom): BarMotio
 function applyStackedSegmentExitGeometry(
   selection: BarMotion,
   geom: StackedGeom,
-  exitPlan: TransitionItemAction | null,
+  exitPlan: BarTransitionItemAction | null,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit']
 ): BarMotion {
   return sourceBaselineExit(selection, { horizontal: geom.horizontal, plan: exitPlan, value: stackSegmentValue });
 }
 
-function stackSegmentBase(d: BarDatum, plan: TransitionItemAction | null = null): number {
+function stackSegmentBase(d: BarDatum, plan: BarTransitionItemAction | null = null): number {
   const anchor = plan?.baseline?.anchor;
   return anchor ? Number(d[anchor]) || 0 : stack0(d);
 }

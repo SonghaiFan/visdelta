@@ -49,7 +49,7 @@
         ];
 
         // Chart states are immutable: `profit` branches from `revenue`.
-        const revenue = vd.bar(rows).x("category").y("revenue", { title: "Revenue" }).key("category");
+        const revenue = vd.bar(rows).x("category").y("revenue", { title: "Revenue" });
         const profit = revenue.y("profit", { title: "Profit" });
 
         try {

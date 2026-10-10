@@ -11,9 +11,10 @@ Two immutable chart states are the endpoints. VisDelta reasons about the change
 between them through four layers that must remain separate:
 
 1. **Identity and correspondence** determine which source records and marks can
-   be related across the endpoints. `.datumKey()` identifies source records;
-   `.key()` identifies marks at the current grain. Lineage and contributions
-   provide additional correspondence evidence.
+   be related across the endpoints. Core infers source-record `datumKey` fields;
+   `.datumKey()` overrides that inference when the data is ambiguous. `.key()`
+   identifies marks at the current grain. Lineage and contributions provide
+   additional correspondence evidence.
 2. **State difference** reports what changed using seven non-exclusive
    categories: Data, Grain, Encoding, Coordinate, Layout, Attention, and
    Appearance. Directional actions such as `remove`, `split`, and `reorient`
@@ -85,12 +86,9 @@ This ontology changes only when implementation evidence requires it:
 
 ## Run a state difference
 
-Edit a pair of immutable states below. This is the documentation's single
-general-purpose playground: it renders a real transition and exposes the
-computed delta, but it does not promise a particular playback order from the
-category list.
-
-<SyntaxPlayground initial="filter" />
+Use the unified [Playground](/playground) to edit immutable chart states,
+save and restore snapshots, render transitions between them, and inspect the
+computed state changes across all five chart modules. The category list does not prescribe playback order.
 
 ## Transition contracts
 
@@ -109,14 +107,63 @@ category list.
    correspondence, measure compatibility, retained selector fields, and visual
    constraints. Another route may be valid. Author-supplied states are fixed
    boundaries; automatic states may be inserted only within each adjacent pair.
-   An empty intermediate list means a direct transition, not no animation.
+   An empty chart intermediate list permits endpoint planning only when the
+   chart supplies a canonical declaration-operation codec. Otherwise the
+   transition keeps its ordinary direct path, not no animation.
+
+Bar orientation changes such as `.flip()` are not split into single-channel
+planner stages: each intermediate must retain one nominal or ordinal category
+axis and one quantitative measure axis. When a flip cannot be represented as a
+valid one-operation route, Bar uses its existing direct coordinate transition.
 
 Every generated waypoint is a complete chart state. Each leg derives its own
 difference and motion plan; simultaneous scale/axis/mark changes remain coupled
 when required for a truthful frame. Explicit sequence and automatic waypoints
 share pair/frame execution, while keeping their distinct timeline ownership.
-These contracts do not imply a universal route-search engine: supported paths
-are currently chart-owned policies, with concrete cases documented below.
+The shared planner searches only the canonical operations supplied by a chart
+plugin. Its bounded, deterministic search applies one operation insertion,
+removal, or update per edge; the plugin evaluates, normalizes, and validates
+each full intermediate chart state. The planner does not recover setter
+history or infer operations from fluent calls. Equivalent normalized endpoints
+produce the same operation path, including when earlier builder calls were
+overwritten. A codec may also constrain each
+route edge with `validateStep(from, to, endpoints)` after validation and
+operation round-trip checks. The endpoint pair stays canonical and fixed for
+the search; reverse planning and playback traverse the same accepted path backward.
+The hook runs only in canonical search direction. Its constraints must be
+stable and direction-symmetric or defined by the canonical pair, without
+depending on builder history.
+Rejecting an edge does not invalidate either complete chart state. These
+chart-owned constraints do not impose an ontology-category playback order.
+Source data and datum identity remain protected boundaries. Each built-in
+chart supplies its own validated operation subset:
+
+- Bar represents supported single-measure aggregates as separate grouping,
+  measure and grouped-offset slots while preserving the aggregate's pipeline
+  position.
+- Point represents summary grouping and its complete x/y measure bundle,
+  including an optional aggregate-size measure, with derived bindings and
+  identity kept consistent.
+- Line and Area keep raw y remapping as Encoding. For supported summaries,
+  source measure, reducer, output alias and derived y binding form one Grain
+  operation. Area's stream layout remains an independent layout modifier.
+- Unit represents quantity, `unitValue`, cap, grouping and layout parameters in
+  separate slots; its axis metadata mirrors the declarations. Grouping changes
+  arrangement, while `unitValue` changes Grain.
+
+The subsets do not promise a route between every pair. Point, Line and Area
+raw/summary pairs retain their chart-owned structural transition or direct
+fallback. Complex aggregates, unverifiable identities, unavailable fields and
+unsupported runtime stages remain outside the planner. See the
+[operation subset reference](/reference) for chart-specific
+limits. All five built-in plugins plan supported declarations before refining
+each stage with native motion. A single semantic operation can require several
+rendered motion legs; phase count does not measure operation count.
+Unknown declaration fields, unsupported values, invalid endpoints, and
+operation sets with no valid route return an explicit unsupported or
+search-limit result with no planned stages; runtime then uses the chart's
+authored route or ordinary direct fallback. `sequence()` continues to fix the
+endpoints for each separately planned pair.
 
 ## Execution flow
 
@@ -243,9 +290,27 @@ lineage       source records contributing to that mark
 contribution  amount each source record contributes to an additive measure
 ```
 
-In the chart grammar, `.datumKey("id")` declares the first line and `.key()`
-declares the second. They must not be aliases: aggregation can change mark
-identity while datum identity remains stable.
+Core infers the first line from the smallest unique categorical field set,
+preferring identifier-like fields such as `id` and `flowerId`. If no stable
+categorical identity exists, it exposes an explicit row-index fallback;
+`.datumKey("id")` remains an override for ambiguous data. `.key()` declares the
+second line. They must not be aliases: aggregation can change mark identity
+while datum identity remains stable. Every transformed mark retains the mapping
+to all contributing source datum keys, which is also exposed in its tooltip.
+
+Core resolves one-to-one mark correspondence independently of lineage. An
+explicit `.key()` has priority; otherwise each chart module declares its
+default mark key through the chart-type interface. Core validates the resolved
+key at both endpoints and reports `updates`, `enter`, and `exit`. Runtime
+membership timing and ordinary keyed joins consume this same identity
+contract. A chart module may add topology or motion rules, but it must not
+reinterpret datum identity as mark identity.
+
+Default mark keys are semantic declarations by chart modules, not guesses from
+partially matching field values. Shared values can be evidence for a chart's
+special matching policy, but do not by themselves prove object continuity.
+Lineage remains the relation for one-to-many, many-to-one, and many-to-many
+structure; those relations cannot be represented by duplicate D3 join keys.
 
 This lets a change from `sum(case) by year` to `sum(case) by location` compile
 to a many-to-many transport graph through the common refinement
@@ -278,15 +343,39 @@ target layout, Bar uses grouped marks as the common visual presentation of
 that maximum common grain. How a chart reaches that grouped view is chart- and
 operation-specific. For Bar `sum` and `count`, the path is aggregate A, stacked
 common-grain marks under A, grouped under A, grouped under B, stacked under B,
-then aggregate B. Other aggregate operators currently keep the ordinary
-fallback transition.
+then aggregate B. This conserved route remains specific to compatible `sum`
+and `count` aggregates. A safe single-measure reducer change may still form a
+declaration planner stage; it does not imply conserved motion. Other forms
+keep the ordinary fallback transition.
 
-We solve readable transition routes one concrete case at a time. These
-chart-owned routes are evidence for a future general capability: deriving
-intermediate states from shared source atoms, endpoint grains, operation
-compatibility, and visual constraints. That future planner must generalize
-verified cases without treating every builder call as an animation phase or
-inventing values that do not conserve an endpoint measure.
+Core also exposes lossless declaration edits through `delta().edits` and
+`applyDeclarationEdits()`. Those edits describe exact serialized differences;
+arrays remain indivisible there. Transition planning uses a separate,
+chart-owned operation codec. Bar supports complete channel slots, separate
+focus/highlight scopes, represented mark keys, supported ordinary ordered
+transforms, and a narrow Grain subset. It synchronizes Bar's derived semantic
+key and validates inline field references at every state. The Grain codec
+keeps its single aggregate at the original pipeline position and represents
+grouping, measure, and grouped offsets in separate operation slots. Category
+and measure field bindings stay coupled to their Grain slots; other channel
+properties remain ordinary encoding operations. Bar-authored motion routes
+refine each planned leg.
+The peer codecs follow their own chart semantics. Point couples aggregate
+position measures to their derived channels. Line and Area couple a summary
+measure to its y binding, while raw y remains an ordinary Encoding slot. Unit
+keeps quantity and layout declarations independent and regenerates their axis
+mirror. Codecs validate complete candidate states and explicitly reject
+unsupported declarations.
+Chart policies may add chart-specific motion bridges between operation states
+without changing operation order. The built-in plugins use this policy to
+refine their supported planner legs with chart-local motion routes.
+
+The operation planner finds valid declaration states; it does not decide how
+those states should look while marks move. Chart plugins continue to own
+motion bridges for structural changes such as grouping and reaggregation.
+Those bridges must preserve the endpoint's measure semantics and correspondence
+evidence, and may use a direct fallback when no truthful intermediate form is
+available.
 
 For additive Bar grain changes, focus and safe sort transforms can form
 separate steps around the structural change. A focused detail merging to an
@@ -295,6 +384,15 @@ merging to a sorted total follows `detail -> total -> sorted total`. With both
 changes, merge finishes the grain change, sorts, then changes focus. The split
 direction reuses the same complete route backward. Grouped detail still passes
 through the existing stacked bridge inside the structural leg.
+
+The Bar declaration planner also constrains focus changes for its supported
+single-aggregate refinement pairs: with the same category and a strict subset
+relationship between groupings, focus changes only where both states have the
+coarse endpoint's grouping, detail, and mark key. Thus a focused finer grain
+merges before focus changes, including supported non-additive measures; the
+reverse uses the same route backward. This route constraint permits valid
+focused detail states and leaves measure, appearance, and layout edits separate.
+It does not imply conserved motion for non-additive measures.
 
 Sorted detail merging to a plain total instead follows
 `sorted detail -> detail -> total`. Detail compilation can place its sort
@@ -367,4 +465,4 @@ examples, tests, and documentation change together. Do not keep aliases in this
 greenfield release.
 
 The detailed signatures live in the [API reference](/reference). Working
-behavior lives in the five transition labs.
+behavior lives in the unified Playground.

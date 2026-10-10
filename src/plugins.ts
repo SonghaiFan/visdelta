@@ -1,6 +1,6 @@
 /** Plugin registration without importing built-in chart renderers. */
 export { defineChartType } from './charts/plugin.js';
-export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, paperChartStyle } from './charts/style.js';
+export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, paperChartStyle } from './charts/style.js';
 export { defineChartModule } from './charts/module.js';
 export {
   ChartState,
@@ -18,4 +18,8 @@ export { registerChartType, registerChartModule, availableChartTypes } from './r
 export type { ChartTypeConfig } from './charts/plugin.js';
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from './charts/style.js';
 export type { ChartModule, LoadedChartModule } from './charts/module.js';
-export type { ChartPlugin, ChartType, ChartTransitionPolicy, IntermediateSpec, CanonicalTransitionPair, TransitionPlan, ChartRuntime, ViewSpec, Renderer, SpecCompiler } from './types/index.js';
+export type {
+  ChartPlugin, ChartType, ChartTransitionPolicy, IntermediateSpec, CanonicalTransitionPair,
+  CanonicalDeclarationOperation, DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec, TransitionPlan, ChartRuntime,
+  ViewSpec, Renderer, SpecCompiler
+} from './types/index.js';

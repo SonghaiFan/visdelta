@@ -1,8 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/area/scenarios.js';
 
 const ready = async page => {
-  // The playground initializes when it approaches the viewport.
+  // ChartPlayground switches its keyed SyntaxPlayground after hydration; wait
+  // for the route-selected chart before scrolling to the replaceable status.
+  await expect(page.getByRole('tab', { name: 'Area', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
   await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#status')).toHaveText('Ready');
 };
@@ -20,11 +24,11 @@ for (const sample of scenarios) {
   test(`area lab ${sample.id}: editable pair and reversible seek`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`/docs/.vitepress/dist/area-lab.html#${sample.id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#area/${sample.id}`);
     await ready(page);
-    await expect(page.getByRole('tab')).toHaveCount(7);
+    await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -45,16 +49,31 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('2010-02-01', '2010-01-01'));
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    await setEditorCode(editor, sample.code
+      .replace('.x("date")', '.x("date", { title: "Month" })')
+      .replace('title: "Date"', 'title: "Month"'));
     await ready(page);
-    await expect(editor).toHaveValue(/2010-01-01/);
+    await expectEditorCode(editor, /title: "Month"/);
+    await expect(page.locator('.vd-x-label')).toHaveText('Month →');
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }
+
+test('single Area rejects duplicate x values until its grain is explicit', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/playground.html#area/stream');
+  await ready(page);
+  await page.locator('#editor').fill(`const from = area(rows)
+  .x("date")
+  .y("unemployed");`);
+
+  await expect(page.locator('#status')).toHaveText('Error');
+  await expect(page.getByRole('alert')).toContainText('Area chart needs one value per date');
+  await expect(page.getByRole('alert')).toContainText('.breakdown(...)');
+  await expect(page.locator('.playground-chart-stage')).toHaveClass(/is-error/);
+});
 
 test('area split and merge are the same cached transition in reverse', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
@@ -156,7 +175,7 @@ test('area custom stream offset and order move the same boundaries in exact reve
 });
 
 test('area focus fits selected cells with one camera without removing area cells', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#focus');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/focus');
   await ready(page);
   const count = await page.locator('#chart path.vd-area').count();
   await page.locator('#end').click();
@@ -183,7 +202,7 @@ test('area focus fits selected cells with one camera without removing area cells
 });
 
 test('area axis titles align to the plot frame and stay clear of y-axis ticks', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#merge');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/merge');
   await ready(page);
 
   for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
@@ -214,7 +233,7 @@ test('area axis titles align to the plot frame and stay clear of y-axis ticks', 
 });
 
 test('area uses only a same-fill seam cover, never a contrasting border', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#highlight');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/highlight');
   await ready(page);
   for (const progress of [0, 0.5, 1]) {
     await page.locator('#progress').fill(String(progress));
@@ -233,7 +252,7 @@ test('area fades isolated cohorts rather than individual seam-covered cells', as
     { id: 'split', progress: '0.39' },
     { id: 'filter', progress: '0.4' }
   ]) {
-    await page.goto(`/docs/.vitepress/dist/area-lab.html#${id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#area/${id}`);
     await page.reload();
     await ready(page);
     await page.locator('#progress').fill(progress);
@@ -263,7 +282,7 @@ test('area fades isolated cohorts rather than individual seam-covered cells', as
 });
 
 test('area highlight clips a bounded x range at exact scale coordinates', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#highlight-range');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/highlight-range');
   await ready(page);
   await page.locator('#end').click();
   const highlight = await page.locator('#chart').evaluate(chart => {
@@ -284,7 +303,7 @@ test('area highlight clips a bounded x range at exact scale coordinates', async 
       clipWidth: Number(clip?.getAttribute('width'))
     };
   });
-  expect(highlight.baseCount).toBe(38);
+  expect(highlight.baseCount).toBe(18);
   expect(highlight.baseOpacity).toBeCloseTo(0.12, 3);
   expect(highlight.overlayCount).toBe(10);
   expect(highlight.highlightOpacity).toBeCloseTo(1, 3);
@@ -294,7 +313,7 @@ test('area highlight clips a bounded x range at exact scale coordinates', async 
 });
 
 test('area split draws a thin contrast divider only between endpoints', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/split');
   await ready(page);
   const read = async progress => {
     await page.locator('#progress').fill(String(progress));
@@ -323,7 +342,7 @@ test('area split draws a thin contrast divider only between endpoints', async ({
   };
 
   expect(result.start.count).toBe(0);
-  expect(result.drawing.count).toBe(4);
+  expect(result.drawing.count).toBe(2);
   expect(result.drawing.offset).toBeGreaterThan(0);
   expect(result.drawing.offset).toBeLessThan(result.drawing.length);
   expect(result.drawing.opacity).toBeGreaterThan(0);
@@ -675,31 +694,33 @@ test('every D3 Area curve renders and curve changes interpolate from the real pa
 });
 
 test('stacked area uses cumulative boundaries and explicit color', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/area-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/split');
   await ready(page);
   await page.locator('#end').click();
-  await expect(page.locator('#chart path.vd-area-cell')).toHaveCount(190);
+  await expect(page.locator('#chart path.vd-area-cell')).toHaveCount(54);
   await expect(page.locator('#chart path.vd-area-edge')).toHaveCount(0);
-  await expect(page.locator('#chart .vd-legend-item')).toHaveCount(5);
+  await expect(page.locator('#chart .vd-legend-item')).toHaveCount(3);
   const paths = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({
     key: node.getAttribute('data-key'),
     layer: node.getAttribute('data-layer-key'),
     fill: node.getAttribute('fill'),
     length: node.getTotalLength()
   })));
-  expect(new Set(paths.map(path => path.layer)).size).toBe(5);
-  expect(new Set(paths.map(path => path.fill)).size).toBe(5);
+  expect(new Set(paths.map(path => path.layer)).size).toBe(3);
+  expect(new Set(paths.map(path => path.fill)).size).toBe(3);
   expect(paths.every(path => path.length > 0)).toBe(true);
 });
 
 test('area lab loads prepared tidy unemployment observations', async ({ page }) => {
   const requests = [];
   page.on('request', request => {
-    if (request.url().endsWith('/data/unemployment.csv')) requests.push(request.url());
+    if (request.url().endsWith('/data/area-lab.csv')) requests.push(request.url());
   });
-  await page.goto('/docs/.vitepress/dist/area-lab.html#split');
+  await page.goto('/docs/.vitepress/dist/playground.html#area/split');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(/\.\/data\/unemployment\.csv/);
+  // The lab loads the CSV once and the authored code reads the shared rows.
+  await expectEditorCode(page.locator('#editor'), /\barea\(rows\)/);
+  await expectEditorCode(page.locator('#editor'), /DATA_URL|area-lab\.csv/, { not: true });
   await page.locator('#end').click();
 
   const rows = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({
@@ -709,9 +730,9 @@ test('area lab loads prepared tidy unemployment observations', async ({ page }) 
     unemployed: node.__data__?.row?.unemployed,
     share: node.__data__?.row?.share
   })));
-  expect(rows).toHaveLength(190);
+  expect(rows).toHaveLength(54);
   expect(rows.every(row => row.date && row.year && row.industry &&
     Number.isFinite(row.unemployed) && Number.isFinite(row.share))).toBe(true);
-  expect(requests).toHaveLength(1);
-  expect(new URL(requests[0]).pathname).toBe('/docs/.vitepress/dist/data/unemployment.csv');
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every(url => new URL(url).pathname === '/docs/.vitepress/dist/data/area-lab.csv')).toBe(true);
 });

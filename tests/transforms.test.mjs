@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyTransforms } from '../dist/data/transforms.js';
+import { serializeViewSpec } from '../dist/spec-meta.js';
 import { domainTransforms } from '../dist/runtime/data.js';
 import { bar, line, point, unit } from '../dist/index.js';
 
@@ -32,6 +33,24 @@ test('domain inference preserves data-shaping transforms and explicit execution 
   assert.deepEqual(transforms, before);
 });
 
+test('domain inference preserves subsets that define aggregate values', () => {
+  const source = [
+    { week: 'one', ticker: 'AAPL', close: 10 },
+    { week: 'one', ticker: 'GOOG', close: 90 },
+    { week: 'two', ticker: 'AAPL', close: 20 },
+    { week: 'two', ticker: 'GOOG', close: 80 }
+  ];
+  const transforms = [
+    { filter: { field: 'ticker', equal: 'AAPL' } },
+    { aggregate: { groupby: ['week'], fields: [{ op: 'mean', field: 'close', as: 'close' }] } }
+  ];
+
+  assert.deepEqual(run(domainTransforms(transforms), source), [
+    { week: 'one', close: 10 },
+    { week: 'two', close: 20 }
+  ]);
+});
+
 test('zero limit is empty; transforms run in declared order without mutating input', () => {
   assert.deepEqual(run([{ limit: 0 }]), []);
   assert.deepEqual(run([{ sort: { field: 'value', order: 'descending' } }, { limit: 1 }]), [rows[2]]);
@@ -39,10 +58,30 @@ test('zero limit is empty; transforms run in declared order without mutating inp
   assert.equal(rows[0].id, 'A');
 });
 
+test('serialization preserves repeated transforms because transform order is semantic', () => {
+  const aggregate = { aggregate: { groupby: ['region'], fields: [{ op: 'sum', field: 'value', as: 'value' }] } };
+  const spec = serializeViewSpec({
+    mark: 'bar',
+    data: { values: [{ region: 'N', value: 2 }, { region: 'N', value: 3 }] },
+    transform: [aggregate],
+    meta: { transform: [aggregate] }
+  });
+  assert.equal(spec.transform.length, 2);
+  assert.deepEqual(applyTransforms(spec.data.values, spec.transform), [{ region: 'N', value: 5 }]);
+});
+
 test('every supported aggregate operator has an explicit result', () => {
   for (const [op, expected] of [['count', 3], ['sum', 6], ['mean', 2], ['min', 0], ['max', 4], ['median', 2]]) {
     assert.deepEqual(run([{ aggregate: { fields: [{ op, field: 'value', as: 'result' }] } }]), [{ result: expected }]);
   }
+});
+
+test('aggregate operators skip missing and nonnumeric measure values', () => {
+  const source = [{ value: 4 }, { value: 'invalid' }, { value: null }, { value: 2 }];
+  assert.deepEqual(run([{ aggregate: { fields: [
+    { op: 'sum', field: 'value', as: 'sum' },
+    { op: 'mean', field: 'value', as: 'mean' }
+  ] } }], source), [{ sum: 6, mean: 3 }]);
 });
 
 test('constant, empty and nonnumeric bins do not divide by zero or emit NaN labels', () => {

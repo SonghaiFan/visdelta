@@ -1,4 +1,6 @@
-# Bar transition lab
+# Bar transition behavior
+
+Try these scenarios in the unified [Playground](/playground#bar/measure).
 
 These examples are organized by the seven state-change categories and form the
 executable transition matrix for VisDelta's
@@ -10,14 +12,12 @@ instead of toy A/B/C rows. Its 468 observations have only three fields:
 `state`, `age`, and `population`. The supplied wide source was reshaped before
 it entered VisDelta; data cleaning is not part of the visualization runtime.
 Segmented examples use `.breakdown("age")`, then explicitly encode
-`.color("age", ...)` with an ordered domain and the active style's default palette.
+`.color("age", ...)` with an ordered domain and the sequential `Blues` spectrum.
 
 The ranked and stacked overviews keep all 52 regions. Examples that need wider
 marks name a fixed six- or eight-state subset in the editable code, keeping the
 filter visible and every animation frame readable. The data-replacement example
 adds unchanged rows from the same CSV; it does not invent replacement values.
-
-<SyntaxPlayground mode="bar-lab" initial="measure" />
 
 The lab is intentionally limited to transitions between bar-chart states. A successful
 render demonstrates this pair, not an undocumented guarantee for every possible

@@ -1,4 +1,6 @@
-# Point transition lab
+# Point transition behavior
+
+Try these scenarios in the unified [Playground](/playground#point/x).
 
 These thirteen scenarios are the executable transition matrix for VisDelta's
 point chart. They cover position, membership, emphasis, color, size, data,
@@ -25,8 +27,6 @@ Each child contributes an equal share of its summary circle's final radius, so
 the summary grows and shrinks with the number of children currently connected.
 Combining starts slowly and accelerates as the points converge; revealing detail
 uses the same motion in reverse.
-
-<SyntaxPlayground mode="point-lab" initial="x" />
 
 The lab tests transitions between point-chart states only. Every example uses
 the real package from this checkout; it is not a separate demo renderer.

@@ -204,9 +204,15 @@ an authored `sequence([A, B, C])` preserves B even if A-to-B gains waypoints.
 
 The internal `TransitionRoute` assembles the chosen waypoints into adjacent
 pairs and their canonical directions. It is DOM-free and does not choose
-chart-specific geometry or timing. `TransitionPlan` remains the per-leg
-execution decision, not the complete multi-state route. Explicit sequence
-continues to own authored boundaries and delegates each pair to `transition()`.
+chart-specific geometry or timing. Core's public `TransitionPlan` carries only
+shared evidence and controls such as lineage, mark correspondence, membership
+timing, and generic phase diagnostics. A chart keeps any additional execution
+choices in its own module-local plan type and narrows the shared plan at its
+rendering boundary. For example, Bar's layout, enter, and exit actions are
+available from `visdelta/bar` as `BarTransitionPlan`; they are not part of the
+generic plugin contract. A transition plan describes one adjacent pair, not
+the complete multi-state route. Explicit sequence continues to own authored
+boundaries and delegates each pair to `transition()`.
 
 Other runtime hooks retain their existing responsibilities:
 

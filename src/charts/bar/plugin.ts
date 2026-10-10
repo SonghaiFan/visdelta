@@ -4,12 +4,17 @@ import type { ChartPlugin } from '../../types/index.js';
 import type { BarSpec } from './chart.js';
 import { barPresentation } from './style.js';
 
-// createBarSpecCompiler is still in compile.js (not yet migrated)
 import { createBarSpecCompiler } from './compile.js';
+import { createBarGrainDeclarationOperationCodec } from './declaration-operations.js';
 
 export const plugin: ChartPlugin<BarSpec> = defineChartType<BarSpec>({
   key: 'bar',
+  declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
+  transition: {
+    declarationOperations: createBarGrainDeclarationOperationCodec()
+  },
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: barPresentation,
   createChart: createBarChart,

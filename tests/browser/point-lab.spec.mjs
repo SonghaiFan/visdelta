@@ -1,7 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { pointScenarios } from '../../examples/point/scenarios.js';
 
-const ready = page => expect(page.locator('#status')).toHaveText('Ready');
+const ready = async page => {
+  await expect(page.getByRole('tab', { name: 'Point', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
+  await page.locator('#chart').scrollIntoViewIfNeeded();
+  await expect(page.locator('#status')).toHaveText('Ready');
+};
 const chooseScenario = async (page, id) => {
   const sample = pointScenarios.find(candidate => candidate.id === id);
   await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
@@ -18,11 +24,11 @@ for (const sample of pointScenarios) {
   test(`point lab ${sample.id}: editable pair and reversible seek`, async ({ page }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await page.goto(`/docs/.vitepress/dist/point-lab.html#${sample.id}`);
+    await page.goto(`/docs/.vitepress/dist/playground.html#point/${sample.id}`);
     await ready(page);
-    await expect(page.getByRole('tab')).toHaveCount(7);
+    await expect(page.locator('.playground-category-tabs [role=tab]')).toHaveCount(7);
     const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
     await page.locator('#progress').fill('0.37');
@@ -36,19 +42,57 @@ for (const sample of pointScenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await editor.fill(sample.code.replace('Weight (1,000 lb)', 'Vehicle weight'));
+    await setEditorCode(editor, sample.code
+      .replace('.x("wt")', '.x("wt", { title: "Vehicle weight" })')
+      .replace('Weight (1,000 lb)', 'Vehicle weight'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
-    await expect(editor).toHaveValue(/Vehicle weight/);
+    await expectEditorCode(editor, /Vehicle weight/);
     await page.locator('#reset').click();
     await ready(page);
-    await expect(editor).toHaveValue(sample.code);
+    await expectEditorCode(editor, sample.code);
     expect(errors).toEqual([]);
   });
 }
 
+for (const width of [1100, 390]) {
+test(`switching tabs animates only the chart, not the tab progress, at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 850 });
+  await page.goto('/docs/.vitepress/dist/playground.html#point/x');
+  await ready(page);
+  await page.locator('#end').click();
+
+  await page.locator('[data-scenario="color"]').click();
+  await expect(page.locator('#status')).toHaveText('Switching tabs');
+  await expect(page.locator('#progress')).toBeDisabled();
+  const frames = await page.evaluate(async () => {
+    const frames = [];
+    while (document.querySelector('#status').textContent === 'Switching tabs') {
+      frames.push({
+        progress: document.querySelector('#progress').value,
+        label: document.querySelector('#value').textContent,
+        positions: [...document.querySelectorAll('#chart circle.vd-point')].map(node => node.getAttribute('cx')).join(',')
+      });
+      await new Promise(requestAnimationFrame);
+    }
+    return frames;
+  });
+  expect(frames.length).toBeGreaterThan(1);
+  expect(new Set(frames.map(frame => frame.positions)).size).toBeGreaterThan(1);
+  expect(frames.every(frame => frame.progress === '0' && frame.label === '0.00')).toBe(true);
+
+  await ready(page);
+  await expect(page.locator('#value')).toHaveText('0.00');
+  await expect(page.locator('#progress')).toBeEnabled();
+  await expectEditorCode(page.locator('#editor'), pointScenarios.find(sample => sample.id === 'color').code);
+
+  await page.locator('#play').click();
+  await expect(page.locator('#value')).toHaveText('1.00');
+});
+}
+
 test('point radius, highlight, and cached node identity are real renderer behavior', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#highlight');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/highlight');
   await ready(page);
   const result = await page.evaluate(() => {
     const chart = document.querySelector('#chart');
@@ -76,7 +120,7 @@ test('point radius, highlight, and cached node identity are real renderer behavi
 });
 
 test('point defaults use compact, open correlation axes', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#x');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/x');
   await ready(page);
   const style = await page.locator('#chart svg').evaluate(svg => ({
     verticalGridLines: svg.querySelectorAll('.vd-point-x-grid line').length,
@@ -96,8 +140,8 @@ test('point defaults use compact, open correlation axes', async ({ page }) => {
   expect(style.horizontalGridLines).toBeGreaterThan(1);
   expect(style.xDomainOpacity).toBe('0');
   expect(style.yDomainOpacity).toBe('0');
-  expect(style.xTitle).toBe('Weight (1,000 lb) →');
-  expect(style.yTitle).toBe('↑ Fuel economy (mpg)');
+  expect(style.xTitle).toBe('Wt →');
+  expect(style.yTitle).toBe('↑ Mpg');
   expect(style.xTitleAnchor).toBe('end');
   expect(style.yTitleAnchor).toBe('start');
   // Responsive spacing is not a fixed 44 × 56 inset. Axes must share the
@@ -130,16 +174,18 @@ test('point lab loads the tidy mtcars dataset without inventing observations', a
   page.on('request', request => {
     if (request.url().endsWith('/data/mtcars.csv')) requests.push(request.url());
   });
-  await page.goto('/docs/.vitepress/dist/point-lab.html#x');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/x');
   await ready(page);
-  await expect(page.locator('#editor')).toHaveValue(/\.\/data\/mtcars\.csv/);
+  // The lab loads the CSV once and the authored code reads the shared rows.
+  await expectEditorCode(page.locator('#editor'), /\bpoint\(rows\)/);
+  await expectEditorCode(page.locator('#editor'), /DATA_URL|mtcars\.csv/, { not: true });
   await expect(page.locator('#chart circle.vd-point')).toHaveCount(32);
   expect(requests).toHaveLength(1);
   expect(new URL(requests[0]).pathname).toBe('/docs/.vitepress/dist/data/mtcars.csv');
 });
 
 test('axis title changes use one label node without a ghost copy', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#rollup');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/rollup');
   await ready(page);
   for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
     await page.locator('#progress').fill(String(progress));
@@ -150,7 +196,7 @@ test('axis title changes use one label node without a ghost copy', async ({ page
 });
 
 test('an added point grows at its target instead of flying from an unrelated anchor', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#add');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/add');
   await ready(page);
   const pointAt = async (progress) => {
     await page.locator('#progress').fill(String(progress));
@@ -172,7 +218,7 @@ test('an added point grows at its target instead of flying from an unrelated anc
 });
 
 test('point focus moves the view without filtering points', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#focus');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/focus');
   await ready(page);
   const start = await page.locator('#chart circle.vd-point').evaluateAll(nodes =>
     nodes.map(node => [node.getAttribute('data-key'), node.getAttribute('cx'), node.getAttribute('cy')]));
@@ -206,7 +252,7 @@ test('point focus moves the view without filtering points', async ({ page }) => 
 });
 
 test('point flip changes the authored first axis before the second axis', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#flip');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/flip');
   await ready(page);
   const positions = async () => page.locator('#chart circle.vd-point').evaluateAll(nodes =>
     nodes.map(node => ({
@@ -296,7 +342,7 @@ test('point rollup and breakdown are the same transition in reverse', async ({ p
 });
 
 test('point combine starts slowly and accelerates into the summary', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#rollup');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/rollup');
   await ready(page);
   const positionAt = async (progress) => {
     await page.locator('#progress').fill(String(progress));
@@ -362,7 +408,7 @@ test('point detail sets the view before summary points spread', async ({ page })
 });
 
 test('point lab Blend is deterministic decoration and Clean removes it', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#breakdown');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/breakdown');
   await ready(page);
   const effect = page.locator('#point-effect');
   await expect(effect).toHaveValue('blend');
@@ -403,7 +449,7 @@ test('point lab Blend is deterministic decoration and Clean removes it', async (
 });
 
 test('point Blend parent exists only while a child is close enough to connect', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#breakdown');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/breakdown');
   await ready(page);
 
   await page.locator('#progress').fill('0');
@@ -476,7 +522,7 @@ test('point Blend parent exists only while a child is close enough to connect', 
 });
 
 test('point lab fits a narrow viewport and keeps progress after resize', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/point-lab.html#rollup');
+  await page.goto('/docs/.vitepress/dist/playground.html#point/rollup');
   await ready(page);
   await page.locator('#progress').fill('0.37');
   await page.setViewportSize({ width: 390, height: 844 });

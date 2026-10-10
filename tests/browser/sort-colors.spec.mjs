@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { expectEditorCode } from './code-editor.mjs';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
@@ -13,8 +14,11 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
         { id: 'a', x: 1, y: 3, group: 'one' }, { id: 'b', x: 2, y: 5, group: 'one' },
         { id: 'c', x: 1, y: 4, group: 'two' }, { id: 'd', x: 2, y: 7, group: 'two' }
       ];
-      let base = vd[kind](rows).datumKey('id').key('id');
-      // Bar needs one row per category; the others read x from the rows directly.
+      const inputRows = kind === 'area'
+        ? rows.map((row, index) => ({ ...row, x: index + 1 }))
+        : rows;
+      let base = vd[kind](inputRows).datumKey('id').key('id');
+      // Bar needs one row per category, while single Area needs one row per x.
       base = kind === 'unit' ? base.group('group')
         : kind === 'bar' ? base.x('id').y('y')
         : base.x('x').y('y');
@@ -170,6 +174,43 @@ test('dark chart style uses white neutral ink without changing authored color', 
   expect([...new Set(samples[1].colors)]).toEqual(['#cc3366']);
 });
 
+test('editorial chart style keeps the logo palette and uses warm ink, hairlines and a flat figure', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const vd = await import('/dist/visdelta.esm.js');
+    const rows = ['A', 'B', 'C'].map((category, index) => ({ category, value: 10 + index, group: `g${index}` }));
+    const host = document.createElement('div');
+    host.style.width = '800px';
+    document.body.append(host);
+    const read = async view => {
+      const change = await vd.transition(view, view, { target: host, height: 400, chartStyle: vd.editorialChartStyle });
+      change.progress(1);
+      const root = host.firstElementChild;
+      const figure = root.querySelector('.vd-figure');
+      const sample = {
+        rootClass: root.className,
+        fills: [...host.querySelectorAll('rect.vd-bar')].map(node => d3.color(getComputedStyle(node).fill).formatHex()),
+        gridWidth: getComputedStyle(root.querySelector('.vd-grid line')).strokeWidth,
+        figureBorder: getComputedStyle(figure).borderTopStyle,
+        tickNumerals: getComputedStyle(root.querySelector('.vd-axis text')).fontVariantNumeric
+      };
+      change.destroy();
+      return sample;
+    };
+    const base = vd.bar(rows).x('category').y('value').key('category');
+    const neutral = await read(base);
+    const colored = await read(base.color('group'));
+    host.remove();
+    return { neutral, colored };
+  });
+  expect(result.neutral.rootClass).toContain('vd-style-editorial');
+  expect([...new Set(result.neutral.fills)]).toEqual(['#1f1e1b']);
+  // The categorical palette is VisDelta's own (the logo colours) in every light style.
+  expect(result.colored.fills).toEqual(['#4269d0', '#efb118', '#ff725c']);
+  expect(result.neutral.gridWidth).toBe('0.75px');
+  expect(result.neutral.figureBorder).toBe('none');
+  expect(result.neutral.tickNumerals).toBe('tabular-nums');
+});
+
 test('reaggregation never invents color meaning across phases or reverse seeks', async ({ page }) => {
   const samples = await page.evaluate(async () => {
     const vd = await import('/dist/visdelta.esm.js');
@@ -312,7 +353,7 @@ test('explicit color changes are still allowed during sorting', async ({ page })
 });
 
 test('sort lab keeps the same colors at both endpoints', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#sort');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/sort');
   await expect(page.locator('#status')).toHaveText('Ready');
   const read = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => Object.fromEntries(
     nodes.map(node => [node.dataset.category, {
@@ -365,12 +406,12 @@ test('undeclared color uses one fill and no legend; split demo declares segment 
   expect(result.splitLegends).toBe(0);
   expect(result.segments).toBe(4);
 
-  await page.goto('/docs/.vitepress/dist/transition-lab.html#sort');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/sort');
   await expect(page.locator('#status')).toHaveText('Ready');
   await page.getByRole('tab', { name: /^Grain/i }).click();
   await page.locator('[data-scenario="split"]').click();
   await expect(page.locator('#status')).toHaveText('Ready');
-  await expect(page.locator('#editor')).toHaveValue(/\.color\("age"/);
+  await expectEditorCode(page.locator('#editor'), /\.color\("age"/);
   await page.locator('#end').click();
   await expect(page.locator('#chart .vd-legend-item')).toHaveCount(9);
   const segmentFills = await page.locator('#chart rect.vd-bar').evaluateAll(nodes =>
@@ -396,16 +437,25 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
       range: ['#336699', '#ee8822']
     });
     const change = await transition(colored.rollup(), colored, { target: host, height: 400 });
+    const phases = change.view.__visDeltaScene.seekSequence?.phases ?? [];
+    const groupingPhase = phases.find(phase => {
+      const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+      return endpoint.encoding?.detail?.field === 'type' && !endpoint.encoding?.color;
+    });
+    if (!groupingPhase) throw new Error('The planned grouping stage was not present in the seek route.');
+    const phaseProgress = local => groupingPhase.start + (groupingPhase.end - groupingPhase.start) * local;
 
     const readSegments = () => [...host.querySelectorAll('rect.vd-bar-segment')]
       .map(node => {
         const style = getComputedStyle(node);
         return {
           key: node.dataset.key,
+          semanticKey: node.dataset.semanticKey,
           x: Number(node.getAttribute('x')),
           y: Number(node.getAttribute('y')),
           width: Number(node.getAttribute('width')),
           height: Number(node.getAttribute('height')),
+          fill: d3.color(style.fill)?.formatHex() || style.fill,
           fillOpacity: Number(style.fillOpacity),
           opacity: Number(style.opacity)
         };
@@ -414,7 +464,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
 
     change.progress(0);
     const startSeamCount = host.querySelectorAll('path.vd-bar-seam').length;
-    change.progress(0.25);
+    change.progress(phaseProgress(0.25));
     const reveal = readSegments();
     const underlay = [...host.querySelectorAll('rect.vd-bar:not(.vd-bar-segment)')].map(node => ({
       category: node.dataset.category,
@@ -430,7 +480,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
         length
       };
     });
-    change.progress(0.32);
+    change.progress(phaseProgress(0.32));
     const fullSeam = [...host.querySelectorAll('path.vd-bar-seam')].map(node => ({
       length: node.getTotalLength(),
       opacity: Number(getComputedStyle(node).opacity)
@@ -457,9 +507,14 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
 
   expect(result.startSeamCount).toBe(0);
   expect(result.reveal).toHaveLength(4);
-  expect(result.reveal.map(({ key, x, y, width, height }) => ({ key, x, y, width, height })))
-    .toEqual(result.end.map(({ key, x, y, width, height }) => ({ key, x, y, width, height })));
-  expect(result.reveal.every(mark => mark.fillOpacity === 1)).toBe(true);
+  expect(result.reveal.every(({ semanticKey }) => typeof semanticKey === 'string' && semanticKey.length > 0)).toBe(true);
+  expect(new Set(result.reveal.map(({ semanticKey }) => semanticKey)).size).toBe(4);
+  // `data-key` is the renderer's join key and can include local measure data;
+  // compare the exposed semantic identity and the complete endpoint geometry.
+  expect(result.reveal.map(({ semanticKey, x, y, width, height }) => ({ semanticKey, x, y, width, height })))
+    .toEqual(result.end.map(({ semanticKey, x, y, width, height }) => ({ semanticKey, x, y, width, height })));
+  expect(result.reveal.every(mark => mark.fill === '#000000' && mark.fillOpacity === 1)).toBe(true);
+  expect([...new Set(result.end.map(mark => mark.fill))].sort()).toEqual(['#336699', '#ee8822']);
   expect(result.reveal.every(mark => mark.opacity > 0 && mark.opacity < 1)).toBe(true);
   expect(result.underlay).toHaveLength(2);
   expect(result.underlay.every(mark => mark.opacity > 0 && mark.opacity < 1)).toBe(true);
@@ -470,11 +525,60 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
     expect(line.length).toBeGreaterThan(0);
     expect(line.length).toBeLessThan(end.length);
   });
-  // The global progress span also includes staggered mark schedules, so the
-  // divider's draw/fade handoff can land a fraction beside authored 0.32.
+  // Sample the draw/fade handoff inside the actual Grain phase.
   expect(result.fullSeam.every(line => line.opacity > 0.99)).toBe(true);
   expect(result.endSeamCount).toBe(0);
   expect(result.noColor.every(mark => mark.fill === '#000000')).toBe(true);
   expect(result.noColorSeams).toHaveLength(1);
   expect(result.noColorSeams.every(opacity => opacity > 0 && opacity < 1)).toBe(true);
 });
+
+for (const scheme of [undefined, 'Blues']) {
+  test(`quantitative legend matches mark colors: ${scheme || 'luminance'}`, async ({ page }) => {
+    const samples = await page.evaluate(async scheme => {
+      const { bar, transition } = await import('/dist/visdelta.esm.js');
+      const rows = [
+        { category: 'A', population: 2000000 },
+        { category: 'D', population: 3000000 },
+        { category: 'B', population: 4000000 },
+        { category: 'E', population: 5000000 },
+        { category: 'C', population: 6000000 }
+      ];
+      const from = bar(rows).x('category').y('population').key('category');
+      const to = from.color('population', { type: 'quantitative', ...(scheme ? { scheme } : {}) });
+      const host = document.createElement('div');
+      document.body.append(host);
+      const samples = [];
+      for (const width of [800, 360]) {
+        host.style.width = `${width}px`;
+        const change = await transition(from, to, { target: host, height: 400 });
+        for (const progress of [0, 0.5, 1, 0.5, 0, 1]) {
+          change.progress(progress);
+          if (progress !== 1) continue;
+          samples.push([...host.querySelectorAll('.vd-legend-item')].map(item => {
+            const value = item.__data__;
+            const row = rows.find(row => row.population === value);
+            const mark = [...host.querySelectorAll('rect.vd-bar')]
+              .find(node => node.dataset.category === row?.category);
+            return {
+              value,
+              swatch: d3.color(getComputedStyle(item.querySelector('rect')).fill).formatHex(),
+              mark: mark ? d3.color(getComputedStyle(mark).fill).formatHex() : null
+            };
+          }));
+        }
+        change.destroy();
+      }
+      host.remove();
+      return samples;
+    }, scheme);
+    for (const sample of samples) {
+      expect(sample.length).toBeGreaterThan(1);
+      expect(new Set(sample.map(item => item.swatch)).size).toBe(sample.length);
+      for (const item of sample) {
+        expect(item.mark).not.toBeNull();
+        expect(item.swatch).toBe(item.mark);
+      }
+    }
+  });
+}

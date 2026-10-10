@@ -10,12 +10,10 @@ import type {
   BarLayout,
   BarOrientation,
   CanonicalTransitionPair,
-  DetailSpec,
   IntermediateSpec,
-  TransitionItemAction,
-  TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
+import type { BarTransitionPlan } from './plan.js';
 import {
   barCategoryChannel,
   barMeasureChannel,
@@ -28,14 +26,14 @@ import { semanticBarState } from './semantic.js';
 export function resolveBarTransitionPlan(
   previousSpec: ViewSpec | null,
   nextSpec: ViewSpec | null
-): TransitionPlan {
+): BarTransitionPlan {
   if (!previousSpec || !nextSpec) return {};
   const previous = barState(previousSpec);
   const next = barState(nextSpec);
   if (!previous || !next) return {};
 
   const diff = diffBarViewStates(previousSpec, nextSpec);
-  const plan: TransitionPlan = {
+  const plan: BarTransitionPlan = {
     source: {
       orientation: previous.orientation,
       layout: previous.barLayout,
@@ -45,15 +43,10 @@ export function resolveBarTransitionPlan(
       orientation: next.orientation,
       layout: next.barLayout,
       renderer: barRendererKey(next.barLayout, next.orientation)
-    },
-    diff: diff.deltas.map(({ type, action, previous: p, next: n }) => ({
-      type, action, previous: p, next: n
-    }))
+    }
   };
 
-  const crossesDetail =
-    diff.hasDelta('bar.detail') || previous.hasDetail || next.hasDetail;
-  if (crossesDetail) {
+  if (diff.hasDelta('bar.detail')) {
     plan.match = { mode: 'semantic', reason: 'detail-item-consistency' };
   }
 
@@ -86,7 +79,7 @@ export function resolveBarTransitionPlan(
       categoryKey: previous.categoryField,
       segmentKey: previous.segmentField,
       valueKey: previous.measureField
-    } as TransitionItemAction;
+    };
   }
 
   // Split: parent → child
@@ -117,7 +110,7 @@ export function resolveBarTransitionPlan(
       categoryKey: next.categoryField,
       segmentKey: next.segmentField,
       valueKey: next.measureField
-    } as TransitionItemAction;
+    };
   }
 
   const layoutChanged = diff.hasDelta('bar.layout');
@@ -152,16 +145,12 @@ export function resolveBarTransitionPlan(
     ease: timing.ease,
     stagger: timing.stagger
   };
-  const staggerMaxVal = staggerMax(stepTiming.stagger);
-  const totalDuration = stepTiming.duration * orderedParts.length + staggerMaxVal;
-
   plan.reason = reason;
   plan.steps = orderedParts.map((part) => ({
     part,
     changes: ['scale', 'axis', 'marks']
   }));
   plan.timing = stepTiming;
-  plan.totalDuration = totalDuration;
 
   return plan;
 }
@@ -270,7 +259,14 @@ export function barIntermediateSpecs(
     const from = waypoints[index - 1];
     const to = waypoints[index];
     const structural = barAdditiveGroupedSplitIntermediateSpecs(from, to);
-    states.push(...(structural.length ? structural : barReaggregationIntermediateSpecs(from, to))
+    const crossCategory = structural.length
+      ? []
+      : barCrossCategorySplitIntermediateSpecs(from, to);
+    states.push(...(structural.length
+      ? structural
+      : crossCategory.length
+        ? crossCategory
+        : barReaggregationIntermediateSpecs(from, to))
       .map(phase => phase.spec), to);
   }
   if (canonical.reverse) states.reverse();
@@ -456,6 +452,81 @@ function barAdditiveGroupedSplitIntermediateSpecs(
   }];
 }
 
+/**
+ * Split a total into an authored common-refinement view whose category is the
+ * other refinement field. The route first exposes children under their current
+ * parent, regroups the same children, then hands that grouped frame to the
+ * authored stacked endpoint. Merge reuses these exact states backward.
+ */
+function barCrossCategorySplitIntermediateSpecs(
+  previousSpec: ViewSpec,
+  nextSpec: ViewSpec
+): IntermediateSpec[] {
+  const previous = barState(previousSpec);
+  const next = barState(nextSpec);
+  if (
+    !previous || !next ||
+    previous.orientation !== next.orientation ||
+    previous.barLayout !== 'simple' || !isSegmentLayout(next.barLayout) ||
+    previous.hasDetail || !next.hasDetail ||
+    !previous.hasAggregate || !next.hasAggregate ||
+    !previous.categoryField || !next.categoryField || !next.segmentField ||
+    previous.categoryField !== next.segmentField ||
+    previous.measureField !== next.measureField
+  ) return [];
+
+  const previousAggregate = singleAggregate(previousSpec);
+  const nextAggregate = singleAggregate(nextSpec);
+  if (
+    !compatibleAggregate(previousAggregate, nextAggregate) ||
+    !sameValue(previousAggregate?.groupby, [previous.categoryField]) ||
+    !sameValue(
+      [...(nextAggregate?.groupby ?? [])].sort(),
+      [next.categoryField, next.segmentField].sort()
+    ) ||
+    !sameValue(nonAggregateTransforms(previousSpec), nonAggregateTransforms(nextSpec)) ||
+    !sameValue(inlineSourceRows(previousSpec), inlineSourceRows(nextSpec)) ||
+    !sameValue(specDatumKey(previousSpec), specDatumKey(nextSpec))
+  ) return [];
+
+  const lineage = viewLineageCorrespondence(previousSpec, nextSpec);
+  if (lineage?.mode !== 'split' || !lineage.splittable) return [];
+  const refinement = lineage.commonRefinement;
+  if (!sameValue([...refinement].sort(), [next.categoryField, next.segmentField].sort())) return [];
+
+  const detailSpec = (
+    spec: ViewSpec,
+    categoryField: string,
+    segmentField: string,
+    layout: Extract<BarLayout, 'stacked' | 'grouped'>
+  ) => reaggregationDetailSpec({
+    spec,
+    categoryField,
+    segmentField,
+    refinement,
+    aggregate: previousAggregate!,
+    layout
+  });
+
+  const phases: IntermediateSpec[] = [
+    {
+      spec: detailSpec(previousSpec, previous.categoryField, next.categoryField, 'stacked'),
+      scene: 'detail'
+    },
+    {
+      spec: detailSpec(previousSpec, previous.categoryField, next.categoryField, 'grouped'),
+      scene: 'axis'
+    }
+  ];
+  if (next.barLayout === 'stacked') {
+    phases.push({
+      spec: detailSpec(nextSpec, next.categoryField, previous.categoryField, 'grouped'),
+      scene: 'axis'
+    });
+  }
+  return phases;
+}
+
 function nonAggregateTransforms(spec: ViewSpec): ViewSpec['transform'] {
   return (spec.transform ?? []).filter((transform) => !('aggregate' in transform));
 }
@@ -478,12 +549,6 @@ function barBaselinePlan(layout: BarLayout): {
     return { name: 'stack-base', anchor: '__stack0', meaning: 'segment-stack-base' };
   }
   return { name: 'zero-baseline', value: 0, meaning: 'measure-zero' };
-}
-
-function staggerMax(stagger: unknown): number {
-  if (stagger == null || typeof stagger !== 'object') return 0;
-  const max = Number((stagger as Record<string, unknown>).max);
-  return Number.isFinite(max) ? max : 0;
 }
 
 /**
@@ -616,6 +681,7 @@ function reaggregationDetailSpec({
   layout: Extract<BarLayout, 'stacked' | 'grouped'>;
 }): ViewSpec {
   const next = cloneSpec(spec) as ViewSpec;
+  const canonicalRefinement = [...new Set(refinement)].sort((a, b) => a.localeCompare(b));
   const encoding = { ...(next.encoding ?? {}) } as Record<string, any>;
   const categoryChannel = barCategoryChannel(encoding);
   const measureChannel = barMeasureChannel(encoding);
@@ -641,7 +707,7 @@ function reaggregationDetailSpec({
     .filter((transform) => !(transform as { aggregate?: unknown }).aggregate);
   transforms.push({
     aggregate: {
-      groupby: refinement,
+        groupby: canonicalRefinement,
       fields: cloneSpec(aggregate.fields)
     }
   });
@@ -649,9 +715,9 @@ function reaggregationDetailSpec({
   const meta = { ...(next.meta ?? {}) } as Record<string, any>;
   meta.object = {
     ...(meta.object ?? {}),
-    key: refinement,
+    key: canonicalRefinement,
     semantic: {
-      entity: refinement.map((field) => ({ field })),
+      entity: canonicalRefinement.map((field) => ({ field })),
       measure: { value: aggregate.fields[0].as }
     }
   };

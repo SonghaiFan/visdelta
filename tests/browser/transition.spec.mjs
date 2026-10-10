@@ -74,6 +74,98 @@ test('an application holds a chart at an endpoint and hands it to the next trans
   expect(errors).toEqual([]);
 });
 
+for (const key of ['state', ['state']]) {
+  test(`cohort filters update persistent state bars with key ${JSON.stringify(key)}`, async ({ page }) => {
+    const result = await page.evaluate(async key => {
+      const population = sl.bar([
+        { state: 'CA', age: 'young', population: 10 },
+        { state: 'TX', age: 'young', population: 30 },
+        { state: 'CA', age: 'old', population: 20 },
+        { state: 'TX', age: 'old', population: 15 }
+      ]).datumKey(['state', 'age']).key(key).x('state')
+        .y('population', { domain: [0, 40] });
+      const change = await sl.transition(population.where({ age: 'young' }), population.where({ age: 'old' }), opts('#a'));
+      const nodes = [...change.view.querySelectorAll('rect.vd-bar')];
+      const frame = p => {
+        change.progress(p);
+        return [...change.view.querySelectorAll('rect.vd-bar')].map(node => ({
+          key: node.dataset.key, height: Number(node.getAttribute('height')),
+          opacity: Number(getComputedStyle(node).opacity)
+        }));
+      };
+      const start = frame(0), middle = frame(0.75), end = frame(1), reverse = frame(0.75);
+      return { start, middle, end, reverse, reused: nodes.every(node => change.view.contains(node)) };
+    }, key);
+    expect(result.reused).toBe(true);
+    expect(result.middle).toHaveLength(2);
+    for (let i = 0; i < 2; i++) {
+      expect(result.middle[i].opacity).toBe(1);
+      expect(result.middle[i].height).toBeGreaterThan(Math.min(result.start[i].height, result.end[i].height));
+      expect(result.middle[i].height).toBeLessThan(Math.max(result.start[i].height, result.end[i].height));
+    }
+    expect(result.reverse).toEqual(result.middle);
+  });
+}
+
+test('new bars grow from the zero-value baseline without fading in', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const to = base.data([...rows, { category: 'D', value: 25, other: 12, type: 'two' }]);
+    const change = await sl.transition(base, to, opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      const bar = [...change.view.querySelectorAll('rect.vd-bar')]
+        .find(node => node.dataset.key === 'D');
+      return {
+        opacity: Number(getComputedStyle(bar).opacity),
+        height: Number(bar.getAttribute('height'))
+      };
+    };
+    // The entering node is mounted at the start of its staged enter window,
+    // after the categorical scale has made room for it.
+    return { start: frame(0.5), middle: frame(0.75), end: frame(1) };
+  });
+  expect(result.start.opacity).toBe(1);
+  expect(result.start.height).toBe(0);
+  expect(result.middle.opacity).toBe(1);
+  expect(result.middle.height).toBeGreaterThan(0);
+  expect(result.end.height).toBeGreaterThan(result.middle.height);
+});
+
+test('equal-size data replacement stages keyed exit, scale movement, and enter', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const replacement = [
+      rows[0], rows[1],
+      { category: 'D', value: 25, other: 12, type: 'two' }
+    ];
+    const change = await sl.transition(base, base.data(replacement), opts('#a'));
+    const frame = progress => {
+      change.progress(progress);
+      const marks = new Map([...change.view.querySelectorAll('rect.vd-bar')]
+        .map(node => [node.dataset.key, {
+          opacity: Number(getComputedStyle(node).opacity),
+          height: Number(node.getAttribute('height'))
+        }]));
+      return { exiting: marks.get('C'), entering: marks.get('D') };
+    };
+    const start = frame(0.001);
+    const exit = frame(0.15);
+    const scale = frame(0.5);
+    const enter = frame(0.85);
+    const reverse = frame(0.15);
+    return { start, exit, scale, enter, reverse };
+  });
+
+  expect(result.exit.exiting.opacity).toBe(1);
+  expect(result.exit.exiting.height).toBeGreaterThan(0);
+  expect(result.exit.exiting.height).toBeLessThan(result.start.exiting.height);
+  expect(result.exit.entering.height).toBe(0);
+  expect(result.scale.exiting.height).toBe(0);
+  expect(result.scale.entering.height).toBe(0);
+  expect(result.enter.entering.opacity).toBe(1);
+  expect(result.enter.entering.height).toBeGreaterThan(0);
+  expect(result.reverse).toEqual(result.exit);
+});
+
 for (const scenario of ['measure', 'filter', 'highlight', 'color', 'sort', 'flip', 'data', 'split', 'merge', 'layout', 'grouped-split', 'grouped-merge']) {
   test(`${scenario}: direct seek equals history, endpoints restore, frame stays still`, async ({ page }) => {
     const errors = [];
@@ -135,6 +227,8 @@ for (const layout of ['stacked', 'grouped']) {
       const split = await sl.transition(aggregate, detailed, opts('#a'));
       const merge = await sl.transition(detailed, aggregate, opts('#b'));
       const splitPhases = split.view.__visDeltaScene.seekSequence?.phases ?? [];
+      const plan = sl.planDeclarationTransition(aggregate.toSpec(), detailed.toSpec(),
+        sl.createBarGrainDeclarationOperationCodec());
       const frames = [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1].map(progress => {
         split.progress(progress);
         merge.progress(1 - progress);
@@ -142,18 +236,31 @@ for (const layout of ['stacked', 'grouped']) {
       });
       return {
         frames,
-        phaseLayouts: splitPhases.map(phase =>
-          phase.spec.meta?.state?.sceneState?.detail?.layout ?? null
-        ),
+        routeLegCounts: [split.stageCount(), merge.stageCount()],
+        plannedOperations: plan.stages.map(stage => stage.operation.id),
+        automaticWaypointLayouts: splitPhases.slice(0, -1).map(phase => {
+          const endpoint = phase.reverse
+            ? phase.transitionSource.effectiveViewSpec
+            : phase.spec;
+          const encoding = endpoint.encoding ?? {};
+          return encoding.xOffset?.field || encoding.yOffset?.field
+            ? 'grouped'
+            : encoding.detail?.field ? 'stacked' : 'simple';
+        }),
         authoredEndpointsPreserved:
           JSON.stringify(merge.from) === JSON.stringify(detailed.toSpec()) &&
           JSON.stringify(merge.to) === JSON.stringify(aggregate.toSpec())
       };
     }, layout);
     expect(result.authoredEndpointsPreserved).toBe(true);
-    expect(result.phaseLayouts).toEqual(layout === 'grouped'
-      ? ['stacked', null]
-      : []);
+    const operations = layout === 'grouped'
+      ? ['__visdeltaBarGrain/grouping', '__visdeltaBarGrain/layout', 'encoding/color']
+      : ['__visdeltaBarGrain/grouping', 'encoding/color'];
+    expect(result.plannedOperations).toEqual(operations);
+    expect(result.routeLegCounts).toEqual([operations.length, operations.length]);
+    expect(result.automaticWaypointLayouts).toEqual(layout === 'grouped'
+      ? ['stacked', 'grouped']
+      : ['stacked']);
     for (const frame of result.frames) expect(frame.merge).toEqual(frame.split);
   });
 }
@@ -175,10 +282,13 @@ test('stacked filter continuously moves surviving segments onto their new stack 
     const change = await sl.transition(stacked, filtered, opts('#a'));
     const frame = progress => {
       change.progress(progress);
-      const node = change.view.querySelector('rect[data-key="B|high"]');
+      const bars = [...change.view.querySelectorAll('rect.vd-bar')];
+      const node = bars
+        .find(candidate => candidate.dataset.key === JSON.stringify(['B', 'high']));
       return {
         y: Number(node?.getAttribute('y')),
-        height: Number(node?.getAttribute('height'))
+        height: Number(node?.getAttribute('height')),
+        keys: bars.map(candidate => candidate.dataset.key)
       };
     };
     const source = frame(0);
@@ -190,11 +300,13 @@ test('stacked filter continuously moves surviving segments onto their new stack 
   });
 
   expect(result.source).not.toEqual(result.target);
+  expect(result.middle.keys).toContain(JSON.stringify(['B', 'high']));
   expect(result.afterExit).not.toEqual(result.target);
   expect(result.middle.y).toBeGreaterThan(Math.min(result.source.y, result.target.y));
   expect(result.middle.y).toBeLessThan(Math.max(result.source.y, result.target.y));
-  // Measured responsive margins can be fractional; allow only arithmetic noise.
-  expect(result.middle.height).toBeCloseTo(result.target.height, 10);
+  // Height follows the scale tween while the surviving segment moves between stack bases.
+  expect(result.middle.height).toBeGreaterThan(Math.min(result.source.height, result.target.height));
+  expect(result.middle.height).toBeLessThan(Math.max(result.source.height, result.target.height));
   expect(result.reverseMiddle).toEqual(result.middle);
 });
 
@@ -287,6 +399,149 @@ test('reaggregation composes split, update, and merge between unrelated grouping
   expect(errors).toEqual([]);
 });
 
+test('field color stays an encoding while reaggregation uses its common grain', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const from = root.x('year').color('year').rollup('year');
+    const to = root.x('location').rollup('location');
+    const change = await sl.transition(from, to, opts('#a'));
+    const phases = change.view.__visDeltaScene.seekSequence.phases;
+    const stateAtEnd = phase => phase.reverse
+      ? phase.transitionSource.effectiveViewSpec
+      : phase.spec;
+    const { canonicalBarTransitionPair } = await import('/dist/charts/bar/state.js');
+    const wholePairReverse = canonicalBarTransitionPair(from.toSpec(), to.toSpec()).reverse;
+    const progressAtEnd = phase => wholePairReverse ? 1 - phase.end : phase.end;
+    change.progress(0);
+    const sourceColors = new Set([...change.view.querySelectorAll('rect.vd-bar')]
+      .map(node => getComputedStyle(node).fill)).size;
+    const unboundPhase = phases.find(phase => {
+      const endpoint = stateAtEnd(phase);
+      const aggregate = endpoint.transform?.find(transform => transform.aggregate)?.aggregate;
+      return !endpoint.encoding?.color && aggregate?.groupby?.length === 1
+        && endpoint.encoding?.x?.field === 'year';
+    });
+    if (!unboundPhase) throw new Error('The field-color unbind phase was not present.');
+    change.progress(progressAtEnd(unboundPhase));
+    const unboundFills = new Set([...change.view.querySelectorAll('rect.vd-bar')]
+      .filter(node => Number(getComputedStyle(node).opacity) > 0.001)
+      .map(node => getComputedStyle(node).fill));
+    const commonGrainPhase = phases.find(phase => {
+      const endpoint = stateAtEnd(phase);
+      const aggregate = endpoint.transform?.find(transform => transform.aggregate)?.aggregate;
+      return aggregate?.groupby?.length === 2
+        && Boolean(endpoint.encoding?.xOffset?.field || endpoint.encoding?.yOffset?.field);
+    });
+    if (!commonGrainPhase) throw new Error('The grouped common-grain phase was not present.');
+    const progress = progressAtEnd(commonGrainPhase);
+    change.progress(progress);
+    const visible = [...change.view.querySelectorAll('rect.vd-bar')]
+      .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
+    const bridge = visible.map(node => ({
+      key: node.dataset.key,
+      fill: getComputedStyle(node).fill,
+      grouped: node.classList.contains('vd-bar-grouped'),
+      geometry: ['x', 'y', 'width', 'height'].map(name => Number(node.getAttribute(name)))
+    }));
+    const snapshot = JSON.stringify(bridge);
+    change.progress(1);
+    const targetFills = [...new Set([...change.view.querySelectorAll('rect.vd-bar')]
+      .map(node => getComputedStyle(node).fill))];
+    change.progress(progress);
+    return {
+      mode: change.delta.lineage.mode,
+      sourceColors,
+      targetFills,
+      encodingChanges: change.delta.stateChanges.filter(change => change.category === 'encoding')
+        .map(({ action, channel }) => ({ action, channel })),
+      unboundFills: [...unboundFills],
+      bars: visible.length,
+      grouped: visible.every(node => node.classList.contains('vd-bar-grouped')),
+      colors: new Set(visible.map(node => getComputedStyle(node).fill)).size,
+      bridge,
+      reverseMatches: JSON.stringify([...change.view.querySelectorAll('rect.vd-bar')]
+        .filter(node => Number(getComputedStyle(node).opacity) > 0.001).map(node => ({
+        key: node.dataset.key,
+        fill: getComputedStyle(node).fill,
+        grouped: node.classList.contains('vd-bar-grouped'),
+        geometry: ['x', 'y', 'width', 'height'].map(name => Number(node.getAttribute(name)))
+      }))) === snapshot
+    };
+  });
+
+  expect(result.mode).toBe('reaggregate');
+  expect(result.sourceColors).toBe(2);
+  expect(result.targetFills).toEqual(['rgb(0, 0, 0)']);
+  expect(result.encodingChanges).toEqual(expect.arrayContaining([{ action: 'unbind', channel: 'color' }]));
+  expect(result.unboundFills).toEqual(['rgb(0, 0, 0)']);
+  expect(result.bars).toBe(4);
+  expect(result.grouped).toBe(true);
+  expect(result.colors).toBe(1);
+  expect(result.bridge.every(mark => mark.fill === 'rgb(0, 0, 0)' && mark.grouped)).toBe(true);
+  expect(result.reverseMatches).toBe(true);
+});
+
+test('authored common-refinement bars regroup before merging by the other field', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const cases = [
+      { id: 'r1', year: 2020, location: 'A', cases: 10 },
+      { id: 'r2', year: 2020, location: 'B', cases: 5 },
+      { id: 'r3', year: 2021, location: 'A', cases: 12 },
+      { id: 'r4', year: 2021, location: 'B', cases: 8 }
+    ];
+    const root = sl.bar(cases).datumKey('id').y('cases');
+    const from = root.x('year').breakdown('location').color('location');
+    const to = root.x('location').rollup('location');
+    const change = await sl.transition(from, to, opts('#a'));
+    const phases = change.view.__visDeltaScene.seekSequence.phases;
+    const stateAtEnd = phase => phase.reverse
+      ? phase.transitionSource.effectiveViewSpec
+      : phase.spec;
+    const { canonicalBarTransitionPair } = await import('/dist/charts/bar/state.js');
+    const wholePairReverse = canonicalBarTransitionPair(from.toSpec(), to.toSpec()).reverse;
+    const groupedPhase = phases.find(phase => {
+      const endpoint = stateAtEnd(phase);
+      return Boolean(endpoint.encoding?.xOffset?.field || endpoint.encoding?.yOffset?.field);
+    });
+    if (!groupedPhase) throw new Error('The grouped common-refinement phase was not present.');
+    const progress = wholePairReverse ? 1 - groupedPhase.end : groupedPhase.end;
+    change.progress(progress);
+    const visible = [...change.view.querySelectorAll('rect.vd-bar')]
+      .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
+    const snapshot = visible.map(node => ({
+      key: node.dataset.key,
+      grouped: node.classList.contains('vd-bar-grouped'),
+      geometry: ['x', 'y', 'width', 'height'].map(name => Number(node.getAttribute(name)))
+    }));
+    change.progress(wholePairReverse ? 0 : 1);
+    change.progress(progress);
+    const reverseMatches = JSON.stringify(snapshot) === JSON.stringify(
+      [...change.view.querySelectorAll('rect.vd-bar')]
+        .filter(node => Number(getComputedStyle(node).opacity) > 0.001)
+        .map(node => ({
+          key: node.dataset.key,
+          grouped: node.classList.contains('vd-bar-grouped'),
+          geometry: ['x', 'y', 'width', 'height'].map(name => Number(node.getAttribute(name)))
+        }))
+    );
+    return {
+      mode: change.delta.lineage.mode,
+      bars: visible.length,
+      grouped: visible.every(node => node.classList.contains('vd-bar-grouped')),
+      keys: new Set(visible.map(node => node.dataset.key)).size,
+      reverseMatches
+    };
+  });
+
+  expect(result).toEqual({ mode: 'merge', bars: 4, grouped: true, keys: 4, reverseMatches: true });
+});
+
 test('additive reaggregation bridges the grouped common grain through stacked totals', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const cases = [
@@ -303,12 +558,21 @@ test('additive reaggregation bridges the grouped common grain through stacked to
     );
     change.progress(0.5);
     const phases = change.view.__visDeltaScene.seekSequence.phases;
-    const layouts = phases.map(phase =>
-      phase.spec.meta?.state?.sceneState?.detail?.layout ?? null
-    );
+    const { canonicalBarTransitionPair } = await import('/dist/charts/bar/state.js');
+    const wholePairReverse = canonicalBarTransitionPair(change.from, change.to).reverse;
+    const logicalEnd = phase => phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+    const layouts = phases.map(phase => {
+      const encoding = logicalEnd(phase).encoding ?? {};
+      return encoding.xOffset?.field || encoding.yOffset?.field ? 'grouped'
+        : encoding.detail?.field ? 'stacked' : 'simple';
+    });
     const reverses = phases.map(phase => phase.reverse ?? false);
-    const rendered = phases.map((phase) => {
-      change.progress((phase.start + phase.end) / 2);
+    const progressAt = (phase, local) => {
+      const progress = phase.start + (phase.end - phase.start) * local;
+      return wholePairReverse ? 1 - progress : progress;
+    };
+    const rendered = phases.map(phase => {
+      change.progress(progressAt(phase, 0.5));
       const bars = [...change.view.querySelectorAll('rect.vd-bar')]
         .filter(node => Number(getComputedStyle(node).opacity) > 0.001);
       return {
@@ -316,8 +580,11 @@ test('additive reaggregation bridges the grouped common grain through stacked to
         grouped: bars.some(node => node.classList.contains('vd-bar-grouped'))
       };
     });
-    const dividerFrame = (phase, localProgress) => {
-      change.progress(phase.start + (phase.end - phase.start) * localProgress);
+    const grainPhases = phases.filter(phase =>
+      Boolean(phase.transitionSource.effectiveViewSpec.encoding?.detail)
+        !== Boolean(phase.spec.encoding?.detail));
+    const dividerFrame = phase => {
+      change.progress(progressAt(phase, phase.reverse ? 0.7 : 0.3));
       const seam = [...change.view.querySelectorAll('path.vd-bar-seam')]
         .find(node => Number(getComputedStyle(node).opacity) > 0.001);
       const widths = [...change.view.querySelectorAll('rect.vd-bar')]
@@ -328,16 +595,13 @@ test('additive reaggregation bridges the grouped common grain through stacked to
         relativeLength: seam.getTotalLength() / Math.max(...widths, 1)
       } : null;
     };
-    const dividerFrames = [
-      dividerFrame(phases[0], 0.1),
-      dividerFrame(phases.at(-1), 0.9)
-    ];
+    const dividerFrames = grainPhases.map(dividerFrame);
     return { layouts, reverses, rendered, dividerFrames };
   });
 
-  expect(result.layouts).toEqual(['stacked', 'grouped', 'grouped', 'stacked', 'stacked']);
-  expect(result.reverses).toEqual([false, false, false, false, true]);
-  expect(result.rendered.slice(0, 4)).toEqual([
+  expect(result.layouts).toEqual(['simple', 'stacked', 'grouped', 'grouped', 'stacked', 'simple']);
+  expect(result.reverses).toEqual([false, false, false, false, false, true]);
+  expect(result.rendered.slice(1, 5)).toEqual([
     { stacked: true, grouped: false },
     { stacked: false, grouped: true },
     { stacked: false, grouped: true },
@@ -440,6 +704,28 @@ test('sequence gives inferred stages time without moving authored boundaries', a
   expect(result.afterOneStage).toBeGreaterThan(0);
   expect(result.afterOneStage).toBeLessThan(1);
   expect(result.final).toBe(1);
+});
+
+test('failed sequence preparation removes pending mounts and keeps its host intact', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const host = document.querySelector('#a');
+    host.innerHTML = '<p>keep sequence host</p>';
+    const first = base;
+    const second = base.y('other');
+    const invalid = sl.bar([{ id: 'dup', value: 1 }, { id: 'dup', value: 2 }])
+      .datumKey('id').x('id').y('value').key('id');
+    let message = '';
+    try { await sl.sequence([first, second, invalid], opts('#a')); }
+    catch (error) { message = String(error.message); }
+    return {
+      message,
+      html: host.innerHTML,
+      mounts: document.querySelectorAll('body > div[style*="-100000px"]').length
+    };
+  });
+  expect(result.message).toContain('Duplicate datum key');
+  expect(result.html).toBe('<p>keep sequence host</p>');
+  expect(result.mounts).toBe(0);
 });
 
 test('a reaggregation sequence hands B to B without an empty boundary frame', async ({ page }) => {

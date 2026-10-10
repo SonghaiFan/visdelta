@@ -1,6 +1,9 @@
 import type { Visualization } from './core.js';
+import { cloneState } from './grammar/view-state.js';
 import { transition } from './transition.js';
 import type { TransitionOptions, VisualizationTransition } from './transition.js';
+import { resolveTarget } from './runtime/target.js';
+import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 
 /** Options for a timeline of adjacent visualization states. */
 export interface SequenceOptions extends TransitionOptions {}
@@ -36,10 +39,6 @@ interface Segment {
   stageCount: number;
 }
 
-interface TimedVisualizationTransition extends VisualizationTransition {
-  stageCount(): number;
-}
-
 /**
  * Turn an ordered set of immutable states into a seekable timeline.
  *
@@ -51,6 +50,9 @@ interface TimedVisualizationTransition extends VisualizationTransition {
  */
 export async function sequence(states: readonly Visualization[], options: SequenceOptions): Promise<VisualizationSequence> {
   if (states.length < 2) throw new Error('sequence() requires at least two visualization states.');
+  const authoredStates = Object.freeze(states.map(state =>
+    typeof (state as { toSpec?: unknown }).toSpec === 'function' ? state : cloneState(state)
+  ));
 
   const host = resolveTarget(options.target);
   const segments: Segment[] = [];
@@ -60,20 +62,22 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   let destroyed = false;
 
   try {
-    for (let index = 0; index < states.length - 1; index += 1) {
+    for (let index = 0; index < authoredStates.length - 1; index += 1) {
       // D3 schedules named transitions on connected nodes. Prepare each leg in
       // a same-sized, hidden document mount; the visible host stays untouched.
       const mount = preparationMount(host, options.height);
-      const controller = await transition(states[index], states[index + 1], { ...options, target: mount });
-      const root = mount.firstElementChild;
-      if (!root) throw new Error('sequence() could not prepare a transition surface.');
-      const timed = controller as TimedVisualizationTransition;
-      segments.push({
-        controller,
-        mount,
-        root,
-        stageCount: Math.max(1, Number(timed.stageCount?.()) || 1)
-      });
+      let controller: VisualizationTransition | undefined;
+      try {
+        controller = await transition(authoredStates[index], authoredStates[index + 1], { ...options, target: mount });
+        const root = mount.firstElementChild;
+        if (!root) throw new Error('sequence() could not prepare a transition surface.');
+        const timed = controller as TimedVisualizationTransition;
+        segments.push({ controller, mount, root, stageCount: Math.max(1, Number(timed.stageCount?.()) || 1) });
+      } catch (error) {
+        controller?.destroy();
+        mount.remove();
+        throw error;
+      }
     }
   } catch (error) {
     segments.forEach(segment => {
@@ -93,7 +97,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   }
 
   function location(next: number) {
-    const lastState = states.length - 1;
+    const lastState = authoredStates.length - 1;
     const clamped = Math.max(0, Math.min(lastState, next));
     if (clamped === lastState) return { index: lastState - 1, local: 1, value: clamped };
     const index = Math.floor(clamped);
@@ -113,14 +117,14 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   function timelinePosition(next: number): number {
     const total = segments.reduce((sum, segment) => sum + segment.stageCount, 0);
     const bounded = Math.max(0, Math.min(total, next));
-    if (bounded === total) return states.length - 1;
+    if (bounded === total) return authoredStates.length - 1;
     let cursor = 0;
     for (let index = 0; index < segments.length; index += 1) {
       const count = segments[index].stageCount;
       if (bounded <= cursor + count) return index + (bounded - cursor) / count;
       cursor += count;
     }
-    return states.length - 1;
+    return authoredStates.length - 1;
   }
 
   function activate(index: number) {
@@ -136,7 +140,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   }
 
   const controller: VisualizationSequence = {
-    states,
+    states: authoredStates,
     get value() { return value; },
     progress(next) {
       assertAlive();
@@ -148,7 +152,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       value = frame.value;
       return controller;
     },
-    play({ duration = 800, from = value, to = states.length - 1 } = {}) {
+    play({ duration = 800, from = value, to = authoredStates.length - 1 } = {}) {
       assertAlive();
       if (!Number.isFinite(duration) || duration < 0) throw new Error('duration must be a finite non-negative number.');
       if (!Number.isFinite(from) || !Number.isFinite(to)) throw new Error('sequence play positions must be finite numbers.');
@@ -194,13 +198,6 @@ export async function sequence(states: readonly Visualization[], options: Sequen
 
   controller.progress(0);
   return controller;
-}
-
-function resolveTarget(target: string | Element): Element {
-  if (typeof target !== 'string') return target;
-  const node = document.querySelector(target);
-  if (!node) throw new Error(`VisDelta target not found: ${target}`);
-  return node;
 }
 
 function preparationMount(host: Element, height: number | undefined): HTMLDivElement {

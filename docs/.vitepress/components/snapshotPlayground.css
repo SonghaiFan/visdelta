@@ -1,0 +1,144 @@
+.playground-page-main { max-width: 1560px; margin: 0 auto; padding: 34px 32px 52px; }
+.playground-page-heading { display: flex; justify-content: space-between; align-items: center; margin: 0 10px 24px; }
+.playground-page-heading h1 { margin: 0; border: 0; font-size: var(--ui-text-xl); font-weight: 650; letter-spacing: -.02em; }
+.playground-page-heading h1 span { margin-left: 22px; color: var(--ui-color-text-subtle); font-size: 12px; font-weight: 450; letter-spacing: 0; }
+.playground-page-heading a { font-size: 11px; color: var(--ui-color-text-muted); }
+.playground-page-note { max-width: 800px; margin: 24px 10px 0; font-size: 12px; color: var(--ui-color-text-subtle); line-height: 1.7; }
+.playground-page .chart-playground { margin: 0; padding: 18px; border-radius: var(--ui-radius-lg); background: var(--ui-color-canvas); }
+.playground-page .chart-playground-tabs { border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0; }
+.playground-page .chart-playground-tabs > span,
+.playground-page .playground-nav-label { padding: 14px 18px 10px; font-size: 10px; }
+.playground-page .chart-playground-tabs button { min-height: 54px; font-size: 13px; }
+.playground-page .syntax-playground { margin: 0; background: transparent; overflow: visible; }
+.playground-page .playground-example-nav { border-radius: 0 0 var(--ui-radius-lg) var(--ui-radius-lg); overflow: hidden; }
+.playground-page .playground-category-tabs button { min-height: 68px; }
+.playground-page .playground-category-name { font-size: 12px; }
+.playground-page .playground-example-list { padding: 12px 18px; height: 65px; }
+.snapshot-film { display: flex; align-items: stretch; gap: 22px; overflow-x: auto; padding: 15px 20px 18px; margin: 16px 0 0; border-top: var(--ui-border); min-height: 152px; }
+.snapshot-frame { position: relative; flex: 0 0 154px; border: 1px solid transparent; border-radius: var(--ui-radius-lg); background: var(--ui-color-surface); overflow: hidden; box-shadow: none; }
+.snapshot-frame.is-active { border-color: var(--ui-color-accent); box-shadow: inset 0 -2px var(--ui-color-accent); }
+.snapshot-select { width: 100%; height: 100%; text-align: left; cursor: pointer; }
+.snapshot-select img { display: block; width: 100%; height: 86px; object-fit: contain; }
+.snapshot-select span { display: flex; gap: 10px; padding: 4px 14px 10px; font: 10px var(--ui-font-mono); }
+.snapshot-select small { color: var(--ui-color-text-subtle); }
+.snapshot-delete { position: absolute; right: 7px; top: 5px; width: 22px; height: 22px; border-radius: var(--ui-radius-sm); background: var(--ui-color-canvas); font-size: 15px; color: var(--ui-color-text-muted); cursor: pointer; }
+.snapshot-delete:disabled { opacity: .25; cursor: default; }
+.snapshot-render-target { position: absolute; width: 480px; visibility: hidden; pointer-events: none; }
+.snapshot-workspace { position: relative; display: grid; grid-template-columns: minmax(0, 29fr) minmax(0, 67fr); align-items: stretch; gap: 3%; min-height: 620px; padding: 10px 7% 20px 8px; }
+.snapshot-data { grid-column: 1; grid-row: 1; min-width: 0; padding: 18px; border: 0; border-radius: var(--ui-radius-lg); background: var(--ui-color-surface); }
+.snapshot-panel-head { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 10px; padding: 0 14px; font: 600 10px var(--ui-font-mono); text-transform: uppercase; letter-spacing: .07em; }
+.snapshot-panel-head span, .snapshot-panel-head output { color: var(--ui-color-text-subtle); font: inherit; }
+.snapshot-data .snapshot-panel-head { background: var(--ui-color-surface); border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0; }
+.snapshot-data-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 12px; background: var(--ui-color-surface); }
+.snapshot-data-tools > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--ui-color-text-subtle); font: 10px var(--ui-font-mono); }
+.dataset-open { flex-shrink: 0; padding: 5px 7px; border: 1px solid var(--ui-color-line); border-radius: var(--ui-radius-sm); font-size: 10px; cursor: pointer; }
+.dataset-open:hover { border-color: var(--ui-color-accent); color: var(--ui-color-accent); }
+.snapshot-table-scroll { height: 478px; overflow: auto; background: var(--ui-color-surface); border-radius: 0 0 var(--ui-radius-lg) var(--ui-radius-lg); }
+.snapshot-table-scroll table { width: 100%; border-collapse: collapse; font: 11px/1.5 var(--ui-font-mono); white-space: nowrap; text-align: left; }
+.snapshot-table-scroll th { position: sticky; top: 0; padding: 12px 14px; background: var(--ui-color-surface-strong); color: var(--ui-color-text-subtle); text-transform: uppercase; font-size: 9px; letter-spacing: .04em; }
+.snapshot-table-scroll td { padding: 12px 14px; }
+.snapshot-code { grid-column: 2; grid-row: 1; min-width: 0; border-radius: var(--ui-radius-lg); background: var(--ui-code-bg); color: var(--ui-code-text); align-self: stretch; margin: 18px 0 10px; }
+.snapshot-code .playground-editor-pane { position: relative; padding: 0; border: 0; min-height: 580px; }
+.snapshot-code .playground-toolbar { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--ui-code-line); color: var(--ui-code-muted); flex-wrap: wrap; margin: 0; }
+.snapshot-file { font: 11px var(--ui-font-mono); margin-right: auto; }
+.snapshot-file small { margin-left: 9px; color: var(--ui-code-muted); font-size: 9px; }
+.snapshot-code .playground-status { padding: 0; font-size: var(--ui-text-2xs); min-width: 0; }
+.snapshot-code .playground-toolbar button { color: var(--ui-code-text); background: var(--ui-code-control); border-color: var(--ui-code-control-line); border-radius: var(--ui-radius-sm) !important; min-height: 25px; padding: 0 8px; font-size: 10px; }
+.snapshot-code .playground-toolbar kbd { color: var(--ui-code-muted); }
+.snapshot-code .playground-code-cell { display: block; padding: 8px 0; }
+.snapshot-code .editable-code-cell { height: 460px; }
+.snapshot-code .cm-scroller { padding-right: 0; }
+.snapshot-code .playground-contract { padding: 0 18px 16px; color: var(--ui-code-muted); font-size: 10px; }
+.snapshot-chart { position: absolute; top: 94px; right: 0; width: 35%; z-index: 2; min-width: 0; border: 0; border-radius: var(--ui-radius-lg); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-float); overflow: hidden; }
+.snapshot-chart .snapshot-panel-head { min-height: 38px; padding: 8px 12px 0 20px; font-size: var(--ui-text-2xs); }
+.snapshot-chart .snapshot-panel-head output { flex: 1; text-align: right; }
+.snapshot-chart .snapshot-panel-head strong { display: flex; align-items: center; gap: 6px; }
+.snapshot-chart .snapshot-panel-head i { width: 5px; height: 5px; border-radius: 50%; background: var(--ui-color-accent); }
+.snapshot-chart .playground-output-pane { padding: 0 16px 8px; }
+.snapshot-chart .playground-chart-stage, .snapshot-chart .playground-chart { min-height: 0; background: transparent; }
+.snapshot-chart .vd-figure { border: 0; background: transparent; border-radius: 0; }
+.snapshot-chart .vd-figure-header { display: none; }
+.snapshot-chart .vd-view, .snapshot-chart .vd-view svg { min-height: 0; height: 280px; }
+.snapshot-chart .vd-legend { padding: 8px 12px; font-size: 9px; }
+.snapshot-chart .playground-description { font-size: 10px; line-height: 1.5; margin: 4px 5px 0; color: var(--ui-color-text-subtle); }
+.snapshot-chart .playground-output-pane > input[type="range"] { margin-top: 8px; height: 3px; }
+.snapshot-chart .playground-output-actions { margin: 5px 0; gap: 4px; }
+.snapshot-chart .playground-output-actions button { min-height: 26px; font-size: 10px; padding: 0 5px; background: transparent; border-radius: var(--ui-radius-sm) !important; }
+.snapshot-chart .playground-output-pane summary { padding: 6px 0; font-size: 9px; }
+.snapshot-error { color: var(--ui-code-danger); white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.6 var(--ui-font-mono); padding: 8px 18px; }
+/* The editor remains usable beneath the floating preview: text wraps in its exposed area. */
+@media (min-width: 1001px) {
+  .snapshot-playground.is-chart-float .snapshot-code .playground-code-cell,
+  .snapshot-playground.is-chart-float .snapshot-code .playground-contract,
+  .snapshot-playground.is-chart-float .snapshot-code .snapshot-error { width: 53%; }
+  .snapshot-playground.is-chart-float .snapshot-chart { transform: translate(var(--float-x, 0px), var(--float-y, 0px)); }
+  .snapshot-playground.is-chart-float .snapshot-chart .snapshot-panel-head { cursor: grab; touch-action: none; user-select: none; }
+  .snapshot-playground.is-chart-float.is-dragging .snapshot-chart .snapshot-panel-head { cursor: grabbing; }
+  /* Docked: data, code and chart sit side by side; nothing overlaps the editor. */
+  .snapshot-playground.is-chart-dock .snapshot-workspace { grid-template-columns: minmax(0, 24fr) minmax(0, 40fr) minmax(0, 36fr); gap: var(--ui-space-4); padding: 10px 8px 20px; }
+  .snapshot-playground.is-chart-dock .snapshot-chart { position: relative; top: auto; right: auto; grid-column: 3; grid-row: 1; align-self: start; width: auto; margin: 18px 0 10px; box-shadow: none; }
+}
+.dataset-dialog { width: min(660px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 26px; border: 1px solid var(--ui-color-line); border-radius: var(--ui-radius-lg); background: var(--ui-color-canvas); color: var(--ui-color-text); box-shadow: var(--ui-shadow-float); }
+.dataset-dialog::backdrop { background: var(--ui-scrim); backdrop-filter: blur(4px); }
+.dataset-dialog header { display: flex; align-items: start; justify-content: space-between; margin-bottom: 22px; }
+.dataset-dialog header span { font: 10px var(--ui-font-mono); color: var(--ui-color-text-subtle); letter-spacing: .1em; }
+.dataset-dialog h2 { font-size: 25px; font-weight: 600; margin: 6px 0 0; letter-spacing: -.04em; }
+.dataset-dialog header button { font-size: 24px; line-height: 1; cursor: pointer; }
+.dataset-sources, .dataset-mapping { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: end; }
+.dataset-dialog label { display: grid; gap: 8px; font-size: 11px; }
+.dataset-dialog select { width: 100%; min-height: 37px; padding: 7px 9px; border: 1px solid var(--ui-color-line); border-radius: var(--ui-radius-sm); background: var(--ui-color-surface); font-size: 12px; }
+.dataset-upload { position: relative; min-height: 37px; align-content: center; text-align: center; border: 1px dashed var(--ui-color-text-subtle); border-radius: var(--ui-radius-sm); cursor: pointer; }
+.dataset-upload input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }
+.dataset-upload:focus-within { outline: 2px solid var(--ui-color-accent); }
+.dataset-local { font-size: 11px; color: var(--ui-color-text-subtle); line-height: 1.6; margin: 12px 0 20px; }
+.dataset-preview-title { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; margin-bottom: 10px; }
+.dataset-preview-title span { color: var(--ui-color-text-subtle); }
+.dataset-preview { overflow: auto; max-height: 170px; margin-bottom: 16px; background: var(--ui-color-surface); border-radius: var(--ui-radius-sm); }
+.dataset-preview table { width: 100%; text-align: left; font: 11px var(--ui-font-mono); white-space: nowrap; border-collapse: collapse; }
+.dataset-preview th, .dataset-preview td { padding: 8px 12px; }
+.dataset-preview th { color: var(--ui-color-text-subtle); }
+.dataset-source { margin: 16px 0; padding: 15px; background: var(--ui-code-bg); color: var(--ui-code-text); border-radius: var(--ui-radius-sm); font-size: 11px; overflow: auto; }
+.dataset-dialog footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; }
+.dataset-dialog footer span { font-size: 11px; color: var(--ui-color-text-subtle); }
+.dataset-dialog footer button { flex-shrink: 0; padding: 9px 13px; border-radius: var(--ui-radius-sm); background: var(--ui-color-accent); color: var(--ui-color-on-accent); font-size: 12px; cursor: pointer; }
+.dataset-dialog button:disabled { opacity: .4; cursor: default; }
+.dataset-dialog .snapshot-error { padding: 0; color: var(--ui-color-danger); }
+@media (max-width: 1000px) {
+  .playground-dock-toggle { display: none; }
+  .playground-page-main { padding: 22px 18px 36px; }
+  .snapshot-workspace { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; padding: 10px 0; }
+  .snapshot-data { grid-column: 1; grid-row: 1 / 3; padding: 10px; }
+  .snapshot-code { grid-column: 2; grid-row: 1; margin: 0; }
+  .snapshot-code .playground-editor-pane { min-height: 0; }
+  .snapshot-code .editable-code-cell { height: 320px; }
+  .snapshot-chart { position: relative; grid-column: 2; grid-row: 2; top: auto; right: auto; width: 100%; margin-top: -8px; }
+  .snapshot-table-scroll { height: 660px; }
+}
+@media (max-width: 640px) {
+  .playground-page-main { padding: 18px 12px 30px; }
+  .playground-page-heading { margin: 0 4px 18px; }
+  .playground-page-heading h1 span { display: none; }
+  .playground-page .chart-playground { padding: 10px; border-radius: var(--ui-radius-lg); }
+  .playground-page .chart-playground-tabs button { min-height: 44px; font-size: 11px; }
+  .playground-page .playground-category-tabs { display: flex; overflow-x: auto; }
+  .playground-page .playground-category-tabs button { flex: 0 0 auto; min-width: 114px; padding-inline: 12px; min-height: 54px; border-bottom: 0; border-right: 1px solid var(--ui-color-line); }
+  .playground-page .playground-category-name { font-size: 10px; gap: 5px; }
+  .playground-page .playground-category-icon { width: 22px; height: 22px; }
+  .playground-page .playground-category-count { display: none; }
+  .playground-page .playground-example-list { padding-inline: 10px; }
+  .snapshot-film { padding-inline: 4px; gap: 12px; }
+  .snapshot-frame { flex-basis: 136px; border-radius: var(--ui-radius-lg); }
+  .snapshot-workspace { display: flex; flex-direction: column; gap: 18px; }
+  .snapshot-data, .snapshot-code, .snapshot-chart { width: 100%; margin: 0; }
+  .snapshot-data { order: 0; border-radius: var(--ui-radius-lg); }
+  .snapshot-code { order: 1; }
+  .snapshot-chart { order: 2; border-radius: var(--ui-radius-lg); }
+  .snapshot-table-scroll { height: 190px; }
+  .snapshot-code .editable-code-cell { height: 310px; }
+  .snapshot-code .playground-toolbar { padding: 10px; gap: 7px; }
+  .snapshot-code .playground-status { margin-left: 0; }
+  .snapshot-file small { display: none; }
+  .dataset-dialog { padding: 20px; }
+  .dataset-sources { grid-template-columns: 1fr; }
+  .dataset-dialog footer { align-items: end; }
+}

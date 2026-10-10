@@ -1,6 +1,7 @@
 import { keyAccessor, semanticKeyForDatum, semanticMeasureForDatum } from '../../identity/semantic-key.js';
 import { specSemanticKey } from '../../spec-meta.js';
 import type { ChartContext, DataRow, ViewSpec } from '../../types/index.js';
+import { barTransitionPlan } from './plan.js';
 
 type KeyFn = (this: Element, d: DataRow, i: number) => string | number;
 
@@ -10,9 +11,7 @@ export function barKeyAccessor(
   fallbackField: string | string[] = 'id'
 ): KeyFn {
   const fallback = keyAccessor(spec, fallbackField) as KeyFn;
-  const matchPlan = chart.transitionPlan?.match as
-    | { mode?: string }
-    | undefined;
+  const matchPlan = barTransitionPlan(chart)?.match;
 
   if (matchPlan?.mode !== 'semantic' || !specSemanticKey(spec)) {
     return fallback;

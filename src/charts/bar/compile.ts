@@ -107,14 +107,6 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
   });
 }
 
-function compileBarScale(spec: ViewSpec, operationSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
-  return compileBarCoordinate(spec, operationSpec, context);
-}
-
-function compileBarLayout(spec: ViewSpec, operationSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
-  return compileBarCoordinate(spec, operationSpec, context);
-}
-
 function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
   const encoding = spec.encoding as Encoding || {};
   const categoryField = (detailSpec['category'] as string) || (encoding['x'] as ChannelSpec)?.field || 'category';
@@ -169,15 +161,21 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
     delete (newEncoding as AnyRecord)['yOffset'];
   }
 
+  const markFields = [...new Set([categoryField, segmentField].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const semantic = (detailSpec['semantic'] as SemanticKey | undefined) ||
+    (detailSpec['semanticKey'] as SemanticKey | undefined) ||
+    (fields.length
+      ? semanticKeyFromParts({ field: categoryField }, { field: sourceField })
+      : semanticKeyFromParts(markFields.map((field) => ({ field })), { value: valueField }));
+
   return withSceneState(withObject({
     ...spec,
     transform,
     encoding: newEncoding as ViewSpec['encoding']
   }, {
-    key: (detailSpec['key'] as string | string[] | undefined) || [categoryField, segmentField],
-    semantic: (detailSpec['semantic'] as SemanticKey | undefined) ||
-      (detailSpec['semanticKey'] as SemanticKey | undefined) ||
-      semanticKeyFromParts({ field: categoryField }, { field: sourceField })
+    key: (detailSpec['key'] as string | string[] | undefined) || markFields,
+    semantic
   }), {
     detail: {
       layout,
@@ -241,7 +239,7 @@ function encodingWithBarLayout(
   return next;
 }
 
-function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: SemanticKey | null = null): SemanticKey | null {
+export function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: SemanticKey | null = null): SemanticKey | null {
   const cat = categoryChannel(encoding);
   const meas = measureChannel(encoding);
   if (!cat?.field || !meas?.field) return previousSemanticKey;

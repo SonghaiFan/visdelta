@@ -8,8 +8,7 @@ import { line } from "visdelta/line";
 
 const chart = line(rows)
   .x("date", { type: "temporal" })
-  .y("close")
-  .key("date");
+  .y("close");
 ```
 
 Every chain creates a new immutable state. `.toSpec()` returns a detached plain
@@ -134,5 +133,5 @@ fields therefore form labelled attractor bands without being inferred from color
 remaining unmatched units use a global minimum-travel assignment. Unit layout
 changes use a short bounded per-mark stagger unless the author overrides it.
 
-The [interactive reference](/reference) covers exact runtime signatures. Each
-lab shows the chart-owned transition rules with real data.
+The [interactive reference](/reference) covers exact runtime signatures. The
+[Playground](/playground) shows every chart-owned transition rule with real data.

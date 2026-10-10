@@ -26,8 +26,7 @@ import "visdelta/style.css";
 
 const revenue = bar(rows)
   .x("category")
-  .y("revenue")
-  .key("category");
+  .y("revenue");
 
 const profit = revenue.y("profit");
 const change = await transition(revenue, profit, {

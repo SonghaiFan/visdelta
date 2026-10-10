@@ -1,4 +1,5 @@
-import { specObjectKey, specSemanticKey, specState } from '../spec-meta.js';
+import { specObjectKey, specScopes, specSemanticKey, specState } from '../spec-meta.js';
+import { declarationEdits } from './declaration-edits.js';
 import type {
   Delta,
   DeltaAction,
@@ -34,6 +35,7 @@ export function diffViewStates(
   const semantic = diffSemanticViewStates(prev, curr);
 
   return {
+    edits: declarationEdits(prev, curr),
     changed,
     has: (key) => changed.includes(key),
     deltas: semantic.deltas,
@@ -111,6 +113,9 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
   const stateFields = specState(spec);
   const sceneState: ChartChangeState = stateFields.sceneState ?? {};
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
+  const selection = sceneState.selection ?? stateFields.selection ?? spec.selection ?? null;
+  const scopes = specScopes(spec);
+  const selectionMode = selection?.mode;
 
   const state: SemanticViewState = {
     mark: spec.mark ?? null,
@@ -122,8 +127,8 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
       ...transforms.filter((t) => t.filter).map((t) => t.filter as FilterSpec)
     ],
     nonFilterTransforms: transforms.filter((t) => !t.filter),
-    selection: sceneState.selection ?? stateFields.selection ?? null,
-    scopes: stateFields.scopes ?? {},
+    selection: selectionMode === 'focus' || selectionMode === 'highlight' ? null : selection,
+    scopes,
     axis: sceneState.axis ?? stateFields.axis ?? null,
     detail: (sceneState.detail ?? stateFields.detail ?? null) as DetailSpec | null
   };

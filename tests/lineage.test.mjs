@@ -7,7 +7,9 @@ import {
   bar,
   delta
 } from '../dist/index.js';
+import { applyTransforms } from '../dist/data/transforms.js';
 import {
+  barState,
   barIntermediateSpecs,
   barReaggregationIntermediateSpecs
 } from '../dist/charts/bar/state.js';
@@ -18,6 +20,27 @@ const cases = [
   { id: 'r3', year: 2021, location: 'A', case: 12 },
   { id: 'r4', year: 2021, location: 'B', case: 8 }
 ];
+
+test('lineage and rendered rows use identical ordered transform semantics', () => {
+  const rows = [
+    { id: 'a', date: '2026-01-01', first: 11, second: 4 },
+    { id: 'b', date: '2026-02-01', first: 23, second: 7 },
+    { id: 'c', date: '2026-03-01', first: null, second: 9 }
+  ];
+  const pipelines = [
+    [{ timeUnit: { field: 'date', unit: 'month', as: 'month' } }],
+    [{ fold: { fields: ['first', 'second'], as: ['measure', 'amount'] } }],
+    [{ bin: { field: 'first', as: 'bucket', step: 10 } }],
+    [{ aggregate: { groupby: ['month'], fields: [{ op: 'mean', field: 'first', as: 'average' }] } }],
+    [{ sort: { field: 'first', order: 'descending' } }, { limit: 2 }]
+  ];
+  for (const transform of pipelines) {
+    assert.deepEqual(
+      compileLineage(rows, transform, { key: 'id' }).rows.map(row => row.datum),
+      applyTransforms(rows, transform)
+    );
+  }
+});
 
 function sumBy(field) {
   return [{
@@ -119,6 +142,42 @@ test('bar reaggregation plans split, update, and merge through one stable refine
     'year',
     null
   ]);
+});
+
+test('field color remains encoding and does not disable the reaggregation route', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const byYear = base.x('year').color('year').rollup('year').toSpec();
+  const byLocation = base.x('location').rollup('location').toSpec();
+  const state = barState(byYear);
+  const phases = barIntermediateSpecs(byYear, byLocation);
+
+  assert.equal(state.barLayout, 'simple');
+  assert.equal(state.hasDetail, false);
+  assert.equal(state.segmentField, null);
+  assert.equal(phases.length, 4);
+  assert.deepEqual(phases.map(phase => phase.spec.meta.state.sceneState.detail.layout), [
+    'stacked', 'grouped', 'grouped', 'stacked'
+  ]);
+});
+
+test('authored common refinement regroups before merging into its other field', () => {
+  const base = bar(cases).datumKey('id').y('case');
+  const detailed = base.x('year').breakdown('location').color('location').toSpec();
+  const byLocation = base.x('location').rollup('location').toSpec();
+  const phases = barIntermediateSpecs(detailed, byLocation);
+
+  assert.deepEqual(detailed.meta.object.key, ['location', 'year']);
+  assert.deepEqual(detailed.meta.object.semantic, phases[0].spec.meta.object.semantic);
+  assert.deepEqual(phases.map(phase => [
+    phase.spec.encoding.x.field,
+    phase.spec.encoding.detail?.field,
+    phase.spec.meta.state.sceneState.detail.layout
+  ]), [
+    ['year', 'location', 'grouped'],
+    ['location', 'year', 'grouped'],
+    ['location', 'year', 'stacked']
+  ]);
+  assert.ok(phases.every(phase => phase.spec.meta.object.key.length === 2));
 });
 
 test('additive grouped split first reaches detail grain as a stack', () => {
@@ -251,7 +310,7 @@ test('lineage transform values match renderer missing-value semantics', () => {
   const mean = compileLineage(source, [{
     aggregate: { fields: [{ op: 'mean', field: 'value', as: 'result' }] }
   }], { key: 'id' });
-  assert.equal(mean.rows[0].datum.result, 1 / 3);
+  assert.equal(mean.rows[0].datum.result, 1);
 
   const binned = compileLineage(source, [{ bin: { field: 'value', step: 1 } }], { key: 'id' });
   assert.deepEqual(binned.rows.map(row => row.datum.value_bin), ['1-2', null, null, null]);
@@ -316,4 +375,25 @@ test('datum identity rejects duplicates and reports unsafe index fallback', () =
   const duplicateIds = compileLineage([{ id: 'A', value: 1 }, { id: 'A', value: 2 }]);
   assert.equal(duplicateIds.identity.mode, 'index');
   assert.equal(duplicateIds.identity.stable, false);
+});
+
+test('datum identity infers the smallest unique categorical field set', () => {
+  const flowers = compileLineage([
+    { flowerId: 'iris-001', species: 'setosa', value: 1 },
+    { flowerId: 'iris-002', species: 'setosa', value: 2 }
+  ]);
+  assert.equal(flowers.identity.mode, 'inferred-fields');
+  assert.equal(flowers.identity.key, 'flowerId');
+  assert.equal(flowers.identity.stable, true);
+
+  const population = compileLineage([
+    { state: 'CA', age: '<10', population: 1 },
+    { state: 'CA', age: '≥80', population: 2 },
+    { state: 'TX', age: '<10', population: 3 },
+    { state: 'TX', age: '≥80', population: 4 }
+  ]);
+  assert.deepEqual(population.identity.key, ['state', 'age']);
+  assert.deepEqual(population.rows.map((row) => row.lineage[0].datumKey), [
+    '["CA","<10"]', '["CA","≥80"]', '["TX","<10"]', '["TX","≥80"]'
+  ]);
 });

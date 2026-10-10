@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+- Added `editorialChartStyle`, an opt-in ink-on-paper chart style: warm
+  neutral ink for undeclared marks, 0.75px hairline grids, 1px Point
+  connectors, a flat figure and tabular tick numerals. It keeps the default
+  categorical palette; `d3ChartStyle` remains the default.
+- Reorganized the documentation site into four sections: Home (the live code →
+  chart demo), Docs (philosophy and syntax tracks), Playground and a new
+  Gallery of visual idioms grouped by mark. Each idiom is drawn live from
+  bundled data, opens in a full-size viewer with its code, and can be edited
+  in the Playground. The Playground chart floats at the top right by
+  default and can be docked beside the code.
+- Extracted the site's shared visual values into three-tier design tokens
+  (`docs/.vitepress/theme/tokens.css`), documented on a Design tokens page.
+
+- Added canonical operation planning for supported Bar, Point, Line, Area and
+  Unit declarations. Routes use complete valid states, edit one semantic
+  operation per stage, and reuse the same path in reverse. Chart modules own
+  their supported subsets and native fallback behavior.
+- Normalized equivalent defaults and connector declarations, derived aggregate
+  bindings and identity metadata, and validated intermediate data fields and
+  layout dependencies.
+- Fixed cached reverse-stage endpoint cleanup and Unit force endpoint reuse,
+  preventing a final-frame layout jump without changing forward completion.
+- Added real-browser route and regression coverage, a live Bar Grain reference
+  example, package-consumer checks, and [review lessons](notes/2026-10-11-codebase-review.md).
+
 ## 0.3.0 - 2026-09-17
 
 This release adds normalized state-change inspection and aligns the package

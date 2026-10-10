@@ -18,7 +18,6 @@ const chartTypes = [
       'const chart = bar(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [
@@ -34,7 +33,6 @@ const chartTypes = [
       'const chart = line(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [
@@ -50,7 +48,6 @@ const chartTypes = [
       'const chart = area(rows)',
       '  .x("year")',
       '  .y("sites")',
-      '  .key(["year", "country"])',
       '  .breakdown("country")'
     ],
     operations: [
@@ -333,7 +330,7 @@ async function advance() {
         <p class="hero-install-command" aria-label="Install VisDelta with npm"><span aria-hidden="true">$</span><code>npm install visdelta</code></p>
         <div class="product-hero-actions">
           <a class="product-primary-action" href="./getting-started.html">Get started</a>
-      <a href="./language-framework.html#run-a-state-difference">Run a difference</a>
+      <a href="./playground.html">Run a difference</a>
         </div>
       </div>
     </header>

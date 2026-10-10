@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createChartRuntime } from '../dist/runtime/chart-runtime.js';
-import { resolveChartPresentation, d3ChartStyle, paperChartStyle, darkChartStyle } from '../dist/charts/style.js';
+import { resolveChartPresentation, d3ChartStyle, paperChartStyle, darkChartStyle, editorialChartStyle } from '../dist/charts/style.js';
 import { barPresentation } from '../dist/charts/bar/style.js';
 
 const rows = [{ x: 'A', y: 10, group: 'North' }, { x: 'B', y: 30, group: 'South' }];
@@ -13,7 +13,7 @@ test('the default D3 bar presentation keeps categorical x ticks without their do
   assert.equal(resolveChartPresentation(barPresentation, paperChartStyle).plot.openXDomain, false);
 });
 
-for (const theme of [d3ChartStyle, paperChartStyle, darkChartStyle]) {
+for (const theme of [d3ChartStyle, paperChartStyle, darkChartStyle, editorialChartStyle]) {
   test(`${theme.key}: layout allocates content without mutating theme or text size`, () => {
     const runtime = createChartRuntime({ chartStyle: theme });
     const { plot } = resolveChartPresentation(local, theme);

@@ -12,6 +12,7 @@ import { createChartRuntime } from './runtime/chart-runtime.js';
 import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
+import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 
 export type { Visualization } from './core.js';
 
@@ -42,11 +43,6 @@ export interface VisualizationTransition {
   /** Recompile at the container's current size/theme, retaining progress and data. */
   resize(): VisualizationTransition;
   destroy(): void;
-}
-
-interface TimedVisualizationTransition extends VisualizationTransition {
-  /** Internal timing contract used by sequence(). */
-  stageCount(): number;
 }
 
 /** Compile two states of the same chart type into a standalone, seekable transition. */
@@ -96,6 +92,7 @@ export async function transition(
     return resolveSpecDataTypes({ ...spec, data: { values: rows } }, rows);
   };
   const [resolvedFrom, resolvedTo] = await Promise.all([resolveData(source), resolveData(target)]);
+  const transitionDelta = delta(resolvedFrom, resolvedTo);
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
@@ -121,7 +118,7 @@ export async function transition(
     // Expose copies: caller inspection cannot change the rendered endpoints.
     from: cloneState(source),
     to: cloneState(target),
-    delta: delta(resolvedFrom, resolvedTo),
+    delta: transitionDelta,
     view: surface.view,
     get value() { return value; },
     progress(next) {

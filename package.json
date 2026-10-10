@@ -141,6 +141,8 @@
   ],
   "devDependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/language": "^6.12.4",
+    "@lezer/highlight": "^1.2.3",
     "@playwright/test": "^1.63.0",
     "@types/d3": "^7.4.3",
     "@types/d3-array": "^3.2.2",
