@@ -4,6 +4,8 @@ This review took Bar's operation planner to Point, Line, Area and Unit, while
 keeping identity, state difference, route planning and frame evaluation separate.
 The implemented contracts remain in [the constitution](../docs/language-framework.md);
 supported subsets and fallback boundaries are in [the reference](../docs/reference.md).
+Ongoing editing and review rules are maintained in [AGENTS.md](../AGENTS.md);
+this note retains the session's findings and verification evidence.
 
 1. **Plan from canonical states, not builder history.** Overwritten fluent calls
    must disappear from the route. Normalize only proven equivalents: Line and
