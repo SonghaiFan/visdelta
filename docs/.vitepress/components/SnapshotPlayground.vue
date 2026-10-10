@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import PlaygroundDataPicker from './PlaygroundDataPicker.vue';
 import EditableCodeCell from './EditableCodeCell.vue';
 import StateChangeIcon from './StateChangeIcon.vue';
+import { datasetName as idiomDataset, findIdiom } from './galleryIdioms.js';
 
 const props = defineProps({ mode: String, initial: String, hashPrefix: String });
 const modules = import.meta.glob('../../../examples/*/scenarios.js', { eager: true });
@@ -138,6 +139,23 @@ async function display(frame, request, from = frame, animate = false) {
   } catch (cause) { next?.destroy(); throw cause; }
   finally { candidates.delete(host); if (next !== controller) host.remove(); }
 }
+// A Gallery idiom opens as a single frame; edits then build snapshots as usual.
+async function loadIdiom(idiom) {
+  if (!api || disposed) return;
+  const request = cancel();
+  category.value = null;
+  status.value = 'Compiling';
+  error.value = '';
+  try {
+    const rows = await d3.csv(idiom.data, d3.autoType);
+    const frame = await makeFrame(idiom.code, idiom.title, rows, request, idiomDataset(idiom.data), `${idiom.title} from the Gallery. Edit the code to save a new frame.`);
+    if (!frame) return;
+    await display(frame, request);
+    if (request !== version) return;
+    sourceRows = rows;
+    frames.value = [frame];
+  } catch (cause) { fail(cause, request); }
+}
 async function loadPreset(id = selected.value) {
   if (!api || disposed) return;
   const request = cancel();
@@ -263,7 +281,9 @@ onMounted(async () => {
     await nextTick();
     observer = new ResizeObserver(() => controller?.resize());
     observer.observe(target.value);
-    await loadPreset();
+    const idiom = props.initial?.startsWith('idiom=') ? findIdiom(props.initial.slice(6)) : null;
+    if (idiom && idiom.mark === lab.chart) await loadIdiom(idiom);
+    else await loadPreset();
   } catch (cause) { fail(cause, version); }
 });
 onBeforeUnmount(() => {

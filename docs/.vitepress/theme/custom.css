@@ -121,9 +121,7 @@ body { background: var(--ui-color-canvas); font-feature-settings: "ss01", "kern"
 .getting-started-demo-controls button,
 .playground-toolbar button,
 .playground-toolbar select,
-.playground-output-actions button,
-.idiom-card-actions button,
-.idiom-card-actions a {
+.playground-output-actions button {
   display: inline-flex;
   min-height: var(--ui-control-md);
   align-items: center;
@@ -144,20 +142,18 @@ body { background: var(--ui-color-canvas); font-feature-settings: "ss01", "kern"
 .workbench-seq-actions button:hover:not(:disabled),
 .getting-started-demo-controls button:hover,
 .playground-toolbar button:hover,
-.playground-output-actions button:hover:not(:disabled),
-.idiom-card-actions button:hover,
-.idiom-card-actions a:hover { border-color: var(--ui-color-accent); color: var(--ui-color-accent); }
+.playground-output-actions button:hover:not(:disabled) { border-color: var(--ui-color-accent); color: var(--ui-color-accent); }
 .ui-button:active,
 .workbench-actions button:active,
 .workbench-seq-actions button:active,
 .getting-started-demo-controls button:active,
 .playground-toolbar button:active,
-.playground-output-actions button:active,
-.idiom-card-actions button:active { transform: translateY(1px); }
+.playground-output-actions button:active { transform: translateY(1px); }
 .ui-button:disabled,
 .workbench-actions button:disabled,
 .workbench-seq-actions button:disabled,
 .playground-output-actions button:disabled { cursor: default; opacity: .4; }
+.ui-button { text-decoration: none !important; }
 .ui-button.is-primary { border-color: var(--ui-color-inverse); background: var(--ui-color-inverse); color: var(--ui-color-on-inverse); }
 .ui-button.is-primary:hover { border-color: var(--ui-color-accent); background: var(--ui-color-accent); color: var(--ui-color-on-accent); }
 
@@ -713,36 +709,67 @@ body:has(.ontology-home) { --ui-color-accent: var(--ui-gray-800); --ui-color-acc
 }
 
 /* 8. Gallery and token reference ---------------------------------------- */
-.idiom-gallery { width: min(var(--ui-page-max), calc(100% - 2 * var(--ui-page-gutter))); margin: 0 auto var(--ui-space-24); }
-.idiom-filters { position: sticky; top: var(--vp-nav-height); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ui-space-3); margin-bottom: var(--ui-space-6); padding: var(--ui-space-3) 0; border-bottom: var(--ui-border); background: color-mix(in srgb, var(--ui-color-canvas) 94%, transparent); backdrop-filter: blur(12px); }
-.idiom-filter-group { display: flex; align-items: center; gap: var(--ui-space-2); }
-.idiom-filters output { color: var(--ui-color-text-subtle); font: var(--ui-type-meta); }
-.idiom-family + .idiom-family { margin-top: var(--ui-space-12); }
-.idiom-family-head { display: flex; align-items: baseline; gap: var(--ui-space-4); margin-bottom: var(--ui-space-4); }
-.idiom-family-head h2 { margin: 0; padding: 0; border: 0; font-size: var(--ui-text-2xl); font-weight: var(--ui-weight-strong); letter-spacing: -.035em; }
-.idiom-family-head p { margin: 0; color: var(--ui-color-text-muted); font-size: var(--ui-text-base); }
-.idiom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--ui-space-3); }
-.idiom-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border-radius: var(--ui-panel-radius); background: var(--ui-color-surface); }
-.idiom-card-stage { position: relative; height: 230px; overflow: hidden; background: var(--ui-color-canvas); }
-.idiom-card-chart { position: relative; height: 230px; }
-.idiom-card-chart .vd-figure { border: 0; background: transparent; }
-.idiom-card-chart .vd-figure-header { display: none; }
-.idiom-card-chart .vd-view,
-.idiom-card-chart .vd-view svg { min-height: 230px; height: 230px; }
-.idiom-card-status { position: absolute; margin: 0; inset: 0; display: grid; place-items: center; color: var(--ui-color-text-subtle); font: var(--ui-type-meta); }
-.idiom-card-status.is-error { padding: var(--ui-space-4); color: var(--ui-color-danger); text-align: center; }
-.idiom-card-progress { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: var(--ui-color-accent); transform: scaleX(0); transform-origin: left; }
-.idiom-card-body { display: grid; flex: 1; align-content: start; gap: var(--ui-space-2); padding: var(--ui-space-4); }
-.idiom-card-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-space-2); }
-.idiom-card-change { display: inline-flex; align-items: center; gap: 6px; color: var(--ui-color-text-muted); font: var(--ui-type-meta); }
-.idiom-card-change .state-icon-tile { width: 18px; height: 18px; flex-basis: 18px; }
-.idiom-card-change .state-icon-tile svg { width: 13px; height: 13px; }
-.idiom-card h3 { margin: var(--ui-space-1) 0 0; padding: 0; border: 0; font-size: var(--ui-text-lg); font-weight: var(--ui-weight-strong); letter-spacing: -.02em; }
-.idiom-card p { margin: 0; color: var(--ui-color-text-muted); font-size: var(--ui-text-md); line-height: 1.5; }
-.idiom-card code.idiom-card-syntax { display: block; overflow: hidden; padding: 6px var(--ui-space-2); border-radius: var(--ui-radius-sm); background: var(--ui-code-bg); color: var(--ui-code-function); font: var(--ui-text-sm)/1.5 var(--ui-font-mono); text-overflow: ellipsis; white-space: nowrap; }
-.idiom-card-actions { display: flex; gap: 6px; margin-top: auto; padding: 0 var(--ui-space-4) var(--ui-space-4); }
-.idiom-card-actions a { margin-left: auto; }
-.idiom-card-actions a { color: var(--ui-color-text); text-decoration: none; }
+.idiom-gallery { width: min(1680px, calc(100% - 2 * var(--ui-page-gutter))); margin: 0 auto var(--ui-space-24); }
+.idiom-index { position: sticky; top: var(--vp-nav-height); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ui-space-1) var(--ui-space-5); margin-bottom: var(--ui-space-8); padding: var(--ui-space-3) 0; border-bottom: var(--ui-border); background: color-mix(in srgb, var(--ui-color-canvas) 94%, transparent); backdrop-filter: blur(12px); }
+.idiom-index > a { color: var(--ui-color-text); font-size: var(--ui-text-lg); font-weight: var(--ui-weight-strong); letter-spacing: -.02em; text-decoration: none; }
+.idiom-index > a:hover { color: var(--ui-color-accent); }
+.idiom-index > a span { margin-left: 2px; color: var(--ui-color-text-subtle); font: var(--ui-type-meta); vertical-align: super; }
+.idiom-search { display: flex; align-items: center; gap: var(--ui-space-2); margin-left: auto; }
+.idiom-search input { width: min(260px, 50vw); height: var(--ui-control-md); padding: 0 var(--ui-space-3); border: var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-color-raised); color: var(--ui-color-text); font: var(--ui-text-base) var(--ui-font-sans); }
+.idiom-search input:focus { border-color: var(--ui-color-accent); outline: none; }
+.idiom-empty { color: var(--ui-color-text-muted); }
+.idiom-group { scroll-margin-top: calc(var(--vp-nav-height) + 72px); }
+.idiom-group + .idiom-group { margin-top: var(--ui-space-16); }
+.idiom-group-head { margin-bottom: var(--ui-space-5); }
+.idiom-group-head h2 { margin: 0; padding: 0; border: 0; font-size: var(--ui-text-display-sm); font-weight: var(--ui-weight-strong); letter-spacing: var(--ui-tracking-display); line-height: 1; }
+.idiom-group-head p { margin: var(--ui-space-2) 0 0; color: var(--ui-color-text-muted); font-size: var(--ui-text-xl); letter-spacing: -.015em; }
+.idiom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--ui-space-8) var(--ui-space-6); }
+.idiom-tile { display: grid; min-width: 0; gap: var(--ui-space-2); padding: 0; border: 0; background: none; color: var(--ui-color-text); text-align: left; cursor: zoom-in; }
+.idiom-thumb { position: relative; display: block; height: 220px; overflow: hidden; border: var(--ui-border); border-radius: var(--ui-radius-md); background: var(--ui-color-raised); transition: border-color var(--ui-duration-fast) ease, box-shadow var(--ui-duration-fast) ease; }
+.idiom-thumb-chart { position: absolute; inset: 0 0 auto; display: block; height: 220px; pointer-events: none; }
+.idiom-thumb-render { position: absolute; inset: 0; visibility: hidden; }
+.idiom-thumb-chart .vd-figure { border: 0; background: transparent; }
+.idiom-thumb-chart .vd-figure-header { display: none; }
+.idiom-thumb-chart .vd-view,
+.idiom-thumb-chart .vd-view svg { min-height: 220px; height: 220px; }
+.idiom-thumb-status { position: absolute; inset: 0; display: grid; place-items: center; padding: var(--ui-space-4); color: var(--ui-color-text-subtle); font: var(--ui-type-meta); text-align: center; }
+.idiom-thumb-status.is-error { color: var(--ui-color-danger); }
+.idiom-title { font-size: var(--ui-text-xl); letter-spacing: -.02em; line-height: 1.25; }
+.idiom-tile:hover .idiom-thumb,
+.idiom-tile:focus-visible .idiom-thumb { border-color: var(--ui-color-text); box-shadow: 0 0 0 1px var(--ui-color-text); }
+.idiom-tile:hover .idiom-title { text-decoration: underline; text-underline-offset: 3px; }
+.idiom-tile:focus-visible { outline: none; }
+
+.idiom-viewer { inset: 0; width: min(1400px, calc(100vw - 32px)); margin: auto; max-width: none; max-height: calc(100dvh - 32px); padding: 0; border: var(--ui-border); border-radius: var(--ui-radius-lg); background: var(--ui-color-canvas); color: var(--ui-color-text); box-shadow: var(--ui-shadow-float); }
+.idiom-viewer::backdrop { background: var(--ui-scrim); backdrop-filter: blur(6px); }
+.idiom-viewer-panel { display: grid; grid-template-rows: auto minmax(0, 1fr); max-height: calc(100dvh - 34px); }
+.idiom-viewer-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: var(--ui-space-1) var(--ui-space-4); padding: var(--ui-space-5) var(--ui-space-6) var(--ui-space-4); border-bottom: var(--ui-border); }
+.idiom-viewer-head .ui-label { grid-column: 1; }
+.idiom-viewer-head h2 { grid-column: 1; margin: 0; padding: 0; border: 0; font-size: var(--ui-text-display-sm); font-weight: var(--ui-weight-strong); letter-spacing: var(--ui-tracking-display); line-height: 1; }
+.idiom-viewer-nav { display: flex; grid-column: 2; grid-row: 1 / 3; gap: 6px; }
+.idiom-viewer-nav .ui-button { width: var(--ui-control-md); padding: 0; }
+.idiom-viewer-body { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); min-height: 0; overflow: auto; }
+.idiom-viewer-stage { position: relative; min-width: 0; padding: var(--ui-space-6); }
+.idiom-viewer-target { position: relative; min-height: 300px; }
+.idiom-viewer-candidate { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
+.idiom-viewer-target .vd-figure { border: 0; background: transparent; }
+.idiom-viewer-target .vd-figure-header { display: none; }
+.idiom-viewer-status { position: absolute; top: 50%; left: 50%; margin: 0; color: var(--ui-color-text-subtle); font: var(--ui-type-meta); transform: translate(-50%, -50%); }
+.idiom-viewer-status[role="alert"] { color: var(--ui-color-danger); }
+.idiom-viewer-side { display: grid; align-content: start; gap: var(--ui-space-4); min-width: 0; padding: var(--ui-space-6); border-left: var(--ui-border); background: var(--ui-color-surface); }
+.idiom-viewer-side .doc-code-block { margin: 0; font-size: var(--ui-text-md); }
+.idiom-viewer-side .doc-code-block code { min-width: 0; }
+.idiom-viewer-side .doc-code-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+.idiom-viewer-data { display: flex; align-items: center; gap: var(--ui-space-2); margin: 0; font: var(--ui-text-md) var(--ui-font-mono); }
+.idiom-viewer-data a { color: var(--ui-color-accent); }
+.idiom-viewer-side .ui-button { justify-self: start; min-height: var(--ui-control-lg); padding: 0 var(--ui-space-4); }
+
+@media (max-width: 860px) {
+  .idiom-viewer-body { grid-template-columns: minmax(0, 1fr); }
+  .idiom-viewer-side { border-top: var(--ui-border); border-left: 0; }
+  .idiom-viewer-stage { padding: var(--ui-space-3); }
+  .idiom-viewer-head { padding: var(--ui-space-4); }
+}
 
 .token-section { margin: var(--ui-space-8) 0; }
 .token-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--ui-space-2); }
@@ -763,8 +790,9 @@ body:has(.ontology-home) { --ui-color-accent: var(--ui-gray-800); --ui-color-acc
 @media (max-width: 760px) {
   .app-page-head { display: block; padding: var(--ui-space-8) 0 var(--ui-space-6); }
   .app-page-head p { margin-top: var(--ui-space-3); font-size: var(--ui-text-base); }
-  .idiom-filters { position: static; }
-  .idiom-filter-group { flex-wrap: wrap; }
+  .idiom-index { position: static; }
+  .idiom-search { width: 100%; margin-left: 0; }
+  .idiom-search input { width: 100%; }
   .idiom-grid { grid-template-columns: minmax(0, 1fr); }
   .docs-tracks { grid-template-columns: minmax(0, 1fr); }
   .token-row { grid-template-columns: minmax(0, 1fr) auto; }

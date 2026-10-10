@@ -4,8 +4,9 @@
 
 - Reorganized the documentation site into four sections: Home (the live code →
   chart demo), Docs (philosophy and syntax tracks), Playground and a new
-  Gallery that renders every expressible visual idiom through its real
-  Playground scenario. The Playground chart floats at the top right by
+  Gallery of visual idioms grouped by mark. Each idiom is drawn live from
+  bundled data, opens in a full-size viewer with its code, and can be edited
+  in the Playground. The Playground chart floats at the top right by
   default and can be docked beside the code.
 - Extracted the site's shared visual values into three-tier design tokens
   (`docs/.vitepress/theme/tokens.css`), documented on a Design tokens page.

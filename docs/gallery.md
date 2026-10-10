@@ -9,9 +9,9 @@ pageClass: gallery-page
 <header class="app-page-head">
   <div>
     <span class="ui-label">Gallery</span>
-    <h1>Every idiom, reached by a transition.</h1>
+    <h1>Visual idioms</h1>
   </div>
-  <p>Each card is a visual idiom VisDelta can express. It is drawn by the library from the same declarations, data and runtime as its Playground scenario, and it arrives through the state change shown on the card.</p>
+  <p>Every chart below is drawn by VisDelta from a few lines of code and a bundled dataset. Open one to see it large, read its code, and edit it in the Playground.</p>
 </header>
 
 <IdiomGallery />

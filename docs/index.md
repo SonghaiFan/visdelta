@@ -30,6 +30,6 @@ pageClass: ontology-home
     <a href="./overview.html"><span>Docs</span><strong>Learn the syntax and the model behind it</strong></a>
     <a href="./language-framework.html"><span>Philosophy</span><strong>Seven categories name every state change</strong></a>
     <a href="./playground.html"><span>Playground</span><strong>Edit two states and scrub the difference</strong></a>
-    <a href="./gallery.html"><span>Gallery</span><strong>Every idiom, reached by a transition</strong></a>
+    <a href="./gallery.html"><span>Gallery</span><strong>Browse visual idioms by mark</strong></a>
   </nav>
 </main>

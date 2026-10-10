@@ -37,8 +37,8 @@ against. Both describe only behavior that exists in the current checkout.
 
 - Edit two states and watch the difference in the [Playground](/playground).
   Examples there are organized by the seven state-change categories.
-- Browse every visual idiom VisDelta can express, each reached by a real
-  transition, in the [Gallery](/gallery).
+- Browse the visual idioms VisDelta can express, grouped by mark, in the
+  [Gallery](/gallery).
 - Extend VisDelta with your own chart module in
   [Add a chart type](/extending-with-plugins).
 

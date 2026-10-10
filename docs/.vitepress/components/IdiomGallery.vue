@@ -1,310 +1,320 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import * as d3 from 'd3';
-import StateChangeIcon from './StateChangeIcon.vue';
+import { datasetName, idiomGroups, idioms } from './galleryIdioms.js';
 
-// Every idiom is the To state of a real Playground scenario. The gallery runs
-// the same declarations, data and transition entry as the Playground, so a
-// card cannot show a picture the library does not produce.
-const labModules = import.meta.glob('../../../examples/*/scenarios.js', { eager: true });
-const labs = Object.fromEntries(
-  Object.values(labModules)
-    .filter(module => module.chart && Array.isArray(module.scenarios) && typeof module.loadChart === 'function')
-    .map(module => [module.chart, {
-      loadChart: module.loadChart,
-      scenarios: Object.fromEntries(module.scenarios.map(scenario => [scenario.id, scenario]))
-    }])
-);
+// Every tile is drawn by VisDelta from the idiom's code and bundled data. A
+// tile is the idiom's finished state; the viewer shows it large and live.
+const factories = {
+  bar: () => import('../../../dist/bar.js').then(module => module.bar),
+  line: () => import('../../../dist/line.js').then(module => module.line),
+  area: () => import('../../../dist/area.js').then(module => module.area),
+  point: () => import('../../../dist/point.js').then(module => module.point),
+  unit: () => import('../../../dist/unit.js').then(module => module.unit)
+};
 
-const families = [
-  { key: 'comparison', label: 'Comparison', summary: 'Compare one measure across categories.' },
-  { key: 'part', label: 'Part to whole', summary: 'Show how parts compose a total.' },
-  { key: 'trend', label: 'Change over time', summary: 'Follow a measure along ordered time.' },
-  { key: 'relationship', label: 'Relationship', summary: 'Relate two or more measures per observation.' },
-  { key: 'count', label: 'Count and distribution', summary: 'One mark per observation or per represented quantity.' },
-  { key: 'emphasis', label: 'Emphasis', summary: 'Direct attention without removing context.' }
-];
+const query = ref('');
+const tileStatus = ref({});
+const viewer = ref(null);
+const viewerStage = ref(null);
+const openId = ref(null);
+const viewerStatus = ref('');
 
-const idioms = [
-  { family: 'comparison', chart: 'bar', scenario: 'measure', title: 'Bar chart' },
-  { family: 'comparison', chart: 'bar', scenario: 'sort', title: 'Ranked bar chart' },
-  { family: 'comparison', chart: 'bar', scenario: 'flip', title: 'Horizontal bar chart' },
-  { family: 'comparison', chart: 'bar', scenario: 'layout', title: 'Grouped bar chart' },
-  { family: 'comparison', chart: 'bar', scenario: 'color', title: 'Color-scaled bars' },
-  { family: 'part', chart: 'bar', scenario: 'split', title: 'Stacked bar chart' },
-  { family: 'part', chart: 'area', scenario: 'split', title: 'Stacked area chart' },
-  { family: 'part', chart: 'area', scenario: 'stream', title: 'Streamgraph' },
-  { family: 'part', chart: 'unit', scenario: 'unit-value', title: 'Quantity unit bars' },
-  { family: 'trend', chart: 'line', scenario: 'x', title: 'Line chart' },
-  { family: 'trend', chart: 'line', scenario: 'split', title: 'Multi-series line chart' },
-  { family: 'trend', chart: 'line', scenario: 'style', title: 'Step line' },
-  { family: 'trend', chart: 'line', scenario: 'log', title: 'Log-scale line' },
-  { family: 'trend', chart: 'line', scenario: 'shift', title: 'Sliding time window' },
-  { family: 'trend', chart: 'area', scenario: 'y', title: 'Area chart' },
-  { family: 'trend', chart: 'area', scenario: 'baseline', title: 'Baseline area' },
-  { family: 'relationship', chart: 'point', scenario: 'x', title: 'Scatterplot' },
-  { family: 'relationship', chart: 'point', scenario: 'color', title: 'Categorical scatterplot' },
-  { family: 'relationship', chart: 'point', scenario: 'size', title: 'Bubble chart' },
-  { family: 'relationship', chart: 'point', scenario: 'rollup', title: 'Aggregated scatterplot' },
-  { family: 'count', chart: 'unit', scenario: 'color', title: 'Unit chart' },
-  { family: 'count', chart: 'unit', scenario: 'bar', title: 'Unit bar chart' },
-  { family: 'count', chart: 'unit', scenario: 'beeswarm', title: 'Beeswarm' },
-  { family: 'count', chart: 'unit', scenario: 'force', title: 'Force-clustered units' },
-  { family: 'emphasis', chart: 'bar', scenario: 'highlight', title: 'Highlighted bars' },
-  { family: 'emphasis', chart: 'line', scenario: 'highlight', title: 'Highlighted series' },
-  { family: 'emphasis', chart: 'area', scenario: 'highlight-range', title: 'Highlighted time range' },
-  { family: 'emphasis', chart: 'point', scenario: 'focus', title: 'Focus and context' }
-]
-  .filter(idiom => labs[idiom.chart]?.scenarios[idiom.scenario])
-  .map(idiom => {
-    const scenario = labs[idiom.chart].scenarios[idiom.scenario];
-    return {
-      ...idiom,
-      id: `${idiom.chart}-${idiom.scenario}`,
-      category: scenario.category,
-      description: scenario.description,
-      syntax: syntaxDelta(scenario.code, scenario.toCode)
-    };
-  });
-
-const chartLabels = { bar: 'Bar', line: 'Line', area: 'Area', point: 'Point', unit: 'Unit' };
-const chartOptions = ['all', ...Object.keys(chartLabels).filter(chart => idioms.some(idiom => idiom.chart === chart))];
-const familyFilter = ref('all');
-const chartFilter = ref('all');
-const states = ref(Object.fromEntries(idioms.map(idiom => [idiom.id, { status: 'Waiting', error: '', progress: 0 }])));
-
-const visibleIdioms = computed(() => idioms.filter(idiom =>
-  (familyFilter.value === 'all' || idiom.family === familyFilter.value) &&
-  (chartFilter.value === 'all' || idiom.chart === chartFilter.value)));
-const visibleFamilies = computed(() => families
-  .map(family => ({ ...family, idioms: visibleIdioms.value.filter(idiom => idiom.family === family.key) }))
-  .filter(family => family.idioms.length));
+const filtered = computed(() => {
+  const terms = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return idioms.filter(idiom => terms.every(term =>
+    `${idiom.title} ${idiom.mark} ${datasetName(idiom.data)}`.toLowerCase().includes(term)));
+});
+const groups = computed(() => idiomGroups
+  .map(group => ({ ...group, idioms: filtered.value.filter(idiom => idiom.mark === group.mark) }))
+  .filter(group => group.idioms.length));
+const current = computed(() => idioms.find(idiom => idiom.id === openId.value) ?? null);
+const currentIndex = computed(() => filtered.value.findIndex(idiom => idiom.id === openId.value));
+const currentGroup = computed(() => idiomGroups.find(group => group.mark === current.value?.mark));
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-const targets = new Map();
-const controllers = new Map();
-const frames = new Map();
-const pending = new Set();
 const dataCache = new Map();
+const tiles = new Map();
+// Thumbnails are frozen copies of a finished render: keeping dozens of live
+// controllers makes every resize re-render all of them at once.
+const drawnWidths = new Map();
+const pending = new Set();
+let queue = Promise.resolve();
+let resizeTimer = 0;
 let transitionApi = null;
 let observer = null;
 let resizeObserver = null;
-let reducedMotion = false;
+let viewerChart = null;
+let viewerState = null;
+let viewerVersion = 0;
 let disposed = false;
 
-function syntaxDelta(fromCode, toCode) {
-  const fromLines = new Set(fromCode.split('\n').map(line => line.trim().replace(/;$/, '')));
-  const changed = toCode.split('\n')
-    .map(line => line.trim().replace(/;$/, ''))
-    .filter(line => line && !fromLines.has(line) && !/^const to =/.test(line));
-  return changed.join(' ') || toCode.split('\n').at(-1).trim();
+async function loadRows(url) {
+  if (!dataCache.has(url)) dataCache.set(url, d3.csv(url, d3.autoType));
+  return structuredClone(await dataCache.get(url));
 }
 
-function setState(id, patch) {
-  states.value = { ...states.value, [id]: { ...states.value[id], ...patch } };
+async function evaluate(idiom) {
+  const [factory, rows] = await Promise.all([factories[idiom.mark](), loadRows(idiom.data)]);
+  const run = new AsyncFunction(idiom.mark, 'd3', 'rows', `"use strict";\n${idiom.code}\nreturn chart;`);
+  return run(factory, d3, rows);
 }
 
-function registerTarget(id, element) {
-  const previous = targets.get(id);
+async function draw(state, target, height, from = state) {
+  transitionApi ??= await import('../../../dist/transition-entry.js');
+  return transitionApi.transition(from, state, { target, height });
+}
+
+function setTile(id, status) {
+  tileStatus.value = { ...tileStatus.value, [id]: status };
+}
+
+function registerTile(id, element) {
+  const previous = tiles.get(id);
   if (element === previous) return;
-  if (previous) releaseIdiom(id, previous);
+  if (previous) {
+    // Search unmounts tiles; release them so a returning tile draws again.
+    observer?.unobserve(previous);
+    drawnWidths.delete(id);
+    pending.delete(id);
+    tiles.delete(id);
+  }
   if (!element) return;
-  targets.set(id, element);
+  tiles.set(id, element);
   observer?.observe(element);
 }
 
-// Filtering unmounts cards. Release their controllers so a card that returns
-// renders again into its new element instead of keeping a detached chart.
-function releaseIdiom(id, element) {
-  observer?.unobserve(element);
-  resizeObserver?.unobserve(element);
-  cancelAnimationFrame(frames.get(id));
-  controllers.get(id)?.destroy();
-  controllers.delete(id);
-  pending.delete(id);
-  targets.delete(id);
-  setState(id, { status: 'Waiting', error: '', progress: 0 });
+function renderTile(id) {
+  const target = tiles.get(id);
+  if (!target || drawnWidths.has(id) || pending.has(id) || disposed) return;
+  pending.add(id);
+  setTile(id, tileStatus.value[id] === 'ready' ? 'ready' : 'loading');
+  // One tile at a time keeps scrolling responsive while thumbnails arrive.
+  queue = queue.then(() => drawTile(id, target)).catch(() => {});
+}
+
+async function drawTile(id, target) {
+  const idiom = idioms.find(candidate => candidate.id === id);
+  try {
+    if (disposed || tiles.get(id) !== target) return;
+    const state = await evaluate(idiom);
+    if (disposed || tiles.get(id) !== target) return;
+    const host = document.createElement('div');
+    host.className = 'idiom-thumb-render';
+    target.append(host);
+    try {
+      const chart = await draw(state, host, 220);
+      chart.progress(1);
+      const frozen = [...host.childNodes].map(node => node.cloneNode(true));
+      chart.destroy();
+      if (disposed || tiles.get(id) !== target) return;
+      target.replaceChildren(...frozen);
+      drawnWidths.set(id, target.clientWidth);
+      setTile(id, 'ready');
+    } finally {
+      host.remove();
+    }
+  } catch (cause) {
+    setTile(id, `error:${cause instanceof Error ? cause.message : cause}`);
+  } finally {
+    pending.delete(id);
+  }
+}
+
+function redrawResizedTiles() {
+  for (const [id, target] of tiles) {
+    const width = drawnWidths.get(id);
+    if (width == null || Math.abs(target.clientWidth - width) < 24) continue;
+    drawnWidths.delete(id);
+    renderTile(id);
+  }
+}
+
+async function openIdiom(idiom) {
+  const previousMark = current.value?.mark;
+  openId.value = idiom.id;
+  if (!viewer.value.open) viewer.value.showModal();
+  if (typeof history !== 'undefined') history.replaceState(null, '', `#${idiom.id}`);
+  await nextTick();
+  const version = ++viewerVersion;
+  viewerStatus.value = 'Rendering';
+  try {
+    const state = await evaluate(idiom);
+    if (version !== viewerVersion || disposed) return;
+    const host = document.createElement('div');
+    host.className = 'idiom-viewer-candidate';
+    viewerStage.value.append(host);
+    let chart;
+    // Moving between idioms of one mark morphs the previous chart briefly;
+    // anything VisDelta cannot route is simply redrawn.
+    const from = previousMark === idiom.mark && viewerState ? viewerState : state;
+    try {
+      chart = await draw(state, host, viewerHeight(), from);
+    } catch {
+      chart = await draw(state, host, viewerHeight());
+    }
+    if (version !== viewerVersion || disposed) {
+      chart.destroy();
+      host.remove();
+      return;
+    }
+    viewerChart?.destroy();
+    viewerStage.value.replaceChildren(host);
+    host.className = 'idiom-viewer-chart';
+    viewerChart = chart;
+    viewerState = state;
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (from !== state && !reducedMotion) {
+      chart.progress(0);
+      chart.play({ from: 0, to: 1, duration: 700 });
+    } else {
+      chart.progress(1);
+    }
+    viewerStatus.value = '';
+  } catch (cause) {
+    if (version === viewerVersion) viewerStatus.value = cause instanceof Error ? cause.message : String(cause);
+  }
+}
+
+function viewerHeight() {
+  return Math.max(300, Math.min(560, Math.round(window.innerHeight * 0.58)));
+}
+
+function step(direction) {
+  const list = filtered.value;
+  if (!list.length) return;
+  const index = currentIndex.value < 0 ? 0 : currentIndex.value;
+  openIdiom(list[(index + direction + list.length) % list.length]);
+}
+
+function closeViewer() {
+  viewer.value?.close();
+}
+
+function onViewerClose() {
+  viewerVersion += 1;
+  viewerChart?.destroy();
+  viewerChart = null;
+  viewerState = null;
+  openId.value = null;
+  if (typeof history !== 'undefined' && location.hash) history.replaceState(null, '', location.pathname + location.search);
+}
+
+function onViewerKey(event) {
+  if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
+  if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
+}
+
+function onViewerClick(event) {
+  // A click on the backdrop (the dialog element itself) closes the viewer.
+  if (event.target === viewer.value) closeViewer();
 }
 
 onMounted(async () => {
-  reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  resizeObserver = new ResizeObserver(entries => {
-    for (const entry of entries) controllers.get(entry.target.dataset.idiom)?.resize();
+  resizeObserver = new ResizeObserver(() => {
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(redrawResizedTiles, 300);
   });
+  resizeObserver.observe(document.documentElement);
   observer = 'IntersectionObserver' in window
     ? new IntersectionObserver(entries => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         observer.unobserve(entry.target);
-        renderIdiom(entry.target.dataset.idiom);
+        renderTile(entry.target.dataset.idiom);
       }
-    }, { rootMargin: '200px' })
+    }, { rootMargin: '300px' })
     : null;
   await nextTick();
-  for (const [id, element] of targets) {
+  for (const [id, element] of tiles) {
     if (observer) observer.observe(element);
-    else renderIdiom(id);
+    else renderTile(id);
   }
+  const linked = idioms.find(idiom => idiom.id === location.hash.slice(1));
+  if (linked) openIdiom(linked);
 });
 
 onBeforeUnmount(() => {
   disposed = true;
   observer?.disconnect();
   resizeObserver?.disconnect();
-  for (const frame of frames.values()) cancelAnimationFrame(frame);
-  for (const controller of controllers.values()) controller.destroy();
-  controllers.clear();
+  clearTimeout(resizeTimer);
+  viewerChart?.destroy();
 });
-
-async function loadRows(url) {
-  if (!url) return [];
-  if (!dataCache.has(url)) dataCache.set(url, d3.csv(url, d3.autoType));
-  return structuredClone(await dataCache.get(url));
-}
-
-async function evaluateCell(source, name, factory, chart, rows) {
-  const run = new AsyncFunction(chart, 'd3', 'rows', `"use strict";\n${source}\nreturn ${name};`);
-  return run(factory, d3, rows);
-}
-
-async function renderIdiom(id) {
-  const idiom = idioms.find(candidate => candidate.id === id);
-  const target = targets.get(id);
-  if (!idiom || !target || controllers.has(id) || pending.has(id) || disposed) return;
-  pending.add(id);
-  setState(id, { status: 'Rendering' });
-  try {
-    const scenario = labs[idiom.chart].scenarios[idiom.scenario];
-    transitionApi ??= await import('../../../dist/transition-entry.js');
-    const [factory, rows] = await Promise.all([
-      labs[idiom.chart].loadChart(),
-      loadRows(scenario.dataUrl)
-    ]);
-    const from = await evaluateCell(scenario.code, 'from', factory, idiom.chart, rows);
-    const to = await evaluateCell(scenario.toCode, 'to', factory, idiom.chart, structuredClone(rows));
-    if (disposed || targets.get(id) !== target) return;
-    const controller = await transitionApi.transition(from, to, { target, height: 230 });
-    if (disposed || targets.get(id) !== target) {
-      controller.destroy();
-      return;
-    }
-    pending.delete(id);
-    controllers.set(id, controller);
-    resizeObserver.observe(target);
-    setState(id, { status: 'Ready' });
-    if (reducedMotion) seek(id, 1);
-    else play(id);
-  } catch (cause) {
-    pending.delete(id);
-    setState(id, { status: 'Error', error: cause instanceof Error ? cause.message : String(cause) });
-  }
-}
-
-function seek(id, value) {
-  const controller = controllers.get(id);
-  if (!controller) return;
-  cancelAnimationFrame(frames.get(id));
-  controller.progress(value);
-  setState(id, { progress: value });
-}
-
-function play(id, from = 0, to = 1) {
-  const controller = controllers.get(id);
-  if (!controller) return;
-  cancelAnimationFrame(frames.get(id));
-  controller.progress(from);
-  controller.play({ from, to, duration: 1600 });
-  const track = () => {
-    const value = controller.value;
-    setState(id, { progress: value });
-    if (Math.abs(value - to) > 0.001 && !disposed) frames.set(id, requestAnimationFrame(track));
-  };
-  frames.set(id, requestAnimationFrame(track));
-}
-
-function toggle(id) {
-  const progress = states.value[id]?.progress ?? 0;
-  if (progress > 0.5) play(id, progress, 0);
-  else play(id, progress, 1);
-}
-
-function categoryLabel(category) {
-  return category ? category[0].toUpperCase() + category.slice(1) : '';
-}
 </script>
 
 <template>
   <section class="idiom-gallery" aria-label="Visual idioms">
-    <div class="idiom-filters">
-      <div class="idiom-filter-group">
-        <span class="ui-label">Idiom</span>
-        <div class="ui-tabs" role="group" aria-label="Filter by idiom family">
-          <button type="button" :aria-pressed="familyFilter === 'all'" @click="familyFilter = 'all'">All</button>
-          <button
-            v-for="family in families"
-            :key="family.key"
-            type="button"
-            :aria-pressed="familyFilter === family.key"
-            @click="familyFilter = family.key"
-          >{{ family.label }}</button>
-        </div>
-      </div>
-      <div class="idiom-filter-group">
-        <span class="ui-label">Chart</span>
-        <div class="ui-tabs" role="group" aria-label="Filter by chart module">
-          <button
-            v-for="chart in chartOptions"
-            :key="chart"
-            type="button"
-            :aria-pressed="chartFilter === chart"
-            @click="chartFilter = chart"
-          >{{ chart === 'all' ? 'All' : chartLabels[chart] }}</button>
-        </div>
-        <output>{{ visibleIdioms.length }} / {{ idioms.length }}</output>
-      </div>
-    </div>
+    <nav class="idiom-index" aria-label="Idiom marks">
+      <a v-for="group in idiomGroups" :key="group.mark" :href="`#marks-${group.mark}`">
+        {{ group.title }} <span>{{ filtered.filter(idiom => idiom.mark === group.mark).length }}</span>
+      </a>
+      <label class="idiom-search">
+        <span class="ui-label">Filter</span>
+        <input v-model="query" type="search" placeholder="stacked, scatter, iris…" aria-label="Filter idioms" />
+      </label>
+    </nav>
 
-    <section v-for="family in visibleFamilies" :key="family.key" class="idiom-family" :aria-labelledby="`idiom-family-${family.key}`">
-      <header class="idiom-family-head">
-        <h2 :id="`idiom-family-${family.key}`">{{ family.label }}</h2>
-        <p>{{ family.summary }}</p>
+    <p v-if="!groups.length" class="idiom-empty">No idiom matches “{{ query }}”.</p>
+
+    <section v-for="group in groups" :id="`marks-${group.mark}`" :key="group.mark" class="idiom-group">
+      <header class="idiom-group-head">
+        <h2>{{ group.title }}</h2>
+        <p>{{ group.summary }}</p>
       </header>
       <div class="idiom-grid">
-        <article v-for="idiom in family.idioms" :key="idiom.id" class="idiom-card" :data-idiom="idiom.id">
-          <div class="idiom-card-stage">
-            <div
-              :ref="element => registerTarget(idiom.id, element)"
-              class="idiom-card-chart"
-              :data-idiom="idiom.id"
-              :aria-label="`${idiom.title}, rendered by VisDelta`"
-            ></div>
-            <p v-if="states[idiom.id].status !== 'Ready'" class="idiom-card-status" :class="{ 'is-error': states[idiom.id].error }" :role="states[idiom.id].error ? 'alert' : undefined">
-              {{ states[idiom.id].error || `${states[idiom.id].status}…` }}
-            </p>
-            <span class="idiom-card-progress" aria-hidden="true" :style="{ transform: `scaleX(${states[idiom.id].progress})` }"></span>
-          </div>
-          <div class="idiom-card-body">
-            <div class="idiom-card-meta">
-              <span class="ui-chip">{{ chartLabels[idiom.chart] }}</span>
-              <span class="idiom-card-change" :title="`Reached through a ${idiom.category} change`">
-                <span class="state-icon-tile" aria-hidden="true"><StateChangeIcon :category="idiom.category" /></span>
-                {{ categoryLabel(idiom.category) }}
-              </span>
-            </div>
-            <h3>{{ idiom.title }}</h3>
-            <p>{{ idiom.description }}</p>
-            <code class="idiom-card-syntax" :title="idiom.syntax">{{ idiom.syntax }}</code>
-          </div>
-          <div class="idiom-card-actions">
-            <button
-              type="button"
-              :disabled="states[idiom.id].status !== 'Ready'"
-              @click="toggle(idiom.id)"
-            >{{ states[idiom.id].progress > 0.5 ? '← Reverse' : 'Play →' }}</button>
-            <a :href="`./playground.html#${idiom.chart}/${idiom.scenario}`">Open in Playground</a>
-          </div>
-        </article>
+        <button
+          v-for="idiom in group.idioms"
+          :key="idiom.id"
+          type="button"
+          class="idiom-tile"
+          :data-idiom-tile="idiom.id"
+          :aria-label="`Open ${idiom.title}`"
+          @click="openIdiom(idiom)"
+        >
+          <span class="idiom-thumb">
+            <span :ref="element => registerTile(idiom.id, element)" class="idiom-thumb-chart" :data-idiom="idiom.id"></span>
+            <span v-if="tileStatus[idiom.id]?.startsWith('error:')" class="idiom-thumb-status is-error" role="alert">{{ tileStatus[idiom.id].slice(6) }}</span>
+            <span v-else-if="tileStatus[idiom.id] !== 'ready'" class="idiom-thumb-status">Drawing…</span>
+          </span>
+          <span class="idiom-title">{{ idiom.title }}</span>
+        </button>
       </div>
     </section>
+
+    <dialog
+      ref="viewer"
+      class="idiom-viewer"
+      :aria-label="current ? current.title : 'Idiom'"
+      @close="onViewerClose"
+      @keydown="onViewerKey"
+      @click="onViewerClick"
+    >
+      <div v-if="current" class="idiom-viewer-panel">
+        <header class="idiom-viewer-head">
+          <span class="ui-label">{{ currentGroup?.title }} · {{ currentIndex + 1 }} / {{ filtered.length }}</span>
+          <h2>{{ current.title }}</h2>
+          <div class="idiom-viewer-nav">
+            <button type="button" class="ui-button" aria-label="Previous idiom" @click="step(-1)">←</button>
+            <button type="button" class="ui-button" aria-label="Next idiom" @click="step(1)">→</button>
+            <button type="button" class="ui-button" aria-label="Close" @click="closeViewer">✕</button>
+          </div>
+        </header>
+        <div class="idiom-viewer-body">
+          <div class="idiom-viewer-stage">
+            <div ref="viewerStage" class="idiom-viewer-target" aria-label="Live chart"></div>
+            <p v-if="viewerStatus" class="idiom-viewer-status" :role="viewerStatus === 'Rendering' ? 'status' : 'alert'">{{ viewerStatus }}</p>
+          </div>
+          <aside class="idiom-viewer-side">
+            <DocsCodeBlock :code="current.code" language="js" />
+            <p class="idiom-viewer-data">
+              <span class="ui-label">rows</span>
+              <a :href="current.data" target="_blank" rel="noopener">{{ datasetName(current.data) }}.csv</a>
+            </p>
+            <a class="ui-button is-primary" :href="`./playground.html#${current.mark}/idiom=${current.id}`">Edit in Playground →</a>
+          </aside>
+        </div>
+      </div>
+    </dialog>
   </section>
 </template>

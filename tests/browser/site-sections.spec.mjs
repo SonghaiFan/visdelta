@@ -16,39 +16,60 @@ test('navigation exposes the four site sections and Docs groups philosophy and s
   await expect(page.locator('.docs-track')).toHaveCount(2);
 });
 
-test('gallery renders every idiom with the library and links each to its playground scenario', async ({ page }) => {
-  test.setTimeout(120000);
+test('gallery draws every idiom tile with the library, grouped by mark', async ({ page }) => {
+  test.setTimeout(150000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`${site}/gallery.html`);
-  const cards = page.locator('.idiom-card');
-  const count = await cards.count();
-  expect(count).toBeGreaterThanOrEqual(20);
+  await expect(page.locator('.idiom-group h2')).toHaveText(['Bar', 'Line', 'Area', 'Point', 'Unit']);
+  const tiles = page.locator('.idiom-tile');
+  const count = await tiles.count();
+  expect(count).toBeGreaterThanOrEqual(40);
   for (let index = 0; index < count; index += 1) {
-    const card = cards.nth(index);
-    await card.scrollIntoViewIfNeeded();
-    await expect(card.locator('.idiom-card-chart svg.vd-chart')).toHaveCount(1, { timeout: 15000 });
-    await expect(card.locator('.idiom-card-status')).toHaveCount(0);
-    const id = await card.getAttribute('data-idiom');
-    const [chart, ...scenario] = id.split('-');
-    await expect(card.getByRole('link', { name: 'Open in Playground' }))
-      .toHaveAttribute('href', `./playground.html#${chart}/${scenario.join('-')}`);
+    const tile = tiles.nth(index);
+    await tile.scrollIntoViewIfNeeded();
+    await expect(tile.locator('svg.vd-chart')).toHaveCount(1, { timeout: 15000 });
+    await expect(tile.locator('.idiom-thumb-status')).toHaveCount(0, { timeout: 15000 });
   }
 
-  // Filtering unmounts cards; returning cards must render again, not stay blank.
-  const filters = page.getByRole('group', { name: 'Filter by chart module' });
-  await filters.getByRole('button', { name: 'Unit', exact: true }).click();
-  await expect(cards).toHaveCount(await page.locator('.idiom-card[data-idiom^="unit-"]').count());
-  await expect(page.locator('.idiom-card:not([data-idiom^="unit-"])')).toHaveCount(0);
-  await filters.getByRole('button', { name: 'All', exact: true }).click();
-  await expect(cards).toHaveCount(count);
-  const bar = page.locator('.idiom-card[data-idiom="bar-measure"]');
-  await bar.scrollIntoViewIfNeeded();
-  await expect(bar.locator('.idiom-card-chart rect.vd-bar').first()).toBeVisible({ timeout: 15000 });
+  // Filtering unmounts tiles; returning tiles must draw again, not stay blank.
+  const search = page.getByRole('searchbox', { name: 'Filter idioms' });
+  await search.fill('stream');
+  await expect(tiles).toHaveCount(2);
+  await search.fill('');
+  await expect(tiles).toHaveCount(count);
+  const first = page.locator('[data-idiom-tile="vertical-bars"]');
+  await first.scrollIntoViewIfNeeded();
+  await expect(first.locator('rect.vd-bar').first()).toBeVisible({ timeout: 15000 });
 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
+});
+
+test('gallery viewer shows a live idiom with its code and hands it to the Playground', async ({ page }) => {
+  await page.goto(`${site}/gallery.html`);
+  await page.locator('[data-idiom-tile="stacked-bars"]').click();
+  const viewer = page.getByRole('dialog');
+  await expect(viewer.getByRole('heading', { name: 'Stacked bar chart' })).toBeVisible();
+  await expect(viewer.locator('.idiom-viewer-target rect.vd-bar').first()).toBeVisible();
+  await expect(viewer.locator('.doc-code-block')).toContainText('.breakdown("age")');
+  await expect(page).toHaveURL(/#stacked-bars$/);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(viewer.getByRole('heading', { level: 2 })).toHaveText('Stacked bars, many categories');
+  await page.keyboard.press('ArrowLeft');
+  await expect(viewer.getByRole('heading', { level: 2 })).toHaveText('Stacked bar chart');
+  const edit = viewer.getByRole('link', { name: 'Edit in Playground →' });
+  await expect(edit).toHaveAttribute('href', './playground.html#bar/idiom=stacked-bars');
+  await page.keyboard.press('Escape');
+  await expect(viewer).toBeHidden();
+
+  await page.goto(`${site}/playground.html#point/idiom=dumbbell`);
+  await expect(page.locator('.playground-status')).toHaveText('Ready');
+  await expect(page.locator('.snapshot-frame')).toHaveCount(1);
+  await expect(page.locator('.snapshot-frame')).toContainText('Dumbbell chart');
+  await expect(page.locator('.playground-chart circle').first()).toBeVisible();
 });
 
 test('playground chart floats by default, docks beside the code, and remembers the choice', async ({ page }) => {
