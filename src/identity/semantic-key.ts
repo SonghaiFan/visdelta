@@ -1,4 +1,4 @@
-import type { SemanticKey, ViewSpec } from '../types/index.js';
+import type { ViewSpec } from '../types/index.js';
 import { specSemanticKey } from '../spec-meta.js';
 import { markKeyValue, resolveMarkIdentity } from './mark-correspondence.js';
 

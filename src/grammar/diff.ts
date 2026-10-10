@@ -113,6 +113,11 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
   const stateFields = specState(spec);
   const sceneState: ChartChangeState = stateFields.sceneState ?? {};
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
+  const selection = sceneState.selection ?? stateFields.selection ?? spec.selection ?? null;
+  const selectionMode = selection?.mode;
+  const scopes = { ...stateFields.scopes };
+  if (selectionMode === 'focus' && scopes.focus == null) scopes.focus = selection;
+  if (selectionMode === 'highlight' && scopes.highlight == null) scopes.highlight = selection;
 
   const state: SemanticViewState = {
     mark: spec.mark ?? null,
@@ -124,8 +129,8 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
       ...transforms.filter((t) => t.filter).map((t) => t.filter as FilterSpec)
     ],
     nonFilterTransforms: transforms.filter((t) => !t.filter),
-    selection: sceneState.selection ?? stateFields.selection ?? null,
-    scopes: stateFields.scopes ?? {},
+    selection: selectionMode === 'focus' || selectionMode === 'highlight' ? null : selection,
+    scopes,
     axis: sceneState.axis ?? stateFields.axis ?? null,
     detail: (sceneState.detail ?? stateFields.detail ?? null) as DetailSpec | null
   };

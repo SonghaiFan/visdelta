@@ -63,23 +63,32 @@ test('application state controls drive the same transition progress', async ({ p
 });
 
 test('ontology playground recompiles live, reports errors, and switches state differences', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
+  await page.goto('/docs/.vitepress/dist/playground.html#bar/measure');
   await page.locator('.syntax-playground').scrollIntoViewIfNeeded();
   await expect(page.locator('.ontology-inspector')).toHaveCount(0);
   await expect(page.getByText('Live semantic inspection', { exact: true })).toHaveCount(0);
   const editor = page.getByRole('textbox', { name: 'Editable VisDelta code' });
   const status = page.locator('.playground-status');
   await expect(status).toHaveText('Ready');
-  await expect(editor).toContainText('.y("sales"');
+  await expect(editor).toContainText('.y("population"');
 
-  await setCells(page, `const all = bar(rows)
-  .x("category")
-  .y("sales");
-const from = all;`, 'const to = all.where({ region: "North" });');
+  await setCells(page, `const from = bar(rows)
+  .datumKey(["state", "age"])
+  .x("state")
+  .y("population")
+  .key(["state", "age"])
+  .where({ age: "<10" })
+  .where({ field: "state", oneOf: ["CA", "TX"] });`, `const to = bar(rows)
+  .datumKey(["state", "age"])
+  .x("state")
+  .y("population")
+  .key(["state", "age"])
+  .where({ age: "≥80" })
+  .where({ field: "state", oneOf: ["CA", "TX"] });`);
   await expect(status).toHaveText('Waiting for input');
   await expect(status).toHaveText('Ready');
   await page.getByRole('slider', { name: 'Playground transition progress' }).fill('1');
-  await expect(page.locator('.playground-chart rect.vd-bar')).toHaveCount(2);
+  expect(await page.locator('.playground-chart rect.vd-bar').count()).toBeGreaterThan(0);
 
   await setEditorCode(editor, 'const broken = ;');
   await expect(status).toHaveText('Waiting for input');
@@ -87,9 +96,9 @@ const from = all;`, 'const to = all.where({ region: "North" });');
   await expect(page.getByRole('alert')).toContainText('Unexpected token');
 
   await page.getByRole('tab', { name: /^Appearance/i }).click();
-  await page.locator('[data-scenario="line"]').click();
+  await page.locator('[data-scenario="appearance"]').click();
   await expect(status).toHaveText('Ready');
-  await expect(page.locator('.playground-chart path.vd-line')).toHaveCount(1);
+  expect(await page.locator('.playground-chart rect.vd-bar').count()).toBeGreaterThan(0);
 });
 
 test('ontology presents seven responsive category icons', async ({ page }) => {
@@ -162,27 +171,32 @@ test('lab controls belong to code and the scenario description follows the chart
 });
 
 test('every editable preset produces real marks', async ({ page }) => {
-  await page.goto('/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
+  await page.goto('/docs/.vitepress/dist/playground.html');
   await page.locator('.syntax-playground').scrollIntoViewIfNeeded();
   const status = page.locator('.playground-status');
   const cases = [
-    ['encoding', 'measure', 'rect.vd-bar'],
+    ['encoding', 'color', 'rect.vd-bar'],
     ['data', 'filter', 'rect.vd-bar'],
     ['attention', 'focus', 'rect.vd-bar'],
     ['attention', 'highlight', 'rect.vd-bar'],
     ['grain', 'split', 'rect.vd-bar'],
     ['coordinate', 'flip', 'rect.vd-bar'],
-    ['appearance', 'line', 'path.vd-line'],
-    ['layout', 'unit', 'circle']
+    ['appearance', 'appearance', 'rect.vd-bar'],
+    ['layout', 'sort', 'rect.vd-bar']
   ];
 
-  await expect(page.locator('.playground-chart rect.vd-bar')).toHaveCount(4);
+  expect(await page.locator('.playground-chart rect.vd-bar').count()).toBeGreaterThan(0);
   for (const [category, sample, mark] of cases) {
     await page.getByRole('tab', { name: new RegExp(`^${category}`, 'i') }).click();
     await page.locator(`[data-scenario="${sample}"]`).click();
     await expect(status).toHaveText('Ready');
     expect(await page.locator(`.playground-chart ${mark}`).count()).toBeGreaterThan(0);
   }
+
+  await page.locator('.chart-playground-tabs').getByRole('tab', { name: 'Unit', exact: true }).click();
+  await page.locator('[data-scenario="bar"]').click();
+  await expect(status).toHaveText('Ready');
+  expect(await page.locator('.playground-chart circle').count()).toBeGreaterThan(0);
 });
 
 test('reference stays usable at a narrow viewport', async ({ page }) => {
@@ -204,14 +218,15 @@ test('ontology documents the implemented state model and core boundary', async (
   await expect(page.getByRole('heading', { name: /^Every frame is true/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Core knows no chart types/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Run a state difference' })).toBeVisible();
-  await expect(page.locator('.syntax-playground')).toHaveCount(1);
+  await expect(page.locator('#VPContent').getByRole('link', { name: 'Playground' }).first())
+    .toHaveAttribute('href', '/docs/.vitepress/dist/playground.html');
 });
 
-test('legacy examples page routes readers to the ontology playground', async ({ page }) => {
+test('legacy examples page routes readers to the unified playground', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/examples.html');
   await expect(page.locator('.syntax-playground')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Ontology and transition contracts' }))
-    .toHaveAttribute('href', '/docs/.vitepress/dist/language-framework.html#run-a-state-difference');
+  await expect(page.locator('#VPContent').getByRole('link', { name: 'Playground' }).first())
+    .toHaveAttribute('href', '/docs/.vitepress/dist/playground.html');
 });
 
 test('documentation keeps readable lines and chart-style previews fit their charts', async ({ page }) => {

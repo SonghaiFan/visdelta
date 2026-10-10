@@ -61,7 +61,7 @@ for (const width of [1100, 390]) {
     await expect(page.locator('.product-proof > div')).toHaveCount(3);
     await expect(page.locator('.product-code')).toContainText('change.progress(0.42)');
     await expect(page.getByRole('link', { name: 'Run a difference' }))
-      .toHaveAttribute('href', './language-framework.html#run-a-state-difference');
+      .toHaveAttribute('href', './playground.html');
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
     expect(errors).toEqual([]);
   });

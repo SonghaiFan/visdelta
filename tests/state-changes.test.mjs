@@ -98,6 +98,64 @@ test('stable datum identity distinguishes value updates from membership changes'
   ]);
 });
 
+test('composite datum keys classify value changes and stable no-op filters stay data-neutral', () => {
+  const sourceRows = [
+    { state: 'AL', age: 'young', value: 10 },
+    { state: 'AL', age: 'old', value: 20 }
+  ];
+  const chart = rows => bar(rows).datumKey(['state', 'age']).x('age').y('value').key(['state', 'age']);
+  assert.deepEqual(summary(delta(chart(sourceRows), chart([{ ...sourceRows[0], value: 11 }, sourceRows[1]])).stateChanges), [
+    { category: 'data', action: 'update' }
+  ]);
+  const allMatch = bar(sourceRows).datumKey(['state', 'age']).x('age').y('value').key(['state', 'age']);
+  assert.deepEqual(summary(delta(allMatch, allMatch.where({ state: 'AL' })).stateChanges), []);
+});
+
+test('grain topology and reducer changes are both reported for one endpoint pair', () => {
+  const source = bar(rows).datumKey('id').x('state').y('value').rollup('state', { op: 'sum' });
+  const target = bar(rows).datumKey('id').x('state').y('value').rollup(['state', 'age'], { op: 'mean' });
+  assert.deepEqual(summary(delta(source, target).stateChanges).filter(change => change.category === 'grain'), [
+    { category: 'grain', action: 'split' },
+    { category: 'grain', action: 'change-reducer' }
+  ]);
+});
+
+test('legacy focus and highlight selectors normalize to attention changes', () => {
+  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
+  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
+  const focused = { ...baseSpec, selection: { mode: 'focus', field: 'group', equal: 'one' } };
+  const highlighted = { ...baseSpec, selection: { mode: 'highlight', field: 'group', equal: 'one' } };
+  assert.deepEqual(summary(delta(baseSpec, focused).stateChanges), [
+    { category: 'attention', action: 'enter', target: 'focus' }
+  ]);
+  assert.deepEqual(summary(delta(baseSpec, highlighted).stateChanges), [
+    { category: 'attention', action: 'enter', target: 'highlight' }
+  ]);
+});
+
+test('axis swaps still report scale changes against the destination channels', () => {
+  const data = { values: [{ id: 'a', x: 0, y: 1 }] };
+  const source = {
+    mark: 'point', data, key: 'id',
+    encoding: {
+      x: { field: 'x', type: 'quantitative', scale: { domain: [0, 1] } },
+      y: { field: 'y', type: 'quantitative', scale: { domain: [0, 2] } }
+    }
+  };
+  const target = {
+    ...source,
+    encoding: {
+      x: { field: 'y', type: 'quantitative', scale: { domain: [0, 3] } },
+      y: { field: 'x', type: 'quantitative', scale: { domain: [0, 4] } }
+    }
+  };
+  assert.deepEqual(summary(delta(source, target).stateChanges), [
+    { category: 'coordinate', action: 'reorient' },
+    { category: 'coordinate', action: 'rescale', channel: 'x' },
+    { category: 'coordinate', action: 'rescale', channel: 'y' }
+  ]);
+});
+
 test('an inferred categorical datum identity classifies value updates', () => {
   const before = bar([{ category: 'A', value: 1 }]).x('category').y('value');
   const after = before.data([{ category: 'A', value: 2 }]);

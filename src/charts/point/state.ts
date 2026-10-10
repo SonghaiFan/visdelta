@@ -22,13 +22,6 @@ interface ParentAnchor {
   y: number;
 }
 
-interface DodgeCircle {
-  x: number;
-  y: number;
-  data: Record<string, unknown>;
-  next?: DodgeCircle;
-}
-
 export function pointState(spec: ViewSpec = {}, enc: EncodingSpec = {}): PointState {
   const state = specState(spec);
   const detail = ((state.sceneState as Record<string, unknown> | undefined)?.['detail'] as Record<string, unknown> | undefined)

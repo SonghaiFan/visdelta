@@ -2,7 +2,7 @@ import type { ChannelSpec, SpecCompiler, ViewSpec } from '../../types/index.js';
 import { specObjectKey } from '../../spec-meta.js';
 import { titleize } from '../../labels.js';
 import { colorField } from './encoding.js';
-import { aggregateFieldSpec, compileCartesianCoordinate, compileCartesianScale, compileFilter, compileFocus, compileHighlight, identitySpec, mergeXYChannel, withObject, withSceneState } from '../../charts/compiler-utils.js';
+import { aggregateFieldSpec, compileCartesianCoordinate, compileFilter, compileFocus, compileHighlight, identitySpec, mergeXYChannel, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -29,10 +29,6 @@ function compilePointBase(spec: ViewSpec, _context: AnyRecord = {}): ViewSpec {
 
 function compilePointCoordinate(spec: ViewSpec, operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
   return compileCartesianCoordinate(spec, operationSpec);
-}
-
-function compilePointScale(spec: ViewSpec, operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
-  return compileCartesianScale(spec, operationSpec);
 }
 
 function compilePointAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
@@ -102,10 +98,6 @@ function compileAggregateSize(value: unknown): {
     aggregate: { op, ...(field ? { field } : {}), as },
     channel: { ...visual, field: as, type: 'quantitative' }
   };
-}
-
-function compilePointLayout(spec: ViewSpec, _operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
-  return spec;
 }
 
 function aggregateTitle(op: string, title: string): string {

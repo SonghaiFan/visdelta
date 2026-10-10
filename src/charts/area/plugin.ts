@@ -1,5 +1,5 @@
 import { areaPresentation } from './style.js';
-import type { ChannelSpec, ChartPlugin } from '../../types/index.js';
+import type { ChartPlugin } from '../../types/index.js';
 import { createDefaultTransitionPlan } from '../transition-plan.js';
 import { defineChartType } from '../plugin.js';
 import type { AreaViewState } from './authoring.js';

@@ -2,7 +2,7 @@ import { bandOrLinear, position } from '../../toolkit/scales.js';
 import { keyFirstTravelMatching } from '../../toolkit/matching.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
-import { specObjectKey, specState, specTransition, specUnit } from '../../spec-meta.js';
+import { specObjectKey, specTransition, specUnit } from '../../spec-meta.js';
 import { defaultTransition } from '../../timing.js';
 import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import { max } from 'd3-array';

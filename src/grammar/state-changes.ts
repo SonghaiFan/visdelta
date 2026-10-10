@@ -1,4 +1,5 @@
 import { specState, specUnit } from '../spec-meta.js';
+import { canonicalDatumKey } from '../data/lineage.js';
 import type { ViewLineageAnalysis } from '../data/view-lineage.js';
 import type { LineageTable } from '../data/lineage.js';
 import type {
@@ -28,8 +29,7 @@ export function classifyStateChanges(
 
   const previousGrain = grainDescription(previous, lineage?.from);
   const nextGrain = grainDescription(next, lineage?.to);
-  const grain = grainChange(previousGrain, nextGrain);
-  if (grain) changes.push(grain);
+  changes.push(...grainChanges(previousGrain, nextGrain, lineage));
 
   const swapped = xyFieldsSwapped(previous, next);
   changes.push(...encodingChanges(previous, next, swapped));
@@ -60,7 +60,7 @@ function dataChanges(
     if ([...toParticipants].some((key) => !fromParticipants.has(key))) {
       actions.push({ category: 'data', action: 'add' });
     }
-    if (actions.length) return actions;
+    return actions;
   }
 
   const filter = semantic.get('filter');
@@ -95,7 +95,12 @@ function sourceRowsChanged(
 }
 
 function rowsByKey(rows: AnyRecord[], key: LineageTable['identity']['key']): Map<string, AnyRecord> {
-  return new Map(rows.map((row, index) => [canonical(datumKey(row, index, key)), row]));
+  return new Map(rows.map((row, index) => {
+    const identity = Array.isArray(key)
+      ? canonical(canonicalDatumKey(key.map(field => row[field])))
+      : canonical(datumKey(row, index, key));
+    return [identity, row];
+  }));
 }
 
 function datumKey(row: AnyRecord, index: number, key: LineageTable['identity']['key']): unknown {
@@ -127,40 +132,52 @@ function lastAggregate(transforms: TransformSpec[]): AggregateTransform | null {
   return null;
 }
 
-function grainChange(previous: GrainDescription, next: GrainDescription): StateChange | null {
+function grainChanges(
+  previous: GrainDescription,
+  next: GrainDescription,
+  lineage: ViewLineageAnalysis | null
+): StateChange[] {
+  const changes: StateChange[] = [];
   if (previous.unitValue !== next.unitValue && previous.unitValue != null && next.unitValue != null) {
-    return {
+    changes.push({
       category: 'grain',
       action: previous.unitValue < next.unitValue ? 'merge' : 'split',
       previous,
       next
-    };
+    });
   }
 
   if (!sameValue(previous.groupby, next.groupby)) {
-    const previousSet = new Set(previous.groupby);
-    const nextSet = new Set(next.groupby);
-    const previousWithinNext = [...previousSet].every((field) => nextSet.has(field));
-    const nextWithinPrevious = [...nextSet].every((field) => previousSet.has(field));
-    const action = previousWithinNext && !nextWithinPrevious
-      ? 'split'
-      : nextWithinPrevious && !previousWithinNext
-        ? 'merge'
-        : 'reaggregate';
-    return { category: 'grain', action, previous, next };
+    const operations = new Set(lineage?.correspondence.components
+      .map(component => component.operation)
+      .filter(operation => operation === 'split' || operation === 'merge' || operation === 'reaggregate'));
+    if (operations.size) {
+      for (const action of operations) changes.push({ category: 'grain', action, previous, next });
+    } else {
+      const previousSet = new Set(previous.groupby);
+      const nextSet = new Set(next.groupby);
+      const previousWithinNext = [...previousSet].every((field) => nextSet.has(field));
+      const nextWithinPrevious = [...nextSet].every((field) => previousSet.has(field));
+      const action = previousWithinNext && !nextWithinPrevious
+        ? 'split'
+        : nextWithinPrevious && !previousWithinNext
+          ? 'merge'
+          : 'reaggregate';
+      changes.push({ category: 'grain', action, previous, next });
+    }
   }
 
   if (!sameValue(reducerSignature(previous), reducerSignature(next))) {
     const previousFields = previous.measures.map(({ field, as }) => [field, as]);
     const nextFields = next.measures.map(({ field, as }) => [field, as]);
-    return {
+    changes.push({
       category: 'grain',
       action: sameValue(previousFields, nextFields) ? 'change-reducer' : 'reaggregate',
       previous,
       next
-    };
+    });
   }
-  return null;
+  return changes;
 }
 
 function reducerSignature(grain: GrainDescription): unknown {
@@ -207,9 +224,9 @@ function coordinateChanges(previous: ViewSpec, next: ViewSpec, swapped: boolean)
     changes.push({ category: 'coordinate', action: 'reorient' });
   }
   for (const channel of ['x', 'y'] as const) {
-    const from = coordinateSignature(previous.encoding?.[channel]);
+    const from = coordinateSignature(previous.encoding?.[swapped ? (channel === 'x' ? 'y' : 'x') : channel]);
     const to = coordinateSignature(next.encoding?.[channel]);
-    if (!sameValue(from, to) && !swapped) {
+    if (!sameValue(from, to)) {
       changes.push({ category: 'coordinate', action: 'rescale', channel });
     }
   }

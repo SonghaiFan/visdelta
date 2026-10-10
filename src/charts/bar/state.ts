@@ -10,7 +10,6 @@ import type {
   BarLayout,
   BarOrientation,
   CanonicalTransitionPair,
-  DetailSpec,
   IntermediateSpec,
   TransitionItemAction,
   TransitionPlan,
@@ -51,8 +50,6 @@ export function resolveBarTransitionPlan(
     }))
   };
 
-  const crossesDetail =
-    diff.hasDelta('bar.detail') || previous.hasDetail || next.hasDetail;
   if (diff.hasDelta('bar.detail')) {
     plan.match = { mode: 'semantic', reason: 'detail-item-consistency' };
   }

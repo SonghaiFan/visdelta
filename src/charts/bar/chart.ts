@@ -76,7 +76,7 @@ function timeUnitTransformsFromEncoding(
 function inferChannelTypes(
   encoding: Record<string, { field?: string; type?: string; aggregate?: string | boolean }>
 ): void {
-  for (const [channelName, channel] of Object.entries(encoding)) {
+  for (const channel of Object.values(encoding)) {
     if (!channel || typeof channel !== 'object' || !channel.field || channel.type) continue;
     if (channel.aggregate) {
       channel.type = 'quantitative';

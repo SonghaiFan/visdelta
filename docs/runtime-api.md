@@ -15,7 +15,7 @@ const change = await transition(from, to, {
 
 | Option | Meaning |
 | --- | --- |
-| `target` | CSS selector or element; defaults to `#app` |
+| `target` | Required CSS selector or element whose contents the transition owns until `destroy()` |
 | `data` | Named tidy datasets used by either state |
 | `height` | Explicit chart height |
 | `chartStyle` | One structural style shared by both endpoints |

@@ -65,7 +65,7 @@ export function createLegend(context: RenderContext, themeValue: ThemeValue, col
         return `translate(${item.x},${item.y})`;
       });
     motion(items.merge(entered).select<SVGRectElement>('rect'), chart.transition.base)
-      .attr('fill', (value) => activeChannel.hue || activeChannel.luminance
+      .attr('fill', (value) => quantitativeLegend || activeChannel.hue || activeChannel.luminance
         ? scale(legendRow(value) as RenderDatum & AxisDomain)
         : scale(value as RenderDatum & AxisDomain));
     items.merge(entered).select('text').text((value) => legendLabel(value, legendChannel));

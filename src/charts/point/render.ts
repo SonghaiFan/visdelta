@@ -15,7 +15,6 @@ import type { ChannelSpec, ChartContext, ChartRuntime, ChartSceneContext, ChartS
 import type { PointViewState } from './authoring.js';
 import type { ChartPresentation } from '../style.js';
 import { group as groupBy } from 'd3-array';
-import { easeCubicOut } from 'd3-ease';
 import { select } from 'd3-selection';
 
 interface Point {

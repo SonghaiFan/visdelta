@@ -479,3 +479,53 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
   expect(result.noColorSeams).toHaveLength(1);
   expect(result.noColorSeams.every(opacity => opacity > 0 && opacity < 1)).toBe(true);
 });
+
+for (const scheme of [undefined, 'Blues']) {
+  test(`quantitative legend matches mark colors: ${scheme || 'luminance'}`, async ({ page }) => {
+    const samples = await page.evaluate(async scheme => {
+      const { bar, transition } = await import('/dist/visdelta.esm.js');
+      const rows = [
+        { category: 'A', population: 2000000 },
+        { category: 'D', population: 3000000 },
+        { category: 'B', population: 4000000 },
+        { category: 'E', population: 5000000 },
+        { category: 'C', population: 6000000 }
+      ];
+      const from = bar(rows).x('category').y('population').key('category');
+      const to = from.color('population', { type: 'quantitative', ...(scheme ? { scheme } : {}) });
+      const host = document.createElement('div');
+      document.body.append(host);
+      const samples = [];
+      for (const width of [800, 360]) {
+        host.style.width = `${width}px`;
+        const change = await transition(from, to, { target: host, height: 400 });
+        for (const progress of [0, 0.5, 1, 0.5, 0, 1]) {
+          change.progress(progress);
+          if (progress !== 1) continue;
+          samples.push([...host.querySelectorAll('.vd-legend-item')].map(item => {
+            const value = item.__data__;
+            const row = rows.find(row => row.population === value);
+            const mark = [...host.querySelectorAll('rect.vd-bar')]
+              .find(node => node.dataset.category === row?.category);
+            return {
+              value,
+              swatch: d3.color(getComputedStyle(item.querySelector('rect')).fill).formatHex(),
+              mark: mark ? d3.color(getComputedStyle(mark).fill).formatHex() : null
+            };
+          }));
+        }
+        change.destroy();
+      }
+      host.remove();
+      return samples;
+    }, scheme);
+    for (const sample of samples) {
+      expect(sample.length).toBeGreaterThan(1);
+      expect(new Set(sample.map(item => item.swatch)).size).toBe(sample.length);
+      for (const item of sample) {
+        expect(item.mark).not.toBeNull();
+        expect(item.swatch).toBe(item.mark);
+      }
+    }
+  });
+}

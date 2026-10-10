@@ -78,10 +78,6 @@ export function compileCartesianCoordinate(spec: ViewSpec, operationSpec: AnyRec
   });
 }
 
-export function compileCartesianScale(spec: ViewSpec, operationSpec: AnyRecord = {}): ViewSpec {
-  return compileCartesianCoordinate(spec, operationSpec);
-}
-
 export function identitySpec(spec: ViewSpec): ViewSpec {
   return spec;
 }
@@ -189,12 +185,7 @@ export function aggregateFieldSpec(
 }
 
 export function cloneViewSpec(viewSpec: ViewSpec): ViewSpec {
-  return {
-    ...viewSpec,
-    ...(viewSpec.meta ? { meta: cloneState(viewSpec.meta) } : {}),
-    transform: [...(viewSpec.transform || [])],
-    encoding: cloneEncoding(viewSpec.encoding)
-  };
+  return cloneState(viewSpec);
 }
 
 export function cloneEncoding(encoding: ViewSpec['encoding'] = {}): Record<string, ChannelSpec | ChannelSpec[]> {

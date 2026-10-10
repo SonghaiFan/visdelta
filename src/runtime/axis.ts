@@ -12,7 +12,6 @@
 import type { Axis, AxisDomain } from 'd3-axis';
 import type { BaseType, Selection } from 'd3-selection';
 import type { Motion } from './recorder.js';
-import { axisBottom } from 'd3-axis';
 
 export type AxisOrient = 'top' | 'right' | 'bottom' | 'left';
 

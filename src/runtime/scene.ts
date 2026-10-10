@@ -36,7 +36,6 @@ export interface RuntimeScene extends ChartSceneContext {
   previousSpec: ViewSpec | null;
   width: number;
   height: number;
-  phaseTimer?: number | null;
   transitionProgress?: SceneProgressController | null;
   seekSequence?: unknown;
 }

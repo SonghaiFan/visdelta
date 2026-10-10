@@ -86,7 +86,8 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   }
 
   color(valueOrField: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
-    return this.with({ encoding: { color: colorFrom(valueOrField, options) } } as Partial<S>);
+    const encoding = { ...(this.state.encoding as EncodingSpec | undefined), color: colorFrom(valueOrField, options) };
+    return this.replaceState('encoding' as keyof S, encoding as S[keyof S]);
   }
 
   size(field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {

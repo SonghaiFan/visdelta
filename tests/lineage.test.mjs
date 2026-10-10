@@ -7,6 +7,7 @@ import {
   bar,
   delta
 } from '../dist/index.js';
+import { applyTransforms } from '../dist/data/transforms.js';
 import {
   barState,
   barIntermediateSpecs,
@@ -19,6 +20,27 @@ const cases = [
   { id: 'r3', year: 2021, location: 'A', case: 12 },
   { id: 'r4', year: 2021, location: 'B', case: 8 }
 ];
+
+test('lineage and rendered rows use identical ordered transform semantics', () => {
+  const rows = [
+    { id: 'a', date: '2026-01-01', first: 11, second: 4 },
+    { id: 'b', date: '2026-02-01', first: 23, second: 7 },
+    { id: 'c', date: '2026-03-01', first: null, second: 9 }
+  ];
+  const pipelines = [
+    [{ timeUnit: { field: 'date', unit: 'month', as: 'month' } }],
+    [{ fold: { fields: ['first', 'second'], as: ['measure', 'amount'] } }],
+    [{ bin: { field: 'first', as: 'bucket', step: 10 } }],
+    [{ aggregate: { groupby: ['month'], fields: [{ op: 'mean', field: 'first', as: 'average' }] } }],
+    [{ sort: { field: 'first', order: 'descending' } }, { limit: 2 }]
+  ];
+  for (const transform of pipelines) {
+    assert.deepEqual(
+      compileLineage(rows, transform, { key: 'id' }).rows.map(row => row.datum),
+      applyTransforms(rows, transform)
+    );
+  }
+});
 
 function sumBy(field) {
   return [{
@@ -288,7 +310,7 @@ test('lineage transform values match renderer missing-value semantics', () => {
   const mean = compileLineage(source, [{
     aggregate: { fields: [{ op: 'mean', field: 'value', as: 'result' }] }
   }], { key: 'id' });
-  assert.equal(mean.rows[0].datum.result, 1 / 3);
+  assert.equal(mean.rows[0].datum.result, 1);
 
   const binned = compileLineage(source, [{ bin: { field: 'value', step: 1 } }], { key: 'id' });
   assert.deepEqual(binned.rows.map(row => row.datum.value_bin), ['1-2', null, null, null]);

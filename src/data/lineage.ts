@@ -1,6 +1,7 @@
 import { matchesFilter, normalizeFilter } from './filter.js';
 import { validateTransforms } from './validate.js';
-import type { DataRow, FilterSpec, TransformSpec } from '../types/index.js';
+import { applyTransformOperation, groupRowsByFields, sortRowsBy } from './transform-operations.js';
+import type { DataRow, TransformSpec } from '../types/index.js';
 
 export type DatumKey = string | number;
 export type DatumKeySpec = string | string[] | ((datum: DataRow, index: number) => DatumKey);
@@ -368,21 +369,15 @@ function numericContributions(datum: DataRow, atom: LineageAtom): Record<string,
 }
 
 function timeUnitRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
-  const field = String(config.field);
-  const as = String(config.as ?? `${field}_${config.unit}`);
-  return rows.map((row) => {
-    const date = row.datum[field] instanceof Date ? row.datum[field] as Date : new Date(row.datum[field] as string);
-    const value = Number.isNaN(date.getTime()) ? String(row.datum[field] ?? '') : date.toLocaleString('en', { month: 'short' });
-    return { ...row, datum: { ...row.datum, [as]: value } };
-  });
+  const data = applyTransformOperation(rows.map(row => row.datum), { timeUnit: config } as TransformSpec);
+  return rows.map((row, index) => ({ ...row, datum: data[index]! }));
 }
 
 function foldRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
   const fields = config.fields as string[];
-  const [keyAs = 'key', valueAs = 'value'] = config.as as string[] | undefined ?? [];
-  const sourceAs = String(config.sourceAs ?? '__foldField');
-  const labelAs = String(config.labelAs ?? keyAs);
-  const labels = config.labels as Record<string, string> | undefined ?? {};
+  const valueAs = (config.as as string[] | undefined)?.[1] ?? 'value';
+  const data = applyTransformOperation(rows.map(row => row.datum), { fold: config } as TransformSpec);
+  let outputIndex = 0;
   return rows.flatMap((row) => fields.map((field) => {
     const atoms = row.lineage.map((atom) => createAtom(atom.datumKey, [...atom.branch, `fold:${field}`]));
     const atomByOldId = new Map(row.lineage.map((atom, index) => [atom.id, atoms[index]! ]));
@@ -395,12 +390,7 @@ function foldRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
     }));
     return {
       ...row,
-      datum: {
-        ...row.datum,
-        [sourceAs]: field,
-        [valueAs]: row.datum[field],
-        [labelAs]: labels[field] ?? field
-      },
+      datum: data[outputIndex++]!,
       lineage: atoms,
       contributions
     };
@@ -408,18 +398,8 @@ function foldRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
 }
 
 function binRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
-  const field = String(config.field);
-  const as = String(config.as ?? `${field}_bin`);
-  const values = rows.map((row) => binNumber(row.datum[field])).filter((value): value is number => value != null);
-  const min = values.length ? Math.min(...values) : 0;
-  const max = values.length ? Math.max(...values) : 0;
-  const step = Number(config.step ?? Math.max(1, Math.ceil((max - min) / Number(config.maxbins ?? 10))));
-  return rows.map((row) => {
-    const value = binNumber(row.datum[field]);
-    if (value == null) return { ...row, datum: { ...row.datum, [as]: null, [`${as}_start`]: null, [`${as}_end`]: null } };
-    const start = Math.floor((value - min) / step) * step + min;
-    return { ...row, datum: { ...row.datum, [as]: `${start}-${start + step}`, [`${as}_start`]: start, [`${as}_end`]: start + step } };
-  });
+  const data = applyTransformOperation(rows.map(row => row.datum), { bin: config } as TransformSpec);
+  return rows.map((row, index) => ({ ...row, datum: data[index]! }));
 }
 
 function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
@@ -429,14 +409,11 @@ function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
 } {
   const grain = (config.groupby as string[] | undefined) ?? [];
   const fields = (config.fields as AnyRecord[] | undefined) ?? [{ op: 'count', as: 'count' }];
-  const groups = new Map<string, TrackedRow[]>();
-  for (const row of rows) {
-    const key = canonicalKey(grain.map((field) => row.datum[field]));
-    groups.set(key, [...(groups.get(key) ?? []), row]);
-  }
+  const groups = groupRowsByFields(rows, grain, (row, field) => row.datum[field]);
+  const transformed = applyTransformOperation(rows.map(row => row.datum), { aggregate: config } as TransformSpec);
   const reasons: string[] = [];
-  const output = [...groups.values()].map((group): TrackedRow => {
-    const datum: DataRow = Object.fromEntries(grain.map((field) => [field, group[0]?.datum[field]]));
+  const output = groups.map((group, index): TrackedRow => {
+    const datum: DataRow = transformed[index]! as DataRow;
     const lineage = uniqueAtoms(group.flatMap((row) => row.lineage));
     const contributions: Record<string, LineageContribution[]> = {};
     for (const metric of fields) {
@@ -445,21 +422,17 @@ function aggregateRows(rows: TrackedRow[], config: AnyRecord): {
       const as = String(metric.as ?? `${op}_${field || 'rows'}`);
       const numeric = group.map((row) => aggregateNumber(row.datum[field])).filter((value): value is number => value != null);
       if (op === 'sum') {
-        datum[as] = numeric.reduce((sum, value) => sum + value, 0);
         contributions[as] = mergeContributions(group.flatMap((row) => row.contributions[field] ?? []));
       } else if (op === 'count') {
-        datum[as] = group.length;
         contributions[as] = group.flatMap((row) => {
           const share = row.lineage.length ? 1 / row.lineage.length : 0;
           return row.lineage.map((atom) => ({ atom, value: share }));
         });
       } else if (op === 'mean') {
-        datum[as] = numeric.length ? numeric.reduce((sum, value) => sum + value, 0) / numeric.length : undefined;
         contributions[as] = mergeContributions(group.flatMap((row) => row.contributions[field] ?? []))
           .map((entry) => ({ ...entry, value: entry.value / Math.max(1, numeric.length) }));
         reasons.push(`${op}(${field}) is not additively splittable`);
       } else {
-        datum[as] = aggregateNonAdditive(numeric, op);
         reasons.push(`${op}(${field}) is not additively splittable`);
       }
     }
@@ -478,36 +451,8 @@ function aggregateNumber(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function binNumber(value: unknown): number | null {
-  if (value == null || value === '' || typeof value === 'boolean') return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function aggregateNonAdditive(values: number[], op: string): number | undefined {
-  if (!values.length) return undefined;
-  if (op === 'min') return Math.min(...values);
-  if (op === 'max') return Math.max(...values);
-  if (op === 'median') {
-    const ordered = [...values].sort((a, b) => a - b);
-    const middle = Math.floor(ordered.length / 2);
-    return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1]! + ordered[middle]!) / 2;
-  }
-  return undefined;
-}
-
 function sortRows(rows: TrackedRow[], config: AnyRecord): TrackedRow[] {
-  const fields = Array.isArray(config.fields) ? config.fields : [config];
-  return [...rows].sort((a, b) => {
-    for (const entry of fields) {
-      const sort = typeof entry === 'string' ? { field: entry } : entry as AnyRecord;
-      const av = a.datum[String(sort.field)];
-      const bv = b.datum[String(sort.field)];
-      const comparison = av === bv ? 0 : av == null ? -1 : bv == null ? 1 : av < bv ? -1 : 1;
-      if (comparison) return sort.order === 'descending' ? -comparison : comparison;
-    }
-    return 0;
-  });
+  return sortRowsBy(rows, config, (row, field) => row.datum[field]);
 }
 
 function rowsByAtom(rows: LineageRow[]): Map<string, LineageRow[]> {
@@ -625,6 +570,10 @@ function mergeAtoms(target: LineageAtom[], atoms: LineageAtom[]): void {
 
 function markKey(datum: DataRow, grain: string[], fallback: DatumKey): string {
   return canonicalKey(grain.length ? grain.map((field) => datum[field]) : fallback);
+}
+
+export function canonicalDatumKey(value: unknown): string {
+  return canonicalKey(value);
 }
 
 function canonicalKey(value: unknown): string {

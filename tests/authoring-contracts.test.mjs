@@ -661,6 +661,32 @@ test('point connector grammar distinguishes baselines from grouped endpoints', (
     /cannot combine a constant from value with by grouping/
   );
   assert.throws(() => base.connector({ orderBy: 'year' }), /orderBy requires by grouping/);
+  assert.deepEqual(base.connector({ from: 0 }).connector({ by: 'country' }).toSpec().connector, { by: 'country' });
+});
+
+test('exclusive encoding variants replace each other and published state is deeply frozen', () => {
+  const base = bar([{ id: 'a', region: 'North', value: 1 }]).x('id').y('value').key('id');
+  const fieldColor = base.color('#ff0000').color('region').toSpec().encoding.color;
+  assert.equal(fieldColor.field, 'region');
+  assert.equal(fieldColor.value, undefined);
+  const fixedColor = base.color('region').color('#ff0000').toSpec().encoding.color;
+  assert.equal(fixedColor.value, '#ff0000');
+  assert.equal(fixedColor.field, undefined);
+
+  const state = base.state;
+  assert.throws(() => { state.encoding.x.field = 'mutated'; }, TypeError);
+  assert.equal(base.toSpec().encoding.x.field, 'id');
+});
+
+test('reset returns to the original state after a replacement-style chart operation', () => {
+  const rows = [{ id: 'a', region: 'North', year: 2020, value: 2 }];
+  for (const chart of [
+    line(rows).x('year').y('value').key('id'),
+    area(rows).x('year').y('value').key('id'),
+    point(rows).x('year').y('value').key('id')
+  ]) {
+    assert.deepEqual(chart.rollup('region').reset().toSpec(), chart.toSpec());
+  }
 });
 
 test('point detail first sets the target view while keeping summary marks', () => {
@@ -753,7 +779,11 @@ test('a JSON-safe chart state survives JSON round-tripping with identical meanin
   assert.deepEqual(revived, spec, 'the serialized spec is the spec');
   // Plain JSON specs are accepted wherever a state is, with the same delta and the same rows.
   const other = state.y('sales', { title: 'Sales' });
-  assert.deepEqual(delta(revived, other.toSpec()).changes, delta(state, other).changes);
+  const revivedDelta = delta(revived, other.toSpec());
+  const authoredDelta = delta(state, other);
+  assert.deepEqual(revivedDelta.changed, authoredDelta.changed);
+  assert.deepEqual(revivedDelta.deltas, authoredDelta.deltas);
+  assert.deepEqual(revivedDelta.stateChanges, authoredDelta.stateChanges);
   assert.deepEqual(applyTransforms(rows, revived.transform), state.rows());
   // Temporal fields are ISO strings in JSON and detected as temporal after revival.
   assert.equal(detectDataTypes(rows).date, 'temporal');

@@ -55,7 +55,7 @@ export class PointState extends ChartState<PointViewState> {
     if (options.channel && options.channel !== 'x' && options.channel !== 'y') {
       throw new Error('Point connector channel must be "x" or "y".');
     }
-    return this.with({ connector: { ...options } });
+    return this.replaceState('connector', { ...options });
   }
 
   flip(options: Record<string, unknown> = {}): this {

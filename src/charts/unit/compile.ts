@@ -48,7 +48,3 @@ function compileUnitLayout(spec: ViewSpec, axisSpec: AnyRecord = {}, _context: A
     }
   });
 }
-
-function compileUnitEncoding(spec: ViewSpec, operationSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
-  return compileUnitLayout(spec, operationSpec, context);
-}

@@ -717,7 +717,7 @@ test('area lab loads prepared tidy unemployment observations', async ({ page }) 
   await ready(page);
   // The lab loads the CSV once and the authored code reads the shared rows.
   await expectEditorCode(page.locator('#editor'), /\barea\(rows\)/);
-  await expect(page.locator('#editor')).not.toHaveValue(/DATA_URL|area-lab\.csv/);
+  await expectEditorCode(page.locator('#editor'), /DATA_URL|area-lab\.csv/, { not: true });
   await page.locator('#end').click();
 
   const rows = await page.locator('#chart path.vd-area-cell').evaluateAll(nodes => nodes.map(node => ({

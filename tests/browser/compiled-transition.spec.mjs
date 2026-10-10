@@ -52,6 +52,21 @@ test('seek and play reuse nodes without D3 schedules', async ({ page }) => {
   expect(result.clicks).toBe(1);
 });
 
+test('invalid transition initialization preserves the existing host content', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const host = document.querySelector('#cached');
+    host.innerHTML = '<p>keep this content</p>';
+    const invalid = sl.bar([{ id: 'same', value: 1 }, { id: 'same', value: 2 }])
+      .datumKey('id').x('id').y('value').key('id');
+    let message = '';
+    try { await sl.transition(base, invalid, options('#cached')); }
+    catch (error) { message = String(error.message); }
+    return { message, html: host.innerHTML };
+  });
+  expect(result.message).toContain('Duplicate datum key');
+  expect(result.html).toBe('<p>keep this content</p>');
+});
+
 test('a chart-style module changes presentation without entering transition semantics', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const compact = sl.defineChartStyle({

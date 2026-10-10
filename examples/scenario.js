@@ -85,7 +85,8 @@ function replaceDeclaredIdentifiers(source, declarations, replacement) {
       const name = source.slice(start, index);
       const previous = source.slice(0, start).match(/\S\s*$/)?.[0]?.trim();
       const next = source.slice(index).match(/^\s*(.)/)?.[1];
-      const isProperty = previous === '.' || next === ':';
+      const isSpread = source.slice(0, start).trimEnd().endsWith('...');
+      const isProperty = (previous === '.' && !isSpread) || next === ':';
       output += declarations.has(name) && !isProperty ? replacement(name) : name;
       continue;
     }

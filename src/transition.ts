@@ -96,6 +96,7 @@ export async function transition(
     return resolveSpecDataTypes({ ...spec, data: { values: rows } }, rows);
   };
   const [resolvedFrom, resolvedTo] = await Promise.all([resolveData(source), resolveData(target)]);
+  const transitionDelta = delta(resolvedFrom, resolvedTo);
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
@@ -121,7 +122,7 @@ export async function transition(
     // Expose copies: caller inspection cannot change the rendered endpoints.
     from: cloneState(source),
     to: cloneState(target),
-    delta: delta(resolvedFrom, resolvedTo),
+    delta: transitionDelta,
     view: surface.view,
     get value() { return value; },
     progress(next) {

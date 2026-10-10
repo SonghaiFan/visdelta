@@ -289,8 +289,9 @@ test('stacked filter continuously moves surviving segments onto their new stack 
   expect(result.afterExit).not.toEqual(result.target);
   expect(result.middle.y).toBeGreaterThan(Math.min(result.source.y, result.target.y));
   expect(result.middle.y).toBeLessThan(Math.max(result.source.y, result.target.y));
-  // Measured responsive margins can be fractional; allow only arithmetic noise.
-  expect(result.middle.height).toBeCloseTo(result.target.height, 10);
+  // Height follows the scale tween while the surviving segment moves between stack bases.
+  expect(result.middle.height).toBeGreaterThan(Math.min(result.source.height, result.target.height));
+  expect(result.middle.height).toBeLessThan(Math.max(result.source.height, result.target.height));
   expect(result.reverseMiddle).toEqual(result.middle);
 });
 
@@ -588,6 +589,28 @@ test('sequence gives inferred stages time without moving authored boundaries', a
   expect(result.afterOneStage).toBeGreaterThan(0);
   expect(result.afterOneStage).toBeLessThan(1);
   expect(result.final).toBe(1);
+});
+
+test('failed sequence preparation removes pending mounts and keeps its host intact', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const host = document.querySelector('#a');
+    host.innerHTML = '<p>keep sequence host</p>';
+    const first = base;
+    const second = base.y('other');
+    const invalid = sl.bar([{ id: 'dup', value: 1 }, { id: 'dup', value: 2 }])
+      .datumKey('id').x('id').y('value').key('id');
+    let message = '';
+    try { await sl.sequence([first, second, invalid], opts('#a')); }
+    catch (error) { message = String(error.message); }
+    return {
+      message,
+      html: host.innerHTML,
+      mounts: document.querySelectorAll('body > div[style*="-100000px"]').length
+    };
+  });
+  expect(result.message).toContain('Duplicate datum key');
+  expect(result.html).toBe('<p>keep sequence host</p>');
+  expect(result.mounts).toBe(0);
 });
 
 test('a reaggregation sequence hands B to B without an empty boundary frame', async ({ page }) => {

@@ -7,7 +7,6 @@ import type {
   BarSemanticState,
   ChannelSignature,
   ChannelSpec,
-  EncodingSpec,
   FilterSpec,
   DetailSpec,
   AxisSpec,
@@ -36,7 +35,7 @@ export function semanticBarState(
   const segmentField = barSegmentField(spec, state);
   const axis = barAxisState({ orientation, layout, state });
   const detail = barDetailState({ layout, categoryField, measureField, segmentField, state });
-  const geometry = barGeometryState({ enc, filters: resolveFilters(spec, state), layout, orientation, categoryField, measureField, segmentField });
+  const geometry = barGeometryState({ enc, filters: resolveFilters(spec), layout, orientation, categoryField, measureField, segmentField });
 
   return {
     orientation,
@@ -161,7 +160,7 @@ function semanticStateFromSpec(spec: ViewSpec): ResolvedChartState & { filters: 
   };
 }
 
-function resolveFilters(spec: ViewSpec, state: Partial<ResolvedChartState>): FilterSpec[] {
+function resolveFilters(spec: ViewSpec): FilterSpec[] {
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
   return [
     ...(spec.filter ? [spec.filter as FilterSpec] : []),

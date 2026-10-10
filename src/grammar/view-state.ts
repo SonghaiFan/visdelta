@@ -15,7 +15,7 @@ export class ViewState<S extends object = Record<string, unknown>> {
   readonly state: Readonly<StateWithMeta<S>>;
 
   constructor(state: S | StateWithMeta<S> = {} as S) {
-    this.state = Object.freeze(cloneState(state)) as Readonly<StateWithMeta<S>>;
+    this.state = deepFreeze(cloneState(state)) as Readonly<StateWithMeta<S>>;
   }
 
   with(patch: Partial<StateWithMeta<S>>, operation?: string | OperationConfig | null): this {
@@ -57,8 +57,14 @@ export class ViewState<S extends object = Record<string, unknown>> {
 
   /** Replace one semantic state family instead of leaking fields from its previous mode. */
   protected replaceState<K extends keyof S>(key: K, value: S[K], operation?: string): this {
+    const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
     const next = cloneState(this.state) as StateWithMeta<S>;
     (next as Record<string, unknown>)[key as string] = cloneState(value);
+    next.__grammar = {
+      ...(next.__grammar ?? {}),
+      initialState: cloneState(grammar?.initialState ?? withoutGrammar(this.state)),
+      operations: [...(grammar?.operations ?? [])]
+    } as GrammarMeta;
     return this.derive(next as S).with({} as Partial<StateWithMeta<S>>, operation);
   }
 
@@ -97,6 +103,12 @@ export function cloneState<T>(value: T): T {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, cloneState(v)])
   ) as T;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  return Object.freeze(value);
 }
 
 export function mergeState<T extends object>(base: T, patch: Partial<T>): T {

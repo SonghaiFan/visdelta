@@ -70,6 +70,9 @@ export function createTransitionSurface(
     resolveIntermediateSpecs(chartType, source, target)
   );
   const routeStages = route.legs.length;
+  const layoutStates = [source, ...route.legs.map(leg => leg.to)].map(spec =>
+    compileTransitionSource(spec).effectiveViewSpec!
+  );
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;
   const host = resolveTarget(options.target);
   const root = document.createElement('div');
@@ -91,7 +94,6 @@ export function createTransitionSurface(
     const scene = runtimeScene();
     if (scene) {
       clearSceneTransitionProgress(scene, { finish: false });
-      if (scene.phaseTimer) window.clearTimeout(scene.phaseTimer);
     }
     select(node).selectAll('*');
     node.replaceChildren();
@@ -100,8 +102,6 @@ export function createTransitionSurface(
   let previousChildren: Node[] = Array.from(host.childNodes);
   host.replaceChildren(root);
   let layoutDirty = true;
-  const layoutStates = [source, ...route.legs.map(leg => leg.to)].map(spec =>
-    compileTransitionSource(spec).effectiveViewSpec!);
 
   function compileFrames(): FrameEvaluator {
     disposeScene();

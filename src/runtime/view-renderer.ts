@@ -2,10 +2,10 @@ import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
 import { resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
 import { resolveMarkRendererKey } from '../charts/index.js';
-import { serializeViewSpec, specDatumKey, specState } from '../spec-meta.js';
+import { serializeViewSpec, specDatumKey } from '../spec-meta.js';
 import { activeMarkLayer, drawUnsupported, fadeLayers } from './mark-layers.js';
 import { applyPlotClip } from './clipping.js';
-import { effectiveTransitionSpec, transitionSpec } from '../toolkit/motion-timing.js';
+import { transitionSpec } from '../toolkit/motion-timing.js';
 
 import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
@@ -15,7 +15,6 @@ import { clearSceneTransitionProgress, createSceneTransitionProgress } from '../
 import { createViewCompiler } from './view-compile.js';
 import type { CompileResult, StepTransition } from './view-compile.js';
 import type {
-  AnyRecord,
   ChartContext,
   ChartType,
   ChartTransitionContext,
@@ -95,7 +94,6 @@ interface RenderPhaseConfig {
   seekable: boolean;
   sceneTransition: SceneTransition;
   transitionSource: CompileResult;
-  transitionPlanDuration: number | null;
   reverse: boolean;
 }
 
@@ -152,11 +150,6 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
     options.previousTransition
   );
 
-  if (scene.phaseTimer) {
-    window.clearTimeout(scene.phaseTimer);
-    scene.phaseTimer = null;
-  }
-
   const seekableStep = Boolean(options.seekable);
   const rawSourceSpec = seekableStep
     ? transitionSource.effectiveViewSpec
@@ -184,8 +177,10 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
       return;
     }
 
-    clearSeekSequence(scene);
-    renderPhaseSequence(scene, renderPhases, 0);
+    // Every production transition is seekable; keep intermediate rendering on
+    // the same progress-driven path so there is no second timer-based runtime.
+    scene.seekSequence = createSeekSequence(renderPhases);
+    renderSeekPhase(scene, 0);
     return;
   }
 
@@ -284,7 +279,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const chartTransition = observationTransition(
     transitionSpec(renderSpec, previousSpec),
     observationChange,
-    { seekable, simultaneous: transitionPlan.membershipTiming === 'simultaneous' }
+    { simultaneous: transitionPlan.membershipTiming === 'simultaneous' }
   );
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
@@ -378,7 +373,7 @@ function observationMembershipChange(
 function observationTransition(
   transition: RuntimeTransition,
   change: MembershipChange,
-  { seekable, simultaneous = false }: { seekable: boolean; simultaneous?: boolean }
+  { simultaneous = false }: { simultaneous?: boolean }
 ): RuntimeTransition {
   if (!change.exit && !change.enter) return transition;
   const totalDuration = Math.max(1, Number(transition.duration) || 900);
@@ -493,27 +488,9 @@ function renderPhaseConfigs(
         ...canonicalSource,
         effectiveViewSpec: canonical.from
       },
-      transitionPlanDuration: transitionPlanDurationForPhase(
-        context.chartType,
-        canonical.from,
-        canonical.to
-      ),
       reverse: canonical.reverse
     };
   });
-}
-
-function transitionPlanDurationForPhase(
-  chartType: ChartType,
-  previousSpec: ViewSpec | null,
-  nextSpec: ViewSpec | null
-): number | null {
-  const plan = chartType?.resolveTransitionPlan?.(
-    prepareChartSpec(chartType, previousSpec),
-    prepareChartSpec(chartType, nextSpec)
-  );
-  const duration = plan?.totalDuration;
-  return duration != null && Number.isFinite(duration) ? duration : null;
 }
 
 function prepareSeekSourceState(
@@ -549,39 +526,12 @@ function prepareSeekSourceState(
 }
 
 
-function phaseDuration(phaseOrSpec: Partial<RenderPhaseConfig> & { spec?: ViewSpec } = {}): number {
-  const spec = phaseOrSpec.spec || phaseOrSpec;
-  const plannedDuration = phaseOrSpec.transitionPlanDuration;
-  if (plannedDuration != null && Number.isFinite(plannedDuration)) return Math.max(1, plannedDuration);
-  const transition = effectiveTransitionSpec(spec);
-  const duration = Number(transition.duration);
-  const fallbackDuration = Number(effectiveTransitionSpec({}).duration) || 900;
-  const axis = specState(spec).sceneState?.axis || specState(spec).axis || {};
-  const stepOrder = Array.isArray(axis.order)
-    ? axis.order.filter((part) => part === "x" || part === "y")
-    : [];
-  const perStepDuration = Number(axis.duration);
-  const effectiveDuration =
-    stepOrder.length > 1 && Number.isFinite(perStepDuration)
-      ? perStepDuration * stepOrder.length
-      : duration;
-  const stagger = transition.stagger;
-  const staggerMax =
-    typeof stagger === "object"
-      ? Number(stagger.max ?? 0)
-      : 0;
-  return Math.max(1, Number.isFinite(effectiveDuration) ? effectiveDuration : fallbackDuration) + (Number.isFinite(staggerMax) ? staggerMax : 0);
-}
-
 function clearSeekSequence(scene: ViewRuntimeScene): void {
   scene.seekSequence = null;
 }
 
 function createSeekSequence(phases: RenderPhaseConfig[] = []): SeekSequence {
   // `progress()` partitions an authored pair by its complete route stages.
-  // Runtime playback then gives each of those stages one caller-supplied
-  // duration. Chart-local timing still controls an individual phase when a
-  // non-seekable renderer runs it directly (see renderPhaseSequence).
   const durations = phases.map(() => 1);
   const total = Math.max(1, durations.reduce((sum, duration) => sum + duration, 0));
   let cursor = 0;
@@ -594,31 +544,6 @@ function createSeekSequence(phases: RenderPhaseConfig[] = []): SeekSequence {
       return { ...phase, start, end };
     })
   };
-}
-
-function renderPhaseSequence(scene: ViewRuntimeScene, phases: RenderPhaseConfig[] = [], index = 0): void {
-  const config = phases[index];
-  if (!config) return;
-
-  renderCompiledView(
-    config.node,
-    config.spec,
-    config.viewConfig,
-    config.datasets,
-    config.tooltip,
-    
-    config.sceneTransition,
-    {
-      transitionSource: config.transitionSource,
-      seekable: config.seekable
-    }
-  );
-
-  if (index >= phases.length - 1) return;
-  scene.phaseTimer = window.setTimeout(() => {
-    scene.phaseTimer = null;
-    renderPhaseSequence(scene, phases, index + 1);
-  }, phaseDuration(config));
 }
 
 function renderSeekPhase(scene: ViewRuntimeScene, phaseIndex: number): void {

@@ -107,14 +107,6 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
   });
 }
 
-function compileBarScale(spec: ViewSpec, operationSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
-  return compileBarCoordinate(spec, operationSpec, context);
-}
-
-function compileBarLayout(spec: ViewSpec, operationSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
-  return compileBarCoordinate(spec, operationSpec, context);
-}
-
 function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
   const encoding = spec.encoding as Encoding || {};
   const categoryField = (detailSpec['category'] as string) || (encoding['x'] as ChannelSpec)?.field || 'category';

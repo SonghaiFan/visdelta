@@ -1,5 +1,5 @@
 import type { SpecCompiler, ViewSpec } from '../../types/index.js';
-import { aggregateFieldSpec, compileCartesianCoordinate, compileCartesianScale, compileFilter, compileFocus, compileHighlight, identitySpec, withObject, withSceneState } from '../../charts/compiler-utils.js';
+import { aggregateFieldSpec, compileCartesianCoordinate, compileFilter, compileFocus, compileHighlight, identitySpec, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -26,10 +26,6 @@ function compileLineBase(spec: ViewSpec, _context: AnyRecord = {}): ViewSpec {
 
 function compileLineCoordinate(spec: ViewSpec, operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
   return compileCartesianCoordinate(spec, operationSpec);
-}
-
-function compileLineScale(spec: ViewSpec, operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
-  return compileCartesianScale(spec, operationSpec);
 }
 
 function compileLineAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, context: AnyRecord = {}): ViewSpec {
@@ -94,8 +90,4 @@ function compileLineSeries(spec: ViewSpec, detailSpec: AnyRecord = {}, _context:
       }
     }
   );
-}
-
-function compileLineLayout(spec: ViewSpec, _operationSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
-  return spec;
 }

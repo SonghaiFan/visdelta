@@ -316,8 +316,8 @@ class LineChart extends BaseChart<LineViewState> {
             .append('circle')
             .attr('class', 'vd-line-point')
             .attr('data-key', (d, i) => key(d, i))
-            .attr('cx', (d, i) => targetPoint(d).x)
-            .attr('cy', (d, i) => targetPoint(d).y)
+            .attr('cx', (d) => targetPoint(d).x)
+            .attr('cy', (d) => targetPoint(d).y)
             .attr('r', 0)
             .attr('data-scroll-radius', pointRadius)
             .attr('fill', (d) => color(d))
@@ -331,8 +331,8 @@ class LineChart extends BaseChart<LineViewState> {
               : (chart.transition.enterDelay || 0) + 260 + staggerDelay(spec, d, i))
             .duration((d, i) => addedKeys.has(String(key(d, i))) ? pointDuration : lineDuration)
             .style('opacity', (d) => visiblePointOpacity(d))
-            .attr('cx', (d, i) => targetPoint(d).x)
-            .attr('cy', (d, i) => targetPoint(d).y)
+            .attr('cx', (d) => targetPoint(d).x)
+            .attr('cy', (d) => targetPoint(d).y)
             .attr('r', visiblePointRadius);
           return entered;
         },

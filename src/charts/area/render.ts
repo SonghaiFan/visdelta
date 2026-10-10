@@ -530,7 +530,7 @@ function areaDividerPaths(
     const index = layerIndex.get(cell.layerKey);
     const direction = stackDirection(cell.center);
     if (index == null || direction === 0) return false;
-    return layers.slice(index + 1).some((layer, offset) => {
+    return layers.slice(index + 1).some((_, offset) => {
       const point = pointByLayerAndX[index + offset + 1].get(String(cell.center.x));
       return point && stackDirection(point) === direction &&
         Math.abs(point.y0 - cell.center.y1) < 1e-9;
