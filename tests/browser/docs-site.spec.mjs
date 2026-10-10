@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setCells, setEditorCode } from './code-editor.mjs';
+import { setEditorCode } from './code-editor.mjs';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/reference.html');
@@ -119,13 +119,7 @@ test('ontology playground recompiles live, reports errors, and switches state di
   await expect(status).toHaveText('Ready');
   await expect(editor).toContainText('.y("population"');
 
-  await setCells(page, `const from = bar(rows)
-  .datumKey(["state", "age"])
-  .x("state")
-  .y("population")
-  .key(["state", "age"])
-  .where({ age: "<10" })
-  .where({ field: "state", oneOf: ["CA", "TX"] });`, `const to = bar(rows)
+  await setEditorCode(editor, `const chart = bar(rows)
   .datumKey(["state", "age"])
   .x("state")
   .y("population")

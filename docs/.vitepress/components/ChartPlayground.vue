@@ -1,4 +1,5 @@
 <script setup>
+import SnapshotPlayground from './SnapshotPlayground.vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const charts = [
@@ -55,7 +56,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncRoute));
         >{{ chart.label }}</button>
       </div>
     </nav>
-    <SyntaxPlayground
+    <SnapshotPlayground
       :key="`${activeChart.mode}:${activeInitial}`"
       :mode="activeChart.mode"
       :initial="activeInitial"

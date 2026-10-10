@@ -1,12 +1,13 @@
-# Playground
+---
+layout: page
+title: Playground
+sidebar: false
+aside: false
+pageClass: playground-page
+---
 
-Explore every implemented VisDelta transition in one place. Choose a chart
-type, select one of the seven state-change categories, then edit either
-immutable endpoint. The data, code, computed difference, and seekable chart all
-come from the current checkout.
-
-<ChartPlayground />
-
-The category describes the state difference, not playback order. Identity and
-lineage provide evidence for correspondence; each chart module still owns its
-visible route and intermediate states.
+<main class="playground-page-main">
+  <header class="playground-page-heading"><h1>Playground<span>Code. State. Motion.</span></h1><a href="./reference.html">API reference ↗</a></header>
+  <ChartPlayground />
+  <p class="playground-page-note">Each valid edit creates a snapshot. Select a frame to restore its code and data. Load a demo dataset or your own CSV / JSON to create a new state. Snapshots stay in this session until you reset, switch presets or leave the page.</p>
+</main>

@@ -86,9 +86,9 @@ This ontology changes only when implementation evidence requires it:
 
 ## Run a state difference
 
-Use the unified [Playground](/playground) to edit a pair of immutable states,
-render the real transition, and inspect the computed delta across all five
-chart modules. The category list does not prescribe playback order.
+Use the unified [Playground](/playground) to edit immutable chart states,
+save and restore snapshots, render transitions between them, and inspect the
+computed state changes across all five chart modules. The category list does not prescribe playback order.
 
 ## Transition contracts
 
