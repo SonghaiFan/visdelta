@@ -114,10 +114,19 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
   const sceneState: ChartChangeState = stateFields.sceneState ?? {};
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
   const selection = sceneState.selection ?? stateFields.selection ?? spec.selection ?? null;
-  const selectionMode = selection?.mode;
   const scopes = { ...stateFields.scopes };
-  if (selectionMode === 'focus' && scopes.focus == null) scopes.focus = selection;
-  if (selectionMode === 'highlight' && scopes.highlight == null) scopes.highlight = selection;
+  // Legacy selection fields can coexist during migration. Resolve each
+  // attention scope independently so a highlight in sceneState cannot mask a
+  // focus in the older state.selection field (or vice versa).
+  if (scopes.focus == null) {
+    scopes.focus = [sceneState.selection, stateFields.selection, spec.selection]
+      .find((candidate) => candidate?.mode === 'focus') ?? null;
+  }
+  if (scopes.highlight == null) {
+    scopes.highlight = [sceneState.selection, stateFields.selection, spec.selection]
+      .find((candidate) => candidate?.mode === 'highlight') ?? null;
+  }
+  const selectionMode = selection?.mode;
 
   const state: SemanticViewState = {
     mark: spec.mark ?? null,

@@ -1,11 +1,5 @@
-const FIELD_TITLE_OVERRIDES: Record<string, string> = {
-  tmin: 'Min temperature',
-  tmax: 'Max temperature'
-};
-
 export function titleize(value: unknown): string {
   const raw = String(value ?? '');
-  if (FIELD_TITLE_OVERRIDES[raw]) return FIELD_TITLE_OVERRIDES[raw];
 
   const words = raw
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -22,11 +16,6 @@ export function titleize(value: unknown): string {
       return index === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
     })
     .join(' ');
-}
-
-export function labelFromValue(value: unknown): string {
-  const text = String(value ?? '');
-  return text.includes('_') || text.includes('-') ? titleize(text) : text;
 }
 
 export function aggregateTitle(op: unknown, valueTitle: unknown): string {

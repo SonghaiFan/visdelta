@@ -1,9 +1,9 @@
 import { builtInChartModules } from '../dist/charts/builtins.js';
 import {
   createChartTypeRegistry,
-  createSpecCompilerRegistry,
   registerChartModules
 } from '../dist/charts/index.js';
+import { createViewCompiler } from '../dist/runtime/view-compile.js';
 import * as sourceApi from '../dist/index.js';
 import * as distApi from '../dist/visdelta.esm.js';
 
@@ -48,13 +48,17 @@ const publicApi = [
 const chartModules = await Promise.all(builtInChartModules.map((module) => module.load()));
 const registry = createChartTypeRegistry();
 registerChartModules(registry, chartModules, {});
-const compilerKeys = Object.keys(createSpecCompilerRegistry(chartModules)).sort();
 const expectedTypes = ['area', 'bar', 'line', 'point', 'unit'];
+const viewCompiler = createViewCompiler(registry);
+const compiledTypes = expectedTypes.filter((mark) => {
+  const result = viewCompiler.compileEffectiveView({ mark, data: { values: [] }, encoding: {} });
+  return result.effectiveViewSpec?.mark === mark;
+});
 
 assertSame(Object.keys(sourceApi).sort(), publicApi.sort(), 'source public API');
 assertSame(Object.keys(distApi).sort(), publicApi.sort(), 'dist public API');
 assertSame(registry.types(), expectedTypes, 'chart type registry');
-assertSame(compilerKeys, expectedTypes, 'spec compiler registry');
+assertSame(compiledTypes, expectedTypes, 'runtime view compiler');
 
 const first = sourceApi.bar([{ category: 'A', value: 1, other: 2 }])
   .x('category')
@@ -73,7 +77,7 @@ if (areaDetail.toSpec().meta.state.sceneState.detail.mode !== 'stacked') {
   throw new Error('Area smoke check did not compile stacked detail.');
 }
 
-console.log(JSON.stringify({ types: registry.types(), compilerKeys }, null, 2));
+console.log(JSON.stringify({ types: registry.types(), compiledTypes }, null, 2));
 
 function assertSame(actual, expected, label) {
   const left = JSON.stringify(actual);

@@ -4,10 +4,11 @@ import * as d3 from 'd3';
 import { area, bar, chartStylePresets, darkChartStyle, delta, detectDataTypes, d3ChartStyle, defineChartStyle, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, line, paperChartStyle, point, unit, UNIT_LAYOUTS } from '../dist/index.js';
 import { applyTransforms } from '../dist/data/transforms.js';
 import { areaCells, areaLayers } from '../dist/charts/area/state.js';
-import { matchAreaFramePoints } from '../dist/charts/area/render.js';
+import { interpolateAreaCellFrames } from '../dist/charts/area/render.js';
 import { connectedLineStretches, lineRowsAtTotal } from '../dist/charts/line/state.js';
 import { pointIntermediateSpecs } from '../dist/charts/point/state.js';
 import { defaultTransition } from '../dist/timing.js';
+import { titleize } from '../dist/labels.js';
 import {
   expandUnits
 } from '../dist/charts/unit/state.js';
@@ -29,6 +30,12 @@ test('documented filtering uses where, not a nonexistent filter method', () => {
     assert.doesNotThrow(() => declaration.where({ field: 'y', gte: 2 }).toSpec());
     assert.throws(() => declaration.where('datum.y >= 2'), /string expressions are not supported/);
   }
+});
+
+test('field titles use generic title casing for weather-like names', () => {
+  assert.equal(titleize('tmin'), 'Tmin');
+  assert.equal(titleize('tmax'), 'Tmax');
+  assert.equal(titleize('daily_high'), 'Daily high');
 });
 
 test('core detects tidy field types and resolves missing channel types', () => {
@@ -547,24 +554,18 @@ test('area filters keep separate connected stretches unless the author connects 
   assert.deepEqual(areaCells(isolatedLayers, lineageLayers), []);
 });
 
-test('area observations enter and exit at zero thickness without moving x', () => {
-  const fewer = [
-    { key: 'Q1', x: 10, y0: 100, y1: 70 },
-    { key: 'Q3', x: 30, y0: 100, y1: 40 }
+test('added Area cells grow from zero thickness at their authored x positions', () => {
+  const to = [
+    { key: 'left', x: 15, y0: 100, y1: 100 },
+    { key: 'center', x: 20, y0: 100, y1: 55 },
+    { key: 'right', x: 25, y0: 100, y1: 100 }
   ];
-  const more = [
-    { key: 'Q1', x: 10, y0: 100, y1: 70 },
-    { key: 'Q2', x: 20, y0: 100, y1: 55 },
-    { key: 'Q3', x: 30, y0: 100, y1: 40 }
-  ];
-  const enter = matchAreaFramePoints(fewer, more).find(pair => pair.key === 'Q2');
-  assert.deepEqual(enter.from, { x: 20, y0: 100, y1: 100 });
-  assert.equal(enter.to.x, 20);
-  assert.equal(enter.to.y1, 55);
+  const from = to.map(point => ({ ...point, y1: point.y0 }));
+  const shape = points => points.map(({ x, y0, y1 }) => `${x}:${y0}:${y1}`).join(';');
+  const tween = interpolateAreaCellFrames(from, to, shape);
 
-  const exit = matchAreaFramePoints(more, fewer).find(pair => pair.key === 'Q2');
-  assert.equal(exit.from.x, 20);
-  assert.deepEqual(exit.to, { x: 20, y0: 100, y1: 100 });
+  assert.equal(tween(0), '15:100:100;20:100:100;25:100:100');
+  assert.equal(tween(1), '15:100:100;20:100:55;25:100:100');
 });
 
 test('color is an explicit encoding, including for bar breakdowns', () => {

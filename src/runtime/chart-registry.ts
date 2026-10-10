@@ -32,12 +32,6 @@ function instantiate(key: string, runtime: ChartRuntime) {
   return factory && factory.chartType === chartType ? factory.plugin.createChartType(runtime) : chartType;
 }
 
-export function snapshotChartRegistry(runtime: ChartRuntime) {
-  const registry = createChartTypeRegistry();
-  for (const key of chartRegistry.types()) registry.register(instantiate(key, runtime)!);
-  return registry;
-}
-
 export function availableChartTypes(): string[] {
   return [...new Set([...modules.keys(), ...chartRegistry.types()])].sort();
 }

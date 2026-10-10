@@ -160,7 +160,7 @@ function mergePlain<T extends Record<string, unknown>>(
   return merged;
 }
 
-function semanticToMeta(semanticKey: SemanticKey = {}): Record<string, unknown> {
+export function semanticToMeta(semanticKey: SemanticKey = {}): Record<string, unknown> {
   return {
     ...(semanticKey.entity !== undefined ? { entity: semanticPartToMeta(semanticKey.entity) } : {}),
     ...(semanticKey.entities !== undefined ? { entity: semanticPartToMeta(semanticKey.entities) } : {}),
@@ -177,7 +177,7 @@ function semanticFromMeta(semantic: Record<string, unknown> | null | undefined):
   };
 }
 
-function semanticPartToMeta(part: unknown): unknown {
+export function semanticPartToMeta(part: unknown): unknown {
   if (Array.isArray(part)) return part.map(semanticPartToMeta);
   if (typeof part === 'string') return { field: part };
   return clonePlain(part);

@@ -133,6 +133,22 @@ test('legacy focus and highlight selectors normalize to attention changes', () =
   ]);
 });
 
+test('legacy focus and highlight fields do not mask one another during normalization', () => {
+  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
+  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
+  const legacy = (focus, highlight) => ({
+    ...baseSpec,
+    meta: { state: {
+      selection: { mode: 'focus', field: 'group', equal: focus },
+      sceneState: { selection: { mode: 'highlight', field: 'group', equal: highlight } }
+    } }
+  });
+
+  assert.deepEqual(summary(delta(legacy('one', 'one'), legacy('two', 'one')).stateChanges), [
+    { category: 'attention', action: 'shift', target: 'focus' }
+  ]);
+});
+
 test('axis swaps still report scale changes against the destination channels', () => {
   const data = { values: [{ id: 'a', x: 0, y: 1 }] };
   const source = {

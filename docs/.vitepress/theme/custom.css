@@ -950,7 +950,6 @@ body { font-feature-settings: "ss01", "kern"; }
 .VPDoc th { text-transform: none; letter-spacing: 0; font-weight: 650; }
 .VPButton,
 .VPNavBarSearch button,
-.home-studio-operations button,
 .workbench-actions button,
 .workbench-seq-actions button,
 .playground-toolbar select,
@@ -1030,7 +1029,6 @@ body { font-feature-settings: "ss01", "kern"; }
 .ontology-hero,
 .ontology-catalogue,
 .ontology-contract,
-.ontology-studio-wrap,
 .ontology-next {
   width: min(1380px, calc(100% - 64px));
   margin-inline: auto;
@@ -1084,8 +1082,7 @@ body { font-feature-settings: "ss01", "kern"; }
 .ontology-model-step small { color: currentColor; font-size: 12px; opacity: .7; }
 
 .ontology-catalogue,
-.ontology-contract,
-.ontology-studio-wrap { padding: 112px 0; }
+.ontology-contract { padding: 112px 0; }
 .ontology-section-head { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); align-items: end; gap: 56px; margin-bottom: 42px; }
 .ontology-home .ontology-section-head h2 { max-width: 15ch; margin: 0; border: 0; font-size: clamp(2.6rem, 5vw, 5.2rem); font-weight: 610; letter-spacing: -.065em; line-height: .94; }
 .ontology-section-head > p { max-width: 46ch; margin: 0 0 5px; color: var(--vp-c-text-2); font-size: 14px; line-height: 1.65; }
@@ -1106,20 +1103,6 @@ body { font-feature-settings: "ss01", "kern"; }
 .ontology-home .ontology-contract-grid h3 { margin: 0 0 24px; border: 0; font-size: 18px; }
 .ontology-contract-grid ul { margin: 0; padding-left: 19px; }
 .ontology-contract-grid li { margin: 0 0 14px; color: var(--vp-c-text-2); font-size: 13px; line-height: 1.6; }
-
-.ontology-studio-wrap { border-top: 1px solid var(--vp-c-divider); }
-.ontology-studio-wrap .home-studio-intro { display: none; }
-.ontology-studio-wrap .home-studio-shell { box-shadow: none; }
-.ontology-studio-wrap .home-studio { margin: 0; }
-.ontology-studio-wrap .home-studio-data { background: var(--vp-c-bg-soft); }
-.ontology-home .home-studio-table { display: table; width: 100%; min-width: 680px; margin: 0; overflow: visible; border-collapse: collapse; table-layout: fixed; font: 12px/1.3 var(--vp-font-family-mono); font-variant-numeric: tabular-nums; }
-.ontology-home .home-studio-table th,
-.ontology-home .home-studio-table td { padding: 9px 17px; text-align: left; white-space: nowrap; }
-.ontology-home .home-studio-table th { position: sticky; top: 0; z-index: 1; background: var(--vp-c-bg-soft); }
-.ontology-home .home-studio-table th + th,
-.ontology-home .home-studio-table td + td { border-left: 1px solid var(--vp-c-divider); }
-.ontology-home .home-studio-table th:last-child,
-.ontology-home .home-studio-table td:last-child { text-align: right; }
 
 .ontology-next { display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 96px; border-top: 1px solid var(--vp-c-divider); border-left: 1px solid var(--vp-c-divider); }
 .ontology-next a { display: flex; min-height: 160px; flex-direction: column; justify-content: space-between; padding: 22px; border-right: 1px solid var(--vp-c-divider); border-bottom: 1px solid var(--vp-c-divider); }
@@ -1143,14 +1126,12 @@ body { font-feature-settings: "ss01", "kern"; }
   .ontology-hero,
   .ontology-catalogue,
   .ontology-contract,
-  .ontology-studio-wrap,
   .ontology-next { width: min(100% - 32px, 1380px); }
   .ontology-home .ontology-hero h1 { font-size: clamp(3rem, 16vw, 5rem); }
   .ontology-hero-copy { padding-top: 64px; }
   .ontology-hero-model { grid-template-columns: 1fr; }
   .ontology-catalogue,
-  .ontology-contract,
-  .ontology-studio-wrap { padding: 76px 0; }
+  .ontology-contract { padding: 76px 0; }
   .ontology-category-grid { grid-template-columns: 1fr; }
   .ontology-category-grid article.is-wide,
   .ontology-category-grid article.is-full { grid-column: span 1; }
@@ -1185,7 +1166,6 @@ body:has(.ontology-home) .VPNavBarTitle .title::before {
 .product-hero,
 .product-proof,
 .product-code,
-.product-studio-wrap,
 .product-next {
   width: min(1440px, calc(100% - 64px));
   margin-inline: auto;
@@ -1394,28 +1374,12 @@ body:has(.ontology-home) .VPNavBarTitle .title::before {
 
 .product-code { display: grid; grid-template-columns: minmax(340px, .8fr) minmax(520px, 1.2fr); align-items: stretch; padding: 112px 0; }
 .product-code-copy { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding-right: clamp(50px, 8vw, 120px); }
-.ontology-home .product-code h2,
-.ontology-home .product-studio-wrap > header h2 { margin: 0; border: 0; font-size: clamp(2.8rem, 5.2vw, 5.7rem); font-weight: 620; letter-spacing: -.065em; line-height: .92; }
+.ontology-home .product-code h2 { margin: 0; border: 0; font-size: clamp(2.8rem, 5.2vw, 5.7rem); font-weight: 620; letter-spacing: -.065em; line-height: .92; }
 .product-code-copy p { max-width: 39ch; margin: 27px 0 0; color: var(--vp-c-text-2); font-size: 14px; line-height: 1.65; }
 .product-code-copy a { margin-top: 29px; padding-bottom: 5px; border: 0; font-size: 13px; font-weight: 650; }
 .product-code-copy a:hover { color: var(--vp-c-brand-1); }
 .ontology-home .product-code .doc-code-block { display: block; min-height: 510px; margin: 0; padding: 35px 0; border: 0; border-radius: 10px; background: var(--vd-code-bg); color: var(--vd-code-text); overflow: auto; }
 .ontology-home .product-code .doc-code-line { font-size: 13px; line-height: 1.8; }
-
-.product-studio-wrap { padding: 106px 0 112px; border: 0; }
-.product-studio-wrap > header { max-width: 760px; margin-bottom: 39px; }
-.product-studio-wrap > header p { max-width: 52ch; margin: 22px 0 0; color: var(--vp-c-text-2); font-size: 15px; line-height: 1.6; }
-.product-studio-wrap .home-studio-intro { display: none; }
-.product-studio-wrap .home-studio-shell { box-shadow: none; }
-.product-studio-wrap .home-studio-data { background: var(--vp-c-bg-soft); }
-.product-studio-wrap .home-studio-table { display: table; width: 100%; min-width: 680px; margin: 0; overflow: visible; border-collapse: collapse; table-layout: fixed; font: 12px/1.3 var(--vp-font-family-mono); font-variant-numeric: tabular-nums; }
-.product-studio-wrap .home-studio-table th,
-.product-studio-wrap .home-studio-table td { padding: 9px 17px; text-align: left; white-space: nowrap; }
-.product-studio-wrap .home-studio-table th { position: sticky; top: 0; z-index: 1; background: var(--vp-c-bg-soft); }
-.product-studio-wrap .home-studio-table th + th,
-.product-studio-wrap .home-studio-table td + td { border: 0; }
-.product-studio-wrap .home-studio-table th:last-child,
-.product-studio-wrap .home-studio-table td:last-child { text-align: right; }
 
 .product-next { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 96px; border: 0; }
 .product-next a { display: flex; min-height: 145px; flex-direction: column; justify-content: space-between; padding: 22px; border: 0; border-radius: 10px; background: var(--vp-c-bg-soft); }
@@ -1469,7 +1433,6 @@ body:has(.ontology-home) .VPNavBarTitle .title::before {
   .product-hero,
   .product-proof,
   .product-code,
-  .product-studio-wrap,
   .product-next { width: min(100% - 32px, 1440px); }
   .product-hero { padding: 28px 0 52px; }
   .hero-title-panel {
@@ -1524,7 +1487,6 @@ body:has(.ontology-home) .VPNavBarTitle .title::before {
   .product-code { padding: 76px 0; }
   .ontology-home .product-code .doc-code-block { min-height: 0; padding: 25px 0; }
   .ontology-home .product-code .doc-code-line { font-size: 10px; }
-  .product-studio-wrap { padding: 72px 0 78px; }
   .product-next { grid-template-columns: 1fr; }
   .product-next a { min-height: 112px; }
 }

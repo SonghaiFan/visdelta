@@ -4,6 +4,9 @@ import { scenarios } from '../../examples/area/scenarios.js';
 
 const ready = async page => {
   // The playground initializes when it approaches the viewport.
+  // Wait for Vue to mount the lab before scrolling; SSR hydration can replace
+  // the chart host while the initial page is still settling.
+  await expect(page.locator('#status')).toBeAttached();
   await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#status')).toHaveText('Ready');
 };

@@ -3,7 +3,6 @@ import type {
   ChartRuntime,
   ChartType,
   ChartPlugin,
-  CompilerContext,
   SpecCompiler,
   ViewSpec
 } from '../types/index.js';
@@ -15,6 +14,11 @@ export interface ChartTypeRegistry {
   get<S extends ViewSpec = ViewSpec>(markOrSpec: string | ViewSpec): ChartType<S> | undefined;
   has(markOrSpec: string | ViewSpec): boolean;
   types(): string[];
+}
+
+export interface SpecCompilerEntry {
+  compiler: SpecCompiler;
+  scenes: string[];
 }
 
 export function createChartTypeRegistry(): ChartTypeRegistry {
@@ -45,11 +49,6 @@ export function createChartTypeRegistry(): ChartTypeRegistry {
   };
 }
 
-export interface SpecCompilerEntry {
-  compiler: SpecCompiler;
-  scenes: string[];
-}
-
 export function registerChartModules(
   registry: ChartTypeRegistry,
   modules: Array<{ plugin: ChartPlugin }>,
@@ -60,29 +59,6 @@ export function registerChartModules(
     registry.register(chartType);
   }
   return registry;
-}
-
-export function createSpecCompilerRegistry(
-  modules: Array<{ plugin: ChartPlugin }>,
-  context: CompilerContext = {}
-): Record<string, SpecCompilerEntry> {
-  const entries = modules
-    .map((module) => {
-      const plugin = pluginFromModule(module);
-      const key = normalizeMarkRendererKey(plugin.key);
-      const compiler = plugin.createSpecCompiler ? plugin.createSpecCompiler(context) : null;
-      if (!key || !compiler) return null;
-      return [
-        key,
-        {
-          compiler,
-          scenes: [...plugin.scenes],
-        }
-      ] as [string, SpecCompilerEntry];
-    })
-    .filter((entry): entry is [string, SpecCompilerEntry] => entry !== null);
-
-  return Object.fromEntries(entries);
 }
 
 // ─── Mark key resolution ──────────────────────────────────────────────────────
@@ -97,10 +73,6 @@ export function normalizeChartType(type: unknown): string {
 
 export function resolveMarkRendererKey(viewSpec: ViewSpec): string {
   return normalizeMarkRendererKey(viewSpec.mark);
-}
-
-export function resolveChartType(viewSpec: ViewSpec): string {
-  return resolveMarkRendererKey(viewSpec);
 }
 
 // ─── Internal ─────────────────────────────────────────────────────────────────

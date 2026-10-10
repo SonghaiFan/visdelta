@@ -2,6 +2,8 @@ import type { Visualization } from './core.js';
 import { cloneState } from './grammar/view-state.js';
 import { transition } from './transition.js';
 import type { TransitionOptions, VisualizationTransition } from './transition.js';
+import { resolveTarget } from './runtime/target.js';
+import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 
 /** Options for a timeline of adjacent visualization states. */
 export interface SequenceOptions extends TransitionOptions {}
@@ -35,10 +37,6 @@ interface Segment {
   mount: Element;
   root: Element;
   stageCount: number;
-}
-
-interface TimedVisualizationTransition extends VisualizationTransition {
-  stageCount(): number;
 }
 
 /**
@@ -200,13 +198,6 @@ export async function sequence(states: readonly Visualization[], options: Sequen
 
   controller.progress(0);
   return controller;
-}
-
-function resolveTarget(target: string | Element): Element {
-  if (typeof target !== 'string') return target;
-  const node = document.querySelector(target);
-  if (!node) throw new Error(`VisDelta target not found: ${target}`);
-  return node;
 }
 
 function preparationMount(host: Element, height: number | undefined): HTMLDivElement {
