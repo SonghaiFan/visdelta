@@ -43,7 +43,8 @@ const publicApi = [
   'transition',
   'unit',
   'viewLineageCorrespondence',
-  'visualizationSpec'
+  'visualizationSpec',
+  'visualizationWarnings'
 ];
 
 const expectedTypes = ['area', 'bar', 'line', 'point', 'unit'];

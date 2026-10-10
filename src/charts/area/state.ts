@@ -88,7 +88,8 @@ export function areaLayers(
   xField: string,
   yField: string,
   state: AreaSceneState,
-  key: (row: Record<string, unknown>, index: number) => string = (row, index) => pointKey(row[xField], index)
+  key: (row: Record<string, unknown>, index: number) => string = (row, index) => pointKey(row[xField], index),
+  seriesOrder?: unknown[]
 ): AreaLayer[] {
   if (state.mode !== 'stacked' || !state.seriesField) {
     return [{
@@ -110,7 +111,9 @@ export function areaLayers(
   }
 
   const xValues = unique(rows.map((row) => row[xField]));
-  const seriesValues = unique(rows.map((row) => row[state.seriesField!]));
+  const present = new Set(rows.map(row => String(row[state.seriesField!])));
+  const seriesValues = (seriesOrder ?? rankedAreaSeries(rows, state.seriesField, yField))
+    .filter(value => present.has(String(value)));
   const byCell = new Map(rows.map((row) => [cellKey(row[xField], row[state.seriesField!]), row]));
   const positive = new Map(xValues.map((value) => [String(value), state.baseline]));
   const negative = new Map(xValues.map((value) => [String(value), state.baseline]));
@@ -134,6 +137,19 @@ export function areaLayers(
       points
     };
   });
+}
+
+/** One stable bottom-to-top order, ranked by total over the data domain. */
+export function rankedAreaSeries(rows: readonly Record<string, unknown>[], seriesField: string, yField: string): unknown[] {
+  const totals = new Map<string, { value: unknown; total: number }>();
+  for (const row of rows) {
+    const key = String(row[seriesField]);
+    const entry = totals.get(key) ?? { value: row[seriesField], total: 0 };
+    entry.total += number(row[yField]);
+    totals.set(key, entry);
+  }
+  // Stable sorting keeps first appearance as the tie-breaker.
+  return [...totals.values()].sort((a, b) => b.total - a.total).map(entry => entry.value);
 }
 
 /** D3-compatible stack geometry for the Area stream layout. */

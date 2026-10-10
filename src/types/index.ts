@@ -1,3 +1,16 @@
+/** Advisory only: never changes state, validity or transition planning. */
+export interface VisualizationWarning {
+  code: string;
+  severity: 'warning';
+  message: string;
+  suggestion: string;
+  field?: string;
+  evidence: Record<string, string | number | boolean>;
+}
+
+export type ChartWarningInspector<S extends ViewSpec = ViewSpec> =
+  (spec: S, rows: readonly Record<string, unknown>[]) => VisualizationWarning[];
+
 // ─── Channel & Encoding ──────────────────────────────────────────────────────
 
 export type ChannelType = 'quantitative' | 'temporal' | 'nominal' | 'ordinal';
@@ -626,6 +639,7 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   key: string;
   /** Opt in only when all animated SVG properties can be captured and sought. */
   transitionEvaluation?: 'cached' | 'reconstruct';
+  warnings?: ChartWarningInspector<S>;
   renderer: Renderer<S>;
   prepareSpec(spec: S): S;
   defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;

@@ -2,7 +2,7 @@ import type { MarginSpec, EncodingSpec, ChartViewport } from '../types/index.js'
 import type { RenderContext } from './render-types.js';
 import type { ThemeValue } from './theme.js';
 import type { createColors } from './colors.js';
-import { legendDomain, legendLabel, legendLayout } from './legend-layout.js';
+import { legendEntries, legendLayout } from './legend-layout.js';
 import type { ChartStyleRule } from '../charts/style.js';
 import { format } from 'd3-format';
 import { createTextMeasure } from './text-measure.js';
@@ -39,7 +39,7 @@ export function createPlotLayout(context: RenderContext, themeValue: ThemeValue,
     if (!active || active.value) return margin;
     const channel = active.hue?.field ? active.hue : active.luminance?.field ? active.luminance : active;
     if (!channel.field) return margin;
-    const labels = legendDomain(rows, channel).map(value => legendLabel(value, channel));
+    const labels = legendEntries(rows, channel).map(entry => entry.label);
     const swatch = themeValue('--vd-legend-swatch-size', 9);
     const inset = context.chartStyle?.legendInset ?? { top: 8, left: 8 };
     const side = legendLayout(labels, 1, swatch, measure);

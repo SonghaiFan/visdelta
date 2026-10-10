@@ -1,3 +1,4 @@
+import { areaLayoutChannels } from './style.js';
 import { bandOrLinear, position } from '../../toolkit/scales.js';
 import { setCartesianState } from '../../toolkit/cartesian.js';
 import { BaseChart } from '../base.js';
@@ -42,6 +43,19 @@ export interface AreaFramePoint extends AreaBoundaryPoint {
 /** Left half, observation center, right half. A flattened frame keeps no keys. */
 export type AreaCellFrame = AreaBoundaryPoint[];
 
+function uniqueAreaLineageRows(
+  rows: RenderDatum[],
+  key: (row: RenderDatum, index: number) => string
+): RenderDatum[] {
+  const seen = new Set<string>();
+  return rows.filter((row, index) => {
+    const identity = key(row, index);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+}
+
 type AreaShape = Area<AreaBoundaryPoint>;
 type AreaEdge = Line<AreaBoundaryPoint>;
 
@@ -68,7 +82,8 @@ export function createAreaRenderer(runtime: ChartRuntime, presentation: ChartPre
 class AreaChart extends BaseChart<AreaViewState> {
   render(chart: ChartContext, rows: RenderDatum[], spec: AreaViewState, tooltip: HTMLElement): void {
     const { colorScale, drawLegend, themeValue } = this.runtime;
-    const enc = spec.encoding || {};
+    const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
+    const enc = areaLayoutChannels(spec, { width: chart.width, height: chart.height, rows: domainRows });
     const xField = enc.x?.field;
     const yField = enc.y?.field;
     if (!xField || !yField) return;
@@ -77,12 +92,20 @@ class AreaChart extends BaseChart<AreaViewState> {
     const grainError = areaGrainError(spec, rows);
     if (grainError) throw new Error(grainError);
     const pointKey = areaPointKeyAccessor(spec, xField);
-    const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const domainLayers = areaLayers(domainRows, xField, yField, state, pointKey);
+    // A single filtered series may share each x value with other series in
+    // the unfiltered domain. Keep one lineage point per x so duplicate domain
+    // rows cannot make every selected point look non-adjacent.
+    const lineageDomainRows = state.mode === 'single'
+      ? uniqueAreaLineageRows(domainRows, pointKey)
+      : domainRows;
+    const lineageDomainLayers = state.mode === 'single'
+      ? areaLayers(lineageDomainRows, xField, yField, state, pointKey)
+      : domainLayers;
     const scaleRows = state.filtersRows ? domainRows : rows;
-    const layers = areaLayers(rows, xField, yField, state, pointKey);
+    const layers = areaLayers(rows, xField, yField, state, pointKey, domainLayers.map(layer => layer.value));
     const lineageLayers = state.filtersRows && state.connect !== 'across'
-      ? domainLayers
+      ? lineageDomainLayers
       : layers;
     const cells = areaCells(layers, lineageLayers);
     const plan = chart.transitionPlan as (typeof chart.transitionPlan & AreaTransitionPlanExtension) | undefined;

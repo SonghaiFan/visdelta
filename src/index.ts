@@ -35,3 +35,6 @@ export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, L
 export type { ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
 export type { TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";
 export type { SequenceOptions, SequencePlayOptions, VisualizationSequence } from "./sequence.js";
+
+export { visualizationWarnings } from './warnings.js';
+export type { VisualizationWarning, ChartWarningInspector } from './types/index.js';

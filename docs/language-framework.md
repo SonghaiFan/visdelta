@@ -240,8 +240,20 @@ or detail unless the author maps it.
 Without a declared color channel, marks in every chart use black (`#000000`)
 and produce no color legend. Theme accents do not supply an implicit mark color.
 An explicit constant or field color keeps its authored meaning and may use the
-theme palette. Generated waypoints obey the same rule: refining a grouping
-must not invent or remap a color channel to its temporary segment field.
+theme palette. Categorical color keeps every category and legend entry; when
+more than five categories share a color channel, VisDelta emits a warning but
+does not collapse or recolor them as an `others` group. Explicit color
+`range` and `scheme` values keep their authored palette; composite
+hue/luminance encodings also retain their declared behavior. Generated
+waypoints must not invent or remap a color channel to a temporary segment
+field, even when grouping is refined.
+
+Ordinary stacked Area derives one layer order from descending whole-domain
+series totals, with stable first-appearance ties. Display filtering retains
+that order. Default categorical color for the same series follows the ranking;
+authored palettes and domains are preserved. This chart-owned derived geometry
+does not add an operation or state-change action. Stream layouts retain their
+explicit/default D3 order policy.
 
 ```js
 point(rows)
@@ -466,3 +478,13 @@ greenfield release.
 
 The detailed signatures live in the [API reference](/reference). Working
 behavior lives in the unified Playground.
+
+## Advisory visualization warnings
+
+Visualization design advice is separate from state differences, validity and
+transition planning. Chart plugins may inspect a prepared state and its
+transformed rows through `warnings(spec, rows)`. Warnings never rewrite data,
+encodings, authored domains or routes, and do not prevent rendering. They are
+not an eighth state-change category. Core transports these diagnostics without
+chart-name branches. See [the warning reference](/reference#visualization-warnings)
+for the implemented rules and their limits.

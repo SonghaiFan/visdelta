@@ -23,3 +23,5 @@ export type {
   CanonicalDeclarationOperation, DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec, TransitionPlan, ChartRuntime,
   ViewSpec, Renderer, SpecCompiler
 } from './types/index.js';
+
+export type { VisualizationWarning, ChartWarningInspector } from './types/index.js';

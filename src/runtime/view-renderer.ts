@@ -1,3 +1,4 @@
+import { reportVisualizationWarnings } from './warnings.js';
 import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
 import { resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
@@ -246,6 +247,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const source = viewRows(renderSpec.data, datasets) as DataRow[];
   const transforms = renderSpec.transform || [];
   const rows = applyTransforms(source, transforms) as RenderDatum[];
+  reportVisualizationWarnings(node, chartType?.warnings?.(renderSpec, rows) ?? []);
   attachDatumIdentity(rows, compileLineage(source, transforms, {
     key: specDatumKey(renderSpec) ?? undefined
   }));

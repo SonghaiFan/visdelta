@@ -42,7 +42,8 @@ const expectedApi = [
   "transition",
   "unit",
   "viewLineageCorrespondence",
-  "visualizationSpec"
+  "visualizationSpec",
+  "visualizationWarnings"
 ];
 
 let tarball = null;
@@ -118,6 +119,8 @@ assertSame(Object.keys(browserApi).sort(), expectedApi, "browser public API");
 assertSame(Object.keys(globalThis.VisDelta).sort(), expectedApi, "browser global API");
 if ("vd" in globalThis) throw new Error("the browser build must define only the VisDelta global");
 assertSame(api.availableChartTypes(), [], "no implicitly registered chart types");
+const warnings = await api.visualizationWarnings(api.line([{ x: "A", y: 2 }, { x: "B", y: 3 }]).x("x").y("y"));
+assertSame(warnings.map(item => item.code), ["connection.unordered-axis"], "packed advisory warnings");
 if (typeof selectedArea !== "function") throw new Error("area subpath did not export area()");
 if (selectedAreaCurveNames.length !== 19) throw new Error("area subpath did not export its D3 curve names");
 if (typeof selectedBar !== "function") throw new Error("bar subpath did not export bar()");

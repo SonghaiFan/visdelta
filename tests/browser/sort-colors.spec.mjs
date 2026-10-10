@@ -59,7 +59,7 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
   });
 }
 
-test('an explicit categorical encoding uses the default palette slots in order', async ({ page }) => {
+test('default categorical color keeps five palette slots and groups overflow', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { bar, transition } = await import('/dist/visdelta.esm.js');
     const rows = Array.from({ length: 10 }, (_, index) => ({
@@ -89,7 +89,7 @@ test('an explicit categorical encoding uses the default palette slots in order',
   });
   expect(result.defaults).toEqual([
     '#4269d0', '#efb118', '#ff725c', '#6cc5b0', '#3ca951',
-    '#ff8ab7', '#a463f2', '#97bbf5', '#9c6b4e', '#9498a0'
+    '#9498a0', '#9498a0', '#9498a0', '#9498a0', '#9498a0'
   ]);
   expect(result.authored).toEqual([
     '#111111', '#eeeeee', '#111111', '#eeeeee', '#111111',

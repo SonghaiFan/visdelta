@@ -1,3 +1,4 @@
+import { chartWarnings } from './warnings.js';
 import { linePresentation } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import type { TransitionSpec } from '../../types/index.js';
@@ -24,6 +25,7 @@ export interface LineTransitionPlanExtension {
 
 export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>({
   key: 'line',
+  warnings: chartWarnings,
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   scenes: ['selection', 'axis', 'detail', 'mapping'],

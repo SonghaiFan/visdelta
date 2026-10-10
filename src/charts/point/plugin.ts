@@ -1,3 +1,4 @@
+import { chartWarnings } from './warnings.js';
 import { pointPresentation } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import { createPointSpecCompiler } from './compile.js';
@@ -10,6 +11,7 @@ import { createPointDeclarationOperationCodec } from './declaration-operations.j
 
 export const plugin: ChartPlugin<PointViewState> = defineChartType<PointViewState>({
   key: 'point',
+  warnings: chartWarnings,
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',

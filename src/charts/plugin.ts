@@ -1,5 +1,6 @@
 import type {
   ChartRuntime,
+  ChartViewport,
   ChartType,
   ChartPlugin,
   ChartTransitionPolicy,
@@ -16,6 +17,7 @@ import { resolveChartPresentation } from './style.js';
 import type { ChartPresentation, ChartPresentationDefinition } from './style.js';
 
 export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
+  warnings?: ChartType<S>['warnings'];
   key: string;
   transitionEvaluation?: 'cached' | 'reconstruct';
   declarationPlanning?: boolean;
@@ -24,7 +26,7 @@ export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   renderer?: Renderer<S>;
   presentation?: ChartPresentationDefinition;
   /** Channels actually shown by the renderer (e.g. a layout-generated group axis). */
-  layoutChannels?: (spec: S) => EncodingSpec;
+  layoutChannels?: (spec: S, viewport?: ChartViewport) => EncodingSpec;
   defaultMarkKey?: ChartType<S>['defaultMarkKey'];
   createRenderer?: (runtime: ChartRuntime, presentation: ChartPresentation) => Renderer<S>;
   createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => Omit<ChartType<S>, 'defaultMargin'>;
@@ -55,8 +57,9 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
     return normalizeChartType<S>(
       {
         ...chartType,
+        warnings: config.warnings ?? chartType.warnings,
         defaultMargin: (spec, viewport) => viewport
-          ? runtime.layoutMargins(config.layoutChannels?.(spec) ?? spec.encoding ?? {}, viewport, presentation.plot)
+          ? runtime.layoutMargins(config.layoutChannels?.(spec, viewport) ?? spec.encoding ?? {}, viewport, presentation.plot)
           : presentation.plot.margin,
         transitionEvaluation: config.transitionEvaluation ?? chartType.transitionEvaluation,
         declarationPlanning: config.declarationPlanning ?? chartType.declarationPlanning,

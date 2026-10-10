@@ -1,4 +1,5 @@
-import { areaPresentation } from './style.js';
+import { chartWarnings } from './warnings.js';
+import { areaPresentation, areaLayoutChannels } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import { createDefaultTransitionPlan } from '../transition-plan.js';
 import { defineChartType } from '../plugin.js';
@@ -16,11 +17,13 @@ export interface AreaTransitionPlanExtension {
 
 export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>({
   key: 'area',
+  warnings: chartWarnings,
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: areaPresentation,
+  layoutChannels: areaLayoutChannels,
   createRenderer: createAreaRenderer,
   createSpecCompiler: createAreaSpecCompiler,
   // One observation per x within each stacked series.

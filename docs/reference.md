@@ -668,3 +668,112 @@ declare their complete `stateOrder` and handlers; no default pipeline is added.
 - Declared transforms execute within VisDelta; no table-library installation is required.
 - Data cleaning is outside the library.
 - Controls call `progress()` from outside the library.
+
+## Visualization warnings
+
+Rendering automatically emits advisory `console.warn` messages. Charts still
+render; declarations and transition plans are unchanged. Consecutive identical
+warning lists are deduplicated per host. A changed list is also exposed as a
+bubbling `visdelta:warnings` event (`event.detail` is the warning array) and JSON
+in the chart scene element's `data-visdelta-warnings` attribute (inside the target). The event bubbles to the target. An empty array clears the last
+reported diagnostics. These describe evaluated chart states, not every animation
+frame; cached playback need not re-evaluate a state.
+
+Inspect without rendering:
+
+```js
+import { bar, visualizationWarnings } from 'visdelta';
+
+const chart = bar([{ category: 'A', value: 12 }, { category: 'B', value: 14 }])
+  .x('category')
+  .y('value', { domain: [10, 20] });
+const warnings = await visualizationWarnings(chart);
+// warnings[0].code === 'bar.truncated-baseline'
+```
+
+`visualizationWarnings(visualization, datasets = {})` returns a promise of
+`VisualizationWarning[]`. Builders carry their chart module; plain specs require
+an explicitly registered chart module/type, just like transitions. Named data
+can be supplied in `datasets`; the inspection does not fetch remote data.
+Warnings include `code`, `severity: 'warning'`, `message`, `suggestion`,
+`evidence`, and an optional `field`. Plugins declare an optional pure
+`warnings(spec, rows)` inspector through `defineChartType`. It receives prepared
+specs and transformed rows. Plugins without this hook return no warnings.
+
+| Code | Trigger | Suggested response |
+| --- | --- | --- |
+| `bar.truncated-baseline` | Explicit two-ended measure domain still excludes zero after renderer nicing, including flipped bars | Include zero or use dots |
+| `connection.unordered-axis` | Line/Area x channel is nominal, inferred or declared | Use bars/dots, or declare ordinal if order is meaningful |
+| `color.too-many-categories` | More than 5 observed nominal/ordinal values share a color channel, in any built-in chart | Consider grouping, filtering or using small multiples; colors and legend entries remain unchanged |
+| `line.too-many-series` | More than 10 actual series | Filter, highlight or use small multiples |
+| `area.too-many-series` | More than 6 actual layers | Reduce layers or use lines |
+| `area.negative-components` | Multiple layers with negative y values | Consider lines or diverging bars |
+| `point.small-sample` | 1–4 finite observations on two quantitative axes | Show sample size; avoid strong relationship conclusions |
+| `point.coincident-positions` | Finite observations on two quantitative axes have identical x/y positions | Inspect overlap; consider transparency or aggregation |
+| `point.negative-size` | Negative values in a mapped bubble-size field | Use position for signed values |
+
+Counts use the transformed rows, so filtering and aggregation affect advice.
+The numeric thresholds are VisDelta heuristics, not universal perceptual laws.
+Ordinal author declarations are respected; sorting nominal labels alone does
+not establish semantic order. Dot plots are not treated as scatterplots.
+Focused line y ranges do not automatically warn.
+
+These rules translate the expressiveness/effectiveness principles in
+*introduction-what-why-how.tex* and the chart design guides in
+*visualisation-of-table-datasets.tex* (Monash teaching materials). The latter's
+Bar, Line, Area, Scatterplot and Bubble Plot sections motivate the chart rules;
+its category-discrimination guidance motivates the color warning.
+
+Unsupported automatic judgements include author intent, causal claims,
+importance of a variable, precise-share comparison goals, annotation quality,
+label collisions, near-overlap in pixel space, palette accessibility and pie
+chart advice (VisDelta has no pie chart module). Bubble-radius scaling and
+nonzero minimum-radius effects are not assessed by these warnings. No universal
+warning is emitted merely for using a stack, a focused line scale or a bubble
+chart. Advice requiring these contexts remains a manual design review.
+
+
+### Default categorical colors
+
+With `.color("category")`, each value in the color domain keeps its own color
+assignment and legend entry. More than five observed categories trigger
+`color.too-many-categories`; the warning does not change the chart, merge
+categories, or introduce an `others` entry.
+
+Colors follow explicit `domain` order when supplied, otherwise the existing
+data-domain order. Default stacked Area color uses its ranked series order
+when no color domain or palette is supplied. Other charts do not automatically
+rank color categories by value. Filtering retains the existing full-domain
+color assignment and all legend entries; marks that remain do not acquire a
+different palette slot. Layout measures the same legend that is drawn,
+including on narrow screens.
+
+Provide an explicit `range` or `scheme` to control the colors assigned to
+categories:
+
+```js
+const compact = point(rows).x("income").y("health").color("region");
+const fullPalette = compact.color("region", { scheme: "Tableau10" });
+```
+
+Quantitative gradients, constant color and composite hue/luminance encodings
+are unchanged. The category-count warning is advisory and does not alter the
+palette or collapse categories. Chart-specific series-count warnings can also
+apply because the number of lines or layers has not changed.
+
+
+### Default stacked Area ranking
+
+Ordinary stacked Area places series with larger total y values nearer the
+baseline. Totals span the full data domain used by the chart, not just the last
+time point. Ties keep first appearance order. One fixed order applies across
+all x positions; trailing display filters retain the full-domain ranking.
+The positive and negative accumulators remain separate.
+
+When color maps the stacked series with no explicit domain or palette, its
+legend and default categorical colors follow this ranking. No color encoding
+is invented for an uncolored stack. Explicit color domains, ranges and schemes
+retain their assignments. Stream layouts retain their declared D3 order and
+offset. To keep input layer order with a fixed baseline, use the existing
+`.layout("stream", { offset: "none", order: "none" })` after `breakdown()`.
+Ranking is derived geometry, not an extra declaration operation.
