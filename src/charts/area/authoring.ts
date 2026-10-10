@@ -79,7 +79,7 @@ export class AreaState extends ChartState<AreaViewState> {
             ? { color: { range: options['color'] as unknown[] } }
             : { color: colorFrom(options['color'] as string) }
           : {})
-    }, 'detail') as this;
+    }, { captureResetBaseline: true }) as this;
   }
 
   /** Arrange stacked layers from a fixed baseline or as a configurable streamgraph. */
@@ -108,12 +108,9 @@ export class AreaState extends ChartState<AreaViewState> {
     const { offset: _offset, order: _order, ...rest } = detail;
     return this.replaceState('detail', {
       ...rest,
-      // DetailSpec predates chart-owned layouts and names only BarLayout.
-      // Keep the shared Core contract unchanged; the Area compiler resolves
-      // this chart-local value before it reaches rendering.
       layout: value as 'stacked',
       ...(value === 'stream' ? { offset, order } : {})
-    }, 'detail') as this;
+    }, { captureResetBaseline: true }) as this;
   }
 
   /** Combine stacked parts into one total at every x value. */
@@ -125,7 +122,7 @@ export class AreaState extends ChartState<AreaViewState> {
         op: String(options['op'] ?? 'sum'),
         ...(options['as'] ? { as: String(options['as']) } : {}),
         ...(options['color'] ? { color: colorFrom(options['color'] as string) } : {})
-    }, 'detail') as this;
+    }, { captureResetBaseline: true }) as this;
   }
 }
 

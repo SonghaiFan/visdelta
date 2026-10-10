@@ -52,7 +52,7 @@ class LineChart extends BaseChart<LineViewState> {
     const removedKeys = new Set((observation?.removedKeys || []).map(String));
     const addsObservations = addedKeys.size > 0;
     const addsAndRemoves = addsObservations && removedKeys.size > 0;
-    const totalDuration = Number(chart.transitionPlan?.timing?.duration) || 900;
+    const totalDuration = Number(plan?.timing?.duration) || 900;
     const scaleDuration = chart.transition.scaleDuration || totalDuration;
     const enterWindow = chart.transition.enterLast
       ? chart.transition.enterDuration ?? totalDuration

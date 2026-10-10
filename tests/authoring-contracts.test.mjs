@@ -32,6 +32,22 @@ test('documented filtering uses where, not a nonexistent filter method', () => {
   }
 });
 
+test('reset baseline is private, immutable across branches, and survives data replacement', () => {
+  const base = bar([{ id: 'a', region: 'North', value: 1 }]).x('id').y('value');
+  const changed = base.where({ region: 'North' });
+  const sibling = base.highlight({ region: 'North' });
+
+  assert.equal(Object.hasOwn(changed.state, '__grammar'), false);
+  assert.equal(typeof changed.operations, 'undefined');
+  assert.equal(typeof changed.capabilities, 'undefined');
+  assert.deepEqual(changed.reset().toSpec(), base.toSpec());
+  assert.deepEqual(sibling.reset().toSpec(), base.toSpec());
+  assert.deepEqual(
+    changed.data([{ id: 'b', region: 'South', value: 2 }]).reset().toSpec(),
+    base.toSpec()
+  );
+});
+
 test('field titles use generic title casing for weather-like names', () => {
   assert.equal(titleize('tmin'), 'Tmin');
   assert.equal(titleize('tmax'), 'Tmax');
@@ -563,9 +579,13 @@ test('added Area cells grow from zero thickness at their authored x positions', 
   const from = to.map(point => ({ ...point, y1: point.y0 }));
   const shape = points => points.map(({ x, y0, y1 }) => `${x}:${y0}:${y1}`).join(';');
   const tween = interpolateAreaCellFrames(from, to, shape);
+  const reverse = interpolateAreaCellFrames(to, from, shape);
 
   assert.equal(tween(0), '15:100:100;20:100:100;25:100:100');
+  assert.equal(tween(0.5), '15:100:100;20:100:77.5;25:100:100');
   assert.equal(tween(1), '15:100:100;20:100:55;25:100:100');
+  assert.equal(reverse(0.5), tween(0.5));
+  assert.equal(reverse(1), tween(0));
 });
 
 test('color is an explicit encoding, including for bar breakdowns', () => {

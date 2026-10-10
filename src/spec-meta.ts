@@ -128,6 +128,18 @@ export function specState(spec: ViewSpec): ResolvedChartState {
   };
 }
 
+/** Resolve attention scopes with the same precedence used by renderer code. */
+export function specScopes(spec: ViewSpec): ViewScopes {
+  const state = specState(spec);
+  const selections = [state.sceneState?.selection, state.selection, spec.selection];
+  const scopes = state.scopes ?? {};
+  return {
+    ...scopes,
+    focus: scopes.focus || selections.find((selection) => selection?.mode === 'focus') || null,
+    highlight: scopes.highlight || selections.find((selection) => selection?.mode === 'highlight') || null
+  };
+}
+
 export function dataName(dataSpec: unknown): string | null {
   if (typeof dataSpec === 'string') return dataSpec;
   return (dataSpec as { name?: string })?.name ?? null;

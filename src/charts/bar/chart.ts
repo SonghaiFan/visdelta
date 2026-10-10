@@ -4,7 +4,6 @@ import type {
   ChartRuntime,
   ChartType,
   IntermediateSpec,
-  TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
 import type { ChartPresentation } from '../style.js';
@@ -14,6 +13,7 @@ import {
   resolveBarTransitionPlan
 } from './state.js';
 import { semanticBarState } from './semantic.js';
+import type { BarTransitionPlan } from './plan.js';
 
 export interface BarSpec extends ViewSpec {
   mark: 'bar';
@@ -30,11 +30,10 @@ export function createBarChart(runtime: ChartRuntime, presentation: ChartPresent
       const state = semanticBarState(spec);
       return [state.categoryField, state.segmentField].filter((field): field is string => Boolean(field));
     },
-    resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => TransitionPlan,
+    resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => BarTransitionPlan,
     canonicalTransitionPair: canonicalBarTransitionPair,
     intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],
-    scenes: ['selection', 'axis', 'detail', 'mapping'],
-    inspect: { transitionPlanKey: 'barTransitionPlan' }
+    scenes: ['selection', 'axis', 'detail', 'mapping']
   };
 }
 

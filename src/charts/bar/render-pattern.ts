@@ -11,10 +11,11 @@ import { select } from 'd3-selection';
 import type {
   ChartContext,
   StaggerSpec,
-  TransitionItemAction,
   TransitionStep,
   ViewSpec
 } from '../../types/index.js';
+import { barTransitionPlan } from './plan.js';
+import type { BarTransitionItemAction } from './plan.js';
 
 // ─── Shared bar types ─────────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ export interface LineageStart {
 
 export interface SourceBaselineExitOptions {
   horizontal?: boolean;
-  plan?: TransitionItemAction | null;
+  plan?: BarTransitionItemAction | null;
   value?: ((d: BarDatum) => unknown) | null;
 }
 
@@ -112,7 +113,7 @@ export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPre
   const { themeValue } = runtime;
 
   function steps(chart: ChartContext, rendererOrientation: string): BarSteps | null {
-    const plan = chart.transitionPlan;
+    const plan = barTransitionPlan(chart);
     if (!plan?.steps?.length) return null;
     if (plan.target?.renderer !== rendererOrientation) return null;
     const ordered = plan.steps.filter((step) =>
@@ -191,7 +192,7 @@ export function createBarRenderKit(runtime: ChartRuntime, presentation: ChartPre
     const applyGeometry = geometry.apply;
     const exitGeometry = geometry.exit;
     const dimOpacity = themeValue('--vd-dim-opacity', 0.22);
-    const structuralEnter = chart.transitionPlan?.enter?.mode === 'parent-child-lineage';
+    const structuralEnter = barTransitionPlan(chart)?.enter?.mode === 'parent-child-lineage';
     // A focus change is one rigid camera move. Per-mark staggering would bend
     // the coordinate system: bars would temporarily leave the shared axis
     // baseline even though neither their data nor identity changed.
@@ -289,7 +290,7 @@ export function setRectGeometry(selection: RectAttrWriter, geometry: RectGeometr
 }
 
 export function collapseLineage(chart: ChartContext, parentField: string | undefined): LineageStart | null {
-  const enterPlan = chart.transitionPlan?.enter;
+  const enterPlan = barTransitionPlan(chart)?.enter;
   if (enterPlan?.mode !== 'parent-child-lineage' || enterPlan.from !== 'child-bounds' || !parentField) return null;
   const bounds = new Map<string, RectGeometry>();
   chart.g.selectAll<SVGRectElement, unknown>('rect.vd-bar').each(function() {
@@ -305,7 +306,7 @@ export function collapseLineage(chart: ChartContext, parentField: string | undef
 }
 
 export function splitLineage(chart: ChartContext): LineageStart | null {
-  const enterPlan = chart.transitionPlan?.enter;
+  const enterPlan = barTransitionPlan(chart)?.enter;
   if (enterPlan?.mode !== 'parent-child-lineage' || enterPlan.from !== 'parent-bounds' || !enterPlan.parentKey) return null;
   const parentKey = enterPlan.parentKey;
   const bounds = new Map<string, RectGeometry>();
@@ -320,13 +321,13 @@ export function splitLineage(chart: ChartContext): LineageStart | null {
   };
 }
 
-export function baselineEnterPlan(chart: ChartContext, from: string): TransitionItemAction | null {
-  const enterPlan = chart.transitionPlan?.enter;
+export function baselineEnterPlan(chart: ChartContext, from: string): BarTransitionItemAction | null {
+  const enterPlan = barTransitionPlan(chart)?.enter;
   return enterPlan?.mode === 'baseline' && enterPlan.from === from ? enterPlan : null;
 }
 
-export function baselineExitPlan(chart: ChartContext, to: string): TransitionItemAction | null {
-  const exitPlan = chart.transitionPlan?.exit;
+export function baselineExitPlan(chart: ChartContext, to: string): BarTransitionItemAction | null {
+  const exitPlan = barTransitionPlan(chart)?.exit;
   return exitPlan?.mode === 'baseline' && exitPlan.to === to ? exitPlan : null;
 }
 
@@ -360,7 +361,7 @@ function currentRect(node: Element): RectGeometry {
   };
 }
 
-function sourceRectIsHorizontal(node: Element, plan: TransitionItemAction | null, fallbackHorizontal: boolean): boolean {
+function sourceRectIsHorizontal(node: Element, plan: BarTransitionItemAction | null, fallbackHorizontal: boolean): boolean {
   const orientation = String(node.getAttribute('data-orientation') || plan?.sourceOrientation || '');
   if (orientation.includes('horizontal')) return true;
   if (orientation.includes('vertical')) return false;

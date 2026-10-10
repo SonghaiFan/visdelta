@@ -3,10 +3,10 @@ import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/area/scenarios.js';
 
 const ready = async page => {
-  // The playground initializes when it approaches the viewport.
-  // Wait for Vue to mount the lab before scrolling; SSR hydration can replace
-  // the chart host while the initial page is still settling.
-  await expect(page.locator('#status')).toBeAttached();
+  // ChartPlayground switches its keyed SyntaxPlayground after hydration; wait
+  // for the route-selected chart before scrolling to the replaceable status.
+  await expect(page.getByRole('tab', { name: 'Area', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
   await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#status')).toHaveText('Ready');
 };
@@ -52,9 +52,9 @@ for (const sample of scenarios) {
     await setEditorCode(editor, sample.code
       .replace('.x("date")', '.x("date", { title: "Month" })')
       .replace('title: "Date"', 'title: "Month"'));
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
     await expectEditorCode(editor, /title: "Month"/);
+    await expect(page.locator('.vd-x-label')).toHaveText('Month →');
     await page.locator('#reset').click();
     await ready(page);
     await expectEditorCode(editor, sample.code);

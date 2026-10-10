@@ -9,7 +9,8 @@ import { specState } from '../../../spec-meta.js';
 import { drawBarAxes } from '../axes.js';
 import type { ChartRuntime } from '../../../runtime/chart-runtime.js';
 import type { RuntimeScale } from '../../../runtime/render-types.js';
-import type { ChartContext, TransitionItemAction } from '../../../types/index.js';
+import type { ChartContext } from '../../../types/index.js';
+import type { BarTransitionItemAction } from '../plan.js';
 import type {
   BarDatum,
   BarGeometryContract,
@@ -136,9 +137,9 @@ function segmentWidth(segment: RuntimeScale | null): number {
 function groupedSegmentGeometryContract(
   geom: GroupedGeom,
   splitLineage: LineageStart | null,
-  zeroBaselineEnter: TransitionItemAction | null,
+  zeroBaselineEnter: BarTransitionItemAction | null,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
-  exitPlan: TransitionItemAction | null
+  exitPlan: BarTransitionItemAction | null
 ): BarGeometryContract {
   return {
     start: (d) => splitLineage?.start(d) || groupedSegmentEnterGeometry(d, geom, zeroBaselineEnter),
@@ -150,7 +151,7 @@ function groupedSegmentGeometryContract(
   };
 }
 
-function groupedSegmentEnterGeometry(d: BarDatum, geom: GroupedGeom, enterPlan: TransitionItemAction | null = null): RectGeometry {
+function groupedSegmentEnterGeometry(d: BarDatum, geom: GroupedGeom, enterPlan: BarTransitionItemAction | null = null): RectGeometry {
   const { x, y, x1, y1, categoryField, valueField, horizontal } = geom;
   const fromZero = !enterPlan || enterPlan.from === 'zero-baseline';
   if (horizontal) {
@@ -219,7 +220,7 @@ function applyGroupedSegmentExitGeometry(
   selection: BarMotion,
   geom: GroupedGeom,
   sourceBaselineExit: BarRenderKit['sourceBaselineExit'],
-  exitPlan: TransitionItemAction | null
+  exitPlan: BarTransitionItemAction | null
 ): BarMotion {
   return sourceBaselineExit(selection, { horizontal: geom.horizontal, plan: exitPlan, value: (d) => d[geom.valueField] });
 }

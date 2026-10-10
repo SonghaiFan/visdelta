@@ -55,7 +55,7 @@ export class PointState extends ChartState<PointViewState> {
     if (options.channel && options.channel !== 'x' && options.channel !== 'y') {
       throw new Error('Point connector channel must be "x" or "y".');
     }
-    return this.replaceState('connector', { ...options });
+    return this.replaceState('connector', { ...options }, { captureResetBaseline: true });
   }
 
   flip(options: Record<string, unknown> = {}): this {
@@ -79,7 +79,7 @@ export class PointState extends ChartState<PointViewState> {
         x: options['x'],
         y: options['y'],
         size: options['size']
-    }), 'detail') as this;
+    }), { captureResetBaseline: true }) as this;
   }
 
   breakdown(detail: string | Record<string, unknown> | null = null, options: Record<string, unknown> = {}): this {
@@ -96,7 +96,7 @@ export class PointState extends ChartState<PointViewState> {
         key: config['key'] || detailKey,
         detail: detailKey,
         parentField: config['parentField'] || previousParent
-    }), 'detail') as this;
+    }), { captureResetBaseline: true }) as this;
   }
 }
 

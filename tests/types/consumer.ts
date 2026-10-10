@@ -2,6 +2,7 @@ import { bar, compileLineage, correspondLineage, delta, sequence } from 'visdelt
 import { sequence as selectedSequence, transition } from 'visdelta/transition';
 import { delta as selectedDelta, applyDeclarationEdits, planDeclarationTransition } from 'visdelta/core';
 import { bar as selectedBar, barModule } from 'visdelta/bar';
+import type { BarTransitionPlan } from 'visdelta/bar';
 import { area as selectedArea, areaModule } from 'visdelta/area';
 import { point as selectedPoint, pointModule } from 'visdelta/point';
 import { line as selectedLine, lineModule } from 'visdelta/line';
@@ -16,7 +17,17 @@ import {
 import { composeCanonicalPolicies, composeIntermediatePolicies, encodingWaypoint, minimumTravelMatching, interpolatePathPoints, connectedStretches } from 'visdelta/toolkit';
 import * as browser from 'visdelta/browser';
 import { bandOrLinear, position, easeFor, staggerDelay } from 'visdelta/toolkit';
-import type { ChartTransitionPolicy, IntermediateSpec, Renderer } from 'visdelta/plugins';
+import type { ChartTransitionPolicy, IntermediateSpec, Renderer, TransitionPlan } from 'visdelta/plugins';
+
+const corePlan: TransitionPlan = { reason: 'generic-plugin-plan' };
+// Bar renderer choices are exposed by the Bar entry only.
+// @ts-expect-error Core transition plans do not encode Bar layout.
+corePlan.source;
+const barPlan: BarTransitionPlan = {
+  source: { orientation: 'vertical', layout: 'simple', renderer: 'bar-simple-vertical' },
+  enter: { mode: 'baseline', reason: 'detail-enter-baseline' }
+};
+void barPlan;
 
 defineChartStyle({ key: 'custom-theme', plot: { margin: { left: 24 } } });
 const externalScale = bandOrLinear([{ category: 'A' }], { field: 'category', type: 'nominal' }, [0, 100]);

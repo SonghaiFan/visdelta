@@ -77,7 +77,7 @@ export class LineState extends ChartState<LineViewState> {
             ? { color: { range: options['color'] as unknown[] } }
             : { color: colorFrom(options['color'] as string) }
           : {})
-    }, 'detail') as this;
+    }, { captureResetBaseline: true }) as this;
   }
 
   rollup(options: Record<string, unknown> = {}): this {
@@ -88,6 +88,6 @@ export class LineState extends ChartState<LineViewState> {
         op: String(options['op'] ?? 'sum'),
         ...(options['as'] ? { as: String(options['as']) } : {}),
         ...(options['color'] ? { color: colorFrom(options['color'] as string) } : {})
-    }, 'detail') as this;
+    }, { captureResetBaseline: true }) as this;
   }
 }

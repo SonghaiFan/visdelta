@@ -293,22 +293,6 @@
   shape-rendering: geometricPrecision;
 }
 
-.vd-scene-layer {
-  pointer-events: none;
-}
-
-.vd-axis-rule {
-  stroke: var(--vd-accent);
-  stroke-width: 1.5px;
-  stroke-dasharray: 5 6;
-}
-
-.vd-axis-dot {
-  fill: var(--vd-accent);
-  stroke: var(--vd-surface);
-  stroke-width: 2px;
-}
-
 .vd-tooltip {
   position: fixed;
   z-index: 20;

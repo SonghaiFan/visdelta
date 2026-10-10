@@ -2,8 +2,7 @@ import { bandOrLinear, position } from '../../toolkit/scales.js';
 import { keyFirstTravelMatching } from '../../toolkit/matching.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
-import { specObjectKey, specTransition, specUnit } from '../../spec-meta.js';
-import { defaultTransition } from '../../timing.js';
+import { specObjectKey, specUnit } from '../../spec-meta.js';
 import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import { max } from 'd3-array';
 import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force';
@@ -94,6 +93,8 @@ export interface UnitStageTiming {
 
 /** Unit-specific plan fields read by the renderer. */
 export interface UnitTransitionPlanExtension {
+  match?: { mode: string; reason: string };
+  motion?: { mode: string };
   detailChange?: {
     mode: 'split';
     parent: string;
@@ -103,6 +104,10 @@ export interface UnitTransitionPlanExtension {
 }
 
 export type UnitTransitionPlan = TransitionPlan & UnitTransitionPlanExtension;
+
+function unitTransitionPlan(chart: Pick<ChartContext, 'transitionPlan'>): UnitTransitionPlan | undefined {
+  return chart.transitionPlan as UnitTransitionPlan | undefined;
+}
 
 interface UnitSpecMeta {
   value?: string;
@@ -260,7 +265,7 @@ export function unitSelectionOpacity(unit: UnitDatum, spec: ViewSpec, dimOpacity
 
 /** Preserve keyed units, then minimize travel for the remaining slots. */
 export function matchUnitSlotsByIdentityAndTravel(chart: ChartContext, units: UnitDatum[], layout: UnitLayoutResult): UnitMatchResult {
-  if (chart.transitionPlan?.match?.mode !== 'key-first-travel') {
+  if (unitTransitionPlan(chart)?.match?.mode !== 'key-first-travel') {
     return { units, maxDistance: 0, totalDistance: 0 };
   }
   const sourceNodes = chart.g.selectAll<UnitNode, unknown>('circle.vd-unit').nodes();
@@ -310,15 +315,8 @@ export function resolveUnitTransitionPlan(previousSpec: ViewSpec | null, nextSpe
   const unitValueChanged = unitValueForSpec(previousSpec) !== unitValueForSpec(nextSpec);
   const positionChanged = unitPositionSignature(previousSpec) !== unitPositionSignature(nextSpec)
     || ['data', 'filter', 'transform', 'encoding.x'].some((type) => diff.hasDelta(type));
-  const timing = defaultTransition({
-    ...specTransition(previousSpec),
-    ...specTransition(nextSpec)
-  });
   const plan: UnitTransitionPlan = {
-    diff: diff.deltas.map(({ type, action, previous, next }) => ({ type, action, previous, next })),
     reason: unitValueChanged ? 'unit-value-split' : positionChanged ? 'unit-key-first-layout' : 'unit-default-plan',
-    timing,
-    totalDuration: timing.duration
   };
   if (!positionChanged) return plan;
   const nextLayout = unitMeta(nextSpec).layout || 'grid';
@@ -367,9 +365,9 @@ export function canonicalUnitTransitionPair<S extends ViewSpec>(previousSpec: S,
 }
 
 export function unitStageTiming(chart: ChartContext): UnitStageTiming | null {
-  if (chart.transitionPlan?.match?.mode !== 'key-first-travel') return null;
+  if (unitTransitionPlan(chart)?.match?.mode !== 'key-first-travel') return null;
   const total = Math.max(1, Number(chart.transition.duration) || 900);
-  if (chart.transitionPlan?.motion?.mode === 'move-across-then-fall') {
+  if (unitTransitionPlan(chart)?.motion?.mode === 'move-across-then-fall') {
     return {
       viewDuration: total * VIEW_STAGE_RATIO,
       moveAcrossDuration: total * MOVE_ACROSS_STAGE_RATIO,
@@ -447,7 +445,7 @@ function forceLayout(
     unit.__unitKey,
     existing.get(String(unit.__semanticUnitKey ?? unit.__unitKey))
   ] as const);
-  const isTransitionTarget = chart.transitionPlan?.match?.mode === 'key-first-travel';
+  const isTransitionTarget = unitTransitionPlan(chart)?.match?.mode === 'key-first-travel';
 
   // The cached transition surface renders the clean target once more at
   // progress 1. Keep an already-resolved force endpoint fixed instead of

@@ -51,14 +51,22 @@ registerChartModules(registry, chartModules, {});
 const expectedTypes = ['area', 'bar', 'line', 'point', 'unit'];
 const viewCompiler = createViewCompiler(registry);
 const compiledTypes = expectedTypes.filter((mark) => {
-  const result = viewCompiler.compileEffectiveView({ mark, data: { values: [] }, encoding: {} });
-  return result.effectiveViewSpec?.mark === mark;
+  const result = viewCompiler.compileEffectiveView({
+    mark,
+    data: { values: [] },
+    encoding: {},
+    selection: { mode: 'focus', field: 'x', equal: 'one' }
+  }, { scene: ['selection'] });
+  const state = result.effectiveViewSpec?.meta?.state;
+  return result.sceneTransition.scene.includes('selection') &&
+    state?.sceneState?.selection?.mode === 'focus' &&
+    state.selection === undefined;
 });
 
 assertSame(Object.keys(sourceApi).sort(), publicApi.sort(), 'source public API');
 assertSame(Object.keys(distApi).sort(), publicApi.sort(), 'dist public API');
 assertSame(registry.types(), expectedTypes, 'chart type registry');
-assertSame(compiledTypes, expectedTypes, 'runtime view compiler');
+assertSame(compiledTypes, expectedTypes, 'runtime view compiler consumes a selection state slot');
 
 const first = sourceApi.bar([{ category: 'A', value: 1, other: 2 }])
   .x('category')

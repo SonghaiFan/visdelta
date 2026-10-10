@@ -11,10 +11,9 @@ import type {
   BarOrientation,
   CanonicalTransitionPair,
   IntermediateSpec,
-  TransitionItemAction,
-  TransitionPlan,
   ViewSpec
 } from '../../types/index.js';
+import type { BarTransitionPlan } from './plan.js';
 import {
   barCategoryChannel,
   barMeasureChannel,
@@ -27,14 +26,14 @@ import { semanticBarState } from './semantic.js';
 export function resolveBarTransitionPlan(
   previousSpec: ViewSpec | null,
   nextSpec: ViewSpec | null
-): TransitionPlan {
+): BarTransitionPlan {
   if (!previousSpec || !nextSpec) return {};
   const previous = barState(previousSpec);
   const next = barState(nextSpec);
   if (!previous || !next) return {};
 
   const diff = diffBarViewStates(previousSpec, nextSpec);
-  const plan: TransitionPlan = {
+  const plan: BarTransitionPlan = {
     source: {
       orientation: previous.orientation,
       layout: previous.barLayout,
@@ -44,10 +43,7 @@ export function resolveBarTransitionPlan(
       orientation: next.orientation,
       layout: next.barLayout,
       renderer: barRendererKey(next.barLayout, next.orientation)
-    },
-    diff: diff.deltas.map(({ type, action, previous: p, next: n }) => ({
-      type, action, previous: p, next: n
-    }))
+    }
   };
 
   if (diff.hasDelta('bar.detail')) {
@@ -83,7 +79,7 @@ export function resolveBarTransitionPlan(
       categoryKey: previous.categoryField,
       segmentKey: previous.segmentField,
       valueKey: previous.measureField
-    } as TransitionItemAction;
+    };
   }
 
   // Split: parent → child
@@ -114,7 +110,7 @@ export function resolveBarTransitionPlan(
       categoryKey: next.categoryField,
       segmentKey: next.segmentField,
       valueKey: next.measureField
-    } as TransitionItemAction;
+    };
   }
 
   const layoutChanged = diff.hasDelta('bar.layout');
@@ -149,16 +145,12 @@ export function resolveBarTransitionPlan(
     ease: timing.ease,
     stagger: timing.stagger
   };
-  const staggerMaxVal = staggerMax(stepTiming.stagger);
-  const totalDuration = stepTiming.duration * orderedParts.length + staggerMaxVal;
-
   plan.reason = reason;
   plan.steps = orderedParts.map((part) => ({
     part,
     changes: ['scale', 'axis', 'marks']
   }));
   plan.timing = stepTiming;
-  plan.totalDuration = totalDuration;
 
   return plan;
 }
@@ -557,12 +549,6 @@ function barBaselinePlan(layout: BarLayout): {
     return { name: 'stack-base', anchor: '__stack0', meaning: 'segment-stack-base' };
   }
   return { name: 'zero-baseline', value: 0, meaning: 'measure-zero' };
-}
-
-function staggerMax(stagger: unknown): number {
-  if (stagger == null || typeof stagger !== 'object') return 0;
-  const max = Number((stagger as Record<string, unknown>).max);
-  return Number.isFinite(max) ? max : 0;
 }
 
 /**

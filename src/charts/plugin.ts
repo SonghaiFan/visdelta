@@ -27,7 +27,6 @@ export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   createRenderer?: (runtime: ChartRuntime, presentation: ChartPresentation) => Renderer<S>;
   createChart?: (runtime: ChartRuntime, presentation: ChartPresentation) => Omit<ChartType<S>, 'defaultMargin'>;
   prepareSpec?: (spec: S) => S;
-  inspect?: Record<string, unknown>;
   transition?: {
     plan?: ChartTransitionPolicy<S>['resolveTransitionPlan'];
     canonicalPair?: ChartTransitionPolicy<S>['canonicalTransitionPair'];
@@ -126,7 +125,6 @@ function createRuntimeChartType<S extends ViewSpec>(
     resolveTransitionPlan: config.transition?.plan ?? emptyTransitionPlan,
     canonicalTransitionPair: config.transition?.canonicalPair,
     intermediateSpecs: config.transition?.intermediateSpecs,
-    inspect: config.inspect ?? {},
     scenes: config.scenes,
     defaultMarkKey: config.defaultMarkKey,
   };

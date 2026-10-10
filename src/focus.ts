@@ -1,5 +1,5 @@
 import { matchesFilter, normalizeFilter } from './data/filter.js';
-import { specState } from './spec-meta.js';
+import { specScopes } from './spec-meta.js';
 import type { DataRow, SelectionSpec, ViewSpec } from './types/index.js';
 
 type AnyRecord = Record<string, unknown>;
@@ -31,18 +31,12 @@ export interface FocusCamera {
 const IDENTITY_CAMERA: FocusCamera = Object.freeze({ k: 1, x: 0, y: 0, bounds: null });
 
 export function viewSelection(spec: ViewSpec): SelectionSpec | null {
-  const state = specState(spec);
-  return (state.scopes.focus ||
-    (state.sceneState?.selection?.mode === 'focus' ? state.sceneState.selection : null) ||
-    (state.selection?.mode === 'focus' ? state.selection : null)) as SelectionSpec | null;
+  return (specScopes(spec).focus ?? null) as SelectionSpec | null;
 }
 
 /** Resolve the independent highlight scope, retaining legacy selection specs. */
 export function viewHighlight(spec: ViewSpec): SelectionSpec | null {
-  const state = specState(spec);
-  return (state.scopes.highlight ||
-    (state.sceneState?.selection?.mode === 'highlight' ? state.sceneState.selection : null) ||
-    (state.selection?.mode === 'highlight' ? state.selection : null)) as SelectionSpec | null;
+  return (specScopes(spec).highlight ?? null) as SelectionSpec | null;
 }
 
 /** All selectors in a scope compose as logical AND. */

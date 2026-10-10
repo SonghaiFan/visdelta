@@ -322,14 +322,6 @@ export interface BarSemanticState {
   yGeometry: BarGeometryState;
 }
 
-// ─── Grammar internal ─────────────────────────────────────────────────────────
-
-export interface GrammarMeta {
-  operations?: string[];
-  /** Per-chart-type scene capabilities (e.g. bar opts out of `mapping`). */
-  capabilities?: Record<string, boolean>;
-}
-
 // ─── Diff ─────────────────────────────────────────────────────────────────────
 
 export type DeltaAction = 'add' | 'remove' | 'change';
@@ -433,67 +425,18 @@ export interface DeltaResult extends DiffResult {
 export type ChartPart = 'x' | 'y' | 'view' | 'marks';
 export type TransitionChange = 'scale' | 'axis' | 'marks' | 'enter' | 'exit';
 
-export interface TransitionMatch {
-  mode: string;
-  reason: string;
-}
-
 export interface TransitionStep {
   /** Built-in Core part, or a plain chart-plugin part such as "fall". */
   part?: ChartPart | (string & {});
   changes: Array<TransitionChange | (string & {})>;
 }
 
-export interface TransitionMotion {
-  mode: string;
-}
-
-export interface TransitionPlanBaseline {
-  name: string;
-  anchor?: string;
-  value?: number;
-  meaning: string;
-}
-
-export interface TransitionItemAction {
-  mode: string;
-  reason: string;
-  from?: string;
-  to?: string;
-  target?: string;
-  source?: string;
-  baseline?: TransitionPlanBaseline;
-  parentKey?: string | null;
-  childKey?: Array<string | null>;
-  targetLayout?: BarLayout;
-  sourceLayout?: BarLayout;
-  sourceOrientation?: BarOrientation;
-  categoryKey?: string | null;
-  segmentKey?: string | null;
-  valueKey?: string | null;
-}
-
-export interface TransitionPlanDiffEntry {
-  type: string;
-  action: DeltaAction;
-  previous: unknown;
-  next: unknown;
-}
-
-/** Execution decisions for one adjacent pair, not the complete waypoint route.
- * Difference and lineage are evidence; steps and timing are chart-owned choices. */
+/** Core-owned evidence and controls shared by chart transition plans. */
 export interface TransitionPlan {
-  diff?: TransitionPlanDiffEntry[];
+  mode?: string;
   reason?: string;
-  source?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
-  target?: { orientation: BarOrientation; layout: BarLayout; renderer: string };
-  match?: TransitionMatch;
-  motion?: TransitionMotion;
-  enter?: TransitionItemAction;
-  exit?: TransitionItemAction;
+  /** Ordered parts are retained as diagnostics and generic frame phases. */
   steps?: TransitionStep[];
-  timing?: TransitionSpec;
-  totalDuration?: number;
   /** Whether row membership and the surviving view share one progress window. */
   membershipTiming?: 'staged' | 'simultaneous';
   /** Datum-provenance evidence, not an instruction to use a particular motion. */
@@ -645,7 +588,6 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   /** Chart-owned default object identity. Explicit `.key()` overrides it in Core. */
   defaultMarkKey?(spec: S): import('../identity/mark-correspondence.js').MarkKeySpec | null;
   readonly scenes: readonly string[];
-  inspect?: Record<string, unknown>;
   createSpecCompiler?: (context: CompilerContext) => SpecCompiler;
 }
 
@@ -666,7 +608,6 @@ export type AnyRecord = Record<string, any>;
 export interface RuntimeOptions {
   /** Where the chart renders. Required: the library never guesses a host element. */
   target: Target;
-  debug?: boolean;
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;
 }

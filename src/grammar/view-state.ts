@@ -1,99 +1,49 @@
-import type { GrammarMeta } from '../types/index.js';
-
-// Internal representation includes the private grammar metadata
-type StateWithMeta<S extends object> = S & { __grammar?: GrammarMeta };
-
-interface OperationConfig {
-  name?: string;
-  operation?: string;
-  replaceLast?: string;
+export interface ViewStateOptions {
+  /** Capture this declaration as the baseline used by reset(), if none exists yet. */
+  captureResetBaseline?: boolean;
 }
 
-type InternalGrammarMeta = GrammarMeta & { initialState?: object };
+const resetBaselines = new WeakMap<object, object>();
 
 export class ViewState<S extends object = Record<string, unknown>> {
-  readonly state: Readonly<StateWithMeta<S>>;
+  readonly state: Readonly<S>;
 
-  constructor(state: S | StateWithMeta<S> = {} as S) {
-    this.state = deepFreeze(cloneState(state)) as Readonly<StateWithMeta<S>>;
+  constructor(state: S = {} as S) {
+    this.state = deepFreeze(cloneState(state)) as Readonly<S>;
   }
 
-  with(patch: Partial<StateWithMeta<S>>, operation?: string | OperationConfig | null): this {
-    const next = mergeState(this.state, patch) as StateWithMeta<S>;
-
-    if (operation) {
-      const operationName =
-        typeof operation === 'string'
-          ? operation
-          : (operation.name ?? operation.operation ?? '');
-
-      let ops = [...(this.state.__grammar?.operations ?? [])];
-
-      if (typeof operation === 'object' && operation.replaceLast) {
-        if (ops[ops.length - 1] === operation.replaceLast) {
-          ops = ops.slice(0, -1);
-        }
-      }
-
-      const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
-      next.__grammar = {
-        ...(next.__grammar ?? {}),
-        initialState: cloneState(grammar?.initialState ?? withoutGrammar(this.state)),
-        operations: operationName ? [...ops, operationName] : ops
-      } as GrammarMeta;
-    }
-
-    return this.derive(next as S);
+  with(patch: Partial<S>, options?: ViewStateOptions | null): this {
+    const next = mergeState(this.state as S, patch) as S;
+    return this.derive(next, options);
   }
 
   /** Return a new state equal to the declaration before its first semantic operation. */
   reset(): this {
-    const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
-    const initial = cloneState((grammar?.initialState ?? withoutGrammar(this.state)) as S);
-    return this.derive(initial).with({} as Partial<StateWithMeta<S>>, {
-      name: 'reset'
-    });
+    const initial = cloneState((resetBaselines.get(this) ?? this.state) as S);
+    return this.derive(initial);
   }
 
   /** Replace one semantic state family instead of leaking fields from its previous mode. */
-  protected replaceState<K extends keyof S>(key: K, value: S[K], operation?: string): this {
-    const grammar = this.state.__grammar as InternalGrammarMeta | undefined;
-    const next = cloneState(this.state) as StateWithMeta<S>;
+  protected replaceState<K extends keyof S>(key: K, value: S[K], options?: ViewStateOptions): this {
+    const next = cloneState(this.state) as S;
     (next as Record<string, unknown>)[key as string] = cloneState(value);
-    next.__grammar = {
-      ...(next.__grammar ?? {}),
-      initialState: cloneState(grammar?.initialState ?? withoutGrammar(this.state)),
-      operations: [...(grammar?.operations ?? [])]
-    } as GrammarMeta;
-    return this.derive(next as S).with({} as Partial<StateWithMeta<S>>, operation);
+    return this.derive(next as S, options);
   }
 
   /** A new instance of this exact subclass holding `state`, so derived states keep their builder type. */
-  protected derive(state: S): this {
+  protected derive(state: S, options?: ViewStateOptions | null): this {
     const Ctor = this.constructor as new (s: S) => this;
-    return new Ctor(state);
+    const next = new Ctor(state);
+    const baseline = options?.captureResetBaseline && !resetBaselines.has(this)
+      ? cloneState(this.state as S)
+      : resetBaselines.get(this);
+    if (baseline) resetBaselines.set(next, baseline);
+    return next;
   }
 
-  toSpec(): Omit<S, '__grammar'> {
-    const spec = cloneState(this.state) as Record<string, unknown>;
-    delete spec.__grammar;
-    return spec as Omit<S, '__grammar'>;
+  toSpec(): S {
+    return cloneState(this.state) as S;
   }
-
-  /** Legacy inspection metadata; not used to infer animated transitions. */
-  operations(): string[] {
-    return [...(this.state.__grammar?.operations ?? [])];
-  }
-
-  capabilities(): Record<string, boolean> {
-    return { ...(this.state.__grammar?.capabilities ?? {}) };
-  }
-}
-
-function withoutGrammar<S extends object>(state: StateWithMeta<S>): S {
-  const next = cloneState(state) as StateWithMeta<S>;
-  delete next.__grammar;
-  return next as S;
 }
 
 export function cloneState<T>(value: T): T {

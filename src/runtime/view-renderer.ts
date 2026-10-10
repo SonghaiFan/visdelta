@@ -9,7 +9,7 @@ import { transitionSpec } from '../toolkit/motion-timing.js';
 
 import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
-import { applySceneTransitions, getScene, resetSceneToEmptySource, resizeScene } from './scene.js';
+import { getScene, recordSceneDiagnostics, resetSceneToEmptySource, resizeScene } from './scene.js';
 import { clamp } from './utils.js';
 import { clearSceneTransitionProgress, createSceneTransitionProgress } from '../transition-progress.js';
 import { createViewCompiler } from './view-compile.js';
@@ -312,7 +312,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   else drawUnsupported(chart, renderSpec, chartTypes.types());
   reflectCamera(scene, chart.camera);
 
-  applySceneTransitions(chart, rows, renderSpec);
+  recordSceneDiagnostics(chart, renderSpec);
   if (seekable) {
     scene.transitionProgress = createSceneTransitionProgress(scene);
   }

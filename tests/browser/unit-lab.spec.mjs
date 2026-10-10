@@ -3,9 +3,14 @@ import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/unit/scenarios.js';
 
 const ready = async page => {
+  await expect(page.getByRole('tab', { name: 'Unit', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
   await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#status')).toHaveText('Ready');
 };
+
+const unitFills = page => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
+  [...new Set(nodes.map(node => getComputedStyle(node).fill))].sort());
 
 const snapshot = page => page.locator('#chart svg').evaluate(svg =>
   Array.from(svg.querySelectorAll('circle.vd-unit, .tick, .vd-legend-item')).map(node => ({
@@ -26,6 +31,7 @@ for (const sample of scenarios) {
     await expectEditorCode(editor, sample.code);
 
     const start = await snapshot(page);
+    const startFills = await unitFills(page);
     await page.locator('#progress').fill('0.37');
     const direct = await snapshot(page);
     expect(direct).not.toEqual(start);
@@ -37,13 +43,15 @@ for (const sample of scenarios) {
     await page.locator('#start').click();
     expect(await snapshot(page)).toEqual(start);
 
-    await setEditorCode(editor, sample.code.replace('radius: 6', 'radius: 5'));
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
-    await ready(page);
-    await expectEditorCode(editor, /radius: 5/);
+    const editedCode = sample.code.replace(/;\s*$/, '.color("#ff00ff");');
+    await setEditorCode(editor, editedCode);
+    await expectEditorCode(editor, editedCode);
+    // Waiting for input is transient; assert that the edited constant color
+    // reaches the marks instead of treating that label as a contract.
+    await expect.poll(() => unitFills(page), { timeout: 15_000 }).toEqual(['rgb(255, 0, 255)']);
     await page.locator('#reset').click();
-    await ready(page);
     await expectEditorCode(editor, sample.code);
+    await expect.poll(() => unitFills(page), { timeout: 15_000 }).toEqual(startFills);
     expect(errors).toEqual([]);
   });
 }

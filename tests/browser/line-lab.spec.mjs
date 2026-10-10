@@ -3,7 +3,11 @@ import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/line/scenarios.js';
 
 const ready = async page => {
-  await page.locator('#status').scrollIntoViewIfNeeded();
+  // ChartPlayground switches its keyed SyntaxPlayground after hydration; wait
+  // for the route-selected chart before scrolling to the replaceable status.
+  await expect(page.getByRole('tab', { name: 'Line', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
+  await page.locator('#chart').scrollIntoViewIfNeeded();
   await expect(page.locator('#status')).toHaveText(/Ready|Error/);
   if (await page.locator('#status').textContent() === 'Error') {
     throw new Error(await page.getByRole('alert').textContent());
@@ -97,11 +101,11 @@ for (const sample of scenarios) {
     expect(await snapshot(page)).toEqual(start);
 
     await setEditorCode(editor, sample.code
-      .replace('.x("date")', '.x("date", { title: "Trading date" })')
-      .replace('title: "Date"', 'title: "Trading date"'));
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+      .replace('.x("date")', '.x("date", { title: "Trading month" })')
+      .replace('title: "Date"', 'title: "Trading month"'));
     await ready(page);
-    await expectEditorCode(editor, /title: "Trading date"/);
+    await expectEditorCode(editor, /title: "Trading month"/);
+    await expect(page.locator('.vd-x-label')).toHaveText('Trading month →');
     await page.locator('#reset').click();
     await ready(page);
     await expectEditorCode(editor, sample.code);

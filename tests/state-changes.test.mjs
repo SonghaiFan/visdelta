@@ -147,6 +147,34 @@ test('legacy focus and highlight fields do not mask one another during normaliza
   assert.deepEqual(summary(delta(legacy('one', 'one'), legacy('two', 'one')).stateChanges), [
     { category: 'attention', action: 'shift', target: 'focus' }
   ]);
+
+  const swappedLegacy = (focus, highlight) => ({
+    ...baseSpec,
+    meta: { state: {
+      selection: { mode: 'highlight', field: 'group', equal: highlight },
+      sceneState: { selection: { mode: 'focus', field: 'group', equal: focus } }
+    } }
+  });
+  assert.deepEqual(summary(delta(swappedLegacy('one', 'one'), swappedLegacy('one', 'two')).stateChanges), [
+    { category: 'attention', action: 'shift', target: 'highlight' }
+  ]);
+});
+
+test('explicit attention scopes take precedence over legacy selection fields', () => {
+  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
+  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
+  const explicit = (scope, legacy) => ({
+    ...baseSpec,
+    meta: { state: {
+      scopes: { focus: { mode: 'focus', field: 'group', equal: scope } },
+      selection: { mode: 'focus', field: 'group', equal: legacy }
+    } }
+  });
+
+  assert.deepEqual(summary(delta(explicit('one', 'legacy-a'), explicit('two', 'legacy-b')).stateChanges), [
+    { category: 'attention', action: 'shift', target: 'focus' }
+  ]);
+  assert.deepEqual(summary(delta(explicit('one', 'legacy-a'), explicit('one', 'legacy-b')).stateChanges), []);
 });
 
 test('axis swaps still report scale changes against the destination channels', () => {
