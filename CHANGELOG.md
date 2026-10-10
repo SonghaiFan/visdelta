@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Reorganized the documentation site into four sections: Home (the live code →
+  chart demo), Docs (philosophy and syntax tracks), Playground and a new
+  Gallery that renders every expressible visual idiom through its real
+  Playground scenario. The Playground chart floats at the top right by
+  default and can be docked beside the code.
+- Extracted the site's shared visual values into three-tier design tokens
+  (`docs/.vitepress/theme/tokens.css`), documented on a Design tokens page.
+
 - Added canonical operation planning for supported Bar, Point, Line, Area and
   Unit declarations. Routes use complete valid states, edit one semantic
   operation per stage, and reuse the same path in reverse. Chart modules own

@@ -32,6 +32,12 @@ export default {
     app.component('StateChangeCatalogue', defineAsyncComponent(
       () => import('../components/StateChangeCatalogue.vue')
     ));
+    app.component('IdiomGallery', defineAsyncComponent(
+      () => import('../components/IdiomGallery.vue')
+    ));
+    app.component('DesignTokens', defineAsyncComponent(
+      () => import('../components/DesignTokens.vue')
+    ));
     app.component('ChartStyleGallery', defineAsyncComponent(
       () => import('../components/ChartStyleGallery.vue')
     ));

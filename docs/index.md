@@ -21,15 +21,15 @@ pageClass: ontology-home
     <div class="product-code-copy">
       <h2 id="product-code-title">Change the state.<br>The chart follows.</h2>
       <p>The same transition can be played, reversed, paused, or scrubbed without rewriting the chart.</p>
-      <a href="./reference.html">See the API reference</a>
+      <a href="./reference.html">See the API reference →</a>
     </div>
     <ProductCode />
   </section>
 
-  <nav class="product-next" aria-label="Documentation paths">
-    <a href="./getting-started.html"><strong>Build your first transition</strong><span>Getting started</span></a>
-    <a href="./playground.html"><strong>Inspect a state difference</strong><span>Playground</span></a>
-    <a href="./chart-types.html"><strong>Explore chart behavior</strong><span>Five chart modules</span></a>
-    <a href="./language-framework.html"><strong>Read the underlying model</strong><span>Ontology and contracts</span></a>
+  <nav class="product-next" aria-label="Explore VisDelta">
+    <a href="./overview.html"><span>Docs</span><strong>Learn the syntax and the model behind it</strong></a>
+    <a href="./language-framework.html"><span>Philosophy</span><strong>Seven categories name every state change</strong></a>
+    <a href="./playground.html"><span>Playground</span><strong>Edit two states and scrub the difference</strong></a>
+    <a href="./gallery.html"><span>Gallery</span><strong>Every idiom, reached by a transition</strong></a>
   </nav>
 </main>

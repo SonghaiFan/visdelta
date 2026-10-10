@@ -1,0 +1,185 @@
+/*
+ * VisDelta site design tokens.
+ *
+ * Extracted from the values the documentation components already shared
+ * (hero pipeline, playground, workbench, style gallery, catalogue). Every
+ * site component reads these tokens instead of literal values. The prefix
+ * `--ui-` keeps them separate from the chart runtime's `--vd-*` tokens, which
+ * belong to the library and its themes.
+ *
+ * Three tiers:
+ *   1. Primitives  - raw palette, scales. Never referenced by components.
+ *   2. Semantic    - role-based aliases (canvas, surface, line, text, accent).
+ *   3. Component   - recurring compositions (panel header, label type, control).
+ */
+
+:root {
+  /* 1. Primitives -------------------------------------------------------- */
+  --ui-gray-0: #fbfbf9;
+  --ui-gray-50: #f4f4f2;
+  --ui-gray-100: #ecece8;
+  --ui-gray-150: #e3e3de;
+  --ui-gray-200: #d6d6d1;
+  --ui-gray-400: #808087;
+  --ui-gray-600: #606069;
+  --ui-gray-800: #303039;
+  --ui-gray-900: #1d2025;
+  --ui-gray-950: #101621;
+
+  --ui-blue-500: #1533ff;
+  --ui-blue-600: #1028d9;
+  --ui-blue-700: #0c1fa8;
+  --ui-green-600: #087d52;
+  --ui-amber-600: #a85c00;
+  --ui-red-600: #d83e13;
+  --ui-violet-600: #7957c8;
+
+  /* Spacing: one 4px rhythm for padding, gaps and section rhythm. */
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-space-6: 24px;
+  --ui-space-8: 32px;
+  --ui-space-10: 40px;
+  --ui-space-12: 48px;
+  --ui-space-16: 64px;
+  --ui-space-24: 96px;
+
+  /* Radius: small, geometric corners. Bars in charts stay square. */
+  --ui-radius-xs: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 8px;
+
+  /* Type families and scale. */
+  --ui-font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, sans-serif;
+  --ui-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --ui-text-2xs: 9px;
+  --ui-text-xs: 10px;
+  --ui-text-sm: 11px;
+  --ui-text-md: 12px;
+  --ui-text-base: 13px;
+  --ui-text-lg: 15px;
+  --ui-text-xl: 18px;
+  --ui-text-2xl: 22px;
+  --ui-text-display-sm: clamp(2.2rem, 4vw, 3.4rem);
+  --ui-text-display: clamp(2.8rem, 5.2vw, 5.7rem);
+  --ui-text-display-lg: clamp(3.3rem, 5.7vw, 6.5rem);
+  --ui-weight-regular: 400;
+  --ui-weight-medium: 560;
+  --ui-weight-strong: 650;
+  --ui-weight-heavy: 700;
+  --ui-tracking-label: .08em;
+  --ui-tracking-tight: -.025em;
+  --ui-tracking-display: -.062em;
+  --ui-leading-tight: 1.2;
+  --ui-leading-body: 1.6;
+
+  /* Motion. */
+  --ui-duration-fast: 120ms;
+  --ui-duration-base: 180ms;
+  --ui-ease: cubic-bezier(.2, .7, .2, 1);
+
+  /* 2. Semantic ---------------------------------------------------------- */
+  --ui-color-canvas: var(--ui-gray-50);
+  --ui-color-surface: var(--ui-gray-100);
+  --ui-color-surface-strong: var(--ui-gray-150);
+  --ui-color-raised: var(--ui-gray-0);
+  --ui-color-line: var(--ui-gray-200);
+  --ui-color-text: var(--ui-gray-800);
+  --ui-color-text-muted: var(--ui-gray-600);
+  --ui-color-text-subtle: var(--ui-gray-400);
+  --ui-color-inverse: var(--ui-gray-800);
+  --ui-color-on-inverse: var(--ui-gray-0);
+  --ui-color-accent: var(--ui-blue-500);
+  --ui-color-accent-hover: var(--ui-blue-600);
+  --ui-color-accent-strong: var(--ui-blue-700);
+  --ui-color-accent-soft: rgba(21, 51, 255, .1);
+  --ui-color-on-accent: #fff;
+  --ui-color-success: var(--ui-green-600);
+  --ui-color-warning: var(--ui-amber-600);
+  --ui-color-danger: var(--ui-red-600);
+  --ui-color-research: var(--ui-violet-600);
+  --ui-color-focus: var(--ui-color-accent);
+
+  /* Source code surfaces (fences, editors, inspectors). */
+  --ui-code-bg: var(--ui-gray-800);
+  --ui-code-gutter: color-mix(in srgb, var(--ui-code-bg) 82%, #000);
+  --ui-code-text: #f1f2f5;
+  --ui-code-muted: #a7a8b0;
+  --ui-code-keyword: #ff8ab7;
+  --ui-code-string: #6cc5b0;
+  --ui-code-number: #efb118;
+  --ui-code-function: #97bbf5;
+  --ui-code-line: rgba(255, 255, 255, .07);
+  --ui-code-control: rgba(255, 255, 255, .03);
+  --ui-code-control-line: rgba(255, 255, 255, .08);
+  --ui-code-danger: #ff9b87;
+  --ui-scrim: rgba(23, 23, 36, .4);
+  --ui-inspector-bg: var(--ui-gray-950);
+  --ui-inspector-text: #dbe7ff;
+
+  /* Aliases for components that predate the token set. */
+  --vd-code-bg: var(--ui-code-bg);
+  --vd-code-text: var(--ui-code-text);
+  --vd-code-muted: var(--ui-code-muted);
+  --vd-code-keyword: var(--ui-code-keyword);
+  --vd-code-string: var(--ui-code-string);
+  --vd-code-number: var(--ui-code-number);
+  --vd-code-function: var(--ui-code-function);
+
+  /* Elevation: only floating surfaces cast a shadow. */
+  --ui-shadow-none: none;
+  --ui-shadow-float: 0 1px 0 rgba(20, 20, 24, .04), 0 14px 36px rgba(20, 20, 24, .16);
+  --ui-shadow-alert: 0 10px 30px rgba(20, 20, 24, .14);
+
+  /* 3. Component --------------------------------------------------------- */
+  --ui-border: 1px solid var(--ui-color-line);
+  --ui-type-label: var(--ui-weight-heavy) var(--ui-text-2xs) / 1.3 var(--ui-font-mono);
+  --ui-type-meta: var(--ui-weight-regular) var(--ui-text-xs) / 1.4 var(--ui-font-mono);
+  --ui-type-control: var(--ui-weight-strong) var(--ui-text-sm) / 1.2 var(--ui-font-sans);
+  --ui-type-code: var(--ui-weight-regular) var(--ui-text-md) / 1.65 var(--ui-font-mono);
+  --ui-control-sm: 24px;
+  --ui-control-md: 32px;
+  --ui-control-lg: 40px;
+  --ui-panel-head: 40px;
+  --ui-panel-radius: var(--ui-radius-lg);
+  --ui-panel-pad: var(--ui-space-4);
+  --ui-page-max: 1440px;
+  --ui-page-gutter: var(--ui-space-8);
+  --ui-prose-max: 82ch;
+  --ui-rail-width: 232px;
+  --ui-float-width: clamp(340px, 34vw, 560px);
+}
+
+.dark {
+  --ui-color-canvas: #111210;
+  --ui-color-surface: #1b1c19;
+  --ui-color-surface-strong: #242520;
+  --ui-color-raised: #1f201d;
+  --ui-color-line: #3b3c36;
+  --ui-color-text: #f1f0e9;
+  --ui-color-text-muted: #b5b6ae;
+  --ui-color-text-subtle: #85877f;
+  --ui-color-inverse: #f1f0e9;
+  --ui-color-on-inverse: #17191d;
+  --ui-color-accent: #88a7ff;
+  --ui-color-accent-hover: #aac0ff;
+  --ui-color-accent-strong: #d2ddff;
+  --ui-color-accent-soft: rgba(136, 167, 255, .15);
+  --ui-color-on-accent: #0d0f11;
+  --ui-color-success: #3cc58f;
+  --ui-color-warning: #e3a046;
+  --ui-color-danger: #ff7a55;
+  --ui-color-research: #b49cf0;
+  --ui-code-bg: #1a1b1f;
+  --ui-inspector-bg: #0b0e14;
+  --ui-shadow-float: 0 1px 0 rgba(0, 0, 0, .3), 0 16px 40px rgba(0, 0, 0, .5);
+  --ui-shadow-alert: 0 10px 30px rgba(0, 0, 0, .4);
+}
+
+@media (max-width: 767px) {
+  :root { --ui-page-gutter: var(--ui-space-4); }
+}

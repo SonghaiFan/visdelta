@@ -25,6 +25,14 @@ const progress = ref(1);
 const deltaText = ref('{}');
 const playing = ref(false);
 const active = computed(() => frames.value.find(f => f.id === activeId.value));
+// Chart placement is a per-viewer convenience: float over the editor's top
+// right (default) or dock beside it. Narrow layouts always stack.
+const PLACEMENT_KEY = 'visdelta:playground-chart-placement';
+const placement = ref('float');
+const floatOffset = ref({ x: 0, y: 0 });
+const dragging = ref(false);
+const floatStyle = computed(() => ({ '--float-x': `${floatOffset.value.x}px`, '--float-y': `${floatOffset.value.y}px` }));
+let drag = null;
 let api, factory, controller, observer, timer, raf;
 let version = 0;
 let nextId = 0;
@@ -213,7 +221,42 @@ function seek(value) {
   progress.value = Number(value);
   controller?.progress(progress.value);
 }
+function togglePlacement() {
+  placement.value = placement.value === 'float' ? 'dock' : 'float';
+  floatOffset.value = { x: 0, y: 0 };
+  try { localStorage.setItem(PLACEMENT_KEY, placement.value); } catch { /* storage unavailable */ }
+}
+function startDrag(event) {
+  if (placement.value !== 'float' || event.button !== 0 || event.target.closest('button')) return;
+  if (!window.matchMedia('(min-width: 1001px)').matches) return;
+  const box = event.currentTarget.closest('.snapshot-chart').getBoundingClientRect();
+  drag = { x: event.clientX, y: event.clientY, offset: { ...floatOffset.value }, box };
+  dragging.value = true;
+  window.addEventListener('pointermove', moveDrag);
+  window.addEventListener('pointerup', stopDrag);
+  window.addEventListener('pointercancel', stopDrag);
+  event.preventDefault();
+}
+function moveDrag(event) {
+  if (!drag) return;
+  const { box, offset } = drag;
+  // Keep the whole header inside the viewport so the panel can always be grabbed again.
+  const dx = Math.max(-box.left, Math.min(innerWidth - box.right, event.clientX - drag.x));
+  const dy = Math.max(64 - box.top, Math.min(innerHeight - box.top - 40, event.clientY - drag.y));
+  floatOffset.value = { x: offset.x + dx, y: offset.y + dy };
+}
+function stopDrag() {
+  drag = null;
+  dragging.value = false;
+  window.removeEventListener('pointermove', moveDrag);
+  window.removeEventListener('pointerup', stopDrag);
+  window.removeEventListener('pointercancel', stopDrag);
+}
 onMounted(async () => {
+  try {
+    const stored = localStorage.getItem(PLACEMENT_KEY);
+    if (stored === 'dock' || stored === 'float') placement.value = stored;
+  } catch { /* storage unavailable */ }
   try {
     [api, factory] = await Promise.all([import('../../../dist/transition-entry.js'), lab.loadChart()]);
     if (disposed) return;
@@ -224,6 +267,7 @@ onMounted(async () => {
   } catch (cause) { fail(cause, version); }
 });
 onBeforeUnmount(() => {
+  stopDrag();
   disposed = true;
   cancel();
   observer?.disconnect();
@@ -233,7 +277,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="syntax-playground snapshot-playground">
+  <div class="syntax-playground snapshot-playground" :class="[`is-chart-${placement}`, { 'is-dragging': dragging }]">
     <nav class="playground-example-nav" aria-label="Examples by state-change category">
       <span class="playground-nav-label">State-change category</span>
       <div class="playground-category-tabs" role="tablist" aria-label="The seven state-change categories">
@@ -271,8 +315,22 @@ onBeforeUnmount(() => {
           <p class="playground-contract">Edit the code. The chart follows.<br />Valid edits save automatically · ⌘/Ctrl + Enter to save now.</p>
         </div>
       </section>
-      <section class="snapshot-chart data-code-chart-chart" aria-label="Floating chart preview">
-        <header class="snapshot-panel-head"><strong><i></i> Live preview</strong><output>{{ playing ? 'Playing → ' : '' }}{{ active?.label }}</output></header>
+      <section class="snapshot-chart data-code-chart-chart" :style="floatStyle" :aria-label="placement === 'float' ? 'Floating chart preview' : 'Docked chart preview'">
+        <header class="snapshot-panel-head" @pointerdown="startDrag" @dblclick="floatOffset = { x: 0, y: 0 }">
+          <strong><i></i> Live preview</strong>
+          <output>{{ playing ? 'Playing → ' : '' }}{{ active?.label }}</output>
+          <button
+            type="button"
+            class="playground-dock-toggle"
+            :aria-pressed="placement === 'dock'"
+            :title="placement === 'float' ? 'Place the chart beside the code' : 'Float the chart over the editor'"
+            @click="togglePlacement"
+          >
+            <svg v-if="placement === 'float'" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 2.5h13v11h-13zM9 2.5v11" fill="none" stroke="currentColor" stroke-width="1.4" /></svg>
+            <svg v-else viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 2.5h13v11h-13z" fill="none" stroke="currentColor" stroke-width="1.4" /><path d="M8.5 4.5h4.5v4h-4.5z" fill="currentColor" /></svg>
+            {{ placement === 'float' ? 'Dock' : 'Float' }}
+          </button>
+        </header>
         <div class="playground-output-pane">
           <div class="playground-chart-stage"><div ref="target" class="playground-chart" aria-label="Editable syntax output"></div></div>
           <p class="playground-description">{{ active?.description }}</p>
