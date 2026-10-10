@@ -25,6 +25,53 @@ test('VitePress reference loads the real seekable transition', async ({ page }) 
   await expect(page.locator('.workbench-inspector')).toContainText('semantic');
 });
 
+test('reference demonstrates the complete three-stage Bar Grain route at desktop and mobile sizes', async ({ page }) => {
+  await page.goto('/docs/.vitepress/dist/reference.html');
+  const demo = page.locator('.bar-grain-demo');
+  await expect(demo.locator('.bar-grain-demo-heading span')).toContainText('Ready');
+  await expect(demo.locator('.bar-grain-demo-chart rect.vd-bar')).toHaveCount(3);
+  await expect(demo.locator('.bar-grain-demo-heading strong')).toHaveText('Total → grouped detail + color');
+  const inspector = demo.locator('.bar-grain-demo-inspector');
+  await expect(inspector.locator('summary')).toContainText('3 complete stages');
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".rollup({ title: 'People (millions)' })");
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".breakdown('age', { title: 'People (millions)' })");
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".layout('grouped')");
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".color('#3366ff')");
+  await expect(inspector).toContainText('__visdeltaBarGrain/grouping');
+  await expect(inspector).toContainText('__visdeltaBarGrain/layout');
+  await expect(inspector).toContainText('encoding/color');
+  await expect(inspector).toContainText('"groupby"');
+  await expect(inspector).toContainText('"detail"');
+  await expect(inspector).toContainText('"xOffset"');
+  await expect(inspector).toContainText('"color"');
+
+  const slider = demo.getByRole('slider', { name: 'Bar Grain transition progress' });
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await demo.scrollIntoViewIfNeeded();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, `document overflow at ${width}px`).toBeLessThanOrEqual(1);
+    expect(await demo.evaluate(node => node.scrollWidth - node.clientWidth), `demo overflow at ${width}px`).toBeLessThanOrEqual(1);
+    await expect(slider).toBeEnabled();
+
+    await demo.getByRole('button', { name: 'Play route →' }).click();
+    await expect(demo.locator('.bar-grain-demo-heading output')).toHaveText('1.00', { timeout: 4000 });
+    await expect(demo.locator('.bar-grain-demo-chart rect.vd-bar')).toHaveCount(9);
+
+    await demo.getByRole('button', { name: '← Play reverse' }).click();
+    await expect(demo.locator('.bar-grain-demo-heading output')).toHaveText('0.00', { timeout: 4000 });
+    await expect(demo.locator('.bar-grain-demo-chart rect.vd-bar')).toHaveCount(3);
+
+    await demo.getByRole('button', { name: 'Play route →' }).click();
+    await slider.fill('0.45');
+    await expect(demo.locator('.bar-grain-demo-heading output')).toHaveText('0.45');
+    await expect.poll(() => demo.locator('.bar-grain-demo-heading output').textContent(), {
+      intervals: [300, 150, 150],
+      timeout: 1200
+    }).toBe('0.45');
+  }
+});
+
 test('getting started leads with a runnable, reversible first transition', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/getting-started.html');
   await expect(page).toHaveTitle(/Getting started.*VisDelta/);
@@ -185,18 +232,22 @@ test('every editable preset produces real marks', async ({ page }) => {
     ['layout', 'sort', 'rect.vd-bar']
   ];
 
-  expect(await page.locator('.playground-chart rect.vd-bar').count()).toBeGreaterThan(0);
+  await expect(status).toHaveText('Ready');
+  await expect.poll(() => page.locator('.playground-chart rect.vd-bar').count())
+    .toBeGreaterThan(0);
   for (const [category, sample, mark] of cases) {
     await page.getByRole('tab', { name: new RegExp(`^${category}`, 'i') }).click();
     await page.locator(`[data-scenario="${sample}"]`).click();
     await expect(status).toHaveText('Ready');
-    expect(await page.locator(`.playground-chart ${mark}`).count()).toBeGreaterThan(0);
+    await expect.poll(() => page.locator(`.playground-chart ${mark}`).count())
+      .toBeGreaterThan(0);
   }
 
   await page.locator('.chart-playground-tabs').getByRole('tab', { name: 'Unit', exact: true }).click();
   await page.locator('[data-scenario="bar"]').click();
   await expect(status).toHaveText('Ready');
-  expect(await page.locator('.playground-chart circle').count()).toBeGreaterThan(0);
+  await expect.poll(() => page.locator('.playground-chart circle').count())
+    .toBeGreaterThan(0);
 });
 
 test('reference stays usable at a narrow viewport', async ({ page }) => {

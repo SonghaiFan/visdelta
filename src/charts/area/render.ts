@@ -25,6 +25,7 @@ import type { ChartPresentation } from '../style.js';
 import type { AreaCell, AreaLayer, AreaPoint } from './state.js';
 import { interpolateNumber } from 'd3-interpolate';
 import { area as shapeArea, line as shapeLine } from 'd3-shape';
+import { areaGrainError } from './grain.js';
 
 /** One boundary sample in pixel space. */
 export interface AreaBoundaryPoint {
@@ -73,14 +74,8 @@ class AreaChart extends BaseChart<AreaViewState> {
     if (!xField || !yField) return;
 
     const state = areaState(spec, enc);
-    if (state.mode === 'single') {
-      const duplicate = duplicateAreaX(rows, xField);
-      if (duplicate !== null) {
-        throw new Error(
-          `Area chart needs one value per ${xField}. Found more than one row for "${displayAreaX(duplicate)}". Use .where(...), .breakdown(...), or .rollup(...) to make the grain explicit.`
-        );
-      }
-    }
+    const grainError = areaGrainError(spec, rows);
+    if (grainError) throw new Error(grainError);
     const pointKey = areaPointKeyAccessor(spec, xField);
     const domainRows = chart.domainRows?.length ? chart.domainRows : rows;
     const domainLayers = areaLayers(domainRows, xField, yField, state, pointKey);
@@ -467,23 +462,6 @@ class AreaChart extends BaseChart<AreaViewState> {
     drawLegend(chart, rows, enc.color);
     drawAreaTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '', this.runtime.tooltip);
   }
-}
-
-function duplicateAreaX(rows: RenderDatum[], field: string): unknown | null {
-  const seen = new Set<string>();
-  for (const row of rows) {
-    const value = row[field];
-    const token = value instanceof Date
-      ? `date:${value.getTime()}`
-      : `${typeof value}:${String(value)}`;
-    if (seen.has(token)) return value;
-    seen.add(token);
-  }
-  return null;
-}
-
-function displayAreaX(value: unknown): string {
-  return value instanceof Date ? value.toISOString() : String(value);
 }
 
 function areaHighlightXRange(

@@ -6,6 +6,7 @@ import type { AreaViewState } from './authoring.js';
 import { createAreaSpecCompiler } from './compile.js';
 import { createAreaRenderer } from './render.js';
 import { areaObservationChange, areaState, canonicalAreaTransitionPair } from './state.js';
+import { createAreaDeclarationOperationCodec } from './declaration-operations.js';
 
 /** Area-specific plan fields read by the renderer. */
 export interface AreaTransitionPlanExtension {
@@ -16,6 +17,7 @@ export interface AreaTransitionPlanExtension {
 export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>({
   key: 'area',
   declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: areaPresentation,
@@ -29,6 +31,7 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
   },
   transition: {
     canonicalPair: canonicalAreaTransitionPair,
+    declarationOperations: createAreaDeclarationOperationCodec(),
     plan: (previousSpec, nextSpec) => {
       const plan = createDefaultTransitionPlan(previousSpec, nextSpec, {
         reason: 'area-default-plan'

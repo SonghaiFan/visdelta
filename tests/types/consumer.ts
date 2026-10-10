@@ -1,7 +1,9 @@
 import { bar, compileLineage, correspondLineage, delta, sequence } from 'visdelta';
+import type { DeclarationCodecResult as EntryCodecResult, DeclarationOperationChange as EntryOperationChange } from 'visdelta';
 import { sequence as selectedSequence, transition } from 'visdelta/transition';
 import { delta as selectedDelta, applyDeclarationEdits, planDeclarationTransition } from 'visdelta/core';
-import { bar as selectedBar, barModule } from 'visdelta/bar';
+import type { DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec, DeclarationPlanOptions } from 'visdelta/core';
+import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec } from 'visdelta/bar';
 import type { BarTransitionPlan } from 'visdelta/bar';
 import { area as selectedArea, areaModule } from 'visdelta/area';
 import { point as selectedPoint, pointModule } from 'visdelta/point';
@@ -17,7 +19,7 @@ import {
 import { composeCanonicalPolicies, composeIntermediatePolicies, encodingWaypoint, minimumTravelMatching, interpolatePathPoints, connectedStretches } from 'visdelta/toolkit';
 import * as browser from 'visdelta/browser';
 import { bandOrLinear, position, easeFor, staggerDelay } from 'visdelta/toolkit';
-import type { ChartTransitionPolicy, IntermediateSpec, Renderer, TransitionPlan } from 'visdelta/plugins';
+import type { ChartTransitionPolicy, DeclarationCodecResult as PluginCodecResult, DeclarationOperationChange as PluginOperationChange, IntermediateSpec, Renderer, TransitionPlan } from 'visdelta/plugins';
 
 const corePlan: TransitionPlan = { reason: 'generic-plugin-plan' };
 // Bar renderer choices are exposed by the Bar entry only.
@@ -62,21 +64,74 @@ defineChartType({
 const waypoint: IntermediateSpec = { spec: { mark: 'custom' } };
 const declarationChange = selectedDelta({ mark: 'custom', width: 10 }, { mark: 'custom', width: 20 });
 applyDeclarationEdits({ mark: 'custom', width: 10 }, declarationChange.edits);
-planDeclarationTransition({ mark: 'custom' }, { mark: 'custom', width: 20 }).stages.forEach(stage => {
+const customCodec: DeclarationOperationCodec = {
+  decompose(spec) {
+    return { status: 'ok', value: typeof spec.width === 'number' ? [{
+      id: 'width', path: ['width'], value: { present: true, value: spec.width }
+    }] : [] };
+  },
+  evaluate(template, operations) {
+    const result = { ...template };
+    const width = operations.find(operation => operation.id === 'width');
+    if (width?.value.present) result.width = width.value.value;
+    else delete result.width;
+    return { status: 'ok', value: result };
+  },
+  normalize(spec) { return { status: 'ok', value: spec }; },
+  validate(spec) { return spec.mark === 'custom' ? { status: 'ok', value: undefined } : { status: 'unsupported', reason: 'wrong mark' }; },
+  validateStep(from, to, endpoints) {
+    return from.mark === endpoints.from.mark && to.mark === endpoints.to.mark
+      ? { status: 'ok', value: undefined }
+      : { status: 'unsupported', reason: 'route must preserve endpoint marks' };
+  }
+};
+const planOptions: DeclarationPlanOptions = { maxSearchStates: 32 };
+const codecResult: DeclarationCodecResult<number> = { status: 'ok', value: 1 };
+const operationChange: DeclarationOperationChange = {
+  id: 'width', action: 'insert', next: { id: 'width', path: ['width'], value: { present: true, value: 20 } }
+};
+const pluginCodecResult: PluginCodecResult<void> = { status: 'ok', value: undefined };
+const pluginOperationChange: PluginOperationChange = operationChange;
+const entryCodecResult: EntryCodecResult<boolean> = { status: 'ok', value: true };
+const entryOperationChange: EntryOperationChange = operationChange;
+const customPlan = planDeclarationTransition(
+  { mark: 'custom' }, { mark: 'custom', width: 20 }, customCodec, planOptions
+);
+const grainRows = [
+  { state: 'A', age: 'young', population: 1 },
+  { state: 'A', age: 'old', population: 2 }
+];
+const grainFrom = selectedBar(grainRows).x('state').y('population', { title: 'Metric' })
+  .rollup({ title: 'Metric' }).toSpec();
+const grainTo = selectedBar(grainRows).x('state').y('population', { title: 'Metric' })
+  .breakdown('age', { title: 'Metric' }).toSpec();
+const publicGrainPlan = planDeclarationTransition(
+  grainFrom, grainTo, createBarGrainDeclarationOperationCodec()
+);
+publicGrainPlan.stages[0]?.operation.id;
+customPlan.stages.forEach(stage => {
   applyDeclarationEdits(stage.from, stage.edits);
 });
+const browserPlanOptions: browser.DeclarationPlanOptions = { maxSearchStates: 16 };
+const browserCodecResult: browser.DeclarationCodecResult<string> = { status: 'unsupported', reason: 'unsupported' };
+const browserOperationChange: browser.DeclarationOperationChange = operationChange;
+void [customPlan.status, browserPlanOptions, codecResult, operationChange, pluginCodecResult, pluginOperationChange, entryCodecResult, entryOperationChange, browserCodecResult, browserOperationChange];
 const policy: ChartTransitionPolicy = {
   declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
+  declarationOperations: customCodec,
   resolveTransitionPlan: () => ({}),
   intermediateSpecs: () => [waypoint],
   canonicalTransitionPair: (from, to) => ({ from, to, reverse: false })
 };
 defineChartType({
   key: 'policy-consumer', renderer() {},
+  declarationPlanningOrder: policy.declarationPlanningOrder,
   transition: {
     plan: policy.resolveTransitionPlan,
     intermediateSpecs: policy.intermediateSpecs,
-    canonicalPair: policy.canonicalTransitionPair
+    canonicalPair: policy.canonicalTransitionPair,
+    declarationOperations: policy.declarationOperations
   }
 });
 

@@ -14,7 +14,6 @@ export type SceneProgressController = ProgressController;
 
 export interface SceneHostElement extends HTMLElement {
   __visDeltaScene?: RuntimeScene;
-  __visDeltaMarkName?: Element;
 }
 
 export interface RuntimeScene extends ChartSceneContext {

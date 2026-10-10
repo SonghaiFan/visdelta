@@ -22,6 +22,9 @@ export default {
     app.component('TransitionWorkbench', defineAsyncComponent(
       () => import('../components/TransitionWorkbench.vue')
     ));
+    app.component('BarGrainPlannerDemo', defineAsyncComponent(
+      () => import('../components/BarGrainPlannerDemo.vue')
+    ));
     app.component('HeroTransitionDemo', HeroTransitionDemo);
     app.component('ProductCode', ProductCode);
     app.component('DocsCodeBlock', DocsCodeBlock);

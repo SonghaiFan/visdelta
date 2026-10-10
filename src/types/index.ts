@@ -526,6 +526,46 @@ export interface IntermediateSpec<S extends ViewSpec = ViewSpec> {
   scene?: string;
 }
 
+/** One canonical endpoint-derived declaration operation. The meaning of an
+ * operation ID is owned by its chart plugin; Core treats it as an opaque slot. */
+export interface CanonicalDeclarationOperation {
+  id: string;
+  path: string[];
+  value: { present: false } | { present: true; value: unknown };
+  /** Ordered sequence family; sequence order is the array order from decompose(). */
+  sequence?: string;
+}
+
+export type DeclarationCodecResult<T> =
+  | { status: 'ok'; value: T }
+  | { status: 'unsupported'; reason: string };
+
+export interface DeclarationOperationChange {
+  id: string;
+  action: 'insert' | 'delete' | 'update';
+  previous?: CanonicalDeclarationOperation;
+  next?: CanonicalDeclarationOperation;
+  /** Sequence positions affected by this insert, delete, or update; updates use the same index for both. */
+  fromIndex?: number;
+  toIndex?: number;
+}
+
+/** Chart-owned codec for complete, valid states along a one-operation route. */
+export interface DeclarationOperationCodec<S extends ViewSpec = ViewSpec> {
+  /** Optional endpoint-pair boundary for chart-owned operation subsets. */
+  supportsTransition?(from: S, to: S): string | void;
+  decompose(spec: S): DeclarationCodecResult<CanonicalDeclarationOperation[]>;
+  /** Evaluate an operation set into a complete state, including derived fields. */
+  evaluate(template: S, operations: readonly CanonicalDeclarationOperation[]): DeclarationCodecResult<S>;
+  normalize(spec: S): DeclarationCodecResult<S>;
+  validate(spec: S): DeclarationCodecResult<void>;
+  /** Optional route-edge constraint over complete valid states and stable canonical endpoints.
+   * Called only in canonical search direction; reverse planning/playback reuse the accepted route.
+   * Constraints must be stable and direction-symmetric or defined by the canonical pair,
+   * never builder history. Rejecting an edge does not make either chart state invalid. */
+  validateStep?(from: S, to: S, endpoints: Readonly<{ from: S; to: S }>): DeclarationCodecResult<void>;
+}
+
 export interface CanonicalTransitionPair<S extends ViewSpec = ViewSpec> {
   from: S;
   to: S;
@@ -558,6 +598,10 @@ export type ChartRuntime = import('../runtime/chart-runtime.js').ChartRuntime;
 export interface ChartTransitionPolicy<S extends ViewSpec = ViewSpec> {
   /** Opt into Core's conservative declaration planner when this chart has no route. */
   declarationPlanning?: boolean;
+  /** Choose whether canonical declaration operations run before or after whole-pair chart routes. */
+  declarationPlanningOrder?: 'before-chart' | 'after-chart';
+  /** Canonical semantic operation vocabulary for endpoint-based route search. */
+  declarationOperations?: DeclarationOperationCodec<S>;
   /** Plan motion and timing for one adjacent pair, not all generated waypoints. */
   resolveTransitionPlan(prev: S | null, next: S | null): TransitionPlan;
   /**

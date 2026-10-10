@@ -18,6 +18,7 @@ const expectedApi = [
   "compileLineage",
   "correspondLineage",
   "correspondMarks",
+  "createBarGrainDeclarationOperationCodec",
   "d3ChartStyle",
   "darkChartStyle",
   "declarationEdits",
@@ -89,13 +90,14 @@ try {
 
 async function writeConsumerSmoke(dir) {
 const source = `
+import { deepStrictEqual } from "node:assert";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import * as api from "visdelta";
 import * as browserApi from "visdelta/browser";
 import { D3_AREA_CURVE_NAMES as selectedAreaCurveNames, area as selectedArea, areaModule } from "visdelta/area";
-import { bar as selectedBar, barModule } from "visdelta/bar";
+import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
 import { point as selectedPoint, pointModule } from "visdelta/point";
 import { D3_CURVE_NAMES as selectedCurveNames, line as selectedLine, lineModule } from "visdelta/line";
 import { UNIT_LAYOUTS as selectedUnitLayouts, unit as selectedUnit, unitModule } from "visdelta/unit";
@@ -118,6 +120,34 @@ assertSame(api.availableChartTypes(), [], "no implicitly registered chart types"
 if (typeof selectedArea !== "function") throw new Error("area subpath did not export area()");
 if (selectedAreaCurveNames.length !== 19) throw new Error("area subpath did not export its D3 curve names");
 if (typeof selectedBar !== "function") throw new Error("bar subpath did not export bar()");
+if (typeof selectedBarGrainCodec !== "function") throw new Error("bar subpath did not export its Grain operation codec");
+const grainRows = [
+  { id: "a", category: "A", segment: "one", amount: 2 },
+  { id: "b", category: "A", segment: "two", amount: 4 },
+  { id: "c", category: "B", segment: "one", amount: 3 }
+];
+const grainBase = selectedBar(grainRows).datumKey("id").x("category").y("amount", { title: "Metric" });
+const grainFrom = grainBase.rollup({ title: "Metric" }).toSpec();
+const grainTo = grainBase.breakdown("segment", { title: "Metric" }).toSpec();
+const grainCodec = selectedBarGrainCodec();
+const grainPlan = api.planDeclarationTransition(grainFrom, grainTo, grainCodec);
+if (grainPlan.status !== "planned" || grainPlan.stages.length !== 1) throw new Error("Packed Bar Grain planner did not produce a one-operation path: " + grainPlan.reason);
+const grainStage = grainPlan.stages[0];
+assertSame(grainStage.operation.id, "__visdeltaBarGrain/grouping", "packed Bar Grain operation");
+const normalizedGrainTarget = grainCodec.normalize(grainTo);
+if (normalizedGrainTarget.status !== "ok" || grainCodec.validate(grainStage.to).status !== "ok") throw new Error("Packed Bar Grain stage is not a complete valid state");
+deepStrictEqual(grainStage.to, normalizedGrainTarget.value, "packed Bar Grain normalized terminal state");
+deepStrictEqual(api.createBarGrainDeclarationOperationCodec().normalize(grainTo), normalizedGrainTarget, "Bar Grain codec root and subpath semantics");
+const grainBefore = grainCodec.decompose(grainStage.from);
+const grainAfter = grainCodec.decompose(grainStage.to);
+if (grainBefore.status !== "ok" || grainAfter.status !== "ok") throw new Error("Packed Bar Grain operations cannot be decomposed");
+const beforeOps = new Map(grainBefore.value.map(operation => [operation.id, JSON.stringify(operation)]));
+const afterOps = new Map(grainAfter.value.map(operation => [operation.id, JSON.stringify(operation)]));
+const changedOps = [...new Set([...beforeOps.keys(), ...afterOps.keys()])].filter(id => beforeOps.get(id) !== afterOps.get(id));
+assertSame(changedOps, ["__visdeltaBarGrain/grouping"], "packed Bar Grain single operation");
+const inverseGrainPlan = api.planDeclarationTransition(grainTo, grainFrom, grainCodec);
+if (inverseGrainPlan.status !== "planned") throw new Error("Packed Bar Grain reverse planner failed");
+deepStrictEqual(inverseGrainPlan.stages.map(stage => [stage.from, stage.to]), [[grainStage.to, grainStage.from]], "packed Bar Grain reversed states");
 if (typeof selectedPoint !== "function") throw new Error("point subpath did not export point()");
 if (typeof selectedLine !== "function") throw new Error("line subpath did not export line()");
 if (selectedCurveNames.length !== 20) throw new Error("line subpath did not export all D3 curve names");

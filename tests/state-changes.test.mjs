@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bar, delta, point, unit } from '../dist/index.js';
+import { viewHighlight, viewSelection } from '../dist/focus.js';
 
 const rows = [
   { id: 'al-young', state: 'AL', age: 'young', value: 10, other: 2 },
@@ -144,7 +145,13 @@ test('legacy focus and highlight fields do not mask one another during normaliza
     } }
   });
 
-  assert.deepEqual(summary(delta(legacy('one', 'one'), legacy('two', 'one')).stateChanges), [
+  const from = legacy('one', 'one');
+  const to = legacy('two', 'one');
+  assert.deepEqual(viewSelection(from), from.meta.state.selection);
+  assert.deepEqual(viewHighlight(from), from.meta.state.sceneState.selection);
+  assert.deepEqual(viewSelection(to), to.meta.state.selection);
+  assert.deepEqual(viewHighlight(to), to.meta.state.sceneState.selection);
+  assert.deepEqual(summary(delta(from, to).stateChanges), [
     { category: 'attention', action: 'shift', target: 'focus' }
   ]);
 

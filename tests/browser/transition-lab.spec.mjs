@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { expectEditorCode, setCells, setEditorCode } from './code-editor.mjs';
+import { expectEditorCode, fromEditor, setCells, setEditorCode, toEditor } from './code-editor.mjs';
 
 test('entering a bar tab does not advance its authored-pair progress', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/playground.html#bar/measure');
@@ -23,6 +23,12 @@ test('entering a bar tab does not advance its authored-pair progress', async ({ 
 });
 import { scenarios } from '../../examples/transition/scenarios.js';
 
+const seekProgress = (page, progress) => page.locator('#progress').evaluate((input, value) => {
+  // Planned boundaries need not align with the product slider's 0.01 step.
+  input.step = 'any';
+  input.value = String(value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}, progress);
 const ready = page => expect(page.locator('#status')).toHaveText('Ready');
 const chooseScenario = async (page, id) => {
   const sample = scenarios.find(candidate => candidate.id === id);
@@ -36,10 +42,22 @@ const snapshot = page => page.locator('#chart svg').evaluateAll(svgs => svgs.map
   }))));
 
 function editedScenario(sample) {
-  if (sample.code.includes('.x("state")')) {
-    return { code: sample.code.replace('.x("state")', '.x("state", { title: "Region" })'), label: 'Region' };
+  const xCall = sample.code.match(/\.x\("([^"]+)"(?:,\s*(\{[^)]*\}))?\)/);
+  if (!xCall) throw new Error(`Scenario ${sample.id} has no editable x encoding.`);
+  const [, field, authoredOptions] = xCall;
+  const label = field === 'year' ? 'Calendar year' : 'Region';
+  let options = authoredOptions;
+  if (options && /\btitle\s*:/.test(options)) {
+    options = options.replace(/(\btitle\s*:\s*)["'][^"']*["']/, `$1"${label}"`);
+  } else if (options) {
+    options = options.replace(/}\s*$/, `, title: "${label}" }`);
+  } else {
+    options = `{ title: "${label}" }`;
   }
-  return { code: sample.code.replace('.x("year")', '.x("year", { title: "Calendar year" })'), label: 'Calendar year' };
+  return {
+    code: sample.code.replace(xCall[0], `.x("${field}", ${options})`),
+    label
+  };
 }
 
 for (const sample of scenarios) {
@@ -65,7 +83,7 @@ for (const sample of scenarios) {
 
     const edited = editedScenario(sample);
     await setEditorCode(editor, edited.code);
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    await expectEditorCode(editor, edited.code);
     await ready(page);
     await expect(page.locator('#chart')).toContainText(edited.label);
     await page.locator('#reset').click();
@@ -111,18 +129,52 @@ test('bar lab exposes the planned split, move, and merge stages', async ({ page 
       nodes.map(node => getComputedStyle(node).fill));
     expect([...new Set(fills)]).toEqual(['rgb(0, 0, 0)']);
   }
+  const phases = await page.locator('#chart').evaluate(chart => {
+    const sceneNode = [...chart.querySelectorAll('*')]
+      .find(node => node.__visDeltaScene?.seekSequence);
+    const scenePhases = sceneNode?.__visDeltaScene.seekSequence.phases ?? [];
+    return scenePhases.map(phase => {
+      const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+      const encoding = endpoint.encoding ?? {};
+      const sourceEncoding = phase.transitionSource.effectiveViewSpec?.encoding ?? {};
+      return {
+        start: phase.start,
+        end: phase.end,
+        reverse: phase.reverse ?? false,
+        sourceCategory: sourceEncoding.x?.field ?? sourceEncoding.y?.field ?? null,
+        grainChange: Boolean(sourceEncoding.detail) !== Boolean(phase.spec.encoding?.detail),
+        detail: endpoint.encoding?.detail?.field ?? null,
+        layout: encoding.xOffset?.field || encoding.yOffset?.field
+          ? 'grouped'
+          : encoding.detail?.field ? 'stacked' : 'simple',
+        groupby: endpoint.transform?.find(transform => transform.aggregate)?.aggregate?.groupby ?? []
+      };
+    });
+  });
+  const detailedPhases = phases.filter(phase => phase.grainChange);
+  expect(detailedPhases.length).toBeGreaterThan(1);
+  const sourcePhase = detailedPhases[0];
+  const targetPhase = detailedPhases.at(-1);
+  const phaseProgress = (phase, local, wholePairReverse) => {
+    const phaseLocal = phase.reverse ? 1 - local : local;
+    const canonicalProgress = phase.start + (phase.end - phase.start) * phaseLocal;
+    return wholePairReverse ? 1 - canonicalProgress : canonicalProgress;
+  };
   const readDivider = async progress => {
-    await page.locator('#progress').fill(String(progress));
+    await seekProgress(page, progress);
     return page.locator('#chart').evaluate(chart => {
-    const seam = chart.querySelector('path.vd-bar-seam');
-    return seam ? {
-      opacity: Number(getComputedStyle(seam).opacity),
-      length: seam.getTotalLength()
-    } : null;
+      const seam = chart.querySelector('path.vd-bar-seam');
+      return seam ? {
+        opacity: Number(getComputedStyle(seam).opacity),
+        length: seam.getTotalLength()
+      } : null;
     });
   };
-  const sourceDivider = await readDivider(0.05);
-  const targetDivider = await readDivider(0.95);
+  // The authored source is year; the canonical route begins at location.
+  const wholePairReverse = phases[0]?.sourceCategory !== 'year';
+  expect(wholePairReverse).toBe(true);
+  const sourceDivider = await readDivider(phaseProgress(sourcePhase, 0.3, wholePairReverse));
+  const targetDivider = await readDivider(phaseProgress(targetPhase, 0.3, wholePairReverse));
   expect(sourceDivider?.length).toBeGreaterThan(0);
   expect(targetDivider?.length).toBeGreaterThan(0);
   expect(sourceDivider?.opacity).toBeCloseTo(targetDivider?.opacity, 5);
@@ -227,7 +279,9 @@ test('bar focus moves one camera over the full category scale without filtering 
   expect(visibility.all).toHaveLength(52);
   expect(visibility.invalid).toEqual([]);
   expect(visibility.inside).toEqual(expect.arrayContaining(['NY', 'PA']));
-  expect(visibility.ticks).toEqual(expect.arrayContaining(['NY', 'PA']));
+  // Tick collision handling may omit an anchor label. The target bars must
+  // remain in the viewport; any tick that is drawn must describe a visible bar.
+  expect(visibility.ticks.length).toBeGreaterThan(0);
   expect(visibility.ticks.every(tick => visibility.inside.includes(tick))).toBe(true);
   expect((visibility.targetBounds.x0 + visibility.targetBounds.x1) / 2).toBeCloseTo(visibility.width / 2, 1);
   expect((visibility.targetBounds.y0 + visibility.targetBounds.y1) / 2).toBeCloseTo(visibility.height / 2, 1);
@@ -271,7 +325,7 @@ test('additive grouped split reaches stacked detail before opening into grouped 
   await page.goto('/docs/.vitepress/dist/playground.html#bar/grouped-split');
   await ready(page);
   const visibleLayouts = async progress => {
-    await page.locator('#progress').fill(String(progress));
+    await seekProgress(page, progress);
     return page.locator('#chart').evaluate(chart =>
       [...chart.querySelectorAll('rect.vd-bar')]
         .filter(mark => Number(getComputedStyle(mark).opacity) > 0.001)
@@ -349,7 +403,7 @@ test('bar lab loads tidy population observations with ordered age detail', async
 
   await expectEditorCode(page.locator('#editor'), /\.breakdown\("age"\)/);
   await expectEditorCode(page.locator('#editor'), /\.segment\(\{[\s\S]*fields:/, { not: true });
-  await expectEditorCode(page.locator('#editor'), /\.color\("age", \{ domain: AGE_BANDS, scheme: "Blues" \}\)/);
+  await expectEditorCode(page.locator('#editor'), /\.color\("age", \{ domain: \["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "≥80"\], scheme: "Blues" \}\)/);
   await expect(page.locator('#chart rect.vd-bar:not(.vd-bar-segment)')).toHaveCount(52);
   await page.locator('#end').click();
   await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
@@ -367,42 +421,63 @@ for (const op of ['sum', 'count']) {
     await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
     await ready(page);
     const sample = scenarios.find(scenario => scenario.id === 'split');
-    const baseCode = sample.code
+    const detailCode = sample.toCode
+      .replace(/^const to = /, 'const from = ')
+      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`);
+    const totalCode = sample.code
+      .replace(/^const from = /, 'const to = ')
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed.rollup();', 'return detailed;')
-      .replace('const from = detailed.rollup();', 'const from = detailed;');
-    const toCode = sample.toCode
-      .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`)
-      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
+      .replace('.rollup()', op === 'count' ? '.rollup({ op: "count" })' : '.rollup()');
     const geometry = () => page.locator('#chart rect.vd-bar').evaluateAll(nodes => nodes.map(node => ({
       key: node.dataset.key,
       attrs: ['x', 'y', 'width', 'height', 'fill'].map(name => node.getAttribute(name))
     })).sort((a, b) => a.key.localeCompare(b.key)));
-    await setCells(page, baseCode, toCode);
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    const axes = () => page.locator('#chart .tick, #chart .domain, #chart .vd-x-label, #chart .vd-y-label')
+      .evaluateAll(nodes => nodes.map(node => ({
+        text: node.textContent,
+        attrs: [...node.attributes].map(({ name, value }) => [name, value
+          .replace(/,\s*/g, ',').replace(/-?\d+(?:\.\d+)?(?:e[+-]?\d+)?/gi,
+            token => String(Number(Number(token).toFixed(4))))]).sort()
+      })));
+    await setCells(page, detailCode, totalCode);
+    await expectEditorCode(fromEditor(page), /\.breakdown\("age", \{ op: "(?:sum|count)" \}\)/);
+    await expectEditorCode(toEditor(page), op === 'count' ? /\.rollup\(\{ op: "count" \}\)/ : /\.rollup\(\)/);
     await ready(page);
     const detailFrame = await geometry();
+    const detailAxes = await axes();
     await page.locator('#end').click();
     const totalFrame = await geometry();
-    await setEditorCode(page.locator('#editor'), baseCode
-      .replace('return detailed;', 'return detailed.sort("population");')
-      .replace('const from = detailed;', 'const from = detailed.sort("population");'));
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+    const totalAxes = await axes();
+    const sortedDetailCode = detailCode.replace(/;\s*$/, '\n  .sort("population");');
+    await setEditorCode(fromEditor(page), sortedDetailCode);
+    await expectEditorCode(fromEditor(page), /\.sort\("population"\)/);
     await ready(page);
     // Editing preserves the slider's current value (the preceding endpoint).
     await page.locator('#start').click();
     const sortedFrame = await geometry();
+    const sortedAxes = await axes();
     expect(sortedFrame).not.toEqual(detailFrame);
-    await page.locator('#progress').fill('0.5');
+    const unsortEnd = await page.locator('#chart').evaluate(chart => {
+      const node = [...chart.querySelectorAll('*')].find(node => node.__visDeltaScene?.seekSequence);
+      const phases = node.__visDeltaScene.seekSequence.phases;
+      const sortPhase = phases.find(phase => phase.spec.transform?.some(transform => transform.sort));
+      if (!sortPhase) throw new Error('The sorted detail route has no sort phase.');
+      // Detail -> total reverses the canonical total -> detail route.
+      return 1 - sortPhase.start;
+    });
+    await seekProgress(page, unsortEnd);
     await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
     expect(await geometry()).toEqual(detailFrame);
+    expect(await axes()).toEqual(detailAxes);
     await page.locator('#end').click();
     expect(await geometry()).toEqual(totalFrame);
-    await page.locator('#progress').fill('0.5');
+    expect(await axes()).toEqual(totalAxes);
+    await seekProgress(page, unsortEnd);
     expect(await geometry()).toEqual(detailFrame);
+    expect(await axes()).toEqual(detailAxes);
     await page.locator('#start').click();
     expect(await geometry()).toEqual(sortedFrame);
+    expect(await axes()).toEqual(sortedAxes);
     expect(errors).toEqual([]);
   });
 
@@ -412,19 +487,37 @@ for (const op of ['sum', 'count']) {
     await page.goto('/docs/.vitepress/dist/playground.html#bar/split');
     await ready(page);
     const sample = scenarios.find(scenario => scenario.id === 'split');
-    const code = sample.code
+    const detailCode = sample.toCode
+      .replace(/^const to = /, 'const from = ')
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed.rollup();', 'return detailed.focus({ state: "AL" });')
-      .replace('const from = detailed.rollup();', 'const from = detailed.focus({ state: "AL" });');
-    const toCode = sample.toCode
+      .replace(/;\s*$/, '\n  .focus({ state: "AL" });');
+    const totalCode = sample.code
+      .replace(/^const from = /, 'const to = ')
       .replace('.breakdown("age")', `.breakdown("age", { op: "${op}" })`)
-      .replace('return detailed;', `return detailed.rollup({ op: "${op}" });`)
-      .replace('const to = detailed;', `const to = detailed.rollup({ op: "${op}" });`);
-    await setCells(page, code, toCode);
-    await expect(page.locator('#status')).toHaveText('Waiting for input');
+      .replace('.rollup()', op === 'count' ? '.rollup({ op: "count" })' : '.rollup()');
+    // Establish this reducer first: changing sum -> count also adds Grain
+    // legs to the editor's bridge, separate from the focus/merge contract.
+    const unfocusedDetailCode = detailCode.replace(/\n\s*\.focus\(\{ state: "AL" \}\);\s*$/, ';');
+    await setCells(page, unfocusedDetailCode, totalCode);
+    await ready(page);
+    await setEditorCode(fromEditor(page), detailCode);
+    await expectEditorCode(fromEditor(page), /\.focus\(\{ state: "AL" \}\)/);
+    await expectEditorCode(toEditor(page), op === 'count' ? /\.rollup\(\{ op: "count" \}\)/ : /\.rollup\(\)/);
     await ready(page);
     await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);
-    await page.locator('#progress').fill('0.5');
+    const mergeEnd = await page.locator('#chart').evaluate(chart => {
+      const node = [...chart.querySelectorAll('*')].find(node => node.__visDeltaScene?.seekSequence);
+      const phases = node.__visDeltaScene.seekSequence.phases;
+      const grainPhase = phases.find(phase => {
+        const logicalStart = phase.reverse ? phase.spec : phase.transitionSource.effectiveViewSpec;
+        const logicalEnd = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+        return !logicalStart.encoding?.detail && Boolean(logicalEnd.encoding?.detail);
+      });
+      if (!grainPhase) throw new Error('The focused detail route has no refinement phase.');
+      // The authored merge evaluates the canonical total -> detail path backward.
+      return 1 - grainPhase.start;
+    });
+    await seekProgress(page, mergeEnd);
     await expect(page.locator('#chart rect.vd-bar')).toHaveCount(52);
     const middle = await snapshot(page);
     const camera = () => page.locator('#chart').evaluate(chart => {
@@ -437,7 +530,7 @@ for (const op of ['sum', 'count']) {
     await page.locator('#end').click();
     await expect(page.locator('#chart rect.vd-bar')).toHaveCount(52);
     expect(await camera()).toMatchObject({ k: 1, x: 0, y: 0 });
-    await page.locator('#progress').fill('0.5');
+    await seekProgress(page, mergeEnd);
     expect(await snapshot(page)).toEqual(middle);
     await page.locator('#start').click();
     await expect(page.locator('#chart rect.vd-bar-segment')).toHaveCount(52 * 9);

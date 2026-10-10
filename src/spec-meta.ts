@@ -133,10 +133,14 @@ export function specScopes(spec: ViewSpec): ViewScopes {
   const state = specState(spec);
   const selections = [state.sceneState?.selection, state.selection, spec.selection];
   const scopes = state.scopes ?? {};
+  const resolve = (target: 'focus' | 'highlight') =>
+    Object.prototype.hasOwnProperty.call(scopes, target)
+      ? scopes[target] ?? null
+      : selections.find((selection) => selection?.mode === target) ?? null;
   return {
     ...scopes,
-    focus: scopes.focus || selections.find((selection) => selection?.mode === 'focus') || null,
-    highlight: scopes.highlight || selections.find((selection) => selection?.mode === 'highlight') || null
+    focus: resolve('focus'),
+    highlight: resolve('highlight')
   };
 }
 

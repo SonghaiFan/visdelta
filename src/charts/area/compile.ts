@@ -74,7 +74,7 @@ function compileAreaDetail(spec: ViewSpec, detailSpec: AnyRecord = {}): ViewSpec
       String(detailSpec['as'] ?? y['field']),
       'sum'
     );
-    encoding['y'] = { ...y, field: aggregate.as };
+    encoding['y'] = { ...y, field: aggregate.as, type: 'quantitative' };
     if (encoding['color']?.['field']) delete encoding['color'];
     if (detailSpec['color']) encoding['color'] = detailSpec['color'] as AnyRecord;
     return withSceneState(withObject({

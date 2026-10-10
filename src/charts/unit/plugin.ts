@@ -5,10 +5,12 @@ import { createUnitRenderer } from './render.js';
 import { defineChartType } from '../plugin.js';
 import { canonicalUnitTransitionPair, resolveUnitTransitionPlan } from './state.js';
 import type { UnitViewState } from './authoring.js';
+import { createUnitDeclarationOperationCodec } from './declaration-operations.js';
 
 export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>({
   key: 'unit',
   declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
   scenes: ['selection', 'axis', 'mapping'],
   presentation: unitPresentation,
@@ -17,6 +19,7 @@ export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>
   createSpecCompiler: createUnitSpecCompiler,
   transition: {
     canonicalPair: canonicalUnitTransitionPair,
-    plan: resolveUnitTransitionPlan
+    plan: resolveUnitTransitionPlan,
+    declarationOperations: createUnitDeclarationOperationCodec()
   }
 });

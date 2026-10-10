@@ -122,6 +122,26 @@ test('plugin factories are delayed until a host transition and isolated per host
   assert.equal((await transitionRegistry({ mark: key })).get(key).renderer(), 'replacement');
 });
 
+test('chart type registration keeps synchronous validation and plugins must preserve their key', async () => {
+  const invalidKey = `registry-invalid-${Date.now()}`;
+  assert.throws(() => registerChartType({ key: invalidKey, scenes: [], prepareSpec: spec => spec }), /renderer function/);
+  assert.equal(availableChartTypes().includes(invalidKey), false);
+
+  const invalidPluginKey = `registry-invalid-plugin-${Date.now()}`;
+  assert.throws(() => registerChartModule({ plugin: { key: invalidPluginKey } }), /createChartType/);
+  assert.equal(availableChartTypes().includes(invalidPluginKey), false);
+
+  const key = `registry-plugin-key-${Date.now()}`;
+  registerChartModule({ plugin: {
+    key,
+    scenes: [],
+    createChartType() {
+      return { key: `${key}-different`, renderer() {}, scenes: [], prepareSpec: spec => spec };
+    }
+  } });
+  await assert.rejects(transitionRegistry({ mark: key }), /created chart type/);
+});
+
 test('an explicit registration made during lazy loading takes precedence', async () => {
   const key = `registry-race-${Date.now()}`;
   let finishLoad;

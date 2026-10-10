@@ -239,7 +239,7 @@ function encodingWithBarLayout(
   return next;
 }
 
-function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: SemanticKey | null = null): SemanticKey | null {
+export function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey: SemanticKey | null = null): SemanticKey | null {
   const cat = categoryChannel(encoding);
   const meas = measureChannel(encoding);
   if (!cat?.field || !meas?.field) return previousSemanticKey;

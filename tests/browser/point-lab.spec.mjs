@@ -2,7 +2,12 @@ import { test, expect } from '@playwright/test';
 import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { pointScenarios } from '../../examples/point/scenarios.js';
 
-const ready = page => expect(page.locator('#status')).toHaveText('Ready');
+const ready = async page => {
+  await expect(page.getByRole('tab', { name: 'Point', exact: true }))
+    .toHaveAttribute('aria-selected', 'true');
+  await page.locator('#chart').scrollIntoViewIfNeeded();
+  await expect(page.locator('#status')).toHaveText('Ready');
+};
 const chooseScenario = async (page, id) => {
   const sample = pointScenarios.find(candidate => candidate.id === id);
   await page.getByRole('tab', { name: new RegExp(`^${sample.category}`, 'i') }).click();
@@ -54,7 +59,6 @@ for (const width of [1100, 390]) {
 test(`switching tabs animates only the chart, not the tab progress, at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 850 });
   await page.goto('/docs/.vitepress/dist/playground.html#point/x');
-  await page.locator('#chart').scrollIntoViewIfNeeded();
   await ready(page);
   await page.locator('#end').click();
 
@@ -136,8 +140,8 @@ test('point defaults use compact, open correlation axes', async ({ page }) => {
   expect(style.horizontalGridLines).toBeGreaterThan(1);
   expect(style.xDomainOpacity).toBe('0');
   expect(style.yDomainOpacity).toBe('0');
-  expect(style.xTitle).toBe('Weight (1,000 lb) →');
-  expect(style.yTitle).toBe('↑ Fuel economy (mpg)');
+  expect(style.xTitle).toBe('Wt →');
+  expect(style.yTitle).toBe('↑ Mpg');
   expect(style.xTitleAnchor).toBe('end');
   expect(style.yTitleAnchor).toBe('start');
   // Responsive spacing is not a fixed 44 × 56 inset. Axes must share the
@@ -174,7 +178,7 @@ test('point lab loads the tidy mtcars dataset without inventing observations', a
   await ready(page);
   // The lab loads the CSV once and the authored code reads the shared rows.
   await expectEditorCode(page.locator('#editor'), /\bpoint\(rows\)/);
-  await expect(page.locator('#editor')).not.toHaveValue(/DATA_URL|mtcars\.csv/);
+  await expectEditorCode(page.locator('#editor'), /DATA_URL|mtcars\.csv/, { not: true });
   await expect(page.locator('#chart circle.vd-point')).toHaveCount(32);
   expect(requests).toHaveLength(1);
   expect(new URL(requests[0]).pathname).toBe('/docs/.vitepress/dist/data/mtcars.csv');

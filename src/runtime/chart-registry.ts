@@ -1,4 +1,5 @@
 import { createChartTypeRegistry, normalizeMarkRendererKey } from '../charts/index.js';
+import { normalizeChartType } from '../charts/plugin.js';
 import type { ChartModule } from '../charts/module.js';
 import type { ChartRuntime, ChartType, ChartPlugin, ViewSpec } from '../types/index.js';
 import { DEFAULT_CHART_RUNTIME } from './chart-runtime.js';
@@ -20,12 +21,19 @@ function registrationKey(key: unknown): string {
 
 export function registerChartType(chartType: ChartType<any>): void {
   const key = registrationKey(chartType.key);
-  registrations.set(key, { kind: 'type', chartType: { ...chartType, key } });
+  const normalized = normalizeChartType({ ...chartType, key });
+  if (typeof normalized.renderer !== 'function') {
+    throw new Error(`Chart type "${key}" must provide a renderer function.`);
+  }
+  registrations.set(key, { kind: 'type', chartType: normalized });
 }
 
 export function registerChartModule(module: { plugin: ChartPlugin<any> } | ChartModule<any>): void {
   if ('plugin' in module) {
     const key = registrationKey(module.plugin.key);
+    if (typeof module.plugin.createChartType !== 'function') {
+      throw new Error('Chart module must export plugin.createChartType(runtime).');
+    }
     registrations.set(key, { kind: 'plugin', plugin: module.plugin });
     return;
   }
@@ -37,9 +45,19 @@ function instantiate(registration: Registration | undefined, runtime: ChartRunti
   if (!registration) return undefined;
   switch (registration.kind) {
     case 'type': return registration.chartType;
-    case 'plugin': return registration.plugin.createChartType(runtime);
+    case 'plugin': return createPluginChartType(registration.plugin, registration.plugin.key, runtime);
     case 'module': return undefined;
   }
+}
+
+function createPluginChartType(plugin: ChartPlugin<any>, expectedKey: string, runtime: ChartRuntime): ChartType<any> {
+  const normalizedExpectedKey = registrationKey(expectedKey);
+  const chartType = plugin.createChartType(runtime);
+  const actualKey = registrationKey(chartType.key);
+  if (actualKey !== normalizedExpectedKey) {
+    throw new Error(`Chart plugin "${normalizedExpectedKey}" created chart type "${actualKey}".`);
+  }
+  return chartType;
 }
 
 export function availableChartTypes(): string[] {
@@ -83,7 +101,7 @@ export async function transitionRegistry(
     if (pluginKey !== key) {
       throw new Error(`Chart module "${key}" loaded plugin "${pluginKey}".`);
     }
-    chartType = loaded.plugin.createChartType(runtime);
+    chartType = createPluginChartType(loaded.plugin, key, runtime);
   }
 
   if (!chartType) throw new Error(`Unsupported chart type: ${key}`);

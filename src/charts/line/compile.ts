@@ -66,7 +66,7 @@ function compileLineSeries(spec: ViewSpec, detailSpec: AnyRecord = {}, _context:
         String(detailSpec['as'] ?? y.field),
         'sum'
       );
-      encoding['y'] = { ...y, field: aggregate.as };
+      encoding['y'] = { ...y, field: aggregate.as, type: y.type ?? 'quantitative' };
       nextSpec = withObject({
         ...spec,
         transform: [...(spec.transform || []), {

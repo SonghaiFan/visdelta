@@ -46,8 +46,8 @@ function compilePointAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _cont
 
   if (mode === 'aggregate') {
     const groupby = authoredGroupby.length ? authoredGroupby : [parentField].filter(Boolean) as string[];
-    const x = mergeXYChannel(spec.encoding?.['x'] as ChannelSpec, (detailSpec['x'] as ChannelSpec) || spec.encoding?.['x'] as ChannelSpec, 'quantitative');
-    const y = mergeXYChannel(spec.encoding?.['y'] as ChannelSpec, (detailSpec['y'] as ChannelSpec) || spec.encoding?.['y'] as ChannelSpec, 'quantitative');
+    const x = aggregateVisualChannel(mergeXYChannel(spec.encoding?.['x'] as ChannelSpec, (detailSpec['x'] as ChannelSpec) || spec.encoding?.['x'] as ChannelSpec, 'quantitative'));
+    const y = aggregateVisualChannel(mergeXYChannel(spec.encoding?.['y'] as ChannelSpec, (detailSpec['y'] as ChannelSpec) || spec.encoding?.['y'] as ChannelSpec, 'quantitative'));
     const xAs = (detailSpec['x'] as ChannelSpec & { as?: string })?.as || x.field!;
     const yAs = (detailSpec['y'] as ChannelSpec & { as?: string })?.as || y.field!;
     const xAggregate = aggregateFieldSpec(detailSpec['x'] as ChannelSpec, x.field!, xAs, 'mean');
@@ -98,6 +98,12 @@ function compileAggregateSize(value: unknown): {
     aggregate: { op, ...(field ? { field } : {}), as },
     channel: { ...visual, field: as, type: 'quantitative' }
   };
+}
+
+/** Reducer configuration belongs to the transform, not the visual channel. */
+function aggregateVisualChannel(channel: ChannelSpec): ChannelSpec {
+  const { op: _op, as: _as, ...visual } = channel as ChannelSpec & { op?: string; as?: string };
+  return visual;
 }
 
 function aggregateTitle(op: string, title: string): string {

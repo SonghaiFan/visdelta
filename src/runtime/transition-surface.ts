@@ -4,10 +4,12 @@
 // evaluators. Nothing here depends on a timer.
 import { renderChartShell } from './chart-shell.js';
 import { createViewRenderer } from './view-renderer.js';
+import { prepareChartSpec } from './view-renderer.js';
 import type { ViewConfig, ViewLayoutSpec, ViewRuntimeScene } from './view-renderer.js';
 import { resolveTarget } from './target.js';
 import { inferTransition } from '../grammar/infer-transition.js';
-import { canonicalTransitionPair, resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
+import { canonicalTransitionPair, selectTransitionRoute } from '../charts/transition-route.js';
+import type { TransitionRoute } from '../charts/transition-route.js';
 import { captureDomFrame } from './dom-frame.js';
 import type { DomFrame } from './dom-frame.js';
 import { hideTooltip } from './tooltip.js';
@@ -19,7 +21,6 @@ import type { ChartTypeRegistry } from '../charts/index.js';
 import { select } from 'd3-selection';
 import { viewRows, domainTransforms } from './data.js';
 import { applyTransforms } from '../data/transforms.js';
-import { resolveSpecDataTypes } from '../data/types.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
   height?: number;
@@ -63,16 +64,12 @@ export function createTransitionSurface(
   // A chart may insert complete states inside this one authored pair. They are
   // route stages, not extra authored sequence entries. Their count is known
   // from the same pure route policy that the renderer uses below.
-  const route = resolveTransitionRoute(
-    chartType,
-    source,
-    target,
-    resolveIntermediateSpecs(chartType, source, target)
-  );
+  const preparedSource = prepareChartSpec(chartType, compileTransitionSource(source).effectiveViewSpec ?? source) ?? source;
+  const preparedTarget = prepareChartSpec(chartType, compileTransitionSource(target).effectiveViewSpec ?? target) ?? target;
+  const route: TransitionRoute = selectTransitionRoute(chartType, preparedSource, preparedTarget);
   const routeStages = route.legs.length;
-  const layoutStates = [source, ...route.legs.map(leg => leg.to)].map(spec =>
-    compileTransitionSource(spec).effectiveViewSpec!
-  );
+  const layoutStates = [route.from, ...route.legs.map(leg => leg.to)]
+    .filter((spec): spec is NonNullable<typeof spec> => Boolean(spec));
   const canonicalProgress = (value: number) => canonical.reverse ? 1 - value : value;
   const host = resolveTarget(options.target);
   const root = document.createElement('div');
@@ -105,9 +102,10 @@ export function createTransitionSurface(
 
   function compileFrames(): FrameEvaluator {
     disposeScene();
-    prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(source));
+    prepareSeekSourceState(node, config, {}, shell.tooltip,
+      { effectiveViewSpec: route.from, sceneTransition: { scene: [] } }, true);
     const startFrame = captureDomFrame(node);
-    drawView(node, target, config, {}, shell.tooltip, scenes, { previousViewSpec: source, seekable: true });
+    drawView(node, target, config, {}, shell.tooltip, scenes, { previousViewSpec: source, seekable: true, transitionRoute: route });
     const scene = runtimeScene();
     if (!scene?.transitionProgress) throw new Error('VisDelta could not compile the transition: no seekable render was produced.');
     const controller = scene.transitionProgress;
@@ -125,16 +123,21 @@ export function createTransitionSurface(
       };
       if (index < phases.length - 1 && 'spec' in phase) {
         const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
-        clearSceneTransitionProgress(scene, { finish: true });
-        prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(endpoint));
+        if (phase.reverse) evaluator.progress(0, -1);
+        clearSceneTransitionProgress(scene, { finish: !phase.reverse });
+        prepareSeekSourceState(node, config, {}, shell.tooltip,
+          { effectiveViewSpec: endpoint, sceneTransition: { scene: [] } }, true);
         boundaries.push({ at: phase.end, dom: captureDomFrame(node) });
       }
       return frame;
     });
     // Save the clean endpoint (no zero-opacity exit marks/ticks), while keeping
     // detached nodes alive in the phase snapshots for later reverse seeks.
-    clearSceneTransitionProgress(scene, { finish: true });
-    prepareSeekSourceState(node, config, {}, shell.tooltip, compileTransitionSource(target));
+    const finalFrame = frames[frames.length - 1];
+    if (finalFrame.reverse) finalFrame.evaluator.progress(0, -1);
+    clearSceneTransitionProgress(scene, { finish: !finalFrame.reverse });
+    prepareSeekSourceState(node, config, {}, shell.tooltip,
+      { effectiveViewSpec: route.to, sceneTransition: { scene: [] } }, true);
     const endFrame = captureDomFrame(node);
     let activeFrame: DomFrame = endFrame;
     const activate = (frame: DomFrame) => {
@@ -180,12 +183,13 @@ export function createTransitionSurface(
       }
       disposeScene();
       if (value === 0 || value === 1) {
-        const endpoint = compileTransitionSource(value === 0 ? source : target);
-        prepareSeekSourceState(node, config, {}, shell.tooltip, endpoint);
+        prepareSeekSourceState(node, config, {}, shell.tooltip,
+          { effectiveViewSpec: value === 0 ? route.from : route.to, sceneTransition: { scene: [] } }, true);
       } else {
         drawView(node, target, config, {}, shell.tooltip, scenes, {
           previousViewSpec: source,
-          seekable: true
+          seekable: true,
+          transitionRoute: route
         });
         // The pair's progress is already normalized. Chart-local timing and
         // step order apply inside the plan.
@@ -204,9 +208,8 @@ export function createTransitionSurface(
 function invariantTransitionMargin(chartType: ChartType, states: ViewLayoutSpec[], width: number, height: number): Partial<MarginSpec> {
   const margins = states.map(spec => {
     const sourceRows = viewRows(spec.data, {}) as DataRow[];
-    const prepared = chartType.prepareSpec(resolveSpecDataTypes(spec, sourceRows));
-    const rows = applyTransforms(sourceRows, domainTransforms(prepared.transform || []));
-    return { ...chartType.defaultMargin(prepared, { width, height, rows }), ...(spec.margin || {}) };
+    const rows = applyTransforms(sourceRows, domainTransforms(spec.transform || []));
+    return { ...chartType.defaultMargin(spec, { width, height, rows }), ...(spec.margin || {}) };
   });
   const sides = ['top', 'right', 'bottom', 'left'] as const;
   return Object.fromEntries(sides.map((side) => [

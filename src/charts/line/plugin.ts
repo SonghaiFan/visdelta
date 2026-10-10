@@ -10,6 +10,7 @@ import { defineChartType } from '../plugin.js';
 import type { LineViewState } from './authoring.js';
 import { canonicalLineTransitionPair, lineIntermediateSpecs, lineObservationChange, lineSeriesKey, lineState } from './state.js';
 import { specState } from '../../spec-meta.js';
+import { createLineDeclarationOperationCodec } from './declaration-operations.js';
 
 export interface LineTransitionPlanExtension {
   timing?: TransitionSpec;
@@ -24,6 +25,7 @@ export interface LineTransitionPlanExtension {
 export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>({
   key: 'line',
   declarationPlanning: true,
+  declarationPlanningOrder: 'before-chart',
   scenes: ['selection', 'axis', 'detail', 'mapping'],
   presentation: linePresentation,
   createRenderer: createLineRenderer,
@@ -36,6 +38,7 @@ export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>
   },
   transition: {
     canonicalPair: canonicalLineTransitionPair,
+    declarationOperations: createLineDeclarationOperationCodec(),
     intermediateSpecs: lineIntermediateSpecs,
     plan: (previousSpec, nextSpec) => {
       const plan: ReturnType<typeof createDefaultTransitionPlan> & LineTransitionPlanExtension = {

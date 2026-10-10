@@ -14,8 +14,11 @@ for (const kind of ['bar', 'line', 'area', 'point', 'unit']) {
         { id: 'a', x: 1, y: 3, group: 'one' }, { id: 'b', x: 2, y: 5, group: 'one' },
         { id: 'c', x: 1, y: 4, group: 'two' }, { id: 'd', x: 2, y: 7, group: 'two' }
       ];
-      let base = vd[kind](rows).datumKey('id').key('id');
-      // Bar needs one row per category; the others read x from the rows directly.
+      const inputRows = kind === 'area'
+        ? rows.map((row, index) => ({ ...row, x: index + 1 }))
+        : rows;
+      let base = vd[kind](inputRows).datumKey('id').key('id');
+      // Bar needs one row per category, while single Area needs one row per x.
       base = kind === 'unit' ? base.group('group')
         : kind === 'bar' ? base.x('id').y('y')
         : base.x('x').y('y');
@@ -397,16 +400,25 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
       range: ['#336699', '#ee8822']
     });
     const change = await transition(colored.rollup(), colored, { target: host, height: 400 });
+    const phases = change.view.__visDeltaScene.seekSequence?.phases ?? [];
+    const groupingPhase = phases.find(phase => {
+      const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+      return endpoint.encoding?.detail?.field === 'type' && !endpoint.encoding?.color;
+    });
+    if (!groupingPhase) throw new Error('The planned grouping stage was not present in the seek route.');
+    const phaseProgress = local => groupingPhase.start + (groupingPhase.end - groupingPhase.start) * local;
 
     const readSegments = () => [...host.querySelectorAll('rect.vd-bar-segment')]
       .map(node => {
         const style = getComputedStyle(node);
         return {
           key: node.dataset.key,
+          semanticKey: node.dataset.semanticKey,
           x: Number(node.getAttribute('x')),
           y: Number(node.getAttribute('y')),
           width: Number(node.getAttribute('width')),
           height: Number(node.getAttribute('height')),
+          fill: d3.color(style.fill)?.formatHex() || style.fill,
           fillOpacity: Number(style.fillOpacity),
           opacity: Number(style.opacity)
         };
@@ -415,7 +427,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
 
     change.progress(0);
     const startSeamCount = host.querySelectorAll('path.vd-bar-seam').length;
-    change.progress(0.25);
+    change.progress(phaseProgress(0.25));
     const reveal = readSegments();
     const underlay = [...host.querySelectorAll('rect.vd-bar:not(.vd-bar-segment)')].map(node => ({
       category: node.dataset.category,
@@ -431,7 +443,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
         length
       };
     });
-    change.progress(0.32);
+    change.progress(phaseProgress(0.32));
     const fullSeam = [...host.querySelectorAll('path.vd-bar-seam')].map(node => ({
       length: node.getTotalLength(),
       opacity: Number(getComputedStyle(node).opacity)
@@ -458,9 +470,14 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
 
   expect(result.startSeamCount).toBe(0);
   expect(result.reveal).toHaveLength(4);
-  expect(result.reveal.map(({ key, x, y, width, height }) => ({ key, x, y, width, height })))
-    .toEqual(result.end.map(({ key, x, y, width, height }) => ({ key, x, y, width, height })));
-  expect(result.reveal.every(mark => mark.fillOpacity === 1)).toBe(true);
+  expect(result.reveal.every(({ semanticKey }) => typeof semanticKey === 'string' && semanticKey.length > 0)).toBe(true);
+  expect(new Set(result.reveal.map(({ semanticKey }) => semanticKey)).size).toBe(4);
+  // `data-key` is the renderer's join key and can include local measure data;
+  // compare the exposed semantic identity and the complete endpoint geometry.
+  expect(result.reveal.map(({ semanticKey, x, y, width, height }) => ({ semanticKey, x, y, width, height })))
+    .toEqual(result.end.map(({ semanticKey, x, y, width, height }) => ({ semanticKey, x, y, width, height })));
+  expect(result.reveal.every(mark => mark.fill === '#000000' && mark.fillOpacity === 1)).toBe(true);
+  expect([...new Set(result.end.map(mark => mark.fill))].sort()).toEqual(['#336699', '#ee8822']);
   expect(result.reveal.every(mark => mark.opacity > 0 && mark.opacity < 1)).toBe(true);
   expect(result.underlay).toHaveLength(2);
   expect(result.underlay.every(mark => mark.opacity > 0 && mark.opacity < 1)).toBe(true);
@@ -471,8 +488,7 @@ test('stacked split cuts at final segment bounds, then reveals color over the pa
     expect(line.length).toBeGreaterThan(0);
     expect(line.length).toBeLessThan(end.length);
   });
-  // The global progress span also includes staggered mark schedules, so the
-  // divider's draw/fade handoff can land a fraction beside authored 0.32.
+  // Sample the draw/fade handoff inside the actual Grain phase.
   expect(result.fullSeam.every(line => line.opacity > 0.99)).toBe(true);
   expect(result.endSeamCount).toBe(0);
   expect(result.noColor.every(mark => mark.fill === '#000000')).toBe(true);

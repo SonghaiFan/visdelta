@@ -1,3 +1,4 @@
+import { UNIT_DEFAULTS } from './defaults.js';
 import { bandOrLinear, position } from '../../toolkit/scales.js';
 import { keyFirstTravelMatching } from '../../toolkit/matching.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
@@ -24,6 +25,13 @@ const FALL_STAGE_RATIO = 0.38;
 const FORCE_TICK_COUNT = 180;
 const FORCE_ALPHA_START = 0.4;
 const FORCE_ALPHA_MIN = 0.1;
+interface ForceEndpointCache {
+  radius: number;
+  endpoints: Map<string, Point>;
+}
+const forceLayoutCache = new WeakMap<SVGGElement, Map<string, ForceEndpointCache>>();
+const FORCE_ENDPOINT_EPSILON = 1e-5;
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -155,8 +163,8 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
   const valueKey = unit.value;
   // An array object key reads as its joined string, exactly as a JS property lookup would.
   const rowKey = String(unit.key || specObjectKey(spec) || 'id');
-  const unitValue = positiveNumber(unit.unitValue, 1);
-  const maxUnits = positiveInteger(unit.maxUnits, 240);
+  const unitValue = positiveNumber(unit.unitValue, UNIT_DEFAULTS.unitValue);
+  const maxUnits = positiveInteger(unit.maxUnits, UNIT_DEFAULTS.maxUnits);
   const units: UnitDatum[] = [];
 
   rows.forEach((row, rowIndex) => {
@@ -186,7 +194,7 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
 
 export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSpec): UnitLayoutResult {
   const unit = unitMeta(spec);
-  const layout = unit.layout || 'grid';
+  const layout = unit.layout || UNIT_DEFAULTS.layout;
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
   const requestedRadius = positiveNumber(unit.radius, 12);
   const xChannel = spec.encoding?.x || null;
@@ -319,7 +327,7 @@ export function resolveUnitTransitionPlan(previousSpec: ViewSpec | null, nextSpe
     reason: unitValueChanged ? 'unit-value-split' : positionChanged ? 'unit-key-first-layout' : 'unit-default-plan',
   };
   if (!positionChanged) return plan;
-  const nextLayout = unitMeta(nextSpec).layout || 'grid';
+  const nextLayout = unitMeta(nextSpec).layout || UNIT_DEFAULTS.layout;
   const fallsToAxis = ['bar', 'beeswarm'].includes(nextLayout);
   return {
     ...plan,
@@ -422,38 +430,61 @@ function forceLayout(
     };
   }
 
-  const radius = fitForceRadius(chart, requestedRadius, units.length);
+  const initialRadius = fitForceRadius(chart, requestedRadius, units.length);
   const centerX = chart.innerWidth / 2;
   const centerY = chart.innerHeight / 2;
   const xField = xChannel?.field;
   const yField = yChannel?.field;
-  const xScale = xChannel && xField
+  const layoutDescriptor = JSON.stringify({
+    width: chart.innerWidth,
+    height: chart.innerHeight,
+    initialRadius,
+    xChannel,
+    yChannel,
+    xField,
+    yField,
+    units: units.map((unit) => [
+      unit.__unitKey,
+      xField ? forceValueSignature(unit.__row[xField]) : null,
+      yField ? forceValueSignature(unit.__row[yField]) : null
+    ])
+  });
+  const host = chart.g.node();
+  const cachedLayouts = host ? forceLayoutCache.get(host) : undefined;
+  const cachedLayout = cachedLayouts?.get(layoutDescriptor);
+  let radius = cachedLayout?.radius ?? initialRadius;
+  let xScale = xChannel && xField
     ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { anchors: true })
     : null;
-  const yScale = yChannel && yField
+  let yScale = yChannel && yField
     ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { anchors: true })
     : null;
-  const axes = {
+  let axes = {
     x: forceAxis(xScale, xChannel),
     y: forceAxis(yScale, yChannel)
   };
   const existing = new Map(chart.g.selectAll<UnitNode, unknown>('circle.vd-unit').nodes().map((node) => [
     String(node.dataset.key ?? node.__data__?.__semanticUnitKey ?? node.__data__?.__unitKey),
-    { x: finiteNumber(node.getAttribute('cx')), y: finiteNumber(node.getAttribute('cy')) }
+    { x: finiteNumber(node.getAttribute('cx')), y: finiteNumber(node.getAttribute('cy')), r: finiteNumber(node.getAttribute('r')) }
   ] as const));
+  const isTransitionTarget = unitTransitionPlan(chart)?.match?.mode === 'key-first-travel';
   const existingEndpoint = units.map((unit) => [
     unit.__unitKey,
     existing.get(String(unit.__semanticUnitKey ?? unit.__unitKey))
   ] as const);
-  const isTransitionTarget = unitTransitionPlan(chart)?.match?.mode === 'key-first-travel';
 
-  // The cached transition surface renders the clean target once more at
-  // progress 1. Keep an already-resolved force endpoint fixed instead of
-  // reheating it and producing a last-frame jump.
-  if (!isTransitionTarget && existingEndpoint.every(([, point]) =>
-    point && Number.isFinite(point.x) && Number.isFinite(point.y))) {
-    const endpoints = new Map(existingEndpoint.map(([key, point]) => [key, point as Point] as const));
-    const endpoint = (unit: UnitDatum) => endpoints.get(unit.__unitKey) ?? { x: centerX, y: centerY };
+  // A reverse leg can end at its canonical source. Keep both endpoints on
+  // this host; the clean endpoint render must not reheat an already solved
+  // state. Matching descriptor alone is insufficient after another layout.
+  const matchesEndpoint = cachedLayout && existing.size === units.length && existingEndpoint.every(([key, point]) => {
+    const endpoint = cachedLayout.endpoints.get(key);
+    return point && endpoint && Number.isFinite(point.x) && Number.isFinite(point.y)
+      && Math.abs(point.x - endpoint.x) <= FORCE_ENDPOINT_EPSILON
+      && Math.abs(point.y - endpoint.y) <= FORCE_ENDPOINT_EPSILON
+      && Math.abs(point.r - cachedLayout.radius) <= FORCE_ENDPOINT_EPSILON;
+  });
+  if (!isTransitionTarget && matchesEndpoint) {
+    const endpoint = (unit: UnitDatum) => cachedLayout.endpoints.get(unit.__unitKey) ?? { x: centerX, y: centerY };
     return {
       name: 'force', axes, axis: axes.x, r: radius,
       x: (unit) => endpoint(unit).x,
@@ -486,11 +517,13 @@ function forceLayout(
       node.unit.__unitKey,
       [{ x: node.x, y: node.y }]
     ]));
-    const targetX = xScale && xField
-      ? (node: ForceNode) => position(xScale, node.unit.__row[xField])
+    const targetXScale = xScale;
+    const targetYScale = yScale;
+    const targetX = targetXScale && xField
+      ? (node: ForceNode) => position(targetXScale, node.unit.__row[xField])
       : centerX;
-    const targetY = yScale && yField
-      ? (node: ForceNode) => position(yScale, node.unit.__row[yField])
+    const targetY = targetYScale && yField
+      ? (node: ForceNode) => position(targetYScale, node.unit.__row[yField])
       : centerY;
     const simulation = forceSimulation<ForceNode>(nodes)
       .force('x', forceX<ForceNode>(targetX).strength(0.2))
@@ -522,18 +555,33 @@ function forceLayout(
     return { nodes, trajectories, cumulativeMotion };
   };
 
-  // The force result is the geometry ground truth. If a cluster crosses the
-  // plot, move its discrete anchor range inward and resolve again; never scale
-  // the circles or infer padding from row counts.
   let resolved = resolveForce();
-  for (let pass = 0; pass < 4; pass++) {
-    if (pass > 0) resolved = resolveForce();
-    const overflow = forceOverflow(
-      resolved.nodes, radius, chart.innerWidth, chart.innerHeight
-    );
-    const changedX = pass < 3 && xScale && insetScaleRange(xScale, overflow.left, overflow.right);
-    const changedY = pass < 3 && yScale && insetScaleRange(yScale, overflow.top, overflow.bottom);
-    if (!changedX && !changedY) break;
+  let finalOverflow = forceOverflow(resolved.nodes, radius, chart.innerWidth, chart.innerHeight);
+  for (let pass = 0; pass < 24; pass++) {
+    const overflowTotal = finalOverflow.left + finalOverflow.right + finalOverflow.top + finalOverflow.bottom;
+    if (overflowTotal <= 1e-6) break;
+    // Use the measured edge margin to reduce the common radius, then resolve
+    // the anchors and collision distances together at that radius.
+    const nextRadius = Math.max(2, Math.min(
+      radius - finalOverflow.left,
+      radius - finalOverflow.right,
+      radius - finalOverflow.top,
+      radius - finalOverflow.bottom
+    ));
+    if (nextRadius >= radius - 1e-8) break;
+    radius = nextRadius;
+    xScale = xChannel && xField
+      ? unitXScale(units, xChannel, [radius, chart.innerWidth - radius], { anchors: true })
+      : null;
+    yScale = yChannel && yField
+      ? unitXScale(units, yChannel, [chart.innerHeight - radius, radius], { anchors: true })
+      : null;
+    axes = {
+      x: forceAxis(xScale, xChannel),
+      y: forceAxis(yScale, yChannel)
+    };
+    resolved = resolveForce();
+    finalOverflow = forceOverflow(resolved.nodes, radius, chart.innerWidth, chart.innerHeight);
   }
   const { nodes, trajectories, cumulativeMotion } = resolved;
   const endpoints = new Map(nodes.map((node) => [node.unit.__unitKey, { x: node.x, y: node.y }] as const));
@@ -542,6 +590,16 @@ function forceLayout(
   const trajectoryTimeline = totalMotion > Number.EPSILON
     ? cumulativeMotion.map((motion) => motion / totalMotion)
     : cumulativeMotion.map((_, index) => index / Math.max(1, cumulativeMotion.length - 1));
+
+  if (host && finalOverflow.left + finalOverflow.right + finalOverflow.top + finalOverflow.bottom <= 1e-6) {
+    const cache = cachedLayouts ?? new Map<string, ForceEndpointCache>();
+    cache.delete(layoutDescriptor);
+    cache.set(layoutDescriptor, { radius, endpoints });
+    while (cache.size > 2) cache.delete(cache.keys().next().value!);
+    forceLayoutCache.set(host, cache);
+  } else if (host) {
+    cachedLayouts?.delete(layoutDescriptor);
+  }
 
   return {
     name: 'force', axes, axis: axes.x, r: radius,
@@ -559,18 +617,6 @@ function forceOverflow(nodes: Point[], radius: number, width: number, height: nu
     top: Math.max(0, -Math.min(...nodes.map((node) => node.y - radius))),
     bottom: Math.max(0, Math.max(...nodes.map((node) => node.y + radius)) - height)
   };
-}
-
-function insetScaleRange(scale: RuntimeScale, lowOverflow: number, highOverflow: number): boolean {
-  const low = Math.max(0, Number(lowOverflow) || 0);
-  const high = Math.max(0, Number(highOverflow) || 0);
-  if (low < 0.01 && high < 0.01) return false;
-  const range = scale.range();
-  const start = Number(range[0]);
-  const end = Number(range[range.length - 1]);
-  if (start <= end) scale.range([start + low, end - high]);
-  else scale.range([start - high, end + low]);
-  return true;
 }
 
 function forceAxis(scale: RuntimeScale | null, channel: ChannelSpec | null): UnitAxis | null {
@@ -654,23 +700,25 @@ function uniqueEnterKey(semanticKey: string, targetIndex: number, used: Set<stri
 function unitPositionSignature(spec: ViewSpec): string {
   const unit = unitMeta(spec);
   return stableStringify({
-    layout: unit.layout || 'grid',
+    layout: unit.layout || UNIT_DEFAULTS.layout,
     columns: unit.columns ?? null,
     radius: unit.radius ?? null,
     group: unit.group ?? null,
     value: unit.value ?? null,
     unitValue: unitValueForSpec(spec),
-    x: spec.encoding?.x ?? null
+    maxUnits: unit.maxUnits ?? UNIT_DEFAULTS.maxUnits,
+    x: spec.encoding?.x ?? null,
+    y: spec.encoding?.y ?? null
   });
 }
 
 function unitValueForSpec(spec: ViewSpec): number {
-  return positiveNumber(unitMeta(spec).unitValue, 1);
+  return positiveNumber(unitMeta(spec).unitValue, UNIT_DEFAULTS.unitValue);
 }
 
 function canonicalUnitOrder(spec: ViewSpec): string {
   const unit = unitMeta(spec);
-  const layoutRank = UNIT_LAYOUT_ORDER.indexOf(unit.layout || 'grid');
+  const layoutRank = UNIT_LAYOUT_ORDER.indexOf(unit.layout || UNIT_DEFAULTS.layout);
   return `${String(layoutRank < 0 ? UNIT_LAYOUT_ORDER.length : layoutRank).padStart(2, '0')}|${stableStringify(spec)}`;
 }
 
@@ -679,6 +727,20 @@ function stableStringify(value: unknown): string {
   if (!value || typeof value !== 'object') return JSON.stringify(value);
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+}
+
+function forceValueSignature(value: unknown): unknown {
+  if (value instanceof Date) return ['date', value.getTime()];
+  if (value === null) return ['null'];
+  const type = typeof value;
+  if (type === 'undefined') return ['undefined'];
+  if (type === 'number') {
+    const number = value as number;
+    return ['number', Number.isFinite(number) ? number : String(number)];
+  }
+  if (type === 'string' || type === 'boolean') return [type, value];
+  if (Array.isArray(value)) return ['array', value.map(forceValueSignature)];
+  return ['object', stableStringify(value)];
 }
 
 function dodgeForHeight(

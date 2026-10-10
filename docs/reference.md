@@ -439,23 +439,138 @@ animation commands or additional state-change categories.
 import { applyDeclarationEdits, planDeclarationTransition } from "visdelta/core";
 
 const targetSpec = applyDeclarationEdits(base.toSpec(), change.edits);
-const plan = planDeclarationTransition(base.toSpec(), next.toSpec());
-// plan.stages: complete { from, to, edits, reason } records
 ```
 
 Applying edits returns a detached declaration and rejects stale previous values.
-The conservative declaration planner requires the same chart, source data, and
-datum-key declaration. For composite changes it can release changed
-focus/highlight, remove changed terminal sorts, change the central state, then
-apply target sorts and attention. Unchanged attention is retained. Sorts before
-other transforms are not separated; data, grain, and bindings stay together.
-Presentation-only changes remain direct. This is not a universal search for a
-common intermediate grain.
+Declaration edits and transition operations are separate: declaration edits
+describe exact serialized differences, while a chart plugin's
+`DeclarationOperationCodec` defines the canonical operations that can form a
+route. A codec decomposes each endpoint, evaluates complete candidate states,
+normalizes derived fields, and validates the result. Unsupported states return
+a reason instead of being treated as valid partial declarations. An optional
+`validateStep(from, to, endpoints)` hook constrains route edges after complete
+candidate states pass validation and operation round-trip checks. It receives
+the same canonical endpoint pair throughout a search; reverse planning reuses
+that canonical route backward. The hook runs only in the canonical search
+direction; constraints must be stable and direction-symmetric or defined by
+the canonical pair, and must not depend on builder history.
+Returning `unsupported` skips that edge without
+declaring either state invalid. Codecs without this hook keep their existing
+route search. Built-in plugins supply chart-owned codecs for validated declaration
+subsets; the operation shape follows each chart's semantics.
 
-All five built-in charts opt into this fallback. Existing chart-specific routes
-take precedence and may further refine individual generated legs. Third-party
-plugins opt in with `declarationPlanning: true`; authored `sequence()` boundaries
-remain fixed.
+| Chart | Supported operation states | Boundaries that retain the chart route or direct fallback |
+| --- | --- | --- |
+| Bar | Ordinary channels, attention, keys, margins and supported ordered transforms; one aggregate measure with category grouping, optional detail, and grouped offsets in separate Grain/layout slots. | Wide folds, multiple aggregates, unresolved data, mismatched aliases or mark keys, and Grain changes combined with reorientation. |
+| Point | Ordinary channels and presentation; summary-to-summary grouping and a complete x/y measure bundle with optional aggregate size. Derived position bindings, mark keys and detail metadata follow those Grain slots. | Raw-to-summary pairs, multiple aggregates, unavailable fields, mismatched keys/aliases, and runtime detail-view stages. |
+| Line | Raw y remapping is an Encoding operation. Summary source field, reducer and output alias form one Grain operation with its derived y binding. Curve, connection, appearance and attention remain separate. | Raw-to-summary pairs keep the native zipper when eligible. Pairs crossing ordinary and explicit-detail declarations retain the native route. Custom mark keys and implicit color-derived series remain supported in ordinary declarations; explicit topology/summary declarations require derived keys and declared series. Complex pipelines and runtime zipper stages are outside that subset. |
+| Area | Raw y remapping and summary measure semantics follow the same distinction. Stacked-to-stream layout and its offset/order form a separate layout modifier; curve, connection, baseline and appearance remain separate. Ignored series provenance in a single summary is normalized away. | Raw-to-summary pairs retain the native topology fallback. Ordinary raw declarations preserve represented custom mark keys; explicit topology and summary declarations require their derived mark keys. Complex pipelines and runtime stages remain outside that subset. |
+| Unit | Quantity field, quantity per circle, circle cap, group, layout, columns and radius are separate slots; x/y, color, tooltip, attention, keys and margins are also supported. Axis metadata is a derived mirror. | Aggregate transforms, unresolved data, legacy unit x/y metadata, axis-order instructions, conflicting mirrors and invalid layout dependencies. |
+
+Point summaries require resolved inline records, one aggregate at its original
+pipeline position, and complete quantitative x/y measures. Line and Area
+summaries require one aggregate measure grouped by x at the end of the
+pipeline. Their transformed observations must have one x value per series and
+finite measures. Ordinary `filter`, `sort` and `timeUnit` operations remain
+ordered and are validated at their actual pipeline positions.
+Unit bar layout requires a group field; beeswarm requires an x field. Candidate
+states must satisfy those dependencies, so a valid route may bind a field before
+entering its layout, or leave the layout before unbinding the field. Force
+positions remain categorical anchors even for numeric fields. Unit grouping
+changes layout; `unitValue` changes Grain. Explicit renderer defaults normalize
+to the same state as omitted defaults.
+
+Bar Grain planning requires the same orientation at both endpoints. A pair
+that combines reorientation with a Grain change is unsupported by this planner
+and uses Bar's chart-authored route or direct fallback.
+
+```ts
+import { planDeclarationTransition } from "visdelta/core";
+import type { DeclarationOperationCodec } from "visdelta/core";
+
+const widthCodec: DeclarationOperationCodec = {
+  decompose(spec) {
+    return { status: "ok", value: typeof spec.width === "number"
+      ? [{ id: "width", path: ["width"], value: { present: true, value: spec.width } }]
+      : [] };
+  },
+  evaluate(template, operations) {
+    const next = { ...template };
+    const width = operations.find(operation => operation.id === "width");
+    if (width?.value.present) next.width = width.value.value;
+    else delete next.width;
+    return { status: "ok", value: next };
+  },
+  normalize(spec) { return { status: "ok", value: spec }; },
+  validate(spec) { return spec.mark === "custom"
+    ? { status: "ok", value: undefined }
+    : { status: "unsupported", reason: "wrong mark" }; }
+};
+
+const plan = planDeclarationTransition(from, to, widthCodec, { maxSearchStates: 256 });
+// plan.status is planned, direct, unsupported, or search-limit.
+// Every planned stage contains complete from/to declarations and one operation action.
+```
+
+The search is deterministic and bounded. Each planned edge inserts, removes,
+or updates one codec operation, and every intermediate must pass the codec's
+validator and round-trip through its normalizer. Source data and datum identity are protected route boundaries; mark
+keys may change when the chart codec represents a grain change. Inline data
+field references and transform declarations are validated at every candidate
+state. Missing codecs,
+invalid endpoints, and endpoints with no valid
+one-operation path return `unsupported` or `search-limit` with an empty `stages`
+array; these results do not claim a one-edit route. The runtime uses an
+available chart-authored route or its ordinary direct fallback. A chart plugin
+opts in by setting `declarationPlanning: true`
+and supplying `declarationOperations` in its transition policy. Existing
+chart-specific routes keep precedence by default. All five built-in chart
+plugins opt into `declarationPlanningOrder: "before-chart"`: they first plan
+supported operation states, then refine each leg with chart-owned motion
+bridges. Unsupported pairs keep the available native route or ordinary direct
+fallback. Authored `sequence()` boundaries remain fixed.
+
+A semantic operation stage and a rendered motion leg are different units. One
+operation may need several chart-owned motion bridges, so the number of runtime
+phases need not equal the number of planner stages. Those bridges must remain
+complete, truthful chart states and cannot invent bindings or color.
+
+Bar's Grain planner currently accepts one aggregate measure over inline source
+rows, with a category and optional detail field. It preserves the aggregate's
+position in the ordered transform pipeline and only accepts a verifiable
+default mark key. For example, a total to stacked-detail path has one complete
+grouping state:
+
+```js
+import { bar, createBarGrainDeclarationOperationCodec } from 'visdelta/bar';
+import { planDeclarationTransition } from 'visdelta';
+
+const from = bar(data).x('state').y('population', { title: 'Metric' })
+  .rollup({ title: 'Metric' }).toSpec();
+const to = bar(data).x('state').y('population', { title: 'Metric' })
+  .breakdown('age', { title: 'Metric' }).toSpec();
+const plan = planDeclarationTransition(
+  from, to, createBarGrainDeclarationOperationCodec()
+);
+plan.stages.map(stage => stage.operation.id);
+// ['__visdeltaBarGrain/grouping']
+```
+
+When endpoints share a category and one aggregate grouping strictly refines the
+other, differing focus scopes change only at the coarse endpoint's grouping,
+detail, and mark key. A focused detail therefore merges before focus changes;
+the split reuses the route backward. Measure, color, and layout operations
+remain separate. This is a Bar route constraint, not a chart-state validity
+rule or a global ordering of state-change categories.
+The preserved focus must also be valid at the coarse Grain; otherwise the
+planner has no permitted route and runtime uses the normal Bar fallback.
+
+<BarGrainPlannerDemo />
+
+Wide folds, multiple aggregates, unresolved data, mismatched output aliases,
+custom mark keys that do not match the Grain, and reorientation combined with a
+Grain change are unsupported by this planner. Runtime uses the Bar-authored
+route when it can provide one, or the ordinary direct fallback.
 
 ## `transition(from, to, options)`
 

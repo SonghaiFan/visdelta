@@ -1,11 +1,13 @@
 import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
 import { resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
+import type { TransitionRoute } from '../charts/transition-route.js';
 import { resolveMarkRendererKey } from '../charts/index.js';
 import { serializeViewSpec, specDatumKey } from '../spec-meta.js';
 import { activeMarkLayer, drawUnsupported, fadeLayers } from './mark-layers.js';
 import { applyPlotClip } from './clipping.js';
 import { transitionSpec } from '../toolkit/motion-timing.js';
+import { resolveSceneTransition } from '../transitions/index.js';
 
 import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
@@ -37,6 +39,16 @@ import type { RenderDatum } from './render-types.js';
 type DatasetMap = Record<string, DataRow[]>;
 type SceneTransition = CompileResult['sceneTransition'];
 
+export function prepareChartSpec(
+  chartType: ChartType | undefined,
+  spec: ViewSpec | null | undefined,
+  datasets: DatasetMap = {}
+): ViewSpec | null {
+  if (!spec) return null;
+  const typed = resolveSpecDataTypes(spec, viewRows(spec.data, datasets));
+  return chartType?.prepareSpec?.(typed) || typed;
+}
+
 export interface ViewConfig {
   height?: number;
   margin?: Partial<MarginSpec>;
@@ -51,12 +63,16 @@ interface DrawViewOptions {
   previousViewSpec?: ViewSpec | null;
   previousTransition?: StepTransition;
   seekable?: boolean;
+  /** Immutable route selected after endpoint preparation by the surface. */
+  transitionRoute?: TransitionRoute;
 }
 
 interface RenderOptions {
   transitionSource?: CompileResult | null;
   seekable?: boolean;
   skipSourcePrep?: boolean;
+  /** Route states are complete compiled/prepared nodes from one selection pass. */
+  routePrepared?: boolean;
 }
 
 interface MembershipChange {
@@ -94,6 +110,7 @@ interface RenderPhaseConfig {
   seekable: boolean;
   sceneTransition: SceneTransition;
   transitionSource: CompileResult;
+  routePrepared?: boolean;
   reverse: boolean;
 }
 
@@ -126,7 +143,7 @@ export interface ViewRuntimeScene extends RuntimeScene {
 export function createViewRenderer(chartTypes: ChartTypeRegistry) {
 const { compileEffectiveView, compileTransitionSource } = createViewCompiler(chartTypes);
 return { drawView, prepareSeekSourceState, compileTransitionSource,
-  renderSeekPhase, applySeekSequence };
+  renderSeekPhase, applySeekSequence, renderPhaseConfigs };
 function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig: ViewConfig, datasets: DatasetMap, tooltip: HTMLElement, stepTransition: StepTransition = {}, options: DrawViewOptions = {}): void {
   const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   if (!viewSpec || !viewSpec.mark) {
@@ -138,27 +155,34 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
 
   scene.empty.style("display", "none");
 
-  const { sceneTransition, effectiveViewSpec } = compileEffectiveView(viewSpec, stepTransition);
+  const selectedRoute = options.transitionRoute;
+  const compiled = selectedRoute
+    ? { effectiveViewSpec: selectedRoute.to, sceneTransition: resolveSceneTransition(
+        serializeViewSpec(selectedRoute.to), stepTransition, chartTypes.get(selectedRoute.to)
+      ) }
+    : compileEffectiveView(viewSpec, stepTransition);
+  const { sceneTransition, effectiveViewSpec } = compiled;
   if (!effectiveViewSpec) {
     clearSeekSequence(scene);
     scene.empty.style("display", "grid").text("No view for this step.");
     fadeLayers(scene, '', null);
     return;
   }
-  const transitionSource = compileTransitionSource(
-    options.previousViewSpec,
-    options.previousTransition
-  );
+  const transitionSource = selectedRoute
+    ? { effectiveViewSpec: selectedRoute.from, sceneTransition: { scene: [] } }
+    : compileTransitionSource(options.previousViewSpec, options.previousTransition);
 
   const seekableStep = Boolean(options.seekable);
   const rawSourceSpec = seekableStep
     ? transitionSource.effectiveViewSpec
     : scene.previousSpec;
   const chartType = chartTypes.get(effectiveViewSpec);
-  const targetForPlan = prepareChartSpec(chartType, effectiveViewSpec, datasets);
-  const sourceForPlan = prepareChartSpec(chartType, rawSourceSpec, datasets);
-  const intermediatePhases = intermediateRenderPhases(chartType, sourceForPlan, targetForPlan);
-  if (intermediatePhases.length) {
+  const targetForPlan = selectedRoute ? effectiveViewSpec : prepareChartSpec(chartType, effectiveViewSpec, datasets);
+  const sourceForPlan = selectedRoute ? rawSourceSpec : prepareChartSpec(chartType, rawSourceSpec, datasets);
+  const intermediatePhases = selectedRoute
+    ? selectedRoute.legs.slice(0, -1).map(({ to }) => ({ spec: to }))
+    : intermediateRenderPhases(chartType, sourceForPlan, targetForPlan);
+  if (selectedRoute || intermediatePhases.length) {
     const renderPhases = renderPhaseConfigs(intermediatePhases, {
       chartType: chartType!,
       node,
@@ -169,7 +193,7 @@ function drawView(node: SceneHostElement, viewSpec: ViewSpec | null, viewConfig:
       
       seekable: seekableStep,
       transitionSource
-    });
+    }, options.transitionRoute);
 
     if (seekableStep) {
       scene.seekSequence = createSeekSequence(renderPhases);
@@ -201,20 +225,24 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
       datasets,
       tooltip,
       
-      renderOptions.transitionSource ?? undefined
+      renderOptions.transitionSource ?? undefined,
+      Boolean(renderOptions.routePrepared)
     );
   }
   clearSceneTransitionProgress(scene, { finish: !seekable });
   const chartType = chartTypes.get(effectiveViewSpec);
-  const typedSpec = resolveSpecDataTypes(
-    effectiveViewSpec,
-    viewRows(effectiveViewSpec.data, datasets)
-  );
-  const renderSpec = chartType?.prepareSpec?.(typedSpec) || typedSpec;
+  const typedSpec = renderOptions.routePrepared
+    ? effectiveViewSpec
+    : resolveSpecDataTypes(effectiveViewSpec, viewRows(effectiveViewSpec.data, datasets));
+  const renderSpec = renderOptions.routePrepared
+    ? typedSpec
+    : chartType?.prepareSpec?.(typedSpec) || typedSpec;
   const previousRawSpec = seekable
     ? renderOptions.transitionSource?.effectiveViewSpec || null
     : scene.previousSpec;
-  const previousSpec = prepareChartSpec(chartType, previousRawSpec, datasets);
+  const previousSpec = renderOptions.routePrepared
+    ? previousRawSpec
+    : prepareChartSpec(chartType, previousRawSpec, datasets);
   const source = viewRows(renderSpec.data, datasets) as DataRow[];
   const transforms = renderSpec.transform || [];
   const rows = applyTransforms(source, transforms) as RenderDatum[];
@@ -441,16 +469,6 @@ function fitMarginPair(
   margin[end] = Math.max(0, margin[end] * scale);
 }
 
-function prepareChartSpec(
-  chartType: ChartType | undefined,
-  spec: ViewSpec | null | undefined,
-  datasets: DatasetMap = {}
-): ViewSpec | null {
-  if (!spec) return null;
-  const typed = resolveSpecDataTypes(spec, viewRows(spec.data, datasets));
-  return chartType?.prepareSpec?.(typed) || typed;
-}
-
 function intermediateRenderPhases(
   chartType: ChartType | undefined,
   sourceSpec: ViewSpec | null,
@@ -469,13 +487,14 @@ function intermediateRenderPhases(
 
 function renderPhaseConfigs(
   intermediatePhases: IntermediatePhase[],
-  context: RenderPhaseContext
+  context: RenderPhaseContext,
+  selectedRoute?: TransitionRoute
 ): RenderPhaseConfig[] {
-  const route = resolveTransitionRoute(context.chartType,
+  const route = selectedRoute ?? resolveTransitionRoute(context.chartType,
     context.transitionSource.effectiveViewSpec, context.finalSpec, intermediatePhases);
   return route.legs.map(({ canonical, scenes }): RenderPhaseConfig => {
-    const canonicalSource = compileTransitionSource(canonical.from);
-    const canonicalTarget = compileEffectiveView(canonical.to, { scene: scenes });
+    const canonicalSource: CompileResult = { effectiveViewSpec: canonical.from, sceneTransition: { scene: [] } };
+    const canonicalTarget = resolveSceneTransition(serializeViewSpec(canonical.to), { scene: scenes }, context.chartType);
     return {
       node: context.node,
       spec: canonical.to,
@@ -483,11 +502,12 @@ function renderPhaseConfigs(
       datasets: context.datasets,
       tooltip: context.tooltip,
       seekable: context.seekable,
-      sceneTransition: canonicalTarget.sceneTransition,
+      sceneTransition: canonicalTarget,
       transitionSource: {
         ...canonicalSource,
         effectiveViewSpec: canonical.from
       },
+      routePrepared: true,
       reverse: canonical.reverse
     };
   });
@@ -498,7 +518,8 @@ function prepareSeekSourceState(
   viewConfig: ViewConfig,
   datasets: DatasetMap,
   tooltip: HTMLElement,
-  transitionSource: CompileResult = { effectiveViewSpec: null, sceneTransition: { scene: [] } }
+  transitionSource: CompileResult = { effectiveViewSpec: null, sceneTransition: { scene: [] } },
+  routePrepared = false
 ): void {
   const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   const sourceSpec = transitionSource?.effectiveViewSpec || null;
@@ -518,6 +539,7 @@ function prepareSeekSourceState(
     {
       seekable: true,
       skipSourcePrep: true,
+      routePrepared,
       transitionSource: null
     }
   );
@@ -562,7 +584,8 @@ function renderSeekPhase(scene: ViewRuntimeScene, phaseIndex: number): void {
     config.sceneTransition,
     {
       transitionSource: config.transitionSource,
-      seekable: config.seekable
+      seekable: config.seekable,
+      routePrepared: config.routePrepared
     }
   );
 }
@@ -584,7 +607,10 @@ function applySeekSequence(scene: ViewRuntimeScene, progress: number, direction 
   if (Math.abs(bounded - phase.end) < 1e-12) {
     const endpoint = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
     prepareSeekSourceState(phase.node, phase.viewConfig, phase.datasets, phase.tooltip,
-      compileTransitionSource(endpoint));
+      phase.routePrepared
+        ? { effectiveViewSpec: endpoint, sceneTransition: { scene: [] } }
+        : compileTransitionSource(endpoint),
+      Boolean(phase.routePrepared));
     sequence.phase = null;
     return true;
   }

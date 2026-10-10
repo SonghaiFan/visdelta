@@ -2,11 +2,11 @@ import { test, expect } from '@playwright/test';
 import { expectEditorCode, setEditorCode } from './code-editor.mjs';
 import { scenarios } from '../../examples/unit/scenarios.js';
 
-const ready = async page => {
+const ready = async (page, compileTimeout = 5000) => {
   await expect(page.getByRole('tab', { name: 'Unit', exact: true }))
     .toHaveAttribute('aria-selected', 'true');
   await page.locator('#chart').scrollIntoViewIfNeeded();
-  await expect(page.locator('#status')).toHaveText('Ready');
+  await expect(page.locator('#status')).toHaveText('Ready', { timeout: compileTimeout });
 };
 
 const unitFills = page => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
@@ -95,13 +95,17 @@ test('unit bar uses category position while every unit keeps equal size', async 
 });
 
 test('Unit forceX uses the declared species scale and keeps one deterministic path', async ({ page }) => {
+  const compilingStarted = Date.now();
   await page.goto('/docs/.vitepress/dist/playground.html#unit/force');
-  await ready(page);
+  // Four independent authored slots require several 150-mark force solves.
+  await ready(page, 15_000);
+  await test.info().attach('force-compilation-budget', { body: JSON.stringify({ elapsedMs: Date.now() - compilingStarted, budgetMs: 15_000 }), contentType: 'application/json' });
+  const leg = await unitLayoutLeg(page, 'force', true);
   const readPositions = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
       .sort((a, b) => a[0].localeCompare(b[0])));
   const positionsAt = async value => {
-    await page.locator('#progress').fill(String(value));
+    await leg.seek(value);
     return readPositions();
   };
   const sampledFrames = [];
@@ -113,7 +117,6 @@ test('Unit forceX uses the declared species scale and keeps one deterministic pa
   });
 
   const beforeForce = sampledFrames[sampledFrames.length - 1];
-  await page.waitForTimeout(120);
   expect(await page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
       .sort((a, b) => a[0].localeCompare(b[0])))).toEqual(beforeForce);
@@ -142,17 +145,26 @@ test('Unit forceX uses the declared species scale and keeps one deterministic pa
       marks,
       plotWidth: Number(plot?.getAttribute('width')),
       plotHeight: Number(plot?.getAttribute('height')),
+      radius: marks[0]?.r,
       centroidX: marks.reduce((sum, mark) => sum + mark.x, 0) / marks.length,
       centroidY: marks.reduce((sum, mark) => sum + mark.y, 0) / marks.length,
       minimumGap,
+      bounds: {
+        left: Math.min(...marks.map(mark => mark.x - mark.r)),
+        right: Math.max(...marks.map(mark => mark.x + mark.r)),
+        top: Math.min(...marks.map(mark => mark.y - mark.r)),
+        bottom: Math.max(...marks.map(mark => mark.y + mark.r))
+      },
       xLabels: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => node.textContent),
       xTickCenters: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => {
         const box = node.getBoundingClientRect();
-        return box.left + box.width / 2;
+        return [node.textContent, box.left + box.width / 2];
       }),
       yTicks: svg.querySelectorAll('.vd-y-axis .tick').length,
-      groupCenters: Object.values(Object.groupBy(marks, mark => mark.species)).map(group =>
-        group.reduce((sum, mark) => sum + mark.screenX, 0) / group.length)
+      groupCenters: Object.entries(Object.groupBy(marks, mark => mark.species)).map(([species, group]) => ({
+        species,
+        center: group.reduce((sum, mark) => sum + mark.screenX, 0) / group.length
+      }))
     };
   });
 
@@ -168,14 +180,24 @@ test('Unit forceX uses the declared species scale and keeps one deterministic pa
   const second = await readLayout();
 
   expect(first.marks).toHaveLength(150);
-  expect(first.centroidX).toBeCloseTo(first.plotWidth / 2, 5);
+  expect(new Set(first.marks.map(({ key }) => key)).size).toBe(150);
+  const initialRadius = Math.min(12, Math.sqrt(
+    first.plotWidth * first.plotHeight * 0.62 / (first.marks.length * Math.PI)
+  ));
+  expect(first.radius).toBeLessThan(initialRadius);
   expect(first.centroidY).toBeCloseTo(first.plotHeight / 2, 5);
   expect(first.minimumGap).toBeGreaterThan(-0.05);
+  expect(first.bounds.left).toBeGreaterThanOrEqual(0);
+  expect(first.bounds.right).toBeLessThanOrEqual(first.plotWidth);
+  expect(first.bounds.top).toBeGreaterThanOrEqual(0);
+  expect(first.bounds.bottom).toBeLessThanOrEqual(first.plotHeight);
   expect(first.xLabels).toEqual(['setosa', 'versicolor', 'virginica']);
   expect(first.yTicks).toBe(0);
-  first.groupCenters.forEach((center, index) => {
-    expect(Math.abs(center - first.xTickCenters[index])).toBeLessThan(30);
-  });
+  for (const { species, center } of first.groupCenters) {
+    const tickCenter = first.xTickCenters.find(([label]) => label === species)?.[1];
+    expect(tickCenter, `resolved x-axis tick for ${species}`).toBeDefined();
+    expect(Math.abs(center - tickCenter)).toBeLessThan(30);
+  }
   expect(second.marks).toEqual(first.marks);
 
   await page.locator('#start').click();
@@ -189,6 +211,27 @@ test('Unit forceX uses the declared species scale and keeps one deterministic pa
     nodes.map(node => [node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')])
       .sort((a, b) => a[0].localeCompare(b[0])));
   expect(reverseFrame).toEqual(forwardFrame);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/docs/.vitepress/dist/playground.html#unit/force');
+  await ready(page);
+  await page.locator('#end').click();
+  const narrow = await readLayout();
+  expect(narrow.marks).toHaveLength(150);
+  const narrowInitialRadius = Math.min(12, Math.sqrt(
+    narrow.plotWidth * narrow.plotHeight * 0.62 / (narrow.marks.length * Math.PI)
+  ));
+  expect(narrow.radius).toBeLessThan(narrowInitialRadius);
+  expect(narrow.minimumGap).toBeGreaterThan(-0.05);
+  expect(narrow.bounds.left).toBeGreaterThanOrEqual(0);
+  expect(narrow.bounds.right).toBeLessThanOrEqual(narrow.plotWidth);
+  expect(narrow.bounds.top).toBeGreaterThanOrEqual(0);
+  expect(narrow.bounds.bottom).toBeLessThanOrEqual(narrow.plotHeight);
+  for (const { species, center } of narrow.groupCenters) {
+    const tickCenter = narrow.xTickCenters.find(([label]) => label === species)?.[1];
+    expect(tickCenter, `narrow resolved x-axis tick for ${species}`).toBeDefined();
+    expect(Math.abs(center - tickCenter)).toBeLessThan(30);
+  }
 });
 
 test('Unit force accepts simultaneous explicit x and y targets', async ({ page }) => {
@@ -213,31 +256,260 @@ test('Unit force accepts simultaneous explicit x and y targets', async ({ page }
       target: '#chart', height: 320
     });
     change.progress(1);
-    return true;
+    const snapshot = () => ({
+      marks: [...document.querySelectorAll('#chart circle.vd-unit')].map(node => [
+        node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')
+      ]).sort((a, b) => a[0].localeCompare(b[0])),
+      xTicks: [...document.querySelectorAll('#chart .vd-x-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [node.textContent, box.left + box.width / 2];
+      }),
+      yTicks: [...document.querySelectorAll('#chart .vd-y-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [node.textContent, box.top + box.height / 2];
+      })
+    });
+    const first = snapshot();
+    change.progress(1);
+    return { first, second: snapshot() };
   });
-  expect(result).toBe(true);
+  expect(result.second).toEqual(result.first);
 
   const layout = await page.locator('#chart svg').evaluate(svg => {
     const marks = [...svg.querySelectorAll('circle.vd-unit')].map(node => ({
       species: node.__data__.__row.species,
       score: node.__data__.__row.score,
       x: Number(node.getAttribute('cx')),
-      y: Number(node.getAttribute('cy'))
+      y: Number(node.getAttribute('cy')),
+      screenX: node.getBoundingClientRect().left + node.getBoundingClientRect().width / 2,
+      screenY: node.getBoundingClientRect().top + node.getBoundingClientRect().height / 2
     }));
     const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
     return {
       xLabels: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => node.textContent),
+      xTickCenters: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [node.textContent, box.left + box.width / 2];
+      }),
+      yTickCenters: [...svg.querySelectorAll('.vd-y-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [node.textContent, box.top + box.height / 2];
+      }),
       yTicks: svg.querySelectorAll('.vd-y-axis .tick').length,
       aX: mean(marks.filter(mark => mark.species === 'A').map(mark => mark.x)),
       bX: mean(marks.filter(mark => mark.species === 'B').map(mark => mark.x)),
       lowY: mean(marks.filter(mark => mark.score === 1).map(mark => mark.y)),
-      highY: mean(marks.filter(mark => mark.score === 9).map(mark => mark.y))
+      highY: mean(marks.filter(mark => mark.score === 9).map(mark => mark.y)),
+      lowScreenY: mean(marks.filter(mark => mark.score === 1).map(mark => mark.screenY)),
+      highScreenY: mean(marks.filter(mark => mark.score === 9).map(mark => mark.screenY)),
+      aScreenX: mean(marks.filter(mark => mark.species === 'A').map(mark => mark.screenX)),
+      bScreenX: mean(marks.filter(mark => mark.species === 'B').map(mark => mark.screenX))
     };
   });
   expect(layout.xLabels).toEqual(['A', 'B']);
   expect(layout.yTicks).toBeGreaterThan(0);
   expect(layout.aX).toBeLessThan(layout.bX);
   expect(layout.highY).toBeLessThan(layout.lowY);
+  for (const [label, center] of [['A', layout.aScreenX], ['B', layout.bScreenX]]) {
+    const target = layout.xTickCenters.find(([tick]) => tick === label)?.[1];
+    expect(target, `resolved x-axis tick for ${label}`).toBeDefined();
+    expect(Math.abs(center - target)).toBeLessThan(30);
+  }
+  for (const [value, center] of [[1, layout.lowScreenY], [9, layout.highScreenY]]) {
+    const target = layout.yTickCenters.find(([tick]) => Number(tick) === value)?.[1];
+    expect(target, `resolved y-axis tick for ${value}`).toBeDefined();
+    expect(Math.abs(center - target)).toBeLessThan(30);
+  }
+});
+
+test('Unit force keeps temporal and quantitative anchor axes aligned and bounded', async ({ page }) => {
+  await page.goto('/tests/fixtures/isolated.html');
+  const layout = await page.evaluate(async () => {
+    const [{ unit }, { transition }] = await Promise.all([
+      import('/dist/unit.js'),
+      import('/dist/transition-entry.js')
+    ]);
+    const rows = [
+      { id: 'jan-low', observedAt: '2024-01-01', score: 1 },
+      { id: 'jan-high', observedAt: '2024-01-01', score: 9 },
+      { id: 'feb-low', observedAt: '2024-02-01', score: 1 },
+      { id: 'feb-high', observedAt: '2024-02-01', score: 9 }
+    ];
+    const source = unit(rows).key('id').layout('grid', { radius: 7 });
+    const target = source
+      .x('observedAt', { type: 'temporal', title: 'Observed' })
+      .y('score', { type: 'quantitative', title: 'Score' })
+      .layout('force', { radius: 7 });
+    const change = await transition(source, target, { target: '#chart', height: 320 });
+    change.progress(1);
+    const snapshot = () => [...document.querySelectorAll('#chart circle.vd-unit')].map(node => [
+      node.dataset.key, node.getAttribute('cx'), node.getAttribute('cy')
+    ]).sort((a, b) => a[0].localeCompare(b[0]));
+    const first = snapshot();
+    change.progress(1);
+    const second = snapshot();
+    const svg = document.querySelector('#chart svg');
+    const plot = svg.querySelector('clipPath[id^="vd-mark-clip-"] rect');
+    const marks = [...svg.querySelectorAll('circle.vd-unit')].map(node => ({
+      key: node.dataset.key,
+      date: node.__data__.__row.observedAt,
+      score: node.__data__.__row.score,
+      x: Number(node.getAttribute('cx')),
+      y: Number(node.getAttribute('cy')),
+      r: Number(node.getAttribute('r')),
+      screenX: node.getBoundingClientRect().left + node.getBoundingClientRect().width / 2,
+      screenY: node.getBoundingClientRect().top + node.getBoundingClientRect().height / 2
+    }));
+    let minimumGap = Infinity;
+    for (let i = 0; i < marks.length; i++) {
+      for (let j = i + 1; j < marks.length; j++) {
+        minimumGap = Math.min(minimumGap,
+          Math.hypot(marks[i].x - marks[j].x, marks[i].y - marks[j].y)
+            - marks[i].r - marks[j].r);
+      }
+    }
+    const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+    return {
+      first,
+      second,
+      marks,
+      minimumGap,
+      plotWidth: Number(plot.getAttribute('width')),
+      plotHeight: Number(plot.getAttribute('height')),
+      xTicks: [...svg.querySelectorAll('.vd-x-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [new Date(node.__data__).getTime(), box.left + box.width / 2];
+      }),
+      yTicks: [...svg.querySelectorAll('.vd-y-axis .tick')].map(node => {
+        const box = node.getBoundingClientRect();
+        return [Number(node.textContent), box.top + box.height / 2];
+      }),
+      dates: [...new Set(marks.map(mark => mark.date))].map(date => {
+        const group = marks.filter(mark => mark.date === date);
+        return [new Date(date).getTime(), mean(group.map(mark => mark.screenX))];
+      }),
+      scores: [...new Set(marks.map(mark => mark.score))].map(score => {
+        const group = marks.filter(mark => mark.score === score);
+        return [score, mean(group.map(mark => mark.screenY))];
+      })
+    };
+  });
+  expect(layout.first).toEqual(layout.second);
+  expect(layout.marks).toHaveLength(4);
+  expect(new Set(layout.marks.map(mark => mark.key)).size).toBe(4);
+  expect(layout.minimumGap).toBeGreaterThan(-0.05);
+  expect(Math.min(...layout.marks.map(mark => mark.x - mark.r))).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...layout.marks.map(mark => mark.x + mark.r))).toBeLessThanOrEqual(layout.plotWidth);
+  expect(Math.min(...layout.marks.map(mark => mark.y - mark.r))).toBeGreaterThanOrEqual(0);
+  expect(Math.max(...layout.marks.map(mark => mark.y + mark.r))).toBeLessThanOrEqual(layout.plotHeight);
+  for (const [value, center] of layout.dates) {
+    const target = layout.xTicks.find(([tick]) => tick === value)?.[1];
+    expect(target, `resolved temporal x-axis tick for ${new Date(value).toISOString()}`).toBeDefined();
+    expect(Math.abs(center - target)).toBeLessThan(30);
+  }
+  for (const [value, center] of layout.scores) {
+    const target = layout.yTicks.find(([tick]) => tick === value)?.[1];
+    expect(target, `resolved quantitative y-axis tick for ${value}`).toBeDefined();
+    expect(Math.abs(center - target)).toBeLessThan(30);
+  }
+});
+
+test('Unit force endpoint cache invalidates when dimensions or anchor spec changes', async ({ page }) => {
+  await page.goto('/tests/fixtures/isolated.html');
+  const result = await page.evaluate(async () => {
+    const [{ expandUnits, unitLayout }] = await Promise.all([
+      import('/dist/charts/unit/state.js')
+    ]);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.append(group);
+    document.querySelector('#chart').append(svg);
+    const g = {
+      node: () => group,
+      selectAll: selector => ({ nodes: () => [...group.querySelectorAll(selector)] })
+    };
+    const rows = [
+      { id: 'A-low', species: 'A', region: 'west', score: 1 },
+      { id: 'A-high', species: 'A', region: 'west', score: 9 },
+      { id: 'B-low', species: 'B', region: 'east', score: 1 },
+      { id: 'B-high', species: 'B', region: 'east', score: 9 }
+    ];
+    const chart = { g, innerWidth: 259, innerHeight: 306, width: 300, height: 350, margin: {} };
+    const spec = { encoding: { x: { field: 'species', type: 'nominal' } }, meta: { unit: { layout: 'force', radius: 6 } } };
+    const units = expandUnits(rows, spec);
+    const first = unitLayout(units, chart, spec);
+    for (const unit of units) {
+      const mark = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      mark.classList.add('vd-unit');
+      mark.dataset.key = unit.__unitKey;
+      mark.setAttribute('cx', String(first.x(unit)));
+      mark.setAttribute('cy', String(first.y(unit)));
+      group.append(mark);
+    }
+    const repeated = unitLayout(units, chart, spec);
+    const repeatedRange = repeated.axes.x.scale.range();
+    chart.innerWidth = 320;
+    chart.width = 361;
+    const resized = unitLayout(units, chart, spec);
+    const resizedRange = resized.axes.x.scale.range();
+    const changedSpec = {
+      ...spec,
+      encoding: { x: { field: 'region', type: 'nominal' } }
+    };
+    const changedUnits = expandUnits(rows, changedSpec);
+    const changed = unitLayout(changedUnits, chart, changedSpec);
+    return {
+      firstRange: first.axes.x.scale.range(),
+      repeatedRange,
+      resizedRange,
+      changedDomain: changed.axes.x.scale.domain()
+    };
+  });
+  expect(result.repeatedRange).toEqual(result.firstRange);
+  expect(result.resizedRange).not.toEqual(result.firstRange);
+  expect(result.changedDomain).toEqual(['west', 'east']);
+});
+
+test('Unit force cache distinguishes values with the same string form', async ({ page }) => {
+  await page.goto('/tests/fixtures/isolated.html');
+  const result = await page.evaluate(async () => {
+    const [{ expandUnits, unitLayout }] = await Promise.all([
+      import('/dist/charts/unit/state.js')
+    ]);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.append(group);
+    document.querySelector('#chart').append(svg);
+    const chart = {
+      g: { node: () => group, selectAll: selector => ({ nodes: () => [...group.querySelectorAll(selector)] }) },
+      innerWidth: 259, innerHeight: 306, width: 300, height: 350, margin: {}
+    };
+    const rows = [{ id: 'number', category: 1 }, { id: 'string', category: '1' }];
+    const spec = { encoding: { x: { field: 'category', type: 'nominal' } }, meta: { unit: { layout: 'force', radius: 6 } } };
+    const numericAndString = expandUnits(rows, spec);
+    const first = unitLayout(numericAndString, chart, spec);
+    const firstPositions = numericAndString.map(unit => [first.x(unit), first.y(unit)]);
+    numericAndString.forEach((unit, index) => {
+      const mark = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      mark.classList.add('vd-unit');
+      mark.dataset.key = unit.__unitKey;
+      mark.setAttribute('cx', String(firstPositions[index][0]));
+      mark.setAttribute('cy', String(firstPositions[index][1]));
+      group.append(mark);
+    });
+    rows[1].category = 1;
+    const numericOnly = expandUnits(rows, spec);
+    const changed = unitLayout(numericOnly, chart, spec);
+    return {
+      firstDomain: first.axes.x.scale.domain(),
+      changedDomain: changed.axes.x.scale.domain(),
+      firstPositions,
+      changedPositions: numericOnly.map(unit => [changed.x(unit), changed.y(unit)])
+    };
+  });
+  expect(result.firstDomain).toEqual([1, '1']);
+  expect(result.changedDomain).toEqual([1]);
+  expect(result.changedPositions).not.toEqual(result.firstPositions);
 });
 
 test('Unit force endpoints preserve update identity and support enter and exit', async ({ page }) => {
@@ -280,6 +552,39 @@ test('Unit force endpoints preserve update identity and support enter and exit',
     .every(mark => mark.r > 0)).toBe(true);
 });
 
+// These examples are composite declaration routes. Motion contracts apply to
+// the layout operation's own leg, independently of preceding parameter edits.
+const unitLayoutLeg = async (page, layout, anchors = false) => {
+  const leg = await page.locator('#chart').evaluate(async (host, { layout, anchors }) => {
+    const view = [host, ...host.querySelectorAll('*')].find(node => node.__visDeltaScene?.seekSequence);
+    const phases = view.__visDeltaScene.seekSequence.phases;
+    const layoutOf = spec => spec?.meta?.unit?.layout ?? 'grid';
+    const phase = phases.find(phase => anchors
+      ? layoutOf(phase.transitionSource.effectiveViewSpec) === 'force' && layoutOf(phase.spec) === 'force'
+        && JSON.stringify(phase.transitionSource.effectiveViewSpec.encoding?.x) !== JSON.stringify(phase.spec.encoding?.x)
+      : layoutOf(phase.transitionSource.effectiveViewSpec) !== layoutOf(phase.spec)
+        && [layoutOf(phase.transitionSource.effectiveViewSpec), layoutOf(phase.spec)].includes(layout));
+    if (!phase) throw new Error('Missing Unit layout operation leg: ' + layout);
+    const from = phase.reverse ? phase.spec : phase.transitionSource.effectiveViewSpec;
+    const to = phase.reverse ? phase.transitionSource.effectiveViewSpec : phase.spec;
+    const { createUnitDeclarationOperationCodec } = await import('/dist/charts/unit/declaration-operations.js');
+    const codec = createUnitDeclarationOperationCodec();
+    const normalizedFrom = codec.normalize(from);
+    const normalizedTo = codec.normalize(to);
+    if (normalizedFrom.status !== 'ok' || normalizedTo.status !== 'ok') throw new Error('Unit layout leg states are invalid');
+    const left = new Map(codec.decompose(normalizedFrom.value).value.map(op => [op.id, JSON.stringify(op)]));
+    const right = new Map(codec.decompose(normalizedTo.value).value.map(op => [op.id, JSON.stringify(op)]));
+    return { start: phase.start, end: phase.end, reverse: phase.reverse, sourceLayout: layoutOf(from), targetLayout: layoutOf(to),
+      changed: [...new Set([...left.keys(), ...right.keys()])].filter(id => left.get(id) !== right.get(id)) };
+  }, { layout, anchors });
+  expect(leg.sourceLayout).toBe(anchors ? 'force' : 'grid');
+  expect(leg.targetLayout).toBe(layout);
+  expect(leg.changed).toEqual([anchors ? 'encoding/x' : 'meta/unit/layout']);
+  // Use exact operation boundaries instead of the UI's authored 0.01 step.
+  await page.locator('#progress').evaluate(input => { input.step = 'any'; });
+  return { ...leg, seek: local => page.locator('#progress').fill(String(leg.start + (leg.end - leg.start) * local)) };
+};
+
 test('Unit bar sets horizontal positions before units fall', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/playground.html#unit/bar');
   await ready(page);
@@ -289,13 +594,19 @@ test('Unit bar sets horizontal positions before units fall', async ({ page }) =>
       y: Number(node.getAttribute('cy'))
     }])));
 
+  const leg = await unitLayoutLeg(page, 'bar');
+  await leg.seek(0);
   const start = await geometry();
-  await page.locator('#progress').fill('0.52');
+  await leg.seek(0.52);
   const afterMoveAcross = await geometry();
   const steps = await page.locator('#chart [data-transition-steps]').first()
     .getAttribute('data-transition-steps');
-  await page.locator('#end').click();
+  await leg.seek(1);
   const end = await geometry();
+  await page.locator('#end').click();
+  const completeEnd = await geometry();
+  expect(Object.keys(completeEnd)).toEqual(Object.keys(start));
+  expect(Object.values(completeEnd).every(mark => Number.isFinite(mark.x) && Number.isFinite(mark.y))).toBe(true);
 
   expect(Object.keys(afterMoveAcross)).toEqual(Object.keys(start));
   for (const key of Object.keys(start)) {
@@ -308,16 +619,16 @@ test('Unit bar sets horizontal positions before units fall', async ({ page }) =>
 test('Unit fall uses the direction inferred from successive progress values', async ({ page }) => {
   await page.goto('/docs/.vitepress/dist/playground.html#unit/beeswarm');
   await ready(page);
-  const progress = page.locator('#progress');
+  const leg = await unitLayoutLeg(page, 'beeswarm');
   const positions = () => page.locator('#chart circle.vd-unit').evaluateAll(nodes =>
     nodes.map(node => Number(node.getAttribute('cy'))));
 
-  await progress.fill('0.7');
-  await progress.fill('0.8');
+  await leg.seek(0.7);
+  await leg.seek(0.8);
   const arrivingForward = await positions();
 
-  await progress.fill('0.9');
-  await progress.fill('0.8');
+  await leg.seek(0.9);
+  await leg.seek(0.8);
   const arrivingBackward = await positions();
 
   expect(arrivingBackward).not.toEqual(arrivingForward);
@@ -626,4 +937,45 @@ test('Unit regroup preserves keyed identity and endpoints in both authored direc
   for (const identity of [result.forwardIdentity, result.reverseIdentity]) {
     expect(identity.every(item => item.key === item.sourceKey && item.matchedBy === 'key')).toBe(true);
   }
+});
+
+test('Unit force endpoint cache recognizes a reversed endpoint and resimulates changed anchors on the same host', async ({ page }) => {
+  await page.goto('/tests/fixtures/isolated.html');
+  const result = await page.evaluate(async () => {
+    const { expandUnits, unitLayout } = await import('/dist/charts/unit/state.js');
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const chart = { g: { node: () => group, selectAll: selector => ({ nodes: () => [...group.querySelectorAll(selector)] }) }, innerWidth: 300, innerHeight: 280, width: 340, height: 320, margin: {} };
+    const rows = [{ id: 'a', species: 'A', region: 'east' }, { id: 'b', species: 'A', region: 'west' }, { id: 'c', species: 'B', region: 'east' }, { id: 'd', species: 'B', region: 'west' }];
+    const spec = field => ({ encoding: { x: { field, type: 'nominal' } }, meta: { unit: { layout: 'force', radius: 6 } } });
+    const a = spec('species');
+    const b = spec('region');
+    const units = expandUnits(rows, a);
+    const coordinates = layout => units.map(unit => [layout.x(unit), layout.y(unit)]);
+    const paint = layout => {
+      group.replaceChildren();
+      for (const unit of units) {
+        const mark = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        mark.classList.add('vd-unit'); mark.dataset.key = unit.__unitKey;
+        mark.setAttribute('cx', String(layout.x(unit))); mark.setAttribute('cy', String(layout.y(unit))); mark.setAttribute('r', String(layout.r));
+        group.append(mark);
+      }
+    };
+    const firstA = unitLayout(units, chart, a); paint(firstA);
+    const firstB = unitLayout(units, chart, b); paint(firstB);
+    // The descriptor exists, but visible marks belong to B: A must be solved.
+    const againA = unitLayout(units, chart, a);
+    const recomputed = againA.trajectoryTimeline.length > 1;
+    paint(againA);
+    const secondB = unitLayout(units, chart, b); paint(secondB);
+    // Reverse playback restores A's already solved marks before clean rendering.
+    paint(againA);
+    const reverseA = unitLayout(units, chart, a);
+    return { recomputed, a: coordinates(againA), b: coordinates(firstB), reverse: coordinates(reverseA), reverseTimeline: reverseA.trajectoryTimeline,
+      domains: [firstA.axes.x.scale.domain(), firstB.axes.x.scale.domain()] };
+  });
+  expect(result.recomputed).toBe(true);
+  expect(result.a).not.toEqual(result.b);
+  expect(result.reverse).toEqual(result.a);
+  expect(result.reverseTimeline).toEqual([0]);
+  expect(result.domains).toEqual([['A', 'B'], ['east', 'west']]);
 });

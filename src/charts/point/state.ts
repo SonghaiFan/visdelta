@@ -2,6 +2,9 @@ import { composeIntermediatePolicies, encodingWaypoint } from '../../toolkit/tra
 import type { CanonicalTransitionPair, ChannelSpec, EncodingSpec, IntermediateSpec, ViewSpec } from '../../types/index.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { specState, withSpecMeta } from '../../spec-meta.js';
+import { stableValueKey } from '../../grammar/declaration-operations.js';
+import { normalizePointDeclaration } from './declaration-operations.js';
+import type { PointViewState } from './authoring.js';
 import { colorField } from './encoding.js';
 import { scaleSqrt } from 'd3-scale';
 
@@ -67,6 +70,21 @@ export function canonicalPointTransitionPair<S extends ViewSpec>(
   const nextFlip = pointAxisState(nextSpec)?.['flip'] === true;
   if (previousFlip && !nextFlip) {
     return { from: nextSpec, to: previousSpec, reverse: true };
+  }
+
+  if (nextFlip && !previousFlip) return { from: previousSpec, to: nextSpec, reverse: false };
+
+  // Summary joins have different enter/exit anchors. Compile one fixed route
+  // so an independently authored reverse pair uses the same recorded frames.
+  if (previousIsSummary && nextIsSummary) {
+    const strictSubset = (a: string[], b: string[]) => a.length < b.length && a.every(field => b.includes(field));
+    if (strictSubset(previousGroup, nextGroup)) return { from: previousSpec, to: nextSpec, reverse: false };
+    if (strictSubset(nextGroup, previousGroup)) return { from: nextSpec, to: previousSpec, reverse: true };
+    const previousKey = stableValueKey(normalizePointDeclaration(previousSpec as unknown as PointViewState));
+    const nextKey = stableValueKey(normalizePointDeclaration(nextSpec as unknown as PointViewState));
+    if (previousKey.status === 'ok' && nextKey.status === 'ok' && previousKey.value > nextKey.value) {
+      return { from: nextSpec, to: previousSpec, reverse: true };
+    }
   }
 
   return { from: previousSpec, to: nextSpec, reverse: false };
