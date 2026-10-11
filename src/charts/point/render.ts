@@ -71,7 +71,7 @@ class PointChart extends BaseChart<PointViewState> {
     const viewYField = viewEnc.y?.field ?? '';
     const viewRows = state.view
       ? applyTransforms(chart.sourceRows ?? [], state.view.transform || [])
-      : rows;
+      : chart.sharedDomains ? domainRows : rows;
     const connector = resolvePointConnector(spec, viewEnc);
     const selection = viewSelection(spec);
     const movesPoints = state.detailMode === 'detail' && !state.view;
@@ -84,7 +84,7 @@ class PointChart extends BaseChart<PointViewState> {
     const t = chart.transition.base;
     const fallbackRadius = Number.isFinite(Number(spec.size))
       ? Number(spec.size)
-      : defaultPointRadius(rows.length);
+      : defaultPointRadius(chart.sharedDomains ? domainRows.length : rows.length);
     const baseRadius = radiusScale(domainRows, enc.size, fallbackRadius, quantitativeDomain);
     const largestRadius = domainRows.reduce(
       (largest, row) => Math.max(largest, baseRadius(row)),

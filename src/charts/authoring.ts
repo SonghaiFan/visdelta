@@ -1,3 +1,7 @@
+import { validateFacetLayout } from './facet-layout.js';
+import { defineChartModule } from './module.js';
+import type { FacetLayout, FacetedViewState } from '../facet.js';
+import type { ChartModule } from './module.js';
 import { serializeViewSpec } from '../spec-meta.js';
 import { ViewState, cloneState } from '../grammar/view-state.js';
 import { titleize } from '../labels.js';
@@ -51,6 +55,26 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
   /** Chart subclasses override this without importing the global chart manifest. */
   protected compileSpec(spec: ViewSpec): ViewSpec {
     return spec;
+  }
+
+  /** Repeat this chart per field value, with shared scales and one controller. */
+  repeat(field: string, layout: FacetLayout = {}): ChartState<FacetedViewState> & { chartModule(): ChartModule<any> } {
+    if (!field.trim()) throw new Error('Repeat requires a grouping field.');
+    validateFacetLayout(layout);
+    if (this.state.encoding?.facet) {
+      return this.with({ encoding: { facet: { field, type: 'nominal' } }, facetLayout: layout } as unknown as Partial<S>) as unknown as ChartState<FacetedViewState> & { chartModule(): ChartModule<any> };
+    }
+    const owner = this as unknown as { chartModule?: () => ChartModule<any> };
+    if (typeof owner.chartModule !== 'function') throw new Error('Repeat requires a chart state carrying its chart module.');
+    const childModule = owner.chartModule();
+    const child = this.toSpec();
+    const key = `faceted-${childModule.key}`;
+    const module = defineChartModule({ key, async load() {
+      const [{ plugin }, { createFacetPlugin }] = await Promise.all([childModule.load(), import('./facet.js')]);
+      return { plugin: createFacetPlugin(key, child.mark!, plugin) };
+    } });
+    class RepeatedState extends ChartState<FacetedViewState> { chartModule() { return module; } }
+    return new RepeatedState({ ...child, mark: key, encoding: { ...child.encoding, facet: { field, type: 'nominal' } }, facetLayout: { ...layout } });
   }
 
   data(data: unknown): this {

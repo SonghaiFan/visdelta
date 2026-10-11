@@ -26,3 +26,13 @@ export function legendLayout(labels: string[], availableWidth: number, swatch: n
   });
   return { items, height: labels.length ? (row + 1) * rowHeight : 0, width: Math.max(0, ...widths) };
 }
+
+
+export interface LegendEntry { value: unknown; label: string }
+
+export function legendEntries(rows: RenderDatum[], channel: RenderChannel): LegendEntry[] {
+  return legendDomain(rows, channel).map((value) => ({
+    value,
+    label: legendLabel(value, channel)
+  }));
+}

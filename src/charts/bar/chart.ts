@@ -1,3 +1,6 @@
+import { validateFacetLayout } from '../facet-layout.js';
+import { canonicalFacetPair } from '../facet-motion.js';
+import { createRepeatedBarRenderer } from './repeat-render.js';
 import { createBarRenderer } from './render.js';
 import { cloneSpec, uniqueTokens } from '../../runtime/utils.js';
 import type {
@@ -13,7 +16,6 @@ import {
   resolveBarTransitionPlan
 } from './state.js';
 import { semanticBarState } from './semantic.js';
-import type { BarTransitionPlan } from './plan.js';
 
 export interface BarSpec extends ViewSpec {
   mark: 'bar';
@@ -24,21 +26,36 @@ export function createBarChart(runtime: ChartRuntime, presentation: ChartPresent
 
   return {
     key: 'bar',
-    renderer,
+    renderer: createRepeatedBarRenderer(runtime, presentation, renderer, prepareBarSpec),
     prepareSpec: prepareBarSpec,
     defaultMarkKey: (spec) => {
       const state = semanticBarState(spec);
       return [state.categoryField, state.segmentField].filter((field): field is string => Boolean(field));
     },
-    resolveTransitionPlan: resolveBarTransitionPlan as (prev: BarSpec | null, next: BarSpec | null) => BarTransitionPlan,
-    canonicalTransitionPair: canonicalBarTransitionPair,
-    intermediateSpecs: barIntermediateSpecs as (prev: BarSpec, next: BarSpec) => IntermediateSpec<BarSpec>[],
+    resolveTransitionPlan: (prev, next) => Boolean(prev?.encoding?.facet) !== Boolean(next?.encoding?.facet) ? {} : resolveBarTransitionPlan(prev, next),
+    canonicalTransitionPair: (from, to) => {
+      if (!from.encoding?.facet && !to.encoding?.facet) return canonicalBarTransitionPair(from, to);
+      if (from.encoding?.facet?.field === to.encoding?.facet?.field && from.encoding?.facet && JSON.stringify(from.facetLayout) !== JSON.stringify(to.facetLayout)) return canonicalFacetPair(from,to);
+      // Repeated flips replay one canonical geometry route in either direction.
+      // Prefer the endpoint carrying authored vertical axis controls; otherwise
+      // the horizontal endpoint carries the flip order.
+      if (from.encoding?.facet && to.encoding?.facet &&
+          JSON.stringify(from.facetLayout) === JSON.stringify(to.facetLayout) &&
+          semanticBarState(from).orientation !== semanticBarState(to).orientation) {
+        const vertical = semanticBarState(from).orientation === 'vertical' ? from : to;
+        const target = semanticBarState(vertical).axis ? vertical : (vertical === from ? to : from);
+        return target === to ? { from, to, reverse: false } : { from: to, to: from, reverse: true };
+      }
+      return { from, to, reverse: false };
+    },
+    intermediateSpecs: (from, to) => from.encoding?.facet || to.encoding?.facet ? [] : barIntermediateSpecs(from, to) as IntermediateSpec<BarSpec>[],
     scenes: ['selection', 'axis', 'detail', 'mapping']
   };
 }
 
 function prepareBarSpec(spec: BarSpec): BarSpec {
   if (spec.mark !== 'bar') return spec;
+  if (spec.encoding?.facet) validateFacetLayout((spec.facetLayout ?? {}) as import('../../facet.js').FacetLayout);
 
   const next = cloneSpec(spec) as BarSpec;
   const enc = (next.encoding ?? {}) as Record<string, { type?: string; field?: string; aggregate?: string | boolean; timeUnit?: string }>;

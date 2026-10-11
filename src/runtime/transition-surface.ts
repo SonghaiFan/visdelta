@@ -35,7 +35,7 @@ export interface TransitionSurface {
   commitMount(): void;
   rollbackMount(): void;
   progress(value: number, direction?: number): void;
-  resize(): void;
+  resize(height?: number): void;
   destroy(): void;
 }
 
@@ -99,6 +99,7 @@ export function createTransitionSurface(
   let previousChildren: Node[] = Array.from(host.childNodes);
   host.replaceChildren(root);
   let layoutDirty = true;
+  let requestedHeight = options.height;
 
   function compileFrames(): FrameEvaluator {
     disposeScene();
@@ -171,7 +172,14 @@ export function createTransitionSurface(
     progress(value, direction = 0) {
       hideTooltip(shell.tooltip);
       if (layoutDirty) {
-        config.margin = invariantTransitionMargin(chartType, layoutStates, node.clientWidth || 720, config.height!);
+        const width = node.clientWidth || 720;
+        const baseHeight = requestedHeight ?? from.height ?? to.height ?? 500;
+        config.margin = invariantTransitionMargin(chartType, layoutStates, width, baseHeight);
+        config.height = requestedHeight != null || from.height != null || to.height != null ? baseHeight
+          : Math.max(baseHeight, ...layoutStates.map(spec => chartType.defaultHeight?.(spec, {
+            width, height: baseHeight, rows: applyTransforms(viewRows(spec.data, {}) as DataRow[], spec.transform ?? [])
+          }, { ...spec.margin, ...config.margin }) ?? baseHeight));
+        config.margin = invariantTransitionMargin(chartType, layoutStates, width, config.height);
         layoutDirty = false;
       }
       value = canonicalProgress(value);
@@ -199,7 +207,7 @@ export function createTransitionSurface(
         }
       }
     },
-    resize() { cached = null; layoutDirty = true; },
+    resize(height) { if (height != null) requestedHeight = height; cached = null; layoutDirty = true; },
     destroy() { cached = null; disposeScene(); root.remove(); }
   };
 }

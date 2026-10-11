@@ -9,3 +9,6 @@ export { unit, UNIT_LAYOUTS, UnitState } from '../charts/unit/grammar.js';
 export type { UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from '../charts/unit/grammar.js';
 export { diffViewStates } from './diff.js';
 export { inferTransition } from './infer-transition.js';
+
+export { pie, PieState } from '../charts/pie/authoring.js';
+export type { PieViewState } from '../charts/pie/authoring.js';

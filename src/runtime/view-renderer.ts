@@ -1,3 +1,4 @@
+import { reportVisualizationWarnings } from './warnings.js';
 import type { BaseType, Selection } from 'd3-selection';
 import { applyTransforms } from '../data/transforms.js';
 import { resolveIntermediateSpecs, resolveTransitionRoute } from '../charts/transition-route.js';
@@ -246,6 +247,7 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const source = viewRows(renderSpec.data, datasets) as DataRow[];
   const transforms = renderSpec.transform || [];
   const rows = applyTransforms(source, transforms) as RenderDatum[];
+  reportVisualizationWarnings(node, chartType?.warnings?.(renderSpec, rows) ?? []);
   attachDatumIdentity(rows, compileLineage(source, transforms, {
     key: specDatumKey(renderSpec) ?? undefined
   }));
@@ -267,7 +269,12 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
 
   const width = Math.max(60, node.clientWidth || 720);
   const layoutSpec = effectiveViewSpec as ViewLayoutSpec;
-  const height = viewConfig.height || layoutSpec.height || 500;
+  const baseHeight = viewConfig.height ?? layoutSpec.height ?? 500;
+  const height = viewConfig.height != null || layoutSpec.height != null ? baseHeight
+    : chartType?.defaultHeight?.(renderSpec, { width, height: baseHeight, rows }, {
+      ...chartType.defaultMargin(renderSpec, { width, height: baseHeight, rows: domainRows }),
+      ...layoutSpec.margin, ...viewConfig.margin
+    }) ?? baseHeight;
   resizeScene(scene, width, height);
 
   const rendererKey = resolveMarkRendererKey(renderSpec);

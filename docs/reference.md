@@ -306,11 +306,30 @@ their intermediate values add up to an endpoint value.
 
 ```ts
 .baseline(number)
+.labels("inside" | "none")
 .curve(d3AreaCurveName)
 .connect("adjacent" | "across")
 .breakdown(field, options?)
 .layout("stacked" | "stream", { offset?, order? })
 .rollup(options?)
+```
+
+Area labels default to `"none"`. `.labels("inside")` identifies stacked and
+stream layers using their existing series values; it adds no field binding.
+The renderer measures text and searches up to 64 observation centers, preferring
+the plot center. It checks a padded text rectangle against the actual cell fills
+on a two-pixel grid, preserving gaps and curved boundaries. Labels that cannot
+fit are omitted, and moving labels are checked again during playback. Text uses
+black or white according to the underlying fill. Single/rolled-up areas have no
+series labels. Custom label text, outside placement and callouts are unsupported.
+The color legend remains governed by its existing `legend` option, so it can
+identify thin layers whose direct labels are omitted. Label placement is
+recomputed on resize.
+
+```js
+area(rows).x("year").y("revenue")
+  .breakdown("businessLine").color("businessLine")
+  .labels("inside");
 ```
 
 ### `bar(data?)`
@@ -586,6 +605,7 @@ change.progress(0.5);
 change.play({ duration: 800, from: 0, to: 1 });
 change.pause();
 change.resize();
+change.resize({ height: 640 }); // Explicit canvas height; retain current progress.
 change.destroy();
 ```
 
@@ -644,7 +664,7 @@ chart stays visible until the next one is ready. For several adjacent states,
 | --- | --- |
 | `visdelta` | All built-in charts, `delta`, `transition`, `sequence`, data types, styles, and registration |
 | `visdelta/core` | DOM-free state/difference helpers plus camera math |
-| `visdelta/area`, `/bar`, `/line`, `/point`, `/unit` | One focused chart builder and module |
+| `visdelta/area`, `/bar`, `/line`, `/pie`, `/point`, `/unit` | One focused chart builder and module |
 | `visdelta/transition` | Pair and sequence controllers |
 | `visdelta/plugins` | Chart-module definition and registration |
 | `visdelta/toolkit` | Optional compiler tools, renderer base, and plot-style composition |
@@ -668,3 +688,209 @@ declare their complete `stateOrder` and handlers; no default pipeline is added.
 - Declared transforms execute within VisDelta; no table-library installation is required.
 - Data cleaning is outside the library.
 - Controls call `progress()` from outside the library.
+
+## Visualization warnings
+
+Rendering automatically emits advisory `console.warn` messages. Charts still
+render; declarations and transition plans are unchanged. Consecutive identical
+warning lists are deduplicated per host. A changed list is also exposed as a
+bubbling `visdelta:warnings` event (`event.detail` is the warning array) and JSON
+in the chart scene element's `data-visdelta-warnings` attribute (inside the target). The event bubbles to the target. An empty array clears the last
+reported diagnostics. These describe evaluated chart states, not every animation
+frame; cached playback need not re-evaluate a state.
+
+Inspect without rendering:
+
+```js
+import { bar, visualizationWarnings } from 'visdelta';
+
+const chart = bar([{ category: 'A', value: 12 }, { category: 'B', value: 14 }])
+  .x('category')
+  .y('value', { domain: [10, 20] });
+const warnings = await visualizationWarnings(chart);
+// warnings[0].code === 'bar.truncated-baseline'
+```
+
+`visualizationWarnings(visualization, datasets = {})` returns a promise of
+`VisualizationWarning[]`. Builders carry their chart module; plain specs require
+an explicitly registered chart module/type, just like transitions. Named data
+can be supplied in `datasets`; the inspection does not fetch remote data.
+Warnings include `code`, `severity: 'warning'`, `message`, `suggestion`,
+`evidence`, an optional `field`, and an optional `source` URL for the design guide. Plugins declare an optional pure
+`warnings(spec, rows)` inspector through `defineChartType`. It receives prepared
+specs and transformed rows. Plugins without this hook return no warnings.
+
+| Code | Trigger | Suggested response |
+| --- | --- | --- |
+| `bar.too-many-stacked-columns` | More than 10 observed categories in vertical stacked bars | Consider horizontal bars, dots or a table |
+| `point.too-many-dots-per-category` | More than 3 finite observations per category with one categorical and one quantitative axis; excludes summary/detail views | Filter or split comparisons; 4–5 dots can still be appropriate |
+| `bar.truncated-baseline` | Explicit two-ended measure domain still excludes zero after renderer nicing, including flipped bars | Include zero or use dots |
+| `connection.unordered-axis` | Line/Area x channel is nominal, inferred or declared | Use bars/dots, or declare ordinal if order is meaningful |
+| `color.too-many-categories` | More than 5 observed nominal/ordinal values share a color channel, in any built-in chart | Consider grouping, filtering or using small multiples; colors and legend entries remain unchanged |
+| `line.too-many-series` | More than 10 actual series | Filter, highlight or use small multiples |
+| `area.too-many-series` | More than 6 actual layers | Reduce layers or use lines |
+| `connection.smoothing` | Natural/cardinal interpolation with at least three distinct x observations in a series (Line/Area) | Consider linear or monotone interpolation; inspect between observations |
+| `area.nonzero-baseline` | Single area with a nonzero fill baseline | Use a line, or explain the threshold and excess explicitly |
+| `area.negative-components` | Multiple layers with negative y values | Consider lines or diverging bars |
+| `pie.too-many-slices` | More than four slices | Consider bars or explicitly group minor components |
+| `pie.simple-share` | One or two slices | Consider stating the percentage directly |
+| `point.small-sample` | 1–4 finite observations on two quantitative axes | Show sample size; avoid strong relationship conclusions |
+| `point.coincident-positions` | Finite observations on two quantitative axes have identical x/y positions | Inspect overlap; consider transparency or aggregation |
+| `point.negative-size` | Negative values in a mapped bubble-size field | Use position for signed values |
+
+Counts use the transformed rows, so filtering and aggregation affect advice.
+The numeric thresholds are VisDelta heuristics, not universal perceptual laws.
+Ordinal author declarations are respected; sorting nominal labels alone does
+not establish semantic order. Dot plots are not treated as scatterplots.
+Focused line y ranges do not automatically warn.
+
+These rules translate the expressiveness/effectiveness principles in
+*introduction-what-why-how.tex* and the chart design guides in
+*visualisation-of-table-datasets.tex* (Monash teaching materials). The latter's
+Bar, Line, Area, Scatterplot and Bubble Plot sections motivate the chart rules;
+its category-discrimination guidance motivates the color warning.
+
+See [Design comparisons](./design-guides.md) for explanations, exceptions and linked Datawrapper guidance.
+
+The [Datawrapper line guide](https://www.datawrapper.de/academy/what-to-consider-when-creating-line-charts)
+informs interpolation advice, and its [area guide](https://www.datawrapper.de/academy/what-to-consider-when-creating-area-charts)
+informs baseline advice. Gallery viewers display the same system warnings with
+source links. These are suggestions, including for deliberately authored
+threshold-band examples; declarations and rendering remain unchanged.
+
+Unsupported automatic judgements include author intent, causal claims,
+importance of a variable, precise-share comparison goals, annotation quality,
+label collisions, near-overlap in pixel space, palette accessibility, and whether pie slices represent a complete, mutually exclusive whole. Bubble-radius scaling and
+nonzero minimum-radius effects are not assessed by these warnings. No universal
+warning is emitted merely for using a stack, a focused line scale or a bubble
+chart. Advice requiring these contexts remains a manual design review.
+
+
+### Default categorical colors
+
+With `.color("category")`, each value in the color domain keeps its own color
+assignment and legend entry. More than five observed categories trigger
+`color.too-many-categories`; the warning does not change the chart, merge
+categories, or introduce an `others` entry.
+
+Colors follow explicit `domain` order when supplied, otherwise the existing
+data-domain order. Default stacked Area color uses its ranked series order
+when no color domain or palette is supplied. Other charts do not automatically
+rank color categories by value. Filtering retains the existing full-domain
+color assignment and all legend entries; marks that remain do not acquire a
+different palette slot. Layout measures the same legend that is drawn,
+including on narrow screens.
+
+Provide an explicit `range` or `scheme` to control the colors assigned to
+categories:
+
+```js
+const compact = point(rows).x("income").y("health").color("region");
+const fullPalette = compact.color("region", { scheme: "Tableau10" });
+```
+
+Quantitative gradients, constant color and composite hue/luminance encodings
+are unchanged. The category-count warning is advisory and does not alter the
+palette or collapse categories. Chart-specific series-count warnings can also
+apply because the number of lines or layers has not changed.
+
+
+### Default stacked Area ranking
+
+Ordinary stacked Area places series with larger total y values nearer the
+baseline. Totals span the full data domain used by the chart, not just the last
+time point. Ties keep first appearance order. One fixed order applies across
+all x positions; trailing display filters retain the full-domain ranking.
+The positive and negative accumulators remain separate.
+
+When color maps the stacked series with no explicit domain or palette, its
+legend and default categorical colors follow this ranking. No color encoding
+is invented for an uncolored stack. Explicit color domains, ranges and schemes
+retain their assignments. Stream layouts retain their declared D3 order and
+offset. To keep input layer order with a fixed baseline, use the existing
+`.layout("stream", { offset: "none", order: "none" })` after `breakdown()`.
+Ranking is derived geometry, not an extra declaration operation.
+
+## Pie module
+
+Import `pie` from `visdelta` or `visdelta/pie`. [Pie grammar and limits](./chart-types.md#pie)
+cover `.value()`, `.label()` and `.labels()`. The quantitative angle binding
+uses raw nonnegative values normalized by their positive total; positional
+scales and domains do not apply. Pie supports keyed direct motion and the
+existing warning API, with no automatic declaration route or chart bridge.
+
+## Native small multiples
+
+See [Repeat](./repeat.md) for the core syntax and live forward/reverse demo.
+
+`chart.repeat(field, { direction, scales, columns, gap, minWidth })` partitions the chart's
+transformed rows by a nominal field. It returns one immutable chart state with
+one SVG, titled panels, panel ticks, shared axis titles, configurable numeric domains and one transition
+controller. It carries the underlying chart module and loads its renderer through
+plugin contracts. No source rows are aggregated or discarded by faceting.
+
+```js
+import { bar } from 'visdelta/bar';
+
+const chart = bar(rows)
+  .x('category').y('value').key('category').color('component')
+  .repeat('component', { columns: 2, gap: 24, minWidth: 180 });
+```
+
+The default is at most two columns, a 24-pixel gap, and a 240-pixel minimum panel
+width. Calling `.repeat()` again replaces the panel binding and updates the supplied
+layout options without nesting panels. Narrow containers reduce the column count.
+Repeat keeps the canvas height by default. Set `autoHeight: true` to grow the
+canvas to fit all panel rows, with `minHeight` (default 240) pixels per complete
+panel plus gaps and outer margins. Explicit chart or transition `height` takes
+priority. A transition reserves the maximum route-state height at the current
+width, keeping that height fixed throughout playback.
+`.with({ facetLayout: { columns: 1 } })` changes the layout immutably.
+Standalone transition controllers automatically observe container width and
+rebuild the current frame without changing progress, direction or the playback
+clock. `.resize()` also supports explicit refreshes. See [Repeat](./repeat.md)
+for sizing rules.
+
+Panel identity uses the typed grouping value; mark identity remains local to
+its panel. A color binding to the panel field becomes its common-domain color
+inside that panel, whose title replaces the redundant legend. Other legends stay
+within panels. Child warnings are reported per panel. Missing, null or nonscalar
+facet values are rejected. Grouping follows first occurrence in transformed rows.
+
+The facet binding is Encoding (`bind`, `unbind`, `remap`); panel direction, columns,
+gap and minimum width are Layout `rearrange`. Changing numeric scale sharing emits
+Coordinate `rescale` for quantitative positional channels. Faceting preserves the child's authored channels and
+transforms. Numeric domains use the complete transformed data through the child
+renderer; categorical domains are shared explicitly. Authored domains retain
+priority. `direction: "y"` places one panel per row; `"x"` places one per column;
+`"grid"` (default) uses responsive columns. `scales: "shared"` (default) shares numeric
+domains; `"independent"` derives each panel's numeric domain from its own rows.
+Categorical positions and colors remain consistent. Independent scales make
+within-panel patterns easier to inspect, but lengths cannot be compared across
+panels. Explicit numeric domains still take priority.
+
+Bars keep `mark: "bar"` and their Bar builder when repeated. A stacked Bar can
+transition directly to `.repeat()` and back: keyed segments use the ordinary Bar coordinate order. Each x stage updates
+x and width; each y stage updates y and height. Vertical Bars default to x then
+y, horizontal Bars to y then x, and authored axis order takes priority. Width
+and height never resize together in one stage. Reverse follows the same
+frames backward. These are motion stages within one route leg, not additional
+state-change categories or generated declaration waypoints. Guides fade as the final scale settles. Both endpoints are
+actual Bar renders. This bridge requires unchanged mark membership and grain,
+unique keys across panels for flat/repeated mode changes. Repeated layout changes
+retain each keyed panel as a container: the first half moves its x/width and
+y/height in separate stages, with child coordinates, ticks and grid resizing together; the
+second half runs the child plugin's internal motion. This requires unchanged
+panel membership. Columns-to-rows is canonical; reverse restores child geometry
+before moving containers back. Combining expansion or rearrangement
+with reorientation is unsupported; use separate sequence legs. Membership changes with flat/repeated mode changes remain unsupported. Bar repeat
+uses a chart-owned direct route, rather than declaration-operation planning.
+Lines also keep `mark: "line"` and the Line builder. Ordinary Line ↔ `.repeat()`
+uses a chart-owned direct layout route: separate container coordinate stages
+first, then child chart reflow. Ticks, grid and observations share each frame;
+reverse replays that route backward. Repeat the existing breakdown field and
+retain observations, series membership, globally unique observation keys,
+x/y bindings and declared domains. Shared and independent numeric scales are
+supported. Other chart modules currently support facet-to-facet transitions through
+their composite module; their flat-to-repeat bridge remains unsupported. Nested facets
+and declaration-operation planning for composite states are unsupported.

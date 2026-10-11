@@ -109,6 +109,21 @@ export function quantitativeDomain(rows: RenderDatum[], channel: RenderChannel =
   return niceExtent(rows, channel.field, floor);
 }
 
+/**
+ * Measure domain for marks drawn from a baseline. An authored domain wins;
+ * otherwise both the baseline and every value stay visible, so a bar can
+ * extend below zero instead of being clipped by the floor.
+ */
+export function baselineDomain(rows: RenderDatum[], channel: RenderChannel = {}, baseline = 0): number[] {
+  if (Array.isArray(channel.domain)) return channel.domain as number[];
+  const key = channel.field ?? '';
+  const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+  if (!values.length) return [0, 1];
+  const min = Math.min(baseline, ...values);
+  const max = Math.max(baseline, ...values);
+  return min === max ? [min - 1, max + 1] : [min, max];
+}
+
 export function channelDomain(rows: RenderDatum[], channel: RenderChannel = {}): unknown[] {
   if (Array.isArray(channel.domain)) return channel.domain;
   const field = channel.field ?? '';

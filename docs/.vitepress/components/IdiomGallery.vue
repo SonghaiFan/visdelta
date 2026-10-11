@@ -19,6 +19,7 @@ const viewer = ref(null);
 const viewerStage = ref(null);
 const openId = ref(null);
 const viewerStatus = ref('');
+const viewerWarnings = ref([]);
 
 const filtered = computed(() => {
   const terms = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -30,6 +31,17 @@ const groups = computed(() => idiomGroups
   .filter(group => group.idioms.length));
 const current = computed(() => idioms.find(idiom => idiom.id === openId.value) ?? null);
 const currentIndex = computed(() => filtered.value.findIndex(idiom => idiom.id === openId.value));
+const designGuides = {
+  bar: { url: 'https://www.datawrapper.de/academy/what-to-consider-when-creating-stacked-column-charts',
+    text: 'Compare totals or the bottom segment in a stack. Use grouped bars or dots when comparing individual components is the goal.' },
+  line: { url: 'https://www.datawrapper.de/academy/what-to-consider-when-creating-line-charts',
+    text: 'Use connected observations for a meaningful order. Keep comparison series subdued and check smoothing against observed values.' },
+  area: { url: 'https://www.datawrapper.de/academy/what-to-consider-when-creating-area-charts',
+    text: 'Use stacks when the combined total and its parts both matter. Use lines for precise component comparisons; a moving baseline supports shape and thickness comparisons.' },
+  point: { url: 'https://www.datawrapper.de/academy/examples-of-datawrapper-dot-charts',
+    text: 'Position supports precise comparisons. Use a range or connector when the difference between paired values matters.' }
+};
+const designGuide = computed(() => designGuides[current.value?.mark]);
 const currentGroup = computed(() => idiomGroups.find(group => group.mark === current.value?.mark));
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
@@ -138,9 +150,13 @@ async function openIdiom(idiom) {
   await nextTick();
   const version = ++viewerVersion;
   viewerStatus.value = 'Rendering';
+  viewerWarnings.value = [];
   try {
     const state = await evaluate(idiom);
+    const { visualizationWarnings } = await import('../../../dist/warnings.js');
+    const advice = await visualizationWarnings(state);
     if (version !== viewerVersion || disposed) return;
+    viewerWarnings.value = advice;
     const host = document.createElement('div');
     host.className = 'idiom-viewer-candidate';
     viewerStage.value.append(host);
@@ -308,6 +324,18 @@ onBeforeUnmount(() => {
             <p v-if="viewerStatus" class="idiom-viewer-status" :role="viewerStatus === 'Rendering' ? 'status' : 'alert'">{{ viewerStatus }}</p>
           </div>
           <aside class="idiom-viewer-side">
+            <div v-if="viewerWarnings.length" class="idiom-guidance" aria-label="Design hints">
+              <p class="ui-label">Design hints · chart remains available</p>
+              <div v-for="hint in viewerWarnings" :key="hint.code">
+                <p>{{ hint.message }} {{ hint.suggestion }}</p>
+                <a v-if="hint.source" :href="hint.source" target="_blank" rel="noopener">Datawrapper guide ↗</a>
+              </div>
+            </div>
+            <div v-if="designGuide" class="idiom-guidance">
+              <p class="ui-label">Choosing this chart</p>
+              <p>{{ designGuide.text }}</p>
+              <a :href="designGuide.url" target="_blank" rel="noopener">Datawrapper guide ↗</a>
+            </div>
             <DocsCodeBlock :code="current.code" language="js" />
             <p class="idiom-viewer-data">
               <span class="ui-label">rows</span>

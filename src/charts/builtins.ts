@@ -4,6 +4,7 @@ import type { ChartModule } from './module.js';
 import { chartModule as area } from "./area/module.js";
 import { chartModule as bar } from "./bar/module.js";
 import { chartModule as line } from "./line/module.js";
+import { chartModule as pie } from "./pie/module.js";
 import { chartModule as point } from "./point/module.js";
 import { chartModule as unit } from "./unit/module.js";
 
@@ -12,6 +13,7 @@ export const builtInChartModules: ChartModule<any>[] = [
   area,
   bar,
   line,
+  pie,
   point,
   unit
 ];

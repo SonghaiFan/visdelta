@@ -10,8 +10,8 @@ import GettingStartedDemo from '../components/GettingStartedDemo.vue';
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
-    app.component('OrbitPluginDemo', defineAsyncComponent(
-      () => import('../components/OrbitPluginDemo.vue')
+    app.component('PiePluginDemo', defineAsyncComponent(
+      () => import('../components/PiePluginDemo.vue')
     ));
     app.component('SyntaxPlayground', defineAsyncComponent(
       () => import('../components/SyntaxPlayground.vue')
@@ -34,6 +34,15 @@ export default {
     ));
     app.component('IdiomGallery', defineAsyncComponent(
       () => import('../components/IdiomGallery.vue')
+    ));
+    app.component('RepeatMotionDemo', defineAsyncComponent(
+      () => import('../components/RepeatMotionDemo.vue')
+    ));
+    app.component('PieMotionDemo', defineAsyncComponent(
+      () => import('../components/PieMotionDemo.vue')
+    ));
+    app.component('DesignComparisons', defineAsyncComponent(
+      () => import('../components/DesignComparisons.vue')
     ));
     app.component('DesignTokens', defineAsyncComponent(
       () => import('../components/DesignTokens.vue')

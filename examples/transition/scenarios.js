@@ -1,3 +1,4 @@
+import { repeatScenario } from '../repeat-scenario.js';
 import { transitionScenario } from '../scenario.js';
 
 // Keep these pairs aligned with tests/browser/transition.spec.mjs.
@@ -101,5 +102,6 @@ export const scenarios = [
   sample('grouped-merge', '12 · Merge grouped ages', 'Move the six-state grouped detail back into population totals.', segmentedFeatured, 'detailed.layout("grouped")', 'detailed.rollup()'),
   sample('focus', '13 · Focus the view', 'Fit one camera around New York and Pennsylvania. Keep all 52 observations, the complete ordered state scale, and every state between the two anchors.', populationFocus, 'under10', 'under10.focus({ field: "state", oneOf: FOCUS_ANCHORS })'),
   sample('reaggregate', '14 · Split → move → merge', 'Regroup the same four source records from totals by year to totals by location. VisDelta identifies and composes split, update, and merge stages automatically.', lineageReaggregation, 'byYear', 'byLocation'),
-  sample('appearance', '15 · Restyle bars', 'Change one authored constant bar color without changing data, grain, encoding, coordinates, or layout.', population, 'featured.color("#111111")', 'featured.color("#2f64ff")')
+  sample('appearance', '15 · Restyle bars', 'Change one authored constant bar color without changing data, grain, encoding, coordinates, or layout.', population, 'featured.color("#111111")', 'featured.color("#2f64ff")'),
+  repeatScenario('bar')
 ];

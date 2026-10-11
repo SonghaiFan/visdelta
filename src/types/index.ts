@@ -1,3 +1,18 @@
+/** Advisory only: never changes state, validity or transition planning. */
+export interface VisualizationWarning {
+  code: string;
+  severity: 'warning';
+  message: string;
+  suggestion: string;
+  /** Optional design-guide source for this advisory. */
+  source?: string;
+  field?: string;
+  evidence: Record<string, string | number | boolean>;
+}
+
+export type ChartWarningInspector<S extends ViewSpec = ViewSpec> =
+  (spec: S, rows: readonly Record<string, unknown>[]) => VisualizationWarning[];
+
 // ─── Channel & Encoding ──────────────────────────────────────────────────────
 
 export type ChannelType = 'quantitative' | 'temporal' | 'nominal' | 'ordinal';
@@ -28,12 +43,18 @@ export interface ChannelSpec {
 }
 
 export interface EncodingSpec {
+  /** Small-multiple panel binding; preserves rows within each panel. */
+  facet?: ChannelSpec;
   x?: ChannelSpec;
   y?: ChannelSpec;
   color?: ChannelSpec;
   /** Declares grouping/detail identity without assigning a visual property. */
   detail?: ChannelSpec;
   size?: ChannelSpec;
+  /** Pie slice magnitude; finite, nonnegative values only. */
+  angle?: ChannelSpec;
+  /** Pie slice label binding. */
+  label?: ChannelSpec;
   xOffset?: ChannelSpec;
   yOffset?: ChannelSpec;
   tooltip?: ChannelSpec | ChannelSpec[];
@@ -504,6 +525,8 @@ export interface ChartContext {
   margin: MarginSpec;
   sourceRows?: DataRow[];
   domainRows?: DataRow[];
+  /** A compositor requests positional domains from domainRows across panels. */
+  sharedDomains?: boolean;
   /** Focus camera the chart resolved for this render; the runtime mirrors it on the scene. */
   camera?: import('../focus.js').FocusCamera | null;
   [key: string]: unknown;
@@ -626,9 +649,12 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   key: string;
   /** Opt in only when all animated SVG properties can be captured and sought. */
   transitionEvaluation?: 'cached' | 'reconstruct';
+  warnings?: ChartWarningInspector<S>;
   renderer: Renderer<S>;
   prepareSpec(spec: S): S;
   defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;
+  /** Optional chart-owned content height, used only without an explicit height. */
+  defaultHeight?(spec: S, viewport: ChartViewport, margin: Partial<MarginSpec>): number;
   /** Chart-owned default object identity. Explicit `.key()` overrides it in Core. */
   defaultMarkKey?(spec: S): import('../identity/mark-correspondence.js').MarkKeySpec | null;
   readonly scenes: readonly string[];

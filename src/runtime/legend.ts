@@ -1,13 +1,11 @@
-import { scaleOrdinal } from 'd3-scale';
-import type { AxisDomain } from 'd3-axis';
 import { motion } from './recorder.js';
-import { legendDomain, legendLabel, legendLayout } from './legend-layout.js';
+import { legendEntries, legendLayout } from './legend-layout.js';
 import { createTextMeasure } from './text-measure.js';
 import type { RenderContext, RenderChartContext, RenderDatum, RenderChannel } from './render-types.js';
 import type { ThemeValue } from './theme.js';
 import type { createColors } from './colors.js';
 export function createLegend(context: RenderContext, themeValue: ThemeValue, colors: ReturnType<typeof createColors>) {
-  const { resolveColorChannel, compositeColorScale, quantitativeColorScale, colorRange, schemeRange, categoricalRange, themeColor, fallbackColor: DEFAULT_LUMINANCE_BASE } = colors;
+  const { resolveColorChannel, colorScale } = colors;
   function drawLegend(
     chart: RenderChartContext,
     rows: RenderDatum[],
@@ -26,24 +24,13 @@ export function createLegend(context: RenderContext, themeValue: ThemeValue, col
         ? activeChannel.luminance
         : activeChannel;
     const legendField = legendChannel.field!;
-    const quantitativeLegend = legendChannel.type === 'quantitative';
-    const domain = legendDomain(colorRows, legendChannel);
-    const fieldRegistry = !activeChannel.range && !activeChannel.hue && !activeChannel.luminance && !quantitativeLegend
-      ? context.colors?.get(legendField)
-      : null;
-    const scale = activeChannel.hue || activeChannel.luminance
-      ? compositeColorScale(activeChannel)
-      : quantitativeLegend
-        ? quantitativeColorScale(colorRows, legendChannel)
-        : fieldRegistry
-          ? (value: unknown) => fieldRegistry.get(String(value)) ?? themeColor(DEFAULT_LUMINANCE_BASE)
-          : scaleOrdinal<AxisDomain, string>(colorRange(activeChannel.range || schemeRange(activeChannel.scheme, domain.length) || categoricalRange(domain)))
-              .domain(domain as AxisDomain[]);
+    const entries = legendEntries(colorRows, legendChannel);
+    const scale = colorScale(colorRows, activeChannel);
     const legendRow = (value: unknown): RenderDatum => ({ [legendField]: value });
     const swatchSize = themeValue('--vd-legend-swatch-size', 9);
     const swatchRadius = themeValue('--vd-legend-swatch-radius', 1.5);
     const legendInset = context.chartStyle?.legendInset ?? { top: 8, left: 8 };
-    const labels = domain.map(value => legendLabel(value, legendChannel));
+    const labels = entries.map(entry => entry.label);
     const sideWidth = legendLayout(labels, 1, swatchSize, measure).width + legendInset.left;
     const atRight = context.chartStyle?.legendPosition === 'right' && chart.margin.right >= sideWidth;
     const layout = legendLayout(
@@ -55,7 +42,7 @@ export function createLegend(context: RenderContext, themeValue: ThemeValue, col
     const legend = chart.scene.legend.style('opacity', 1)
       .attr('data-position', atRight ? 'right' : 'top')
       .attr('transform', `translate(${chart.margin.left + legendInset.left + (atRight ? chart.innerWidth : 0)},${legendInset.top + (atRight ? chart.margin.top : 0)})`);
-    const items = legend.selectAll<SVGGElement, unknown>('g.vd-legend-item').data(domain, (value) => String(value));
+    const items = legend.selectAll<SVGGElement, unknown>('g.vd-legend-item').data(entries.map(entry => entry.value), (value) => String(value));
     const entered = items.enter().append('g').attr('class', 'vd-legend-item').style('opacity', 0);
     entered.append('rect').attr('width', swatchSize).attr('height', swatchSize).attr('rx', swatchRadius);
     entered.append('text').attr('x', swatchSize + 6).attr('y', swatchSize - 0.5);
@@ -65,10 +52,8 @@ export function createLegend(context: RenderContext, themeValue: ThemeValue, col
         return `translate(${item.x},${item.y})`;
       });
     motion(items.merge(entered).select<SVGRectElement>('rect'), chart.transition.base)
-      .attr('fill', (value) => quantitativeLegend || activeChannel.hue || activeChannel.luminance
-        ? scale(legendRow(value) as RenderDatum & AxisDomain)
-        : scale(value as RenderDatum & AxisDomain));
-    items.merge(entered).select('text').text((value) => legendLabel(value, legendChannel));
+      .attr('fill', (value) => scale(legendRow(value)));
+    items.merge(entered).select('text').text((_value, index) => labels[index]);
     motion(items.exit<unknown>(), chart.transition.base).style('opacity', 0).remove();
   }
 

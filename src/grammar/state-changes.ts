@@ -226,11 +226,15 @@ function coordinateChanges(previous: ViewSpec, next: ViewSpec, swapped: boolean)
   for (const channel of ['x', 'y'] as const) {
     const from = coordinateSignature(previous.encoding?.[swapped ? (channel === 'x' ? 'y' : 'x') : channel]);
     const to = coordinateSignature(next.encoding?.[channel]);
-    if (!sameValue(from, to)) {
+    if (!sameValue(from, to) || (next.encoding?.[channel]?.type === 'quantitative' && repeatScaleMode(previous) !== repeatScaleMode(next))) {
       changes.push({ category: 'coordinate', action: 'rescale', channel });
     }
   }
   return changes;
+}
+
+function repeatScaleMode(spec: ViewSpec): unknown {
+  return spec.encoding?.facet ? (spec.facetLayout as AnyRecord | undefined)?.scales ?? 'shared' : 'shared';
 }
 
 function coordinateSignature(channel: unknown): unknown {
@@ -263,6 +267,12 @@ function layoutChanges(previous: ViewSpec, next: ViewSpec): StateChange[] {
   return changes;
 }
 
+function repeatArrangement(spec: ViewSpec): unknown {
+  if (!spec.encoding?.facet) return null;
+  const layout = (spec.facetLayout ?? {}) as AnyRecord;
+  return { columns: layout.columns ?? 2, gap: layout.gap ?? 24, minWidth: layout.minWidth ?? 240, direction: layout.direction ?? 'grid', autoHeight: layout.autoHeight ?? false, ...(layout.autoHeight ? { minHeight: layout.minHeight ?? 240 } : {}) };
+}
+
 function layoutSignature(spec: ViewSpec, state: ReturnType<typeof specState>): unknown {
   const unit = specUnit(spec) ?? spec.unit ?? {};
   const detail = state.sceneState.detail ?? state.detail ?? {};
@@ -273,6 +283,7 @@ function layoutSignature(spec: ViewSpec, state: ReturnType<typeof specState>): u
     yOffset: spec.encoding?.yOffset ?? null,
     offset: detail.offset ?? null,
     order: detail.order ?? null,
+    facetLayout: repeatArrangement(spec),
     columns: unit.columns ?? null,
     group: unit.group ?? null
   };
@@ -311,12 +322,12 @@ function appearanceChanges(previous: ViewSpec, next: ViewSpec): StateChange[] {
   if (!sameValue(previousSize, nextSize)) {
     changes.push({ category: 'appearance', action: 'reshape', property: 'size' });
   }
-  for (const property of ['strokeWidth'] as const) {
+  for (const property of ['strokeWidth', 'labels'] as const) {
     if (!sameValue(previous[property] ?? null, next[property] ?? null)) {
       changes.push({ category: 'appearance', action: 'restyle', property });
     }
   }
-  for (const property of ['curve', 'pointSize', 'size', 'baseline'] as const) {
+  for (const property of ['curve', 'pointSize', 'size', 'baseline', 'innerRadius'] as const) {
     if (!sameValue(previous[property] ?? null, next[property] ?? null)) {
       changes.push({ category: 'appearance', action: 'reshape', property });
     }

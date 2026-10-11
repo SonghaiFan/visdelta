@@ -33,6 +33,7 @@ export function createLineDeclarationOperationCodec(): DeclarationOperationCodec
   });
   const codec: DeclarationOperationCodec<LineViewState> = {
     supportsTransition(from, to) {
+      if (from.encoding?.facet || to.encoding?.facet) return 'Line repeat uses its chart-owned layout bridge rather than declaration operation planning';
       if (isOrdinary(from) !== isOrdinary(to)) return 'Line explicit detail transitions retain the native chart route';
       if (Boolean(topology(from).aggregate) !== Boolean(topology(to).aggregate)) return 'Line raw/summary transitions retain the native chart route';
       if (lineState(from, from.encoding).flipped !== lineState(to, to.encoding).flipped && !deepEqual(topology(from), topology(to))) {

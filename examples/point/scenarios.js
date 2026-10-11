@@ -1,3 +1,4 @@
+import { repeatScenario } from '../repeat-scenario.js';
 import { transitionScenario } from '../scenario.js';
 
 // Keep these pairs aligned with tests/browser/point-lab.spec.mjs.
@@ -57,7 +58,8 @@ export const pointScenarios = [
   sample('flip', '10 · Swap x and y', 'Swap vehicle weight and fuel economy while preserving car identity.', base, 'cars', 'cars.flip({ order: ["x", "y"] })'),
   sample('rollup', '11 · Combine into summaries', 'Gather the points under one fixed view, then let the view return to the summary scale.', summarySetup, 'detailed', 'summary'),
   sample('breakdown', '12 · Reveal detail', 'Set the detail view first, then spread each cylinder-count summary into its cars.', summarySetup, 'summary', 'detailed'),
-  sample('focus', '13 · Focus the view', 'Keep all 32 cars in the scene while fitting both axes around four-cylinder cars.', base, 'cars', 'cars.focus({ cyl: 4 })')
+  sample('focus', '13 · Focus the view', 'Keep all 32 cars in the scene while fitting both axes around four-cylinder cars.', base, 'cars', 'cars.focus({ cyl: 4 })'),
+  repeatScenario('point')
 ];
 
 export const scenarios = pointScenarios;

@@ -43,6 +43,7 @@ export function createBarGrainDeclarationOperationCodec(): DeclarationOperationC
   });
   return {
     supportsTransition(from, to) {
+      if (from.encoding?.facet || to.encoding?.facet) return 'Bar repeat uses its chart-owned bridge rather than declaration operation planning';
       if (hasAggregate(from) !== hasAggregate(to)) return 'Bar Grain planning requires aggregate transforms at both endpoints';
       if (!hasAggregate(from)) return;
       if (semanticBarState(from).orientation !== semanticBarState(to).orientation) {

@@ -240,8 +240,20 @@ or detail unless the author maps it.
 Without a declared color channel, marks in every chart use black (`#000000`)
 and produce no color legend. Theme accents do not supply an implicit mark color.
 An explicit constant or field color keeps its authored meaning and may use the
-theme palette. Generated waypoints obey the same rule: refining a grouping
-must not invent or remap a color channel to its temporary segment field.
+theme palette. Categorical color keeps every category and legend entry; when
+more than five categories share a color channel, VisDelta emits a warning but
+does not collapse or recolor them as an `others` group. Explicit color
+`range` and `scheme` values keep their authored palette; composite
+hue/luminance encodings also retain their declared behavior. Generated
+waypoints must not invent or remap a color channel to a temporary segment
+field, even when grouping is refined.
+
+Ordinary stacked Area derives one layer order from descending whole-domain
+series totals, with stable first-appearance ties. Display filtering retains
+that order. Default categorical color for the same series follows the ranking;
+authored palettes and domains are preserved. This chart-owned derived geometry
+does not add an operation or state-change action. Stream layouts retain their
+explicit/default D3 order policy.
 
 ```js
 point(rows)
@@ -466,3 +478,74 @@ greenfield release.
 
 The detailed signatures live in the [API reference](/reference). Working
 behavior lives in the unified Playground.
+
+## Advisory visualization warnings
+
+Visualization design advice is separate from state differences, validity and
+transition planning. Chart plugins may inspect a prepared state and its
+transformed rows through `warnings(spec, rows)`. Warnings never rewrite data,
+encodings, authored domains or routes, and do not prevent rendering. They are
+not an eighth state-change category. Core transports these diagnostics without
+chart-name branches. See [the warning reference](/reference#visualization-warnings)
+for the implemented rules and their limits.
+
+### Area layer labels
+
+Area `.labels("inside" | "none")` is an independently authored presentation
+control. It emits Appearance `restyle` with property `labels`, using the existing
+public vocabulary. Series names come from the declared breakdown; placement and
+fit are chart-owned geometry, not a new encoding, grain, layout or mark key.
+The Area operation codec keeps this control in its own slot. Omitted labels
+retain the default of no direct labels; thin or narrow layers may omit text
+without changing the authored declaration or color legend.
+
+### Pie bindings and fallback
+
+Pie adds quantitative `encoding.angle` and nominal `encoding.label` bindings;
+they use the existing Encoding bind/unbind/remap actions. `.labels()` is an
+independently authored presentation control and emits Appearance `restyle`
+with property `labels`. It is not a grain or layout change. `.innerRadius()` is Appearance `reshape`
+with property `innerRadius`; it controls the donut hole as a fraction of the
+outer radius. Slice keys obey the
+ordinary mark identity contract. Pie has no declaration-operation codec or
+automatic intermediate states; it keeps the direct runtime fallback. Changing
+slice values does not authorize a cross-chart morph. The Playground's five
+existing chart editors remain its current supported subset.
+
+## Small-multiple composition
+
+`.repeat()` partitions transformed rows into typed, keyed panels without
+changing their measure or discarding records. Its `encoding.facet` is a field
+binding and emits Encoding `bind`, `unbind` or `remap`. The independently authored
+`facetLayout` direction, columns, gap and minimum width control panel arrangement
+and emit Layout `rearrange`. Numeric scale sharing emits Coordinate `rescale`.
+The x/y field bindings retain their authored meaning; titles appear once in
+the ordinary chart style while each panel retains its scale ticks. Panel identity
+and each child's mark identity are distinct levels of continuity.
+
+The compositor delegates rendering to the carried child plugin, using common
+data domains and one motion recorder. Facet-to-facet transitions retain the
+carried child's cached or reconstructed evaluation policy. Bar and Line preserve their native chart type under repeat and own direct flat-to-repeat bridges for unchanged keyed marks. Line partitions its existing series field; observation membership, x/y bindings and declared domains stay unchanged. Its source panels share the original chart frame, then separate in container coordinate stages before child reflow. Repeat uses the ordinary Bar axis-order policy: x and width form one
+coordinate stage; y and height form another. Vertical defaults to x then y,
+horizontal to y then x; authored order takes priority. Panel layout direction
+does not replace coordinate order. Repeated child Bars also use their ordinary
+coordinate planner, including flip.
+For repeated-panel rearrangements with unchanged panel membership, the compositor
+first moves the entire keyed container rectangle through x/width and y/height
+stages, resizing through source child coordinates with source data and domains. It then runs the child plugin's recorded
+motion inside the settled container. Axes, grid, titles and marks share the panel
+coordinate system without SVG group scaling. These nested motion stages remain one semantic route leg; reverse
+replays the same container and child frames backward.
+Reverse uses the same geometry path backward, including independent scales; no
+declaration-operation codec is added for repeat. Area, Point and Unit do not
+currently implement flat-to-repeat routes. Column count responds to container size during resize, within the authored
+layout bounds. Repeat preserves canvas height by default; opt-in `autoHeight`
+reserves enough height for `minHeight` per complete panel, gaps and margins.
+Explicit heights take priority. A transition reserves the maximum required
+height across its route at the current width, so playback does not change the
+outer canvas. Standalone controllers observe container width and re-evaluate
+the same progress and direction after resize, preserving the playback clock.
+An explicit `resize({ height })` sets the canvas height without changing progress.
+Resize invalidates geometry caches; marks, ticks and grids use the new dimensions
+together. The [API reference](./reference.md#native-small-multiples) records
+the implemented controls and unsupported combinations.

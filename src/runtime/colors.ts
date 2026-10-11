@@ -35,12 +35,12 @@ export function createColors(context: RenderContext, themeValue: ThemeValue) {
     if (activeChannel.type === 'quantitative') return quantitativeColorScale(rows, activeChannel);
     // Use the transition registry for consistent key→color mapping across frames.
     const field = activeChannel.field;
-    const fieldRegistry = !activeChannel.range && context.colors?.get(field);
+    const domain = channelDomain(rows, activeChannel);
+    const fieldRegistry = !activeChannel.range && !activeChannel.scheme && context.colors?.get(field);
     if (fieldRegistry) {
       const fallback = themeColor(DEFAULT_LUMINANCE_BASE);
       return (row) => fieldRegistry.get(String(row[field])) ?? fallback;
     }
-    const domain = channelDomain(rows, activeChannel);
     const scale = scaleOrdinal<AxisDomain, string>(colorRange(activeChannel.range || schemeRange(activeChannel.scheme, domain.length) || categoricalRange(domain)))
       .domain(domain as AxisDomain[]);
     return (row) => scale(row[field] as AxisDomain);

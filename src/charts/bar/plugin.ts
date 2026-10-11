@@ -1,3 +1,5 @@
+import { facetDefaultHeight } from '../facet-layout.js';
+import { chartWarnings } from './warnings.js';
 import { defineChartType } from '../plugin.js';
 import { createBarChart } from './chart.js';
 import type { ChartPlugin } from '../../types/index.js';
@@ -9,6 +11,8 @@ import { createBarGrainDeclarationOperationCodec } from './declaration-operation
 
 export const plugin: ChartPlugin<BarSpec> = defineChartType<BarSpec>({
   key: 'bar',
+  defaultHeight: facetDefaultHeight,
+  warnings: chartWarnings,
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',

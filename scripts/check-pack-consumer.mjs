@@ -32,6 +32,7 @@ const expectedApi = [
   "lineageMarkKey",
   "markKeyValue",
   "paperChartStyle",
+  "pie",
   "planDeclarationTransition",
   "point",
   "registerChartModule",
@@ -39,10 +40,12 @@ const expectedApi = [
   "resolveEncodingTypes",
   "resolveMarkIdentity",
   "sequence",
+  "smallMultiples",
   "transition",
   "unit",
   "viewLineageCorrespondence",
-  "visualizationSpec"
+  "visualizationSpec",
+  "visualizationWarnings"
 ];
 
 let tarball = null;
@@ -99,6 +102,7 @@ import * as api from "visdelta";
 import * as browserApi from "visdelta/browser";
 import { D3_AREA_CURVE_NAMES as selectedAreaCurveNames, area as selectedArea, areaModule } from "visdelta/area";
 import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
+import { pie as selectedPie, pieModule } from "visdelta/pie";
 import { point as selectedPoint, pointModule } from "visdelta/point";
 import { D3_CURVE_NAMES as selectedCurveNames, line as selectedLine, lineModule } from "visdelta/line";
 import { UNIT_LAYOUTS as selectedUnitLayouts, unit as selectedUnit, unitModule } from "visdelta/unit";
@@ -118,6 +122,14 @@ assertSame(Object.keys(browserApi).sort(), expectedApi, "browser public API");
 assertSame(Object.keys(globalThis.VisDelta).sort(), expectedApi, "browser global API");
 if ("vd" in globalThis) throw new Error("the browser build must define only the VisDelta global");
 assertSame(api.availableChartTypes(), [], "no implicitly registered chart types");
+const pieState = selectedPie([{ part: "A", n: 25 }, { part: "B", n: 75 }]).value("n").key("part").color("part").innerRadius(0.75);
+if (pieState.toSpec().encoding.angle.field !== "n" || pieState.toSpec().innerRadius !== 0.75 || pieModule.key !== "pie") throw new Error("Packed pie entry failed");
+const facets = selectedBar([{ panel: "A", x: "one", y: 2 }]).x("x").y("y").repeat("panel");
+if ((await facets.chartModule().load()).plugin.key !== "bar" || facets.toSpec().encoding.facet.field !== "panel") throw new Error("Packed native facets failed");
+const warnings = await api.visualizationWarnings(api.line([{ x: "A", y: 2 }, { x: "B", y: 3 }]).x("x").y("y"));
+assertSame(warnings.map(item => item.code), ["connection.unordered-axis"], "packed advisory warnings");
+const labelledArea = selectedArea([{ x: 1, y: 2, part: "A" }]).x("x").y("y").breakdown("part").labels("inside");
+if (labelledArea.toSpec().labels !== "inside") throw new Error("Packed Area labels failed");
 if (typeof selectedArea !== "function") throw new Error("area subpath did not export area()");
 if (selectedAreaCurveNames.length !== 19) throw new Error("area subpath did not export its D3 curve names");
 if (typeof selectedBar !== "function") throw new Error("bar subpath did not export bar()");
@@ -151,6 +163,8 @@ if (inverseGrainPlan.status !== "planned") throw new Error("Packed Bar Grain rev
 deepStrictEqual(inverseGrainPlan.stages.map(stage => [stage.from, stage.to]), [[grainStage.to, grainStage.from]], "packed Bar Grain reversed states");
 if (typeof selectedPoint !== "function") throw new Error("point subpath did not export point()");
 if (typeof selectedLine !== "function") throw new Error("line subpath did not export line()");
+const repeatedLine = selectedLine([{ date: 1, ticker: "A", close: 20 }]).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").repeat("ticker", { direction: "y" }).curve("curveStep");
+if (repeatedLine.toSpec().mark !== "line" || (await repeatedLine.chartModule().load()).plugin.key !== "line") throw new Error("Packed Line repeat changed chart type");
 if (selectedCurveNames.length !== 20) throw new Error("line subpath did not export all D3 curve names");
 if (typeof selectedUnit !== "function" || selectedUnitLayouts.length !== 4) throw new Error("unit subpath did not export Unit grammar");
 if (areaModule.key !== "area" || barModule.key !== "bar" || pointModule.key !== "point" || lineModule.key !== "line" || unitModule.key !== "unit") throw new Error("focused chart module mismatch");

@@ -1,3 +1,4 @@
+import { colorWarnings } from '../warnings.js';
 import { unitPresentation, unitLayoutChannels } from './style.js';
 import type { ChartPlugin } from '../../types/index.js';
 import { createUnitSpecCompiler } from './compile.js';
@@ -9,6 +10,7 @@ import { createUnitDeclarationOperationCodec } from './declaration-operations.js
 
 export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>({
   key: 'unit',
+  warnings: colorWarnings,
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',

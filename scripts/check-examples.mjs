@@ -5,11 +5,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const examplesDir = join(root, 'examples');
 const labs = await discoverLabs(examplesDir);
-assertLab(labs.get('bar'), 'bar', 15);
-assertLab(labs.get('point'), 'point', 13);
-assertLab(labs.get('line'), 'line', 16);
-assertLab(labs.get('area'), 'area', 16);
-assertLab(labs.get('unit'), 'unit', 15);
+assertLab(labs.get('bar'), 'bar', 16);
+assertLab(labs.get('point'), 'point', 14);
+assertLab(labs.get('line'), 'line', 17);
+assertLab(labs.get('area'), 'area', 18);
+assertLab(labs.get('unit'), 'unit', 16);
 
 console.log('Area, bar, line, point, and unit example invariants ok.');
 

@@ -13,10 +13,12 @@ export {
   D3_CURVE_NAMES,
   line,
   point,
+  pie,
   unit,
   UNIT_LAYOUTS
 } from "./grammar/index.js";
 export { createBarGrainDeclarationOperationCodec } from './charts/bar/declaration-operations.js';
+export type { PieViewState } from "./grammar/index.js";
 export type { AreaLayout, AreaStackOffset, AreaStackOrder, AreaStreamOptions, AreaViewState, D3AreaCurveName, D3CurveName, UnitLayout, UnitLayoutOptions, UnitValueOptions, UnitViewState } from "./grammar/index.js";
 export { defineChartType } from "./charts/plugin.js";
 export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, paperChartStyle } from "./charts/style.js";
@@ -35,3 +37,9 @@ export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, L
 export type { ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
 export type { TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";
 export type { SequenceOptions, SequencePlayOptions, VisualizationSequence } from "./sequence.js";
+
+export { visualizationWarnings } from './warnings.js';
+export type { VisualizationWarning, ChartWarningInspector } from './types/index.js';
+
+export { smallMultiples } from './facet.js';
+export type { FacetLayout, FacetedViewState } from './facet.js';
