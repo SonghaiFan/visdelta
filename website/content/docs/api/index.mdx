@@ -7,6 +7,12 @@ VisDelta's API has three parts: **builders** that create immutable chart
 states, **`delta()`** to inspect what changed, and **`transition()`** and
 **`sequence()`** to render a seekable path.
 
+<TransitionWorkbench />
+
+The workbench above is a real controller. Seek in either direction, then switch
+the inspector to **Delta** for `change.delta` or **Spec** for the resolved
+endpoints.
+
 ```ts
 import { bar } from 'visdelta/bar';                         // builders
 import { delta } from 'visdelta/core';                       // inspection

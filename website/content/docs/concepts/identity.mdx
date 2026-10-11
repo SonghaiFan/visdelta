@@ -1,94 +1,53 @@
 ---
-title: Identity and lineage
-description: How VisDelta decides which mark continues across a change. Datum keys, mark keys and lineage are separate contracts.
+title: Identity
+description: How VisDelta knows which mark is the same mark in both states.
 ---
 
-A transition needs to know what continues. A bar that stays should move; a bar
-that leaves should exit. VisDelta answers this with three separate ideas:
+To move a mark, VisDelta has to know it is the same mark in A and B. Marks that
+match move; the others enter or leave.
 
-```text
-datum key     identity of an immutable source record
-mark key      identity of one mark at the current grain
-lineage       which source records contribute to which marks
-```
+## Keys
 
-They are deliberately not aliases. Aggregation can change mark identity while
-every source record keeps its own identity.
-
-## Datum keys
-
-Core infers source-record identity from the data. It prefers a unique,
-identifier-like field such as `id`, then the smallest unique set of categorical
-fields. If the data has no stable categorical identity, Core reports a row-index
-fallback.
-
-Override the inference only when the data is ambiguous:
-
-```ts
-bar(rows).datumKey('id');
-bar(rows).datumKey(['state', 'age']);
-```
-
-VisDelta does not infer that a record was updated from its row position. When
-identity is unavailable, an uncertain Data action is left out of
-`stateChanges`.
-
-## Mark keys
-
-`.key()` identifies a mark in the current view, at the current grain:
+Give marks a key when they should keep their identity through a change:
 
 ```ts
 point(cars).x('weight').y('mpg').key('name');
 bar(sales).x('region').y('revenue').key(['region', 'channel']);
 ```
 
-An explicit `.key()` has priority. Otherwise each chart module declares its own
-default mark key. Core validates the resolved key at both endpoints and
-classifies every mark as an **update** (it stays), **enter** or **exit**.
+Without `.key()`, each chart type uses a sensible default. If marks fade in and
+out when you expected them to move, add a key.
 
-<Callout title="When to add a key">
-  Add `.key()` when marks should keep their identity through a change that
-  re-orders, filters or re-maps them, such as a scatterplot whose axes change.
-  Without it, the chart module's default key decides correspondence.
-</Callout>
+<LiveExample id="point-remap" code={false} />
+
+## Records and marks are different
+
+A **record** is a row of your data. A **mark** is something drawn. When you
+total rows, many records become one mark, and the records still keep their own
+identity.
+
+VisDelta finds record identity on its own: a unique `id` field if there is one,
+otherwise the smallest set of text fields that tells rows apart. Override it
+only when that guess would be wrong:
+
+```ts
+bar(rows).datumKey('id');
+```
 
 ## Lineage
 
-When both states use inline data, `delta()` also returns a `lineage` plan. It
-describes how marks relate through the source records they share, including
-relations a one-to-one key cannot express:
+With inline data, VisDelta also traces which records feed which marks in both
+states. That is how it knows a total **split** into parts, parts **merged**
+into a total, or groups were **reaggregated**:
+
+<LiveExample id="bar-split" code={false} />
 
 ```ts
-const change = delta(byYear, byLocation);
-
-change.lineage.mode;              // "reaggregate"
-change.lineage.commonRefinement;  // ["location", "year"]
-change.lineage.edges;             // non-empty joint-grain cells
-change.lineage.components;        // connected operations
+delta(byYear, byLocation).lineage.mode; // 'reaggregate'
 ```
 
-Each connected component is classified by its endpoint cardinality:
+Lineage is evidence, not an order. Bar uses it to keep sums readable while they
+split and merge; averages and medians keep their history but move directly,
+because their parts don't add up to the whole.
 
-```text
-1 → 1  update       1 → N  split       N → 1  merge
-N → M  reaggregate  1 → 0  exit        0 → 1  enter
-```
-
-`mixed` means that disconnected components with different operations coexist;
-it is not another primitive.
-
-Lineage is **evidence**, not a route command. A shared source record proves a
-relationship but does not by itself require a particular trajectory. For
-example, Bar uses lineage for `sum` and `count` aggregates to route a total
-through a stacked view that preserves it. Non-additive aggregates such as
-`median` keep provenance but use the ordinary transition, because their
-subgroup values do not add up to the endpoint value.
-
-<LiveExample id="bar-split" />
-
-## Lower-level helpers
-
-The functions behind this are exported from `visdelta/core` for inspection and
-for chart plugins: `compileLineage()`, `buildGroupingTree()`,
-`correspondLineage()`, `resolveMarkIdentity()`, `correspondMarks()` and
-`markKeyValue()`. See the [core API](/docs/api/core).
+The functions behind this are in [Core](/docs/api/core#lineage).

@@ -114,7 +114,7 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 
 Read the [documentation](https://songhaifan.github.io/visdelta/docs/), the
 [API reference](https://songhaifan.github.io/visdelta/docs/api/) and the
-[playground](https://songhaifan.github.io/visdelta/docs/examples/playground/).
+[playground](https://songhaifan.github.io/visdelta/playground/).
 The [design principles](docs/language-framework.md) are the semantic
 constitution the implementation follows.
 

@@ -5,11 +5,13 @@
 - Rebuilt the documentation site from scratch with Fumadocs and a Next.js static
   export in `website/`, deployed to the same GitHub Pages URL. It adds a
   restructured information architecture (introduction, concepts, charts,
-  guides, examples, reference), a category-first playground and live examples
-  driven by real example modules verified against `delta()`, type tables
-  generated from the TypeScript source, static search, `llms.txt`, a sitemap
-  and redirects from the previous VitePress URLs. The VitePress site in `docs/`
-  is no longer deployed.
+  guides, reference) in plain English, a homepage whose code edits itself and
+  drives the real transition, an editable A/B playground with curated demos
+  organized by the seven state-change categories, the idiom gallery, live
+  examples driven by real example modules verified against `delta()`, type
+  tables generated from the TypeScript source, static search, `llms.txt`, a
+  sitemap and redirects from the previous VitePress URLs. The VitePress site in
+  `docs/` is no longer deployed.
 - Documented the defaults of `PlayOptions`, `SequencePlayOptions` and the
   controller members in JSDoc. Types and behaviour are unchanged.
 

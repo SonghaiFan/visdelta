@@ -4,10 +4,13 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import type { MDXComponents } from 'mdx/types';
-import { ExampleIndex } from '@/components/example-index';
+import { BarGrainDemo } from '@/components/demos/bar-grain-demo';
+import { ChartStyleGallery } from '@/components/demos/chart-style-gallery';
+import { DesignComparisons } from '@/components/demos/design-comparisons';
+import { RepeatDemo } from '@/components/demos/repeat-demo';
+import { StateChangeCatalogue } from '@/components/demos/state-change-catalogue';
+import { TransitionWorkbench } from '@/components/demos/transition-workbench';
 import { LiveExample } from '@/components/live/live-example';
-import { Playground } from '@/components/playground/playground';
-import { StateChangeTable } from '@/components/state-change-table';
 
 export function getMDXComponents(components?: MDXComponents) {
   return {
@@ -19,10 +22,13 @@ export function getMDXComponents(components?: MDXComponents) {
     Tab,
     Tabs,
     TypeTable,
-    ExampleIndex,
+    BarGrainDemo,
+    ChartStyleGallery,
+    DesignComparisons,
     LiveExample,
-    Playground,
-    StateChangeTable,
+    RepeatDemo,
+    StateChangeCatalogue,
+    TransitionWorkbench,
     ...components,
   } satisfies MDXComponents;
 }

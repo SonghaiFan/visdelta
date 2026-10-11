@@ -11,7 +11,8 @@ export function baseOptions(): BaseLayoutProps {
     githubUrl: repositoryUrl,
     links: [
       { text: 'Documentation', url: '/docs', active: 'url' },
-      { text: 'Playground', url: '/docs/examples/playground' },
+      { text: 'Playground', url: '/playground' },
+      { text: 'Gallery', url: '/gallery' },
       { text: 'API', url: '/docs/api', active: 'nested-url' },
       {
         text: `v${libraryVersion}`,

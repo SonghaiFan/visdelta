@@ -31,7 +31,7 @@ change.lineage;               // present when both states have inline data
 | `deltas`               | Raw semantic differences                                                 |
 | `hasDelta(type, action?)` | Whether a raw difference of `type` exists                             |
 | `edits`                | `DeclarationEdit[]` describing exact serialized differences              |
-| `lineage`              | `LineageCorrespondence`; see [Identity and lineage](/docs/concepts/identity#lineage) |
+| `lineage`              | `LineageCorrespondence`; see [Identity](/docs/concepts/identity#lineage) |
 
 Grain entries in `stateChanges` include `previous` and `next` descriptions of
 their `groupby` and `measures`. See [Types](/docs/api/types#statechange).
@@ -88,6 +88,8 @@ const plan = planDeclarationTransition(from, to, createBarGrainDeclarationOperat
 plan.status;                                   // 'planned'
 plan.stages.map((stage) => stage.operation.id); // ['__visdeltaBarGrain/grouping']
 ```
+
+<BarGrainDemo />
 
 | `status`       | Meaning                                                        |
 | -------------- | -------------------------------------------------------------- |

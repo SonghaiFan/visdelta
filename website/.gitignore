@@ -27,3 +27,6 @@ next-env.d.ts
 # browser tests
 /test-results/
 /playwright-report/
+
+# demo datasets copied from ../docs/public/data by scripts/prepare.mjs
+/public/data/

@@ -1,18 +1,14 @@
 ---
 title: Quick start
-description: Build, play and inspect your first VisDelta transition in four steps.
+description: Your first transition in four steps.
 ---
-
-This page builds the transition below: one bar chart whose y mapping changes
-from revenue to profit. Use the controls to play it, reverse it or drag the
-scrubber.
 
 <LiveExample id="bar-remap" code={false} />
 
 <Steps>
 <Step>
 
-### Declare one chart state
+### Describe a chart
 
 ```ts
 import { bar } from 'visdelta/bar';
@@ -24,96 +20,75 @@ const products = [
   { product: 'Support', revenue: 6, profit: 4 },
 ];
 
-const revenue = bar(products)
+const a = bar(products)
   .x('product', { title: 'Product line' })
   .y('revenue', { title: 'Revenue ($M)' });
 ```
 
-A state describes facts: its data, grain, encodings, layout, attention and
-appearance. It is not an animation command, and creating it renders nothing.
+This is a description, not a drawing. Nothing renders yet.
 
 </Step>
 <Step>
 
-### Branch to the next state
+### Describe the change
 
 ```ts
-const profit = revenue.y('profit', { title: 'Profit ($M)' });
+const b = a.y('profit', { title: 'Profit ($M)' });
 ```
 
-Chart states are immutable. `profit` reuses the declaration and data of
-`revenue` and does not modify it, so both remain valid endpoints.
+`a` is untouched. `b` is a new state that differs in one line.
 
 </Step>
 <Step>
 
-### Create one transition
+### Connect them
 
 ```ts
 import { transition } from 'visdelta/transition';
 import 'visdelta/style.css';
 
-const change = await transition(revenue, profit, { target: '#chart' });
+const change = await transition(a, b, { target: '#chart' });
 ```
 
-Both endpoints must use the same chart type. VisDelta resolves both states,
-loads the chart's renderer, matches corresponding marks and mounts a seekable
-route into the target element. The target's previous contents stay in place
-until the transition is ready.
+VisDelta draws `a` into `#chart` and prepares every frame up to `b`.
 
 </Step>
 <Step>
 
-### Supply progress
+### Move through it
 
 ```ts
-change.progress(0.42);                  // show one exact frame
-change.play({ duration: 800 });         // animate 0 → 1
-change.play({ from: 1, to: 0 });        // the same route, backward
-change.pause();                         // stop at the current frame
-change.destroy();                       // remove it when the view goes away
+change.play();                   // a → b
+change.play({ from: 1, to: 0 }); // b → a, the same frames backward
+change.progress(0.42);           // one exact frame
 ```
-
-Progress is a number from `0` to `1`. Anything can supply it: a slider, a
-button, scroll position, a gesture or an application timeline.
 
 </Step>
 </Steps>
 
-## Connect a control
-
-Controls stay outside the library. A range input is enough:
-
-```html
-<div id="chart"></div>
-<input id="progress" type="range" min="0" max="1" step="0.01" value="0">
-```
+## Drive it with anything
 
 ```ts
-const slider = document.querySelector<HTMLInputElement>('#progress')!;
 slider.addEventListener('input', () => change.progress(slider.valueAsNumber));
 ```
 
-## Inspect what changed
+A slider, a button, scroll position or a video's clock. They all call
+`progress()`.
 
-Inspection is separate from playback. `delta()` is DOM-free:
+## See what changed
 
 ```ts
 import { delta } from 'visdelta/core';
 
-delta(revenue, profit).stateChanges;
+delta(a, b).stateChanges;
 // [{ category: 'encoding', action: 'remap', channel: 'y' }]
 ```
 
-The same result is available on the controller as `change.delta`. The seven
-categories (Data, Grain, Encoding, Coordinate, Layout, Attention and
-Appearance) describe endpoint differences. They are not a playback order.
-
-## Next steps
+This is the **Δ** line under every chart on this site.
 
 <Cards>
-  <Card title="Chart states" href="/docs/concepts/chart-states" description="Builders, channels and immutability." />
-  <Card title="Controlling playback" href="/docs/guides/controlling-playback" description="Buttons, sliders, scroll and timelines." />
-  <Card title="Use with React" href="/docs/guides/react" description="Mount, update and clean up in a component." />
-  <Card title="Playground" href="/docs/examples/playground" description="Every state-change category, live." />
+  <Card title="Playground" href="/playground" description="Edit two states and watch the chart follow." />
+  <Card title="Controlling playback" href="/docs/guides/controlling-playback" description="Buttons, sliders and scroll." />
+  <Card title="Use with React" href="/docs/guides/react" description="Mount and clean up in a component." />
+  <Card title="State changes" href="/docs/concepts/state-changes" description="The seven kinds of change." />
 </Cards>

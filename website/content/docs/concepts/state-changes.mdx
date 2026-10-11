@@ -1,85 +1,51 @@
 ---
 title: State changes
-description: delta() names every difference between two states with seven categories and a small set of directional actions.
+description: delta() names what changed between two states, using seven kinds of change.
 ---
 
-`delta(from, to)` compares two states of the same chart type and returns
-`stateChanges`: a list of directional facts drawn from a closed vocabulary.
+`delta(a, b)` tells you what changed between two states. It is the **Δ** line
+under every chart on this site.
 
 ```ts
 import { delta } from 'visdelta/core';
 
-const change = delta(revenue, profit);
-change.stateChanges;
+delta(a, b).stateChanges;
 // [{ category: 'encoding', action: 'remap', channel: 'y' }]
 ```
 
-`delta()` is DOM-free and runs anywhere, including Node. Every transition
-controller exposes the same result as `change.delta`.
+It needs no browser, so it also runs in Node and in tests. A transition
+exposes the same result as `change.delta`.
 
-## The seven categories
+## Seven kinds of change
 
-<StateChangeTable />
+<StateChangeCatalogue />
 
-The **public syntax** column lists existing builder calls that commonly produce
-each category. The **emitted actions** are exact `stateChanges` values; they are
-facts about the endpoints, not additional builder methods.
+Every entry is a fact about the two states: a **category**, an **action**, and
+sometimes a detail such as the channel. A few lines that are easy to mix up:
 
-## Category boundaries
+- A colour **field** (`.color("region")`) is Encoding. A colour **value**
+  (`.color("#3366ff")`) is Appearance.
+- Mapping y to another field is Encoding. Changing the scale or flipping the
+  chart is Coordinate.
+- `where()` changes Data. `highlight()` and `focus()` change Attention: every
+  row stays.
+- Changing `sum` to `mean` is Grain, even if the groups stay the same.
 
-- **Data** is source-record membership or value change. An `update` is reported
-  only when stable datum identity provides evidence for it.
-- **Grain** covers grouping and measure semantics. Changing `sum` to `mean` is
-  `change-reducer` even when grouping is unchanged. A Unit chart's `unitValue`
-  also belongs here, because it changes what one mark represents.
-- **Encoding** is a data-field binding. A field-driven `.color('region')` is
-  Encoding; a constant `.color('#3366ff')` is Appearance.
-- **Coordinate** is the positional scale, domain or orientation. Remapping y to
-  another field is Encoding; `.flip()` and a log scale are Coordinate.
-- **Layout** is the arrangement, order or connection of the same objects.
-- **Attention** preserves data and marks while focus moves the camera or
-  highlight changes emphasis. It carries a `target` of `focus` or `highlight`.
-- **Appearance** is fixed visual styling or form that binds no field.
+## Several at once
 
-## Several categories at once
+One edit can produce several facts. Splitting totals into coloured detail is a
+Grain change, a new colour binding and a colour style change, all at once:
 
-Categories are non-exclusive. One pair of states can produce several facts:
+<LiveExample id="bar-split" code={false} />
 
-```ts
-const detailed = bar(sales)
-  .x('region').y('revenue')
-  .key(['region', 'channel'])
-  .breakdown('channel')
-  .color('channel');
+## Not a schedule
 
-delta(detailed.rollup(), detailed).stateChanges;
-// grain.split, encoding.bind (color), appearance.restyle
-```
+The list is for reading. Its order is fixed by category and says nothing about
+what moves first. How a chart moves is decided by its chart type; see
+[Transitions](/docs/concepts/transitions).
 
-Timing set with `.transition({ duration })` describes how a state animates, not
-what it shows, so on its own it reports no state change.
+## More detail
 
-## Not a playback schedule
-
-The array's order is categorical and stable, for inspection only. It is **not**
-a priority list, a route or an animation script. How a transition actually moves
-is chosen by the chart module, see [Transitions](/docs/concepts/transitions).
-
-## Lower-level results
-
-`stateChanges` is the normalized view. The same result also includes:
-
-| Field                    | Meaning                                                                |
-| ------------------------ | ---------------------------------------------------------------------- |
-| `deltas`, `hasDelta(type)` | Raw semantic differences, e.g. `change.hasDelta('encoding.y')`       |
-| `edits`                  | Exact, lossless edits to the serialized declaration                    |
-| `lineage`                | Mark correspondence through source records, when both states have inline data |
-
-See [Identity and lineage](/docs/concepts/identity) and the
-[core API](/docs/api/core) for these.
-
-## Try every category
-
-The [playground](/docs/examples/playground) uses these seven categories as its
-navigation. Each example reports the state changes that `delta()` actually
-emits for it.
+The same result also carries the raw differences (`deltas`, `hasDelta()`),
+exact declaration `edits`, and `lineage` when both states have inline data. See
+[Core](/docs/api/core) and [Identity](/docs/concepts/identity).

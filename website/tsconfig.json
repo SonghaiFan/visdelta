@@ -24,13 +24,16 @@
       ],
       "collections/*": [
         "./.source/*"
+      ],
+      "@repo/*": [
+        "../*"
       ]
     },
     "plugins": [
       {
         "name": "next"
       }
-    ],
+    ]
   },
   "include": [
     "next-env.d.ts",

@@ -30,7 +30,7 @@ npm run dev        # http://localhost:3000
 | `npm start`              | Serve `out/` the way GitHub Pages does                                 |
 | `npm run lint`           | ESLint (Next.js rules)                                                  |
 | `npm run types:check`    | Generate MDX and route types, then `tsc --noEmit`                       |
-| `npm run examples:check` | Verify every live example against the real `delta()`                    |
+| `npm run examples:check` | Verify every live example and playground demo against the real `delta()` |
 | `npm test`               | Playwright tests against the exported site in `out/`                    |
 | `npm run check`          | All of the above, as CI runs it                                         |
 
@@ -56,16 +56,19 @@ they serve whatever the last build produced.
 
 ```text
 website/
-  app/                     Next.js routes: home, docs, search index, llms.txt, sitemap
-  content/docs/            Documentation pages (MDX) and sidebar order (meta.json)
-  examples/                Live example modules and their registry
-  components/live/         The transition player, example loaders, error boundary
-  components/playground/   The playground (server half + client half)
-  components/home/         Homepage demo
-  lib/                     Source loader, shared constants, example-source formatting
-  scripts/                 prepare, postbuild, example verification, static server
-  tests/                   Playwright tests
-  source.config.ts         MDX configuration, including generated type tables
+  app/                       Routes: home, playground, gallery, docs, search, llms.txt, sitemap
+  content/docs/              Documentation pages (MDX) and sidebar order (meta.json)
+  examples/                  Live example modules and their registry
+  components/live/           The transition player, example loaders, error boundary
+  components/interactive/    Shared runtime: code evaluation, data loading, editor, scrubber
+  components/playground/     The A/B playground and its curated demos (demos.ts)
+  components/gallery/        The idiom gallery
+  components/home/           Homepage: self-editing code pipeline and scroll story
+  components/demos/          Interactive figures used inside docs pages
+  lib/                       Source loader, shared constants, example-source formatting
+  scripts/                   prepare, postbuild, example and demo verification, static server
+  tests/                     Playwright tests
+  source.config.ts           MDX configuration, including generated type tables
 ```
 
 ### Content
@@ -77,7 +80,8 @@ Pages live in `content/docs/`. The URL follows the file path, and each folder's
 - **Concepts**: explanations of the model (`concepts/`)
 - **Charts**: one page per chart module (`charts/`)
 - **Guides**: task-oriented how-tos (`guides/`)
-- **Examples**: the playground and gallery (`examples/`)
+- **Examples**: sidebar links to the Playground and Gallery pages, which are
+  full-width routes in `app/(home)/`
 - **Reference**: API signatures and types (`api/`)
 
 Keep each kind of page to its job. A concept page explains, a guide solves one
@@ -92,9 +96,9 @@ Components available in MDX without imports (see `components/mdx.tsx`):
 | Component                         | Use                                                    |
 | --------------------------------- | ------------------------------------------------------ |
 | `<LiveExample id="…" />`          | A live transition with its exact source; `code={false}` hides the source |
-| `<Playground />`                  | The full playground                                    |
-| `<StateChangeTable />`            | The seven state-change categories                      |
-| `<ExampleIndex />`                | Every example, grouped by category                     |
+| `<StateChangeCatalogue />`        | The seven state-change categories                      |
+| `<TransitionWorkbench />`         | One transition with its code, `delta` and spec         |
+| `<BarGrainDemo />`, `<RepeatDemo />`, `<ChartStyleGallery />`, `<DesignComparisons />` | Figures for specific pages |
 | `<auto-type-table path name />`   | A type table generated from the library's TypeScript source |
 | `Callout`, `Cards`, `Card`, `Steps`, `Step`, `Tabs`, `Tab`, `Accordions`, `Accordion`, `TypeTable` | Fumadocs UI components |
 
@@ -116,12 +120,41 @@ To add one:
 3. Add its loader to `components/live/loaders.ts`.
 4. Run `npm run examples:check`. It fails if the files, registry and loaders
    disagree, or if `delta()` does not report the declared category.
-5. Use it with `<LiveExample id="<id>" />`. It also appears in the playground.
+5. Use it with `<LiveExample id="<id>" />`.
 
 The player (`components/live/transition-player.tsx`) mounts the real
 `transition()` or `sequence()` when the chart is near the viewport, drives it
 with `progress()`, `play()` and `pause()`, refreshes it with `resize()` on theme
-changes, and calls `destroy()` on unmount.
+changes, and calls `destroy()` on unmount. Below the chart it prints the
+transition's `delta().stateChanges` as the **Δ** line.
+
+### Playground
+
+The playground (`/playground`) shows two editable states, A and B, and the real
+transition between them. Edits re-run after a short pause; the chart moves from
+what is on screen to the edited state, then the full A → B transition is ready
+to play and scrub. A broken edit shows its error and keeps the last chart.
+Readers can replace the dataset with their own CSV or JSON rows.
+
+Its demos are a short, curated list in `components/playground/demos.ts`: one
+idea each, on real data, with a one-line caption. Prefer a demo whose motion
+teaches something over one that covers another API. `npm run examples:check`
+runs `scripts/verify-playground.mjs`, which evaluates every demo's A and B with
+the built library and fails if a demo draws no marks or reports no change.
+
+Gallery idioms open in the playground as state A (`/playground#idiom=<id>`).
+
+### Design language
+
+The site's visual identity is three colours defined in `app/global.css`:
+**A** (`--color-state-a`, blue), **B** (`--color-state-b`, coral) and the
+**Δ** amber (`--color-delta`) that marks what changed: the changed code line,
+the scrubber head and the Δ line. Everything else is ink on paper. Keep
+corners small, motion purposeful and copy plain; let the chart carry the page.
+Bars always have square corners.
+
+Every animated figure respects `prefers-reduced-motion`: nothing plays on its
+own, and charts change in one step until the reader presses play or scrubs.
 
 ### API reference
 
@@ -182,16 +215,22 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
 - **Build warnings.** Next.js's CSS optimizer reports two warnings about
   `::highlight(fd-search)` in Fumadocs UI's stylesheet. The selector is valid
   CSS (the Custom Highlight API); the warning is upstream and harmless.
-- **No editable examples.** Examples are fixed modules with adjustable
-  parameters (speed, chart style, stage duration). Running reader-edited code
-  would need a sandbox; the previous VitePress site's editable playground was
-  not carried over.
+- **Reader code runs in the page.** The playground and gallery evaluate the
+  code in the editor with `new Function` in the reader's own tab, as the
+  previous site did. There is no sandbox; nothing is sent anywhere.
+- **Sequence theme tokens.** `sequence()` resolves CSS tokens on a hidden
+  preparation mount attached to `document.body`, so tokens scoped to a chart's
+  container do not reach sequence legs. The site sets its dark-mode `--vd-*`
+  tokens on `.dark` (the document) for this reason.
 - **Search index size.** The static search index is about 200 KB gzipped. It
   loads only when search is opened.
 - **Legacy anchors.** Redirects preserve pages, not every in-page anchor of the
   old site.
 - **Legacy VitePress site.** The previous site in `docs/` is still built by the
-  root `npm test` (`docs:check`) and is no longer deployed. Remove it, and its
-  scripts and dependencies, once this site has been validated in production.
+  root `npm test` (`docs:check`) and is no longer deployed. This site still
+  reads from it: datasets in `docs/public/data/` (copied to `public/data/` by
+  `scripts/prepare.mjs`), `demo.gif`, and the gallery and design-comparison
+  corpora in `docs/.vitepress/components/`. Move those into the site before
+  removing `docs/`.
   The semantic constitution (`docs/language-framework.md`) and the regression
   log remain the authoritative engineering records referenced by `AGENTS.md`.
