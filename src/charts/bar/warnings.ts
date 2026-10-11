@@ -5,6 +5,11 @@ import { colorWarnings, warning } from '../warnings.js';
 
 export const chartWarnings: ChartWarningInspector = (spec, rows) => {
   const result = colorWarnings(spec, rows);
+  if (spec.encoding?.facet && (spec.facetLayout as {scales?: string} | undefined)?.scales === 'independent') {
+    result.push(warning('bar.independent-repeat-scales',
+      'Repeated panels use independent numeric scales, so bar lengths cannot be compared across panels.',
+      'Use shared scales when comparing component magnitudes.', {}, spec.encoding.facet.field));
+  }
   const channel = barMeasureChannel(spec.encoding);
   const domain = channel.domain;
   if (rows.length && domain?.length === 2 && domain.every(value => Number.isFinite(Number(value)))) {

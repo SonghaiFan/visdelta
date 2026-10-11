@@ -209,3 +209,28 @@ class CustomState extends ChartState {
   chartModule() { return customModule; }
 }
 new CustomState({ mark: 'custom-lazy', data: { values: [] }, encoding: {} }).x('value');
+
+import { pie as selectedPie, pieModule } from 'visdelta/pie';
+import type { PieViewState } from 'visdelta/pie';
+const pieState: PieViewState = selectedPie([{ part: 'A', n: 1 }]).value('n').key('part').label('part').innerRadius(0.75).labels('outside').toSpec();
+void pieState; void pieModule;
+
+import type { FacetLayout, FacetedViewState } from 'visdelta/facet';
+const facetLayout: FacetLayout = { columns: 2, gap: 24, minWidth: 240 };
+const facetState: FacetedViewState = selectedBar([{ p: 'A', x: 'one', y: 2 }]).x('x').y('y').repeat('p', facetLayout).toSpec();
+void facetState;
+
+// Repeat is native Line layout syntax and retains Line-specific fluent methods.
+import { line as nativeLine } from 'visdelta/line';
+const nativeRepeatedLine = nativeLine([{ date: 1, ticker: 'A', close: 20 }])
+  .x('date').y('close').key(['date', 'ticker']).breakdown('ticker')
+  .repeat('ticker', { direction: 'y', scales: 'independent' }).curve('curveStep');
+const nativeLineMark: 'line' = nativeRepeatedLine.toSpec().mark;
+void nativeLineMark;
+
+const autoHeightLine = nativeRepeatedLine.repeat("ticker", { autoHeight: true, minHeight: 240 });
+void autoHeightLine;
+
+import type { VisualizationTransition as ResizableTransition } from "visdelta/transition";
+function resizeCanvas(change: ResizableTransition) { return change.resize({ height: 640 }); }
+void resizeCanvas;

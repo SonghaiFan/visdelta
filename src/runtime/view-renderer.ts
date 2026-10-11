@@ -269,7 +269,12 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
 
   const width = Math.max(60, node.clientWidth || 720);
   const layoutSpec = effectiveViewSpec as ViewLayoutSpec;
-  const height = viewConfig.height || layoutSpec.height || 500;
+  const baseHeight = viewConfig.height ?? layoutSpec.height ?? 500;
+  const height = viewConfig.height != null || layoutSpec.height != null ? baseHeight
+    : chartType?.defaultHeight?.(renderSpec, { width, height: baseHeight, rows }, {
+      ...chartType.defaultMargin(renderSpec, { width, height: baseHeight, rows: domainRows }),
+      ...layoutSpec.margin, ...viewConfig.margin
+    }) ?? baseHeight;
   resizeScene(scene, width, height);
 
   const rendererKey = resolveMarkRendererKey(renderSpec);

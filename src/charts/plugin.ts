@@ -18,6 +18,7 @@ import type { ChartPresentation, ChartPresentationDefinition } from './style.js'
 
 export interface ChartTypeConfig<S extends ViewSpec = ViewSpec> {
   warnings?: ChartType<S>['warnings'];
+  defaultHeight?: ChartType<S>['defaultHeight'];
   key: string;
   transitionEvaluation?: 'cached' | 'reconstruct';
   declarationPlanning?: boolean;
@@ -58,6 +59,7 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
       {
         ...chartType,
         warnings: config.warnings ?? chartType.warnings,
+        defaultHeight: config.defaultHeight ?? chartType.defaultHeight,
         defaultMargin: (spec, viewport) => viewport
           ? runtime.layoutMargins(config.layoutChannels?.(spec, viewport) ?? spec.encoding ?? {}, viewport, presentation.plot)
           : presentation.plot.margin,

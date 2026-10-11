@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Repeat keeps canvas height by default; opt-in `autoHeight` and `minHeight` reserve a stable route canvas. Standalone transitions automatically re-evaluate retained progress on container width changes.
+
+- Keep repeated Line as the native Line type; add staged ordinary Line ↔ repeat motion with shared/independent scales, scrubbing and canonical reverse. Show the bridge in the Line Playground.
+
+- Add native `.repeat()` composition with configurable x/y/grid direction and shared/independent numeric scales; stacked Bars transition into keyed repeated baselines through staged x/width and y/height geometry with play, reverse and scrubbing. Repeated Bars retain ordinary staged flip planning. Add runnable Repeat examples to every Playground chart type.
+- Repeated panels reuse ordinary axis and grid styles, align grids with the mark coordinate frame, and reserve space for shared axis titles.
+- Stage repeat rearrangements as whole panel containers first, then run each child chart's motion; reverse replays both levels backward.
+
+- Add Pie/Donut through `visdelta/pie`, with keyed angular motion, label placement,
+  value constraints and advisory design warnings.
+- Add source-backed Not ideal / Better comparisons, runnable data and code,
+  and forward/reverse/scrub arc demonstrations.
+- Surface design hints in Gallery and add nonzero Area baseline and risky
+  interpolation advice without changing authored charts.
+
 - Added `editorialChartStyle`, an opt-in ink-on-paper chart style: warm
   neutral ink for undeclared marks, 0.75px hairline grids, 1px Point
   connectors, a flat figure and tabular tick numerals. It keeps the default

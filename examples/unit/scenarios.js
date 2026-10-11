@@ -1,3 +1,4 @@
+import { repeatScenario } from '../repeat-scenario.js';
 import { transitionScenario } from '../scenario.js';
 
 // Keep these pairs aligned with tests/browser/unit-lab.spec.mjs.
@@ -78,5 +79,6 @@ export const scenarios = [
   sample('force', '12 · Gather with forceX', 'Use the explicitly mapped species positions as forceX attractors while collision keeps every flower separate.', forced, 'colored', 'bySpeciesForce'),
   sample('grid', '13 · Return to one grid', 'Move the three species bars back into one grid while every flower keeps its identity.', bars, 'bySpecies', 'colored.layout("grid", { columns: 15, radius: 6 })'),
   sample('unit-value', '14 · Split represented quantities', 'Split each coarse circle into the finer quantity intervals it represents; reverse merges those exact children into their parent.', unitValueSplit, 'detailed.value("count", { unitValue: 4, maxUnits: 40 })', 'detailed'),
-  sample('focus', '15 · Focus one flower', 'Keep all 150 flowers and use the shared 2D camera to fit one selected unit to the plot.', base, 'flowers', 'flowers.focus({ flowerId: "iris-001" })')
+  sample('focus', '15 · Focus one flower', 'Keep all 150 flowers and use the shared 2D camera to fit one selected unit to the plot.', base, 'flowers', 'flowers.focus({ flowerId: "iris-001" })'),
+  repeatScenario('unit')
 ];

@@ -33,6 +33,7 @@ const publicApi = [
   'lineageMarkKey',
   'markKeyValue',
   'paperChartStyle',
+  'pie',
   'planDeclarationTransition',
   'point',
   'registerChartType',
@@ -40,6 +41,7 @@ const publicApi = [
   'resolveEncodingTypes',
   'resolveMarkIdentity',
   'sequence',
+  'smallMultiples',
   'transition',
   'unit',
   'viewLineageCorrespondence',
@@ -47,7 +49,7 @@ const publicApi = [
   'visualizationWarnings'
 ];
 
-const expectedTypes = ['area', 'bar', 'line', 'point', 'unit'];
+const expectedTypes = ['area', 'bar', 'line', 'pie', 'point', 'unit'];
 const resolvedTypes = [];
 const compiledTypes = [];
 for (const mark of expectedTypes) {
@@ -77,7 +79,7 @@ assertSame(Object.keys(barApi).sort(), [
   'BarState', 'bar', 'barModule', 'createBarGrainDeclarationOperationCodec'
 ], 'Bar subentry public API');
 assertSame(resolvedTypes.sort(), expectedTypes, 'production chart type registries');
-assertSame(compiledTypes, expectedTypes, 'runtime view compiler consumes a selection state slot');
+assertSame(compiledTypes, ['area', 'bar', 'line', 'point', 'unit'], 'charts declaring selection compile that state slot');
 
 const first = sourceApi.bar([{ category: 'A', value: 1, other: 2 }])
   .x('category')

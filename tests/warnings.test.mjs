@@ -100,3 +100,25 @@ test('plain declarations run chart compiler slots before inspection', async () =
   assert.equal((await visualizationWarnings(spec))[0].evidence.count, 1);
   assert.deepEqual(spec, before);
 });
+
+test('guide-backed baseline and interpolation advice preserves author choices', async () => {
+  const data = [{ x: 1, y: 10 }, { x: 2, y: 20 }, { x: 3, y: 10 }];
+  const chart = area(data).x('x').y('y').baseline(5);
+  const before = chart.toSpec();
+  const hints = await visualizationWarnings(chart);
+  assert.deepEqual(hints.map(hint => hint.code), ['area.nonzero-baseline']);
+  assert.equal(hints[0].evidence.baseline, 5);
+  assert.match(hints[0].source, /datawrapper.*area-charts$/);
+  assert.deepEqual(chart.toSpec(), before);
+  for (const factory of [line, area]) {
+    for (const curve of ['curveNatural', 'curveCardinal']) {
+      const curved = factory(data).x('x').y('y').curve(curve);
+      assert.deepEqual(await codes(curved), ['connection.smoothing']);
+      assert.equal(curved.toSpec().curve, curve);
+    }
+    assert.deepEqual(await codes(factory(data).x('x').y('y').curve('curveMonotoneX')), []);
+    assert.deepEqual(await codes(factory(data.slice(0, 2)).x('x').y('y').curve('curveNatural')), []);
+    const pairs = ['A', 'B'].flatMap(group => data.slice(0, 2).map(row => ({ ...row, group })));
+    assert.deepEqual(await codes(factory(pairs).x('x').y('y').breakdown('group').curve('curveNatural')), []);
+  }
+});

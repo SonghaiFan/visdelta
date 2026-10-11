@@ -1,3 +1,5 @@
+import type { FacetLayout } from '../../facet.js';
+import { validateFacetLayout } from '../facet-layout.js';
 import type { AxisSpec, ViewSpec } from '../../types/index.js';
 import { ChartState, colorFrom, normalizeDataSource } from '../authoring.js';
 import { compileViewWithCompiler } from '../compile-view.js';
@@ -10,6 +12,7 @@ const LINE_SPEC_COMPILER = createLineSpecCompiler();
 
 export interface LineViewState extends ViewSpec {
   mark: 'line';
+  facetLayout?: FacetLayout;
   curve?: D3CurveName;
   connect?: 'adjacent' | 'across';
   strokeWidth?: number;
@@ -21,6 +24,11 @@ export function line(data?: unknown): LineState {
 }
 
 export class LineState extends ChartState<LineViewState> {
+  override repeat(field: string, layout: FacetLayout = {}): this {
+    if (!field.trim()) throw new Error('Repeat requires a grouping field.');
+    validateFacetLayout(layout);
+    return this.with({ encoding: { facet: { field, type: 'nominal' } }, facetLayout: layout } as Partial<LineViewState>);
+  }
   chartModule() {
     return lineModule;
   }

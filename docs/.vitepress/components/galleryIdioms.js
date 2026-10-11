@@ -5,7 +5,6 @@
 
 const FEATURE_STATES = '["CA", "TX", "FL", "NY", "PA", "IL", "OH", "GA"]';
 const SIX_STATES = '["CA", "TX", "FL", "NY", "PA", "IL"]';
-const AGES = '["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "≥80"]';
 const POPULATION = './data/us-population-state-age-tidy.csv';
 const STOCKS = './data/line-lab.csv';
 const STOCK_YEAR = './data/stock.csv';
@@ -50,7 +49,8 @@ export const idioms = [
   .y("population", { title: "Residents under 10" })
   .key(["state", "age"])
   .where({ age: "<10" })
-  .sort("population", "descending");`
+  .sort("population", "descending")
+  .flip();`
   },
   {
     id: 'ranked-horizontal-bars', mark: 'bar', title: 'Ranked horizontal bars', note: 'one bar = one car · sorted by horsepower', data: CARS,
@@ -62,44 +62,65 @@ export const idioms = [
   .flip();`
   },
   {
-    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', note: 'one segment = one age band in one state · bar = state total', data: POPULATION,
-    code: `const chart = bar(rows)
+    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', note: 'one segment = one age group in one state · bar = state total', data: POPULATION,
+    code: `const bands = rows.map(row => ({ ...row,
+  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
+    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
+}));
+const chart = bar(bands)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
-  .color("age", { domain: ${AGES}, scheme: "Blues" });`
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
+  .rollup(["state", "age"]);`
   },
   {
-    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked bars, many categories', note: 'nine age bands stacked for every state and territory', data: POPULATION,
-    code: `const chart = bar(rows)
-  .x("state")
-  .y("population", { format: "~s" })
-  .key(["state", "age"])
-  .breakdown("age")
-  .color("age", { domain: ${AGES}, scheme: "Blues" });`
-  },
-  {
-    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', note: 'one segment = one age band · bar length = state total', data: POPULATION,
-    code: `const chart = bar(rows)
+    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked totals', note: 'three age groups · six states · complete state totals', data: POPULATION,
+    code: `const bands = rows.map(row => ({ ...row,
+  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
+    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
+}));
+const chart = bar(bands)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
-  .color("age", { domain: ${AGES}, scheme: "Blues" })
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
+  .rollup(["state", "age"]);`
+  },
+  {
+    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', note: 'one segment = one age group · bar length = state total', data: POPULATION,
+    code: `const bands = rows.map(row => ({ ...row,
+  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
+    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
+}));
+const chart = bar(bands)
+  .x("state")
+  .y("population", { format: "~s" })
+  .key(["state", "age"])
+  .where({ field: "state", oneOf: ${SIX_STATES} })
+  .breakdown("age")
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
+  .rollup(["state", "age"])
   .flip();`
   },
   {
-    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', note: 'one bar = one age band · grouped by state', data: POPULATION,
-    code: `const chart = bar(rows)
+    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', note: 'one bar = one age group · grouped by state', data: POPULATION,
+    code: `const bands = rows.map(row => ({ ...row,
+  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
+    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
+}));
+const chart = bar(bands)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
-  .color("age", { domain: ${AGES}, scheme: "Blues" })
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
+  .rollup(["state", "age"])
   .layout("grouped");`
   },
   {
@@ -149,13 +170,14 @@ export const idioms = [
   .color("ticker");`
   },
   {
-    id: 'many-series-line', mark: 'line', title: 'Many series', note: 'one line = one industry · monthly unemployed', data: UNEMPLOYMENT,
+    id: 'many-series-line', mark: 'line', title: 'Many series', note: 'manufacturing in focus · other industries provide context', data: UNEMPLOYMENT,
     code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)" })
   .key(["date", "industry"])
   .breakdown("industry")
-  .color("industry");`
+  .color("#64748b")
+  .highlight({ industry: "Manufacturing" }, { opacity: 0.15 });`
   },
   {
     id: 'long-line', mark: 'line', title: 'Daily time series', note: 'one line = one ticker · a year of daily closes', data: STOCK_YEAR,
@@ -261,7 +283,7 @@ export const idioms = [
   .color("industry");`
   },
   {
-    id: 'many-layer-area', mark: 'area', title: 'Stacked area, many layers', note: 'fourteen industries stacked · top edge = total unemployed', data: UNEMPLOYMENT,
+    id: 'many-layer-area', mark: 'area', title: 'Stacked area over time', note: 'three selected industries · top edge = their combined total', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
@@ -270,7 +292,7 @@ export const idioms = [
   .color("industry");`
   },
   {
-    id: 'normalized-area', mark: 'area', title: 'Normalized stacked area', note: 'one layer = one industry · each month sums to 100%', data: UNEMPLOYMENT,
+    id: 'normalized-area', mark: 'area', title: 'Normalized stacked area', note: 'shares within three selected industries · each month sums to 100%', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Share of unemployed" })
@@ -280,7 +302,7 @@ export const idioms = [
   .layout("stream", { offset: "expand", order: "none" });`
   },
   {
-    id: 'streamgraph', mark: 'area', title: 'Streamgraph', note: 'layers centred on a moving baseline · thickness = unemployed', data: UNEMPLOYMENT,
+    id: 'streamgraph', mark: 'area', title: 'Streamgraph', note: 'three selected industries · thickness = unemployed · moving baseline', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
@@ -290,7 +312,7 @@ export const idioms = [
   .layout("stream");`
   },
   {
-    id: 'smooth-stream', mark: 'area', title: 'Smoothed streamgraph', note: 'silhouette offset · thickness = unemployed per industry', data: INDUSTRIES,
+    id: 'smooth-stream', mark: 'area', title: 'Smoothed streamgraph', note: 'silhouette offset · monotone interpolation between monthly observations', data: INDUSTRIES,
     code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
@@ -298,7 +320,7 @@ export const idioms = [
   .breakdown("industry")
   .color("industry")
   .layout("stream", { offset: "silhouette" })
-  .curve("curveBasis");`
+  .curve("curveMonotoneX");`
   },
   {
     id: 'highlighted-range', mark: 'area', title: 'Highlighted range', note: 'Sep 2008 – Jun 2009 in ink · the rest as context', data: INDUSTRIES,

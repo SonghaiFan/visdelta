@@ -49,7 +49,7 @@
 .snapshot-code .editable-code-cell { height: 460px; }
 .snapshot-code .cm-scroller { padding-right: 0; }
 .snapshot-code .playground-contract { padding: 0 18px 16px; color: var(--ui-code-muted); font-size: 10px; }
-.snapshot-chart { position: absolute; top: 94px; right: 0; width: 35%; z-index: 2; min-width: 0; border: 0; border-radius: var(--ui-radius-lg); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-float); overflow: hidden; }
+.snapshot-chart { position: absolute; top: 94px; right: 0; width: var(--preview-width, 35%); z-index: 2; min-width: 0; border: 0; border-radius: var(--ui-radius-lg); background: var(--ui-color-surface); box-shadow: var(--ui-shadow-float); overflow: hidden; }
 .snapshot-chart .snapshot-panel-head { min-height: 38px; padding: 8px 12px 0 20px; font-size: var(--ui-text-2xs); }
 .snapshot-chart .snapshot-panel-head output { flex: 1; text-align: right; }
 .snapshot-chart .snapshot-panel-head strong { display: flex; align-items: center; gap: 6px; }
@@ -58,7 +58,7 @@
 .snapshot-chart .playground-chart-stage, .snapshot-chart .playground-chart { min-height: 0; background: transparent; }
 .snapshot-chart .vd-figure { border: 0; background: transparent; border-radius: 0; }
 .snapshot-chart .vd-figure-header { display: none; }
-.snapshot-chart .vd-view, .snapshot-chart .vd-view svg { min-height: 0; height: 280px; }
+.snapshot-chart .vd-view, .snapshot-chart .vd-view svg { min-height: 0; height: auto; }
 .snapshot-chart .vd-legend { padding: 8px 12px; font-size: 9px; }
 .snapshot-chart .playground-description { font-size: 10px; line-height: 1.5; margin: 4px 5px 0; color: var(--ui-color-text-subtle); }
 .snapshot-chart .playground-output-pane > input[type="range"] { margin-top: 8px; height: 3px; }
@@ -142,3 +142,16 @@
   .dataset-sources { grid-template-columns: 1fr; }
   .dataset-dialog footer { align-items: end; }
 }
+
+.preview-resize-edge { position: absolute; padding: 0; margin: 0; border: 0; background: transparent; z-index: 4; touch-action: none; }
+.preview-resize-edge:hover { background: color-mix(in srgb, var(--ui-color-accent) 12%, transparent); }
+.resize-n, .resize-s { left: 12px; right: 12px; height: 7px; cursor: ns-resize; }
+.resize-n { top: 0; } .resize-s { bottom: 0; }
+.resize-e, .resize-w { top: 12px; bottom: 12px; width: 7px; cursor: ew-resize; }
+.resize-e { right: 0; } .resize-w { left: 0; }
+.resize-ne, .resize-nw, .resize-se, .resize-sw { width: 12px; height: 12px; }
+.resize-ne { top: 0; right: 0; cursor: nesw-resize; }
+.resize-nw { top: 0; left: 0; cursor: nwse-resize; }
+.resize-se { bottom: 0; right: 0; cursor: nwse-resize; }
+.resize-sw { bottom: 0; left: 0; cursor: nesw-resize; }
+@media (max-width: 1000px) { .preview-resize-edge { display: none; } }

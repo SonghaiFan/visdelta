@@ -3,13 +3,217 @@
 A chart type is an independent module. Core should work before that module is
 imported and should not change when the module is added.
 
-## Live external plugin: Orbit
+## Live chart plugin: Pie
 
-This example loads the Orbit plugin through its own module, using the same
-host services as built-in charts. It is an extension example, not a new
-built-in export. Play forward, reverse, or scrub the same transition below.
+This example loads the focused `visdelta/pie` module. It uses the same plugin
+contract as an external chart package. Pie already exists in this checkout;
+the source panels below show its actual implementation, including internal
+imports. They are a source walkthrough, not a standalone external package.
 
-<OrbitPluginDemo />
+<PiePluginDemo />
+
+The selected value field determines each slice's fraction of the total.
+The four records retain their keys while the renderer interpolates angles.
+Play, reverse, and scrub all control the same VisDelta transition.
+
+## Build a chart plugin from zero
+
+Start with one small, explicit contract: one transformed row becomes one
+slice, a declared nonnegative value determines its angle, and a stable key
+identifies it. Complete direct rendering and reversible motion before adding
+a planner. The following steps follow the Pie implementation above.
+
+### 1. Separate state, meaning, geometry, and control
+
+A plugin participates in the [four-layer constitution](./language-framework.md#the-four-layer-constitution).
+Keep these questions separate:
+
+| Layer | Pie example | Owner |
+| --- | --- | --- |
+| Identity | Does slice A remain slice A? | Core correspondence, using chart-declared mark keys |
+| State difference | Did `angle` change from `before` to `after`? | Existing Encoding vocabulary |
+| Transition plan | Is a direct pair sufficient? | Chart policy; Pie uses direct fallback |
+| Frame and control | What are the angles at progress 0.5? | Renderer records tracks; controller supplies progress |
+
+A fluent call produces a new state, not a queued animation instruction.
+Changing the bound field is Encoding; changing values under stable source
+identity is Data. Neither implies a split/merge trajectory.
+
+### 2. Give each file one responsibility
+
+For a separate package, begin with this small structure:
+
+```text
+my-pie/
+  package.json
+  index.js        # immutable builder and carried module
+  module.js       # lazy loader
+  plugin.js       # validation, identity defaults, renderer factory
+  geometry.js     # transformed rows -> keyed angular geometry
+  render.js       # keyed DOM joins and recorded motion
+```
+
+Use `visdelta` as a peer dependency with a range you have actually tested.
+Declare the D3 packages you import as dependencies. Export your builder through
+your package's `exports`; keep the renderer behind a dynamic import.
+Import SDK contracts from `visdelta/plugins` and optional helpers from
+`visdelta/toolkit`. Do not import `visdelta/dist/...` or another chart's internals.
+The source panels use repository-relative imports because this Pie lives
+inside VisDelta; an external implementation must adapt those imports and own
+its geometry and identity adapter.
+
+### 3. Define immutable authored slots
+
+Pie maps `.value(field)` to `encoding.angle` and `.label(field)` to
+`encoding.label`. It does not store computed angles in the public declaration.
+`.innerRadius(fraction)` and `.labels(position)` remain independent
+presentation controls.
+
+A minimal external builder can use the public SDK like this. Use a distinct
+key such as `example-pie` so it does not collide with the supplied Pie module.
+
+```js
+// index.js
+import { ChartState, normalizeDataSource } from "visdelta/plugins";
+import { chartModule } from "./module.js";
+
+class PieState extends ChartState {
+  chartModule() { return chartModule; }
+  value(field) {
+    return this.channel("angle", field, { type: "quantitative" });
+  }
+  label(field) {
+    return this.channel("label", field, { type: "nominal" });
+  }
+}
+
+export function pie(data) {
+  return new PieState({
+    mark: "example-pie",
+    data: normalizeDataSource(data),
+    encoding: {}
+  });
+}
+```
+
+Inherited `.key()`, `.color()`, and transforms still produce new states.
+Use `this.channel()` and `this.with()` rather than mutating `encoding` or data.
+Additional syntax needs a compiler only when it needs compilation:
+the current Pie has no custom compiler. A custom compiler must declare its
+`stateOrder` and matching handlers, as described in the builder contract below.
+
+### 4. Carry a lazy module and declare capabilities
+
+```js
+// module.js
+import { defineChartModule } from "visdelta/plugins";
+export const chartModule = defineChartModule({
+  key: "example-pie",
+  load: () => import("./plugin.js")
+});
+```
+
+The loaded module exports `plugin = defineChartType({ ... })` with the same
+key. Supply `createRenderer`; add only the hooks needed by the chart.
+Pie declares `scenes: []`, its margins, and `layoutChannels` exposing only
+color because it draws no Cartesian axes. Its default mark key is the color
+field, then the label field; an explicit `.key()` takes priority.
+
+Validate declarations in `prepareSpec`. Current Pie rejects Cartesian
+position channels and axes, focus cameras, angle scales/domains/ranges,
+invalid label modes, and hole fractions outside `[0, 1)`.
+Do not silently accept inherited syntax the renderer cannot honor.
+
+A builder carries this module into `transition()`. When loading a plain JSON
+spec, call `registerChartModule(chartModule)` from `visdelta/plugins` first.
+Registration is for resolving a module by key; it does not add semantic
+categories or teach Core how to draw arcs.
+
+### 5. Validate transformed rows and establish identity
+
+Geometry receives the rows after declared transforms, not just the source
+array. Current Pie checks that the value field exists, values are finite and
+nonnegative, keys are unique, and a nonempty chart has a finite positive total.
+It rejects repeated categories instead of silently aggregating them.
+Authors must request aggregation explicitly.
+
+Source-record `datumKey` and slice `key` are different contracts. Preserve
+the original row on geometry wrappers so tooltips and correspondence retain
+their evidence. The repository's `pieSlices()` uses internal identity helpers;
+an external implementation needs its own public-contract-compatible key
+adapter. A minimal external version can require one explicit string key
+field, validate uniqueness, and reject unsupported key forms rather than
+guessing identity.
+
+### 6. Derive polar geometry without changing data
+
+For each value v and total T, the angular span is `2π × v / T`.
+Cumulative spans determine start and end angles. Current Pie uses
+`d3-shape`'s pie generator with `.sort(null)`, preserving the transformed
+row order. A declared sort therefore remains meaningful.
+
+Calculate the outer radius from available inner width and height. Derive the
+hole radius by multiplying the outer radius by the authored fraction.
+Keep angles, radii, label positions, and leader paths in renderer geometry;
+they are not independent authored state-change operations.
+
+### 7. Record motion that can be evaluated at any progress
+
+Join paths by slice key. Entering slices begin with a collapsed angle and
+zero radius; exiting paths fade through recorded motion and `.remove()`.
+Current Pie retains the previous start/end angles and radii as SVG attributes.
+Its `attrTween("d", ...)` interpolates those numbers and calls the arc generator
+for each frame. It also records the numeric attributes for later rendering.
+
+This is why a path moves as a wedge instead of interpolating unrelated SVG
+string coordinates. Use the injected `runtime.motion` so separately bundled
+plugins share the host recorder. Never schedule `selection.transition()`
+or use start/end callbacks for state changes.
+
+Use `runtime.colorScale` for declared colors and `runtime.bindTooltip` for
+the host tooltip. Without a color binding, marks remain black.
+Labels and leaders need their own keyed joins and cleanup. On resize, derive
+geometry again from the new dimensions; a destination spec alone is not a
+sufficient geometry cache key.
+
+### 8. Keep planning optional and truthful
+
+Current Pie has no declaration-operation codec and no automatic waypoints.
+It uses the ordinary direct runtime fallback; this is a working transition,
+not a promise of conserved split/merge motion or cross-chart morphing.
+Its renderer also does not opt into cached transition evaluation.
+
+If a future plugin needs automatic operation planning, first identify authored
+slots and derived bindings. Implement a chart-owned codec that normalizes to
+a fixed point, round-trips exactly, and validates every complete candidate
+against transformed data. Keep the search bounded and deterministic.
+Unsupported combinations must retain an explicit fallback. Do not introduce
+a generic Core branch for your chart or treat the seven semantic categories
+as an animation schedule.
+
+### 9. Verify the plugin before distributing it
+
+Use the existing `tests/pie.test.mjs` and `tests/browser/pie.spec.mjs` as
+concrete starting points:
+
+- Check bindings, input immutability, angular totals, unique keys, invalid
+  values, unsupported declarations, and the exact emitted state changes.
+- Compare transition endpoints with independent static renders at the same
+  size. Test forward play, reverse play, scrubbing, membership cleanup,
+  and narrow/desktop resize behavior.
+- For multi-phase motion, inspect actual local phase progress. If you add a
+  codec, also test deterministic routes, one operation per edge, valid
+  complete states, replay, exact normalized endpoints, and inverse routes.
+- Bundle an external plugin separately from its host. Test JSON registration,
+  disposal, and an installed-package consumer; source imports alone do not
+  verify package exports or recorder sharing.
+
+The demo on this page is a focused official-module example. The repository
+retains `examples/plugins/orbit/index.js` and its separate-bundle browser test
+as an additional packaging fixture; it is not the chart taught on this page.
+
+See [Pie syntax](./chart-types.md#pie) and
+[implemented limits](./reference.md) before extending the example.
 
 ## Module contract
 
@@ -26,6 +230,11 @@ The shared renderer services have no privileged built-in-only subset. Mark
 layers are isolated by plugin key, so Core never cleans up shapes by guessing
 which named chart owns a rectangle, circle, or path.
 
+
+A compositor can set `ChartContext.sharedDomains` and supply `domainRows` from
+all panels. Renderers should then use those rows for positional domains while
+drawing only their panel rows. Line, Area and Point honor this context; ordinary
+standalone rendering keeps its existing domain policy.
 
 The module owns its builder, compiler, renderer, matching, transition plan,
 axes, examples, and tests.
@@ -179,7 +388,7 @@ plain object cannot carry a module reference.
 
 ## Runtime object
 
-Chart plugins follow the [three governing contracts](./language-framework.md#three-governing-contracts):
+Chart plugins follow the [three governing contracts](./language-framework.md#transition-contracts):
 states are facts, correspondence is evidence, and paths are chart-owned default
 choices constrained by that evidence and the authored endpoints.
 
@@ -231,21 +440,16 @@ extension hooks to Core.
 
 ## Official chart checklist
 
-The [live Orbit example](#live-external-plugin-orbit), with expandable plugin source, demonstrates
-an external chart using only `visdelta/plugins`, `visdelta/toolkit`, and injected host services.
-Its circles are arranged around a ring and use a declared size field. It is a
-reference for packaging and runtime integration, not a built-in chart or a
-claim of specialized split/merge semantics. Browser tests independently bundle
-it and check seek, reverse seek, resize, disposal, and plain JSON registration.
-
-An official chart folder lives at `src/charts/<name>/` and contains its
-authoring, compile, state, render, plugin, and module files. Then:
+The [live Pie example](#live-chart-plugin-pie) exposes the current authoring,
+module, plugin, geometry, and renderer sources. An official chart lives in
+`src/charts/<name>/`; create compiler or state files only when needed. Then:
 
 1. run `node scripts/sync-chart-manifest.mjs`;
 2. add a focused package entry;
 3. add authoring and real-browser transition tests;
-4. add one real-data lab;
-5. update `chart-types.md` and the API reference.
+4. add a live example with explicit data and state declarations;
+5. update `chart-types.md` and the API reference;
+6. update public types, classifier, constitution, and tests if vocabulary changes.
 
 The inventory check keeps built-in lazy loading aligned with chart folders. A
 focused-module browser test must prove that no unrelated built-in chart module
@@ -300,3 +504,13 @@ const intermediateSpecs = composeIntermediatePolicies(
 
 This selects a route inside one authored pair. It does not turn builder history
 into an animation script or cross the boundaries supplied to `sequence()`.
+
+### Optional content height
+
+A plugin may provide `defaultHeight(spec, viewport, margin)` through
+`defineChartType`. The viewport includes transformed rows, width and the base
+height; margin is the outer layout margin. Return a finite positive height.
+Explicit chart/runtime heights take priority. A standalone transition reserves
+the largest requested height across its complete route states and recomputes it
+on container width changes, retaining progress. Repeat plugins use this hook for
+opt-in `autoHeight`; no chart-name branches are needed in the runtime.

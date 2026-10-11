@@ -28,6 +28,14 @@ const publicExports = {
     types: "./dist/bar.d.ts",
     import: "./dist/bar.js"
   },
+  "./facet": {
+    types: "./dist/facet.d.ts",
+    import: "./dist/facet.js"
+  },
+  "./pie": {
+    types: "./dist/pie.d.ts",
+    import: "./dist/pie.js"
+  },
   "./point": {
     types: "./dist/point.d.ts",
     import: "./dist/point.js"

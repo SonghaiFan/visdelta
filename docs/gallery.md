@@ -14,4 +14,6 @@ pageClass: gallery-page
   <p>Every chart below is drawn by VisDelta from a few lines of code and a bundled dataset. Open one to see it large, read its code, and edit it in the Playground.</p>
 </header>
 
+[Explore Not ideal → Better design comparisons](./design-guides.md)
+
 <IdiomGallery />

@@ -95,8 +95,10 @@ for (const [path, output] of Object.entries(outputs)) {
 if (!loaded.size) throw new Error('Missing selected transition output.');
 const files = new Map(split.outputFiles.map(file => [file.path, file.contents]));
 let gzipBytes = 0;
-// Includes non-blocking plugin diagnostics and their browser event reporting.
-const maxSelectedTransitionGzipBytes = 91_000;
+// Includes non-blocking diagnostics, native repeated panels and the Bar-owned
+// staged rectangle bridge. Other chart plugins remain excluded from this budget.
+// Includes the staged repeat container and its nested child motion projection.
+const maxSelectedTransitionGzipBytes = 98_000;
 for (const path of loaded) {
   gzipBytes += gzipSync(files.get(resolve(root, path))).byteLength;
   for (const source of Object.keys(outputs[path].inputs)) {

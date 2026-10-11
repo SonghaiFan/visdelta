@@ -1,3 +1,4 @@
+import { repeatScenario } from '../repeat-scenario.js';
 import { transitionScenario } from '../scenario.js';
 
 // Keep these pairs aligned with tests/browser/area-lab.spec.mjs.
@@ -63,5 +64,6 @@ export const scenarios = [
   sample('split', '13 · Split into industry areas', 'Draw the internal boundaries through the combined total, then reveal three industries using the default color scheme.', stacked, 'total', 'detailed'),
   sample('merge', '14 · Merge into a total', 'Hide the industry parts and erase the same boundaries in exact reverse.', stacked, 'detailed', 'total'),
   sample('curve', '15 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")'),
-  sample('stream', '16 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })')
+  sample('stream', '16 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })'),
+  repeatScenario('area')
 ];

@@ -34,9 +34,9 @@ export default defineConfig({
     // philosophy), the editor, and the gallery of expressible idioms.
     nav: [
       { text: 'Home', link: '/', activeMatch: '^/$' },
-      { text: 'Docs', link: '/overview', activeMatch: '^/(?!playground|gallery|$)' },
+      { text: 'Docs', link: '/overview', activeMatch: '^/(?!playground|gallery|design-guides|$)' },
       { text: 'Playground', link: '/playground' },
-      { text: 'Gallery', link: '/gallery' },
+      { text: 'Gallery', link: '/gallery', activeMatch: '^/(gallery|design-guides)' },
       { text: '0.3.0', items: [
         { text: 'Changelog', link: 'https://github.com/SonghaiFan/visdelta/blob/main/CHANGELOG.md' },
         { text: 'npm package', link: 'https://www.npmjs.com/package/visdelta' }
@@ -53,7 +53,8 @@ export default defineConfig({
       {
         text: 'Philosophy',
         items: [
-          { text: 'Ontology and contracts', link: '/language-framework' }
+          { text: 'Ontology and contracts', link: '/language-framework' },
+          { text: 'Design comparisons', link: '/design-guides' }
         ]
       },
       {
@@ -61,6 +62,7 @@ export default defineConfig({
         items: [
           { text: 'Data and transforms', link: '/data-sources-and-transforms' },
           { text: 'Chart types', link: '/chart-types' },
+          { text: 'Repeat', link: '/repeat' },
           { text: 'Appearance and style', link: '/chart-style' },
           { text: 'API reference', link: '/reference' }
         ]

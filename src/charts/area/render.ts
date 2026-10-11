@@ -102,7 +102,7 @@ class AreaChart extends BaseChart<AreaViewState> {
     const lineageDomainLayers = state.mode === 'single'
       ? areaLayers(lineageDomainRows, xField, yField, state, pointKey)
       : domainLayers;
-    const scaleRows = state.filtersRows ? domainRows : rows;
+    const scaleRows = state.filtersRows || chart.sharedDomains ? domainRows : rows;
     const layers = areaLayers(rows, xField, yField, state, pointKey, domainLayers.map(layer => layer.value));
     const lineageLayers = state.filtersRows && state.connect !== 'across'
       ? lineageDomainLayers

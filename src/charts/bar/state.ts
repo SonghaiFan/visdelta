@@ -747,7 +747,7 @@ function reaggregationDetailSpec({
   };
 }
 
-function stepOrder(options: Record<string, unknown>, orientation: BarOrientation): Array<'x' | 'y'> {
+export function barAxisStepOrder(options: Record<string, unknown>, orientation: BarOrientation): Array<'x' | 'y'> {
   const order = options.order as Array<'x' | 'y'> | undefined;
   if (Array.isArray(order) && order.length) return order.filter((a) => a === 'x' || a === 'y');
   return orientation === 'horizontal' ? ['y', 'x'] : ['x', 'y'];
@@ -783,7 +783,7 @@ function coordinateStepOrder({
 }): Array<'x' | 'y'> {
   const baseOrder = changesSegmentLayout
     ? segmentLayoutStepOrder(orderOptions, target.barLayout)
-    : stepOrder(orderOptions, target.orientation);
+    : barAxisStepOrder(orderOptions, target.orientation);
   const ordered = reverse ? [...baseOrder].reverse() : [...baseOrder];
   const dimensionSet = new Set(dimensions);
   const steps = ordered.filter((dimension) => dimensionSet.has(dimension));

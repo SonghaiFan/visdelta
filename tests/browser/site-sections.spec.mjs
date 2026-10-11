@@ -57,7 +57,7 @@ test('gallery viewer shows a live idiom with its code and hands it to the Playgr
   await expect(page).toHaveURL(/#stacked-bars$/);
 
   await page.keyboard.press('ArrowRight');
-  await expect(viewer.getByRole('heading', { level: 2 })).toHaveText('Stacked bars, many categories');
+  await expect(viewer.getByRole('heading', { level: 2 })).toHaveText('Stacked totals');
   await page.keyboard.press('ArrowLeft');
   await expect(viewer.getByRole('heading', { level: 2 })).toHaveText('Stacked bar chart');
   const edit = viewer.getByRole('link', { name: 'Edit in Playground →' });
@@ -113,4 +113,19 @@ test('design token reference reads live values for both appearances', async ({ p
   await expect(canvas.locator('span')).toHaveText('#f4f4f2');
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await expect(canvas.locator('span')).toHaveText('#111210');
+});
+
+test('gallery exposes system hints and source guides on desktop and mobile', async ({ page }) => {
+  for (const width of [1100, 390]) {
+    await page.setViewportSize({ width, height: 850 });
+    await page.goto(`${site}/gallery.html`);
+    await page.locator('[data-idiom-tile="baseline-area"]').click();
+    const viewer = page.getByRole('dialog');
+    const hints = viewer.getByLabel('Design hints');
+    await expect(hints).toContainText('nonzero baseline');
+    await expect(hints.getByRole('link')).toHaveAttribute('href', /datawrapper.*area-charts$/);
+    await expect(viewer.locator('.idiom-viewer-target path').first()).toBeAttached();
+    expect(await viewer.evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+    await page.keyboard.press('Escape');
+  }
 });

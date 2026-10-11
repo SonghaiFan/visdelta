@@ -1,6 +1,6 @@
 # Chart types
 
-VisDelta ships five peer chart modules. Import a focused module when an
+VisDelta ships six peer chart modules. Import a focused module when an
 application uses one chart type:
 
 ```js
@@ -135,3 +135,37 @@ changes use a short bounded per-mark stagger unless the author overrides it.
 
 The [interactive reference](/reference) covers exact runtime signatures. The
 [Playground](/playground) shows every chart-owned transition rule with real data.
+
+## Pie
+
+`pie()` shows nonnegative parts of one positive total. Every row is one keyed
+slice; repeated categories must be aggregated before constructing the chart.
+
+```js
+import { pie } from "visdelta/pie";
+const chart = pie([{ part: "Selected", value: 25 }, { part: "Remaining", value: 75 }])
+  .value("value").color("part").key("part").label("part");
+```
+
+`.value(field, options?)` binds `encoding.angle`; `.label(field)` binds
+`encoding.label`. `.labels("inside" | "outside" | "none")` controls the labels;
+outside labels are the default. `.innerRadius(fraction)` creates a donut;
+its fraction must be at least zero and less than one. Outside labels have leaders and vertical
+spacing; names that exceed the available gutter are shortened, with full
+values in the tooltip. Input order determines clockwise slice order, starting
+at the top. `.sort()` changes that order explicitly. `.where()`, `.highlight()`,
+color and tooltips are supported. Zero components have no visible sector.
+Negative, missing, nonfinite values and nonpositive totals are rejected.
+
+Pie uses the direct runtime transition fallback with recorded angular/radial
+motion and keyed enter/exit. It has no declaration operation codec, automatic
+waypoints, Cartesian axes, focus camera or cross-chart geometry
+bridge. Those subsets are unsupported. See the runnable [design comparisons](./design-guides.md).
+
+## Small multiples
+
+See [Repeat](./repeat.md) for the core syntax and live transition.
+Use `chart.repeat(field, options)` to compose a chart into one SVG with
+shared-scale panels and a single transition controller. See the
+[API and supported boundaries](./reference.md#native-small-multiples) and
+[live design comparisons](./design-guides.md).

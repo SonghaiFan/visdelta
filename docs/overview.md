@@ -26,7 +26,7 @@ against. Both describe only behavior that exists in the current checkout.
     <ul>
       <li><a href="./getting-started.html">Getting started <span>first transition</span></a></li>
       <li><a href="./data-sources-and-transforms.html">Data and transforms <span>rows, urls, where</span></a></li>
-      <li><a href="./chart-types.html">Chart types <span>five modules</span></a></li>
+      <li><a href="./chart-types.html">Chart types <span>six modules</span></a></li>
       <li><a href="./reference.html">API reference <span>every method</span></a></li>
       <li><a href="./runtime-api.html">Transition runtime <span>controller</span></a></li>
     </ul>

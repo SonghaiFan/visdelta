@@ -1,12 +1,13 @@
 import { orderedAxisWarnings } from '../ordered-warnings.js';
 import type { ChartWarningInspector } from '../../types/index.js';
 import { lineSeriesKey, lineState } from './state.js';
-import { categoryCount, colorWarnings, warning } from '../warnings.js';
+import { categoryCount, colorWarnings, smoothingWarnings, warning } from '../warnings.js';
 
 export const chartWarnings: ChartWarningInspector = (spec, rows) => {
   if (!rows.length) return [];
   const result = [...colorWarnings(spec, rows), ...orderedAxisWarnings(spec.encoding?.x)];
   const field = lineSeriesKey(lineState(spec, spec.encoding));
+  result.push(...smoothingWarnings(spec, rows, field));
   const count = categoryCount(rows, field);
   if (count > 10) result.push(warning('line.too-many-series',
     `${count} lines can obscure trends and crossovers.`,

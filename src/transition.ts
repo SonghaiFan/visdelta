@@ -41,7 +41,7 @@ export interface VisualizationTransition {
   play(options?: PlayOptions): VisualizationTransition;
   pause(): VisualizationTransition;
   /** Recompile at the container's current size/theme, retaining progress and data. */
-  resize(): VisualizationTransition;
+  resize(options?: { height?: number }): VisualizationTransition;
   destroy(): void;
 }
 
@@ -101,6 +101,7 @@ export async function transition(
   let lastDirection = 1;
   let animation: number | null = null;
   let destroyed = false;
+  let resizeObserver: ResizeObserver | null = null;
 
   function assertAlive() {
     if (destroyed) throw new Error('This transition has been destroyed.');
@@ -156,10 +157,15 @@ export async function transition(
     },
     pause() { assertAlive(); stop(); return controller; },
     stageCount() { return surface.stageCount(); },
-    resize() { assertAlive(); surface.resize(); show(value, lastDirection); return controller; },
+    resize({ height } = {}) {
+      assertAlive();
+      if (height != null && (!Number.isFinite(height) || height <= 0)) throw new Error('resize height must be finite and positive.');
+      surface.resize(height); show(value, lastDirection); return controller;
+    },
     destroy() {
       if (destroyed) return;
       stop();
+      resizeObserver?.disconnect();
       surface.destroy();
       destroyed = true;
     }
@@ -167,6 +173,15 @@ export async function transition(
   try {
     show(0);
     surface.commitMount();
+    if (typeof ResizeObserver !== 'undefined') {
+      let width = host.clientWidth;
+      resizeObserver = new ResizeObserver(() => {
+        if (destroyed || host.clientWidth === width) return;
+        width = host.clientWidth;
+        controller.resize();
+      });
+      resizeObserver.observe(host);
+    }
   } catch (error) {
     surface.rollbackMount();
     controller.destroy();

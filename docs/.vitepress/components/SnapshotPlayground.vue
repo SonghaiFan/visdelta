@@ -32,12 +32,20 @@ const PLACEMENT_KEY = 'visdelta:playground-chart-placement';
 const placement = ref('float');
 const floatOffset = ref({ x: 0, y: 0 });
 const dragging = ref(false);
-const floatStyle = computed(() => ({ '--float-x': `${floatOffset.value.x}px`, '--float-y': `${floatOffset.value.y}px` }));
+const floatSize = ref({ width: null, height: null });
+let resizing = null;
+const floatStyle = computed(() => ({ ...(placement.value === 'float' && floatSize.value.width ? { '--preview-width': `${floatSize.value.width}px` } : {}), '--float-x': `${floatOffset.value.x}px`, '--float-y': `${floatOffset.value.y}px` }));
 let drag = null;
 let api, factory, controller, observer, timer, raf;
 let version = 0;
 let nextId = 0;
 let sourceRows = [];
+const workspaceHeight = ref(620);
+function updateWorkspaceHeight() {
+  const panel = target.value?.closest('.snapshot-chart');
+  workspaceHeight.value = panel && getComputedStyle(panel).position === 'absolute'
+    ? Math.max(620, panel.offsetTop + panel.offsetHeight + 20) : 620;
+}
 let disposed = false;
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const candidates = new Set();
@@ -57,7 +65,10 @@ function fail(cause, request) {
 async function evaluate(source, rows) {
   const state = await new AsyncFunction(lab.chart, 'd3', 'rows', `"use strict";\n${source}\nreturn chart;`)(factory, d3, structuredClone(rows));
   if (typeof state?.toSpec !== 'function' || typeof state?.rows !== 'function') throw new Error('Assign a VisDelta state to const chart.');
-  if (state.toSpec().mark !== lab.chart) throw new Error(`Use the ${lab.chart} chart type selected above.`);
+  const spec = state.toSpec();
+  const repeatedModule = `faceted-${lab.chart}`;
+  const isRepeated = spec.encoding?.facet && spec.mark === repeatedModule && state.chartModule()?.key === repeatedModule;
+  if (spec.mark !== lab.chart && !isRepeated) throw new Error(`Use the ${lab.chart} chart type selected above.`);
   return state;
 }
 async function makeFrame(source, label, rows, request, name = datasetName.value, description = active.value?.description ?? sample.value.description) {
@@ -110,13 +121,15 @@ async function display(frame, request, from = frame, animate = false) {
   candidates.add(host);
   let next;
   try {
-    next = await api.transition(from.state, frame.state, { target: host, height: 360 });
+    // Canvas policy belongs to the runtime, including opt-in repeat auto height.
+    next = await api.transition(from.state, frame.state, { target: host, ...(floatSize.value.height ? { height: floatSize.value.height } : {}) });
     if (request !== version || disposed) { next.destroy(); return; }
     next.progress(animate ? 0 : 1);
     controller?.destroy();
     target.value.replaceChildren(host);
     host.className = '';
     controller = next;
+    nextTick(updateWorkspaceHeight);
     activeId.value = frame.id;
     code.value = frame.code;
     tableRows.value = structuredClone(frame.rows);
@@ -239,9 +252,46 @@ function seek(value) {
   progress.value = Number(value);
   controller?.progress(progress.value);
 }
+function startResize(event, edge) {
+  if (event.button !== 0 || placement.value !== 'float' || !window.matchMedia('(min-width: 1001px)').matches) return;
+  const panel = event.currentTarget.closest('.snapshot-chart');
+  const box = panel.getBoundingClientRect();
+  resizing = { edge, top: box.top, right: box.right, x: event.clientX, y: event.clientY, width: box.width,
+    height: target.value.querySelector('svg').viewBox.baseVal.height, left: box.left, offset: { ...floatOffset.value } };
+  window.addEventListener('pointermove', moveResize);
+  window.addEventListener('pointerup', stopResize);
+  window.addEventListener('pointercancel', stopResize);
+  event.preventDefault();
+}
+function moveResize(event) {
+  if (!resizing) return;
+  const { edge, width, height, left, right, top, offset } = resizing;
+  const dx = event.clientX - resizing.x, dy = event.clientY - resizing.y;
+  const horizontal = edge.includes('e') || edge.includes('w');
+  const vertical = edge.includes('n') || edge.includes('s');
+  floatSize.value = {
+    width: horizontal ? Math.max(280, Math.min(edge.includes('w') ? right - 12 : innerWidth - left - 12,
+      width + (edge.includes('w') ? -dx : dx))) : width,
+    height: vertical ? Math.max(180, Math.min(edge.includes('n') ? height + Math.max(0, top - 64) : Infinity,
+      height + (edge.includes('n') ? -dy : dy))) : floatSize.value.height
+  };
+  floatOffset.value = {
+    x: offset.x + (edge.includes('e') ? floatSize.value.width - width : 0),
+    y: offset.y - (edge.includes('n') ? floatSize.value.height - height : 0)
+  };
+  nextTick(() => { controller?.resize({ height: floatSize.value.height }); updateWorkspaceHeight(); });
+}
+function stopResize() {
+  resizing = null;
+  window.removeEventListener('pointermove', moveResize);
+  window.removeEventListener('pointerup', stopResize);
+  window.removeEventListener('pointercancel', stopResize);
+}
 function togglePlacement() {
   placement.value = placement.value === 'float' ? 'dock' : 'float';
   floatOffset.value = { x: 0, y: 0 };
+  floatSize.value = { ...floatSize.value, width: null };
+  nextTick(() => controller?.resize());
   try { localStorage.setItem(PLACEMENT_KEY, placement.value); } catch { /* storage unavailable */ }
 }
 function startDrag(event) {
@@ -279,7 +329,7 @@ onMounted(async () => {
     [api, factory] = await Promise.all([import('../../../dist/transition-entry.js'), lab.loadChart()]);
     if (disposed) return;
     await nextTick();
-    observer = new ResizeObserver(() => controller?.resize());
+    observer = new ResizeObserver(() => { controller?.resize(); updateWorkspaceHeight(); });
     observer.observe(target.value);
     const idiom = props.initial?.startsWith('idiom=') ? findIdiom(props.initial.slice(6)) : null;
     if (idiom && idiom.mark === lab.chart) await loadIdiom(idiom);
@@ -288,6 +338,7 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   stopDrag();
+  stopResize();
   disposed = true;
   cancel();
   observer?.disconnect();
@@ -319,7 +370,7 @@ onBeforeUnmount(() => {
       </article>
       <p v-if="!frames.length">Rendering snapshots…</p>
     </div>
-    <div id="snapshot-workspace" class="snapshot-workspace">
+    <div id="snapshot-workspace" class="snapshot-workspace" :style="{ minHeight: `${workspaceHeight}px` }">
       <section class="snapshot-data data-code-chart-data" aria-label="Snapshot data">
         <header class="snapshot-panel-head"><strong>Rows</strong><span>{{ tableRows.length }} records</span></header>
         <div class="snapshot-data-tools"><span :title="datasetName">{{ datasetName }}</span><PlaygroundDataPicker :chart="lab.chart" :busy="status === 'Compiling' || !active" @load="useDataset" /></div>
@@ -358,6 +409,7 @@ onBeforeUnmount(() => {
           <div class="playground-output-actions"><button :disabled="!active || active.id === frames[0]?.id" @click="step(-1)">← Previous</button><button @click="seek(progress)">Pause</button><button :disabled="!active || active.id === frames.at(-1)?.id" @click="step(1)">Play next →</button></div>
           <details><summary>Inspect computed state difference</summary><DocsCodeBlock :code="deltaText" language="json" /></details>
         </div>
+        <button v-if="placement === 'float'" v-for="edge in ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']" :key="edge" class="preview-resize-edge" :class="`resize-${edge}`" :aria-label="`Resize chart preview ${edge}`" @pointerdown.stop="startResize($event, edge)"></button>
       </section>
     </div>
   </div>

@@ -1,3 +1,5 @@
+import { validateFacetLayout } from '../facet-layout.js';
+import type { FacetLayout } from '../../facet.js';
 import { serializeViewSpec } from '../../spec-meta.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { aggregateTitle, titleize } from '../../labels.js';
@@ -17,6 +19,7 @@ import type {
 } from '../../types/index.js';
 
 export interface BarViewState extends ViewSpec {
+  facetLayout?: FacetLayout;
   mark: 'bar';
   detail?: DetailSpec | null;
   axis?: AxisSpec | null;
@@ -31,6 +34,12 @@ export function bar(data?: unknown): BarState {
 const BAR_SPEC_COMPILER = createBarSpecCompiler();
 
 export class BarState extends ChartState<BarViewState> {
+  override repeat(field: string, layout: FacetLayout = {}): this {
+    if (!field.trim()) throw new Error('Repeat requires a grouping field.');
+    validateFacetLayout(layout);
+    return this.with({ encoding: { facet: { field, type: 'nominal' } }, facetLayout: layout } as Partial<BarViewState>);
+  }
+
   chartModule() {
     return barModule;
   }

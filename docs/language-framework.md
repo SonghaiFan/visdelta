@@ -488,3 +488,54 @@ encodings, authored domains or routes, and do not prevent rendering. They are
 not an eighth state-change category. Core transports these diagnostics without
 chart-name branches. See [the warning reference](/reference#visualization-warnings)
 for the implemented rules and their limits.
+
+### Pie bindings and fallback
+
+Pie adds quantitative `encoding.angle` and nominal `encoding.label` bindings;
+they use the existing Encoding bind/unbind/remap actions. `.labels()` is an
+independently authored presentation control and emits Appearance `restyle`
+with property `labels`. It is not a grain or layout change. `.innerRadius()` is Appearance `reshape`
+with property `innerRadius`; it controls the donut hole as a fraction of the
+outer radius. Slice keys obey the
+ordinary mark identity contract. Pie has no declaration-operation codec or
+automatic intermediate states; it keeps the direct runtime fallback. Changing
+slice values does not authorize a cross-chart morph. The Playground's five
+existing chart editors remain its current supported subset.
+
+## Small-multiple composition
+
+`.repeat()` partitions transformed rows into typed, keyed panels without
+changing their measure or discarding records. Its `encoding.facet` is a field
+binding and emits Encoding `bind`, `unbind` or `remap`. The independently authored
+`facetLayout` direction, columns, gap and minimum width control panel arrangement
+and emit Layout `rearrange`. Numeric scale sharing emits Coordinate `rescale`.
+The x/y field bindings retain their authored meaning; titles appear once in
+the ordinary chart style while each panel retains its scale ticks. Panel identity
+and each child's mark identity are distinct levels of continuity.
+
+The compositor delegates rendering to the carried child plugin, using common
+data domains and one motion recorder. Facet-to-facet transitions retain the
+carried child's cached or reconstructed evaluation policy. Bar and Line preserve their native chart type under repeat and own direct flat-to-repeat bridges for unchanged keyed marks. Line partitions its existing series field; observation membership, x/y bindings and declared domains stay unchanged. Its source panels share the original chart frame, then separate in container coordinate stages before child reflow. Repeat uses the ordinary Bar axis-order policy: x and width form one
+coordinate stage; y and height form another. Vertical defaults to x then y,
+horizontal to y then x; authored order takes priority. Panel layout direction
+does not replace coordinate order. Repeated child Bars also use their ordinary
+coordinate planner, including flip.
+For repeated-panel rearrangements with unchanged panel membership, the compositor
+first moves the entire keyed container rectangle through x/width and y/height
+stages, resizing through source child coordinates with source data and domains. It then runs the child plugin's recorded
+motion inside the settled container. Axes, grid, titles and marks share the panel
+coordinate system without SVG group scaling. These nested motion stages remain one semantic route leg; reverse
+replays the same container and child frames backward.
+Reverse uses the same geometry path backward, including independent scales; no
+declaration-operation codec is added for repeat. Area, Point and Unit do not
+currently implement flat-to-repeat routes. Column count responds to container size during resize, within the authored
+layout bounds. Repeat preserves canvas height by default; opt-in `autoHeight`
+reserves enough height for `minHeight` per complete panel, gaps and margins.
+Explicit heights take priority. A transition reserves the maximum required
+height across its route at the current width, so playback does not change the
+outer canvas. Standalone controllers observe container width and re-evaluate
+the same progress and direction after resize, preserving the playback clock.
+An explicit `resize({ height })` sets the canvas height without changing progress.
+Resize invalidates geometry caches; marks, ticks and grids use the new dimensions
+together. The [API reference](./reference.md#native-small-multiples) records
+the implemented controls and unsupported combinations.

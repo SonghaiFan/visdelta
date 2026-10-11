@@ -96,7 +96,7 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 | `visdelta` | All built-in builders plus the core API |
 | `visdelta/core` | State normalization, data types, camera math, and `delta()` |
 | `visdelta/transition` | `transition()`, seek, play, pause, resize, and destroy |
-| `visdelta/area`, `/bar`, `/line`, `/point`, `/unit` | Focused chart modules |
+| `visdelta/area`, `/bar`, `/line`, `/pie`, `/point`, `/unit` | Focused chart modules |
 | `visdelta/plugins` | Define and register independent chart modules |
 | `visdelta/chart-style` | Structural chart-style modules |
 | `visdelta/browser` | Browser-global dependency adapter |
@@ -133,3 +133,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a chart type. Generated
 `dist/`, VitePress output, test results, and screenshots are not source files.
 
 Released under the MIT License.
+
+
+Pie and donut charts are available through `visdelta/pie`:
+
+```js
+import { pie } from 'visdelta/pie';
+const chart = pie([{ part: 'A', value: 25 }, { part: 'B', value: 75 }])
+  .value('value').color('part').key('part').innerRadius(0.75);
+```
+
+See [Design comparisons](docs/design-guides.md) for contextual alternatives,
+runnable data and code, and seekable arc examples.
