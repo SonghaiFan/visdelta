@@ -36,7 +36,7 @@ const sampleCategories = {
   x: 'coordinate', y: 'encoding', filter: 'data', restore: 'data', add: 'data',
   remove: 'data', data: 'data', highlight: 'attention', 'highlight-range': 'attention', color: 'appearance',
   baseline: 'appearance', focus: 'attention', split: 'grain', merge: 'grain',
-  curve: 'appearance', stream: 'layout'
+  curve: 'appearance', labels: 'appearance', stream: 'layout'
 };
 
 function sample(id, label, description, setup, from, to) {
@@ -65,5 +65,6 @@ export const scenarios = [
   sample('merge', '14 · Merge into a total', 'Hide the industry parts and erase the same boundaries in exact reverse.', stacked, 'detailed', 'total'),
   sample('curve', '15 · Change curve', 'Shape both manufacturing Area boundaries with exact D3 curve names.', base, 'base.curve("curveLinear")', 'base.curve("curveMonotoneX")'),
   sample('stream', '16 · Center as a streamgraph', 'Order the layers inside-out and shift their baseline with D3’s wiggle offset.', stacked, 'detailed', 'detailed.layout("stream", { offset: "wiggle", order: "insideOut" })'),
+  sample('labels', '17 · Label layers directly', 'Identify each industry inside its layer when the name fits; retain the legend for narrow layers.', stacked, 'detailed', 'detailed.labels("inside")'),
   repeatScenario('area')
 ];

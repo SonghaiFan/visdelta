@@ -113,7 +113,7 @@ onBeforeUnmount(() => { disposed = true; observer?.disconnect(); resizer?.discon
       <button v-for="guide in comparisonGuides" :key="guide.id" class="ui-button" :aria-pressed="selected === guide.id" @click="selected = guide.id">{{ guide.title }}</button>
     </nav>
     <section v-for="guide in groups" :key="guide.id" :aria-label="guide.title" class="comparison-guide">
-      <header><h2>{{ guide.title }}</h2><a :href="guide.url" target="_blank" rel="noopener">Read the Datawrapper Academy guide ↗</a></header>
+      <header><h2 :id="`guide-${guide.id}`">{{ guide.title }}</h2><a :href="guide.url" target="_blank" rel="noopener">Read the Datawrapper Academy guide ↗</a></header>
       <aside class="datawrapper-guidance" :aria-label="`${guide.title}: Datawrapper guidance`">
         <span class="ui-label">Datawrapper guidance · paraphrased</span>
         <p><strong>Why this can be less effective.</strong> {{ guideExplanations[guide.id].why }}</p>

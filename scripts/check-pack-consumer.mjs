@@ -128,6 +128,8 @@ const facets = selectedBar([{ panel: "A", x: "one", y: 2 }]).x("x").y("y").repea
 if ((await facets.chartModule().load()).plugin.key !== "bar" || facets.toSpec().encoding.facet.field !== "panel") throw new Error("Packed native facets failed");
 const warnings = await api.visualizationWarnings(api.line([{ x: "A", y: 2 }, { x: "B", y: 3 }]).x("x").y("y"));
 assertSame(warnings.map(item => item.code), ["connection.unordered-axis"], "packed advisory warnings");
+const labelledArea = selectedArea([{ x: 1, y: 2, part: "A" }]).x("x").y("y").breakdown("part").labels("inside");
+if (labelledArea.toSpec().labels !== "inside") throw new Error("Packed Area labels failed");
 if (typeof selectedArea !== "function") throw new Error("area subpath did not export area()");
 if (selectedAreaCurveNames.length !== 19) throw new Error("area subpath did not export its D3 curve names");
 if (typeof selectedBar !== "function") throw new Error("bar subpath did not export bar()");

@@ -8,7 +8,7 @@ const labs = await discoverLabs(examplesDir);
 assertLab(labs.get('bar'), 'bar', 16);
 assertLab(labs.get('point'), 'point', 14);
 assertLab(labs.get('line'), 'line', 17);
-assertLab(labs.get('area'), 'area', 17);
+assertLab(labs.get('area'), 'area', 18);
 assertLab(labs.get('unit'), 'unit', 16);
 
 console.log('Area, bar, line, point, and unit example invariants ok.');

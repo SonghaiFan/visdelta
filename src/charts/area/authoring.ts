@@ -11,6 +11,7 @@ const AREA_SPEC_COMPILER = createAreaSpecCompiler();
 export interface AreaViewState extends ViewSpec {
   mark: 'area';
   baseline?: number;
+  labels?: 'inside' | 'none';
   connect?: 'adjacent' | 'across';
   curve?: D3AreaCurveName;
 }
@@ -42,6 +43,14 @@ export class AreaState extends ChartState<AreaViewState> {
 
   protected override compileSpec(spec: ViewSpec): ViewSpec {
     return compileViewWithCompiler(spec, { scene: [] }, AREA_SPEC_COMPILER);
+  }
+
+  /** Identify stacked/stream layers by series name when the text fits inside. */
+  labels(position: 'inside' | 'none'): this {
+    if (position !== 'inside' && position !== 'none') {
+      throw new Error('Area labels must be inside or none.');
+    }
+    return this.with({ labels: position });
   }
 
   /** Set the value from which an ordinary area grows. Defaults to zero. */

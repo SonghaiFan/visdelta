@@ -26,6 +26,7 @@ import type { ChartPresentation } from '../style.js';
 import type { AreaCell, AreaLayer, AreaPoint } from './state.js';
 import { interpolateNumber } from 'd3-interpolate';
 import { area as shapeArea, line as shapeLine } from 'd3-shape';
+import { drawAreaLabels } from './labels.js';
 import { areaGrainError } from './grain.js';
 
 /** One boundary sample in pixel space. */
@@ -482,6 +483,7 @@ class AreaChart extends BaseChart<AreaViewState> {
       .style('opacity', 0)
       .remove();
 
+    drawAreaLabels(chart, spec, cells, frame, shape, color, state.highlight, dimOpacity);
     drawLegend(chart, rows, enc.color);
     drawAreaTooltip(chart, spec, tooltip, xField, yField, state.seriesField || '', this.runtime.tooltip);
   }

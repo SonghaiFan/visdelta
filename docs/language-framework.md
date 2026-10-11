@@ -489,6 +489,16 @@ not an eighth state-change category. Core transports these diagnostics without
 chart-name branches. See [the warning reference](/reference#visualization-warnings)
 for the implemented rules and their limits.
 
+### Area layer labels
+
+Area `.labels("inside" | "none")` is an independently authored presentation
+control. It emits Appearance `restyle` with property `labels`, using the existing
+public vocabulary. Series names come from the declared breakdown; placement and
+fit are chart-owned geometry, not a new encoding, grain, layout or mark key.
+The Area operation codec keeps this control in its own slot. Omitted labels
+retain the default of no direct labels; thin or narrow layers may omit text
+without changing the authored declaration or color legend.
+
 ### Pie bindings and fallback
 
 Pie adds quantitative `encoding.angle` and nominal `encoding.label` bindings;

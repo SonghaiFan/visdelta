@@ -74,7 +74,10 @@ for (const width of [1100, 390]) {
   test(`Datawrapper explanations and source links fit at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(site);
-    const header = await page.locator('.app-page-head').boundingBox();
+    await expect(page.locator('.VPDoc')).toBeVisible();
+    await expect(page.locator('.VPPage')).toHaveCount(0);
+    if (width >= 960) await expect(page.locator('.VPSidebar')).toBeVisible();
+    const header = await page.locator('.vp-doc > div').first().boundingBox();
     for (const selector of ['.comparison-intro', '.design-comparisons']) {
       const bounds = await page.locator(selector).boundingBox();
       expect(Math.abs(bounds.x - header.x)).toBeLessThanOrEqual(1);
@@ -105,5 +108,45 @@ for (const width of [1440, 390]) {
     await expect(compact.locator('.comparison-compact-message')).toContainText('60%');
     expect(await compact.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
     await compact.screenshot({ path: `/tmp/visdelta-compact-pie-${width}.png` });
+  });
+}
+
+for (const width of [1100, 1440]) {
+test(`design guides provide the standard right-hand section outline at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await page.goto(site);
+  const outline = page.locator('.VPDocAsideOutline');
+  await expect(outline).toBeVisible();
+  await expect(outline.locator('a')).toHaveCount(6);
+  await outline.getByRole('link', { name: 'Pie alternatives', exact: true }).click();
+  await expect(page).toHaveURL(/#guide-pie$/);
+  await expect(page.locator('h2#guide-pie')).toBeInViewport();
+  const content = await page.locator('.VPDoc > .container > .content').boundingBox();
+  const aside = await page.locator('.VPDoc .aside').boundingBox();
+  expect(content.x + content.width).toBeLessThanOrEqual(aside.x + 1);
+});
+}
+
+for (const width of [1440, 390]) {
+  test(`expanded comparison code stays within the docs column at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(site);
+    const example = page.locator('[data-comparison="stack-irregular"]');
+    await example.scrollIntoViewIfNeeded();
+    const details = example.locator('[data-side="after"] .comparison-code');
+    const before = await example.boundingBox();
+    await details.locator('summary').click();
+    await expect(details).toHaveAttribute('open', '');
+    const after = await example.boundingBox();
+    expect(Math.abs(after.width - before.width)).toBeLessThanOrEqual(1);
+    for (const selector of ['.comparison-frame', '.comparison-tools', '.doc-code-block']) {
+      for (const node of await example.locator(selector).all()) {
+        if (!await node.isVisible()) continue;
+        const box = await node.boundingBox();
+        expect(box.x).toBeGreaterThanOrEqual(after.x - 1);
+        expect(box.x + box.width).toBeLessThanOrEqual(after.x + after.width + 1);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
 }

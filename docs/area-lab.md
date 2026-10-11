@@ -2,13 +2,13 @@
 
 Try these scenarios in the unified [Playground](/playground#area/split).
 
-These sixteen editable scenarios use one 54-row tidy US unemployment dataset
+These editable scenarios use one 54-row tidy US unemployment dataset
 to exercise VisDelta's Area module. Each source row is one month and industry;
 the sample contains eighteen months for three industries.
 The demo asset adds `year` and the industry's `share` of that month's total
 before it enters VisDelta; the library receives tidy rows and performs no data
 cleaning. The scenarios cover scales, mappings, keyed observations, filtering,
-focus, layer and x-range highlight, fill, baseline, stream layout, and reversible
+focus, layer and x-range highlight, fill, direct layer labels, baseline, stream layout, and reversible
 total/stacked changes.
 
 An Area observation still owns half the interval to each neighbour for identity,

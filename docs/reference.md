@@ -306,11 +306,30 @@ their intermediate values add up to an endpoint value.
 
 ```ts
 .baseline(number)
+.labels("inside" | "none")
 .curve(d3AreaCurveName)
 .connect("adjacent" | "across")
 .breakdown(field, options?)
 .layout("stacked" | "stream", { offset?, order? })
 .rollup(options?)
+```
+
+Area labels default to `"none"`. `.labels("inside")` identifies stacked and
+stream layers using their existing series values; it adds no field binding.
+The renderer measures text and searches up to 64 observation centers, preferring
+the plot center. It checks a padded text rectangle against the actual cell fills
+on a two-pixel grid, preserving gaps and curved boundaries. Labels that cannot
+fit are omitted, and moving labels are checked again during playback. Text uses
+black or white according to the underlying fill. Single/rolled-up areas have no
+series labels. Custom label text, outside placement and callouts are unsupported.
+The color legend remains governed by its existing `legend` option, so it can
+identify thin layers whose direct labels are omitted. Label placement is
+recomputed on resize.
+
+```js
+area(rows).x("year").y("revenue")
+  .breakdown("businessLine").color("businessLine")
+  .labels("inside");
 ```
 
 ### `bar(data?)`

@@ -34,9 +34,9 @@ export default defineConfig({
     // philosophy), the editor, and the gallery of expressible idioms.
     nav: [
       { text: 'Home', link: '/', activeMatch: '^/$' },
-      { text: 'Docs', link: '/overview', activeMatch: '^/(?!playground|gallery|design-guides|$)' },
+      { text: 'Docs', link: '/overview', activeMatch: '^/(?!playground|gallery|$)' },
       { text: 'Playground', link: '/playground' },
-      { text: 'Gallery', link: '/gallery', activeMatch: '^/(gallery|design-guides)' },
+      { text: 'Gallery', link: '/gallery', activeMatch: '^/gallery' },
       { text: '0.3.0', items: [
         { text: 'Changelog', link: 'https://github.com/SonghaiFan/visdelta/blob/main/CHANGELOG.md' },
         { text: 'npm package', link: 'https://www.npmjs.com/package/visdelta' }

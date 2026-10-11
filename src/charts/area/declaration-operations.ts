@@ -20,16 +20,16 @@ const fail = <T>(reason: string): DeclarationCodecResult<T> => ({ status: 'unsup
 export function createAreaDeclarationOperationCodec(): DeclarationOperationCodec<AreaViewState> {
   const ordinaryValidator = createStandardDeclarationOperationCodec<AreaViewState>({
     mark: 'area', requiredChannels: ['x', 'y'], allowedChannels: ['x', 'y', 'color', 'tooltip', 'key'],
-    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline'],
+    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline', 'labels'],
     validate: value => validateArea(value, true) ?? undefined
   });
   const ordinary = createDeclarationOperationCodec<AreaViewState>({
-    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline'],
+    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline', 'labels'],
     atomicPaths: [['margin']], normalize: value => { prune(value); return value; },
     validate: value => { const result = ordinaryValidator.validate(value); return result.status === 'unsupported' ? result.reason : undefined; }
   });
   const shadowCodec = createDeclarationOperationCodec<ViewSpec>({
-    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline', ROOT, LAYOUT],
+    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'meta', 'key', 'datumKey', 'margin', 'curve', 'connect', 'baseline', 'labels', ROOT, LAYOUT],
     atomicPaths: [['margin'], [ROOT], [LAYOUT], ['meta', 'state', 'sceneState', 'axis']],
     derivedPaths: [['meta', 'object']],
     normalize: value => { prune(value); return value; }
@@ -125,6 +125,7 @@ function normalizeArea(spec: AreaViewState): AreaViewState {
 function prune(value: ViewSpec) {
   // Renderer defaults have the same effective state as an omitted declaration.
   if (value.connect === 'adjacent') delete value.connect;
+  if (value.labels === 'none') delete value.labels;
   if (value.baseline === 0) delete value.baseline;
   if (value.curve === 'curveLinear') delete value.curve;
   if (value.meta?.state?.scopes && !Object.keys(value.meta.state.scopes).length) delete value.meta.state.scopes;
@@ -151,6 +152,7 @@ function validateArea(spec: AreaViewState, ordinary = false): string | null {
   if (identity) return identity;
   const attention = validateCanonicalAttentionScopes(serialized);
   if (attention) return attention;
+  if (spec.labels !== undefined && spec.labels !== 'inside' && spec.labels !== 'none') return 'unsupported Area labels';
   if (spec.curve !== undefined && !isD3AreaCurveName(spec.curve)) return 'unsupported Area curve';
   if (spec.connect !== undefined && spec.connect !== 'adjacent' && spec.connect !== 'across') return 'unsupported Area connection';
   if (spec.baseline !== undefined && !Number.isFinite(spec.baseline)) return 'invalid Area baseline';
