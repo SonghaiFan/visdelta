@@ -8,6 +8,8 @@ VisDelta is a declarative visualization-transition library. Describe a chart
 before and after a change; VisDelta finds the difference and lets any external
 control play or seek the transition.
 
+> This project is evolving quickly and will remain free and open source forever. If you’ve downloaded it or are using it, please **Star** the repository and [**Follow @SonghaiFan**](https://github.com/SonghaiFan) to keep up with my projects. Your Star is my biggest source of support and motivation to keep building.
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/SonghaiFan/visdelta/main/docs/public/demo.gif" width="760" alt="A bar chart scrubbed from a rollup to an age breakdown to a grouped layout and back, driven by progress(t)">
 </p>
