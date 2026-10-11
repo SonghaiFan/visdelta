@@ -13,6 +13,10 @@ rule set here.
 - `src/grammar/state-changes.ts` implements its classification.
 - [docs/reference.md](docs/reference.md) records the implemented API, supported
   operation subsets and fallback boundaries.
+- The published documentation site is the Fumadocs project in `website/`; see
+  [website/README.md](website/README.md). Its live examples are real modules in
+  `website/examples/`, checked against `delta()` by `npm run examples:check`.
+  Public API changes must also update the affected site pages.
 - For vocabulary or public API changes, update constitution, types, classifier,
   reference, examples and tests together as applicable.
 - Document only behavior that exists in the current checkout. Mark uncertain

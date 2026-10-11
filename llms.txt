@@ -54,6 +54,9 @@ VisDelta depends only on the `d3-*` modules it renders with; declared transforms
 run without any extra package. Chart states are JSON-safe; selectors and data
 sources are objects (`{ field, gte }`, `{ url }`, `{ name }`), never strings.
 
+Published documentation, written for agents: https://songhaifan.github.io/visdelta/llms.txt
+(every page as Markdown) and https://songhaifan.github.io/visdelta/llms-full.txt.
+
 Source-of-truth docs:
 
 - `docs/language-framework.md`

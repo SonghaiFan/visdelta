@@ -1,0 +1,99 @@
+---
+title: Transitions and routes
+description: How a chart module turns two endpoint states into a truthful, reversible path, and where intermediate states come from.
+---
+
+`transition(from, to, options)` executes a path between two states of the same
+chart type. Two states don't determine one unique path, so each chart module
+chooses a readable default within a set of rules.
+
+## Four layers
+
+VisDelta keeps four questions apart:
+
+```text
+Identity / correspondence   What continues?
+State difference            What changed, and in which direction?
+Transition plan             Which route and phase order?
+Frame and control           What is drawn at this progress value?
+```
+
+The first two are covered by [Identity and lineage](/docs/concepts/identity)
+and [State changes](/docs/concepts/state-changes). This page covers the plan,
+and [Progress and playback](/docs/concepts/progress) covers frames and control.
+
+## Every frame is true
+
+At any progress value, marks agree with the scales and axes that explain them.
+When x or y changes, the scale, ticks, grid lines, title and existing marks move
+together. When membership changes, the default order keeps the frame honest:
+
+```text
+Remove: exiting marks → scale, axis and remaining marks
+Add:    scale, axis and existing marks → entering marks
+```
+
+Line and Area add chart-specific path steps. A line extends to a new
+observation before its point appears, and removal runs the same frames backward.
+
+<LiveExample id="line-add" code={false} />
+
+## Intermediate states
+
+A route can contain more than one **stage**. Chart modules may insert
+automatically generated intermediate states between your endpoints. Each one is a
+complete, valid chart state, never a partial declaration. For example, a Bar
+total splitting into grouped detail first reaches the finer grain as a stack,
+where the total stays readable, then opens it into groups.
+
+<LiveExample id="bar-grouped-split" code={false} />
+
+Intermediate states:
+
+- are inserted **within** one pair, never in place of a state you authored;
+- never invent a field binding or a colour mapping;
+- keep source data and datum identity as fixed boundaries.
+
+When a chart module cannot find a valid route for a pair, the transition keeps
+the chart's ordinary direct path. It does not fall back to no animation.
+
+## Authored waypoints with sequence()
+
+Use [`sequence()`](/docs/api/sequence) when you want particular waypoints. Each
+state you pass is a fixed boundary that the planner may not remove. Every
+adjacent pair still plans its own route and may contain inferred stages.
+
+```ts
+const story = await sequence([revenue, profit, ranked, revenue], {
+  target: '#chart',
+});
+```
+
+## Reverse means the same frames backward
+
+For a reversible pair, forward progress `p` and reverse progress `1 − p` show
+the same frame. Playing backward is the same route traversed in reverse, not a
+second animation. Bar's canonical routes obey this strictly.
+
+<Callout title="Directional easing is an explicit exception">
+  An opt-in `directionalEase()` motion profile, used by Unit layouts, depends on
+  both progress and direction. It preserves endpoints and matching, but the same
+  numeric progress need not produce the same geometry in both directions.
+</Callout>
+
+## Chart-owned behaviour
+
+Core owns shared state, difference, progress, frame evaluation, lifecycle and
+camera math. It contains no branches for Area, Bar, Line, Point, Unit or Pie.
+Each chart module owns its builder, compilation, matching, transition steps,
+axes and examples. See [Chart types](/docs/charts) for each module's rules, and
+[Custom chart types](/docs/guides/custom-chart-types) to add your own.
+
+## Declaration planning
+
+Under the hood, every built-in chart except Pie can plan a route as a sequence
+of single, validated declaration operations before refining each step with its
+own motion. This planner is bounded and deterministic, and it is exposed for
+advanced use as `planDeclarationTransition()` in
+[`visdelta/core`](/docs/api/core#declaration-planning). Pie uses the direct
+runtime path.

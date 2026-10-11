@@ -19,29 +19,39 @@ export type { Visualization } from './core.js';
 export interface TransitionOptions extends RuntimeOptions {
   /** Named sources for visualizations that use .data("name"). */
   data?: Record<string, unknown>;
+  /** Explicit canvas height in pixels. Overrides the chart's default height. */
   height?: number;
 }
 
 export interface PlayOptions {
-  /** Milliseconds for one serial route stage. */
+  /** Milliseconds for one serial route stage. Defaults to 800. */
   duration?: number;
+  /** Start progress, clamped to [0, 1]. Defaults to 0. */
   from?: number;
+  /** End progress, clamped to [0, 1]. Defaults to 1. */
   to?: number;
 }
 
 export interface VisualizationTransition {
+  /** Defensive copy of the resolved start state. */
   readonly from: ViewSpec;
+  /** Defensive copy of the resolved end state. */
   readonly to: ViewSpec;
+  /** Semantic difference between the resolved endpoints, as returned by delta(). */
   readonly delta: DeltaResult;
+  /** The mounted chart-view element. */
   readonly view: Element;
+  /** Current progress from 0 to 1. */
   readonly value: number;
   /** Synchronously display a frame. Direction is inferred from the previous value. */
   progress(value: number): VisualizationTransition;
   /** Plays from 0 to 1 by default. Returns this controller for chaining. */
   play(options?: PlayOptions): VisualizationTransition;
+  /** Stop owned playback at the current frame. */
   pause(): VisualizationTransition;
   /** Recompile at the container's current size/theme, retaining progress and data. */
   resize(options?: { height?: number }): VisualizationTransition;
+  /** Stop playback and remove the mounted transition. The controller cannot be used afterwards. */
   destroy(): void;
 }
 

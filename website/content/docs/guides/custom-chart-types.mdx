@@ -1,0 +1,173 @@
+---
+title: Custom chart types
+description: Add an independent chart module through the plugin SDK, without changing the runtime.
+---
+
+A chart type is an independent module. The runtime works before the module is
+imported and does not change when it is added. The built-in charts use the same
+contract, and Pie is the smallest complete reference implementation in the
+repository (`src/charts/pie/`).
+
+<Callout title="Advanced">
+  This guide is for authors of new chart families. To restyle or combine
+  existing charts, see [Styling and themes](/docs/guides/styling) and
+  [Small multiples](/docs/charts/repeat).
+</Callout>
+
+## Package layout
+
+```text
+my-chart/
+  package.json
+  index.js        # immutable builder that carries its module
+  module.js       # lazy loader
+  plugin.js       # validation, identity defaults, renderer factory
+  geometry.js     # transformed rows → keyed geometry
+  render.js       # keyed DOM joins and recorded motion
+```
+
+Use `visdelta` as a peer dependency at a version range you have tested, and
+declare the `d3-*` packages you import as your own dependencies. Import SDK
+contracts from `visdelta/plugins` and optional helpers from `visdelta/toolkit`.
+Never import `visdelta/dist/...` or another chart's internals.
+
+## 1. A builder
+
+A builder extends `ChartState` and returns its module. Use `this.channel()` and
+`this.with()` rather than mutating state.
+
+```js title="index.js"
+import { ChartState, normalizeDataSource } from 'visdelta/plugins';
+import { chartModule } from './module.js';
+
+class DonutState extends ChartState {
+  chartModule() {
+    return chartModule;
+  }
+  value(field) {
+    return this.channel('angle', field, { type: 'quantitative' });
+  }
+}
+
+export function donut(data) {
+  return new DonutState({
+    mark: 'example-donut',
+    data: normalizeDataSource(data),
+    encoding: {},
+  });
+}
+```
+
+Inherited methods such as `.key()`, `.color()` and `.where()` keep working and
+keep returning new states.
+
+## 2. A lazy module
+
+```js title="module.js"
+import { defineChartModule } from 'visdelta/plugins';
+
+export const chartModule = defineChartModule({
+  key: 'example-donut',
+  load: () => import('./plugin.js'),
+});
+```
+
+The loaded file exports `plugin = defineChartType({ ... })` with the same key.
+
+## 3. The plugin
+
+```js title="plugin.js"
+import { defineChartType } from 'visdelta/plugins';
+
+export const plugin = defineChartType({
+  key: 'example-donut',
+  scenes: [],
+  presentation: { plot: { margin: { top: 24, right: 20, bottom: 24, left: 20 } } },
+  prepareSpec(spec) {
+    // Reject syntax this renderer cannot honour instead of ignoring it.
+    if (spec.encoding?.x || spec.encoding?.y) throw new Error('Donut has no position channels.');
+    return spec;
+  },
+  createRenderer: (runtime, presentation) => (chart, rows, spec) => {
+    // Join rows by key and animate through runtime.motion(), see below.
+  },
+});
+```
+
+Supply only the hooks your chart needs. Useful ones include `createRenderer`,
+`createSpecCompiler`, `prepareSpec`, `layoutChannels`, `warnings`,
+`defaultHeight` and `transition` (with `intermediateSpecs`, `canonicalPair` and
+`plan`).
+
+## 4. Recorded motion, not D3 transitions
+
+VisDelta seeks recorded property tracks; D3's scheduler is timer-driven and
+cannot be sought. A renderer joins data with D3 as usual but animates through
+`runtime.motion()`, never `selection.transition()`.
+
+```js
+import { scaleLinear } from 'd3-scale';
+
+const render = (runtime) => (chart, rows) => {
+  const x = scaleLinear().domain([0, 100]).range([0, chart.innerWidth]);
+  const dots = chart.g
+    .selectAll('circle.dot')
+    .data(rows, (row) => row.id)
+    .join('circle')
+    .attr('class', 'dot');
+
+  runtime.motion(dots, chart.transition.base)
+    .attr('cx', (row) => x(row.value))
+    .style('opacity', 1);
+};
+```
+
+`motion(selection, base)` mirrors the d3-transition authoring surface (`attr`,
+`style`, `attrTween`, `styleTween`, `tween`, `text`, `delay`, `duration`,
+`ease`, `remove` and chained `transition()`) but records tracks. Because frames
+are sought, not played:
+
+- `on('start' | 'end')` callbacks are rejected. Compute end states up front.
+- `remove()` detaches a node only when the transition finishes, so exited marks
+  can return when the reader scrubs backward.
+- `chart.transition.base`, `enter` and `exit` are plain `{ delay, duration, ease }`
+  descriptors, not D3 transitions.
+
+Prefer `runtime.motion` over the standalone `motion` export in separately
+bundled plugins, so your renderer records into the host's recorder.
+
+## 5. Use it
+
+A builder carries its module, so it works with `visdelta/transition` without
+registration:
+
+```js
+import { transition } from 'visdelta/transition';
+import { donut } from 'my-chart';
+
+const change = await transition(donut(rows).value('a'), donut(rows).value('b'), {
+  target: '#chart',
+});
+```
+
+Only plain JSON specs need `registerChartModule(chartModule)`, because a plain
+object cannot carry a module reference.
+
+## Rules to keep
+
+- **Identity is declared.** Source-record `datumKey` and mark `key` are different
+  contracts. Validate uniqueness and reject unsupported key forms rather than
+  guessing.
+- **Validate transformed rows.** Geometry receives rows after declared
+  transforms. Reject invalid values instead of silently repairing them.
+- **No chart-name branches in core.** Everything chart-specific stays in your
+  module.
+- **Planning is optional.** A direct transition is a complete, working fallback.
+  Add a declaration-operation codec only when you can make it normalize to a
+  fixed point, round-trip exactly and validate every complete candidate state.
+- **Test like the built-ins.** Check bindings, immutability, invalid values,
+  emitted state changes, forward and reverse play, scrubbing, cleanup and resize.
+
+The repository's [plugin authoring notes](https://github.com/SonghaiFan/visdelta/blob/main/docs/extending-with-plugins.md)
+cover the full runtime contract, the toolkit's geometry, topology, matching and
+policy helpers, and the checklist for an official chart.

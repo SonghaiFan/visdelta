@@ -1,0 +1,64 @@
+---
+title: Area
+description: Magnitude and composition over an ordered dimension, with stacked layers, streamgraphs and direct labels.
+---
+
+```ts
+import { area } from 'visdelta/area';
+```
+
+`area()` shows magnitude over an ordered dimension and supports stacked detail.
+
+<LiveExample id="area-stream" />
+
+## Methods
+
+| Method                                             | Meaning                                                |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `.baseline(number)`                                | Set the ordinary area baseline                         |
+| `.curve(d3AreaCurveName)`                          | Use an exact D3 curve export supported by `d3.area()`  |
+| `.connect('adjacent' \| 'across')`                 | Preserve gaps, or connect across filtered observations |
+| `.breakdown(field, options?)`                      | Split a total into stacked layers                      |
+| `.rollup(options?)`                                | Combine stacked layers into a total                    |
+| `.layout('stacked' \| 'stream', { offset?, order? })` | Use a fixed stack, or configure D3 stream offsets and orders |
+| `.labels('inside' \| 'none')`                      | Label stacked layers inside their area                 |
+
+The supported curve names are exported as `D3_AREA_CURVE_NAMES`. Unlike Line,
+Area does not accept `curveBundle`.
+
+## Stacking and streams
+
+Ordinary stacked areas place series with larger whole-domain totals nearer the
+baseline. Ties keep first-appearance order, and one fixed order applies across
+all x positions. When colour maps the stacked series with no explicit domain or
+palette, the legend and default colours follow the same ranking.
+
+Stream layouts default to the `wiggle` offset and `insideOut` order. The
+`diverging` offset supports signed values. To keep input layer order with a
+fixed baseline, use:
+
+```ts
+detailed.layout('stream', { offset: 'none', order: 'none' });
+```
+
+## Direct labels
+
+`.labels('inside')` identifies stacked and stream layers by their series value.
+The renderer measures text, searches observation centres for a position where a
+padded label fits inside the layer and picks black or white text for contrast.
+Labels that cannot fit are omitted, and the colour legend still identifies those
+layers. Custom label text, outside placement and callouts are not supported.
+
+```ts
+area(rows).x('year').y('revenue')
+  .breakdown('businessLine')
+  .color('businessLine')
+  .labels('inside');
+```
+
+## Transition behaviour
+
+Area owns `y0`/`y1` geometry. A divider line appears only during a detail
+transition; endpoints have no default border.
+
+<LiveExample id="area-split" code={false} />

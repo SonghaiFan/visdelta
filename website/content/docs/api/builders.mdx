@@ -1,0 +1,133 @@
+---
+title: Builders
+description: Signatures of every builder method. Behaviour is documented on the concept and chart pages linked from each section.
+---
+
+Every method returns a **new** state; none mutates the receiver. Option bags not
+listed here are documented on the linked pages.
+
+## Factories
+
+```ts
+bar(data?): BarState        // visdelta/bar
+line(data?): LineState      // visdelta/line
+area(data?): AreaState      // visdelta/area
+point(data?): PointState    // visdelta/point
+unit(data?): UnitState      // visdelta/unit
+pie(data?): PieState        // visdelta/pie
+```
+
+`data` is rows, `{ values }`, `{ url, type? }` or `{ name }`; see
+[Data sources](/docs/concepts/data-and-transforms#data-sources).
+
+## Shared methods
+
+Available on every chart state. See [Chart states](/docs/concepts/chart-states)
+and [where, highlight and focus](/docs/concepts/selection).
+
+```ts
+.data(source)
+.x(field, options?)
+.y(field, options?)
+.channel(name, field, options?)
+.color(valueOrField, options?)
+.size(field, options?)
+.key(fieldOrFields)
+.datumKey(fieldOrFields)
+.tooltip(fieldOrFields)
+.sort(field, 'ascending' | 'descending')
+.where(selector)
+.highlight(selector, { opacity? })
+.focus(selector)
+.reset()
+.axis(config)
+.transition({ duration?, ease?, stagger? })
+.repeat(field, { direction?, scales?, columns?, gap?, minWidth?, autoHeight?, minHeight? })
+.rows(source?)   // → tidy rows after transforms
+.toSpec()        // → detached view spec
+```
+
+## Bar
+
+See [Bar](/docs/charts/bar).
+
+```ts
+.flip(options?)
+.breakdown(field?, { layout?, op?, title?, ... })
+.rollup(groupby?, options?)
+.segment(fieldOrConfig?, config?)
+.layout('simple' | 'grouped' | 'stacked', options?)
+```
+
+## Line
+
+See [Line](/docs/charts/line).
+
+```ts
+.curve(d3CurveName)
+.connect('adjacent' | 'across')
+.strokeWidth(number)
+.pointSize(number)
+.flip(options?)
+.breakdown(field, options?)
+.rollup({ op? })
+```
+
+## Area
+
+See [Area](/docs/charts/area).
+
+```ts
+.baseline(number)
+.labels('inside' | 'none')
+.curve(d3AreaCurveName)
+.connect('adjacent' | 'across')
+.breakdown(field, options?)
+.layout('stacked' | 'stream', { offset?, order? })
+.rollup({ op? })
+```
+
+## Point
+
+See [Point](/docs/charts/point).
+
+```ts
+.pointSize(number)
+.radius(number)
+.connector({ from: number, channel?: 'x' | 'y' })
+.connector({ by: string | string[], orderBy?: string })
+.flip(options?)
+.rollup(groupby, options?)
+.breakdown(detail?, options?)
+```
+
+## Unit
+
+See [Unit](/docs/charts/unit).
+
+```ts
+.value(field, { unitValue?, maxUnits? })
+.group(field)
+.layout('grid' | 'force' | 'bar' | 'beeswarm', { columns?, radius? })
+.columns(number)
+.radius(number)
+```
+
+## Pie
+
+See [Pie](/docs/charts/pie).
+
+```ts
+.value(field, options?)
+.label(field)
+.labels('inside' | 'outside' | 'none')
+.innerRadius(fraction)   // 0 ≤ fraction < 1
+```
+
+## Constants
+
+| Export                | Entry           | Contents                                     |
+| --------------------- | --------------- | -------------------------------------------- |
+| `D3_CURVE_NAMES`      | `visdelta/line` | Curve names accepted by `line().curve()`      |
+| `D3_AREA_CURVE_NAMES` | `visdelta/area` | Curve names accepted by `area().curve()`      |
+| `UNIT_LAYOUTS`        | `visdelta/unit` | Layout names accepted by `unit().layout()`    |

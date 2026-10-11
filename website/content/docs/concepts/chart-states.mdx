@@ -1,0 +1,130 @@
+---
+title: Chart states
+description: Immutable, chainable builders that describe one chart. Every visual mapping is explicit.
+---
+
+A **chart state** is an immutable description of one chart: its data, field
+mappings, transforms, layout, attention and appearance. Builders such as
+`bar()` create one, and every chained call returns a new state.
+
+```ts
+import { bar } from 'visdelta/bar';
+
+const base = bar(rows).x('category').y('sales');
+const next = base.y('profit');
+
+base === next;   // false: chaining never mutates
+base.toSpec();   // a detached, serializable view spec
+```
+
+Chaining does not render anything. A state becomes visible only when it is an
+endpoint of [`transition()`](/docs/api/transition) or [`sequence()`](/docs/api/sequence).
+
+## Builders
+
+| Builder   | Import           | Reader question                                  |
+| --------- | ---------------- | ------------------------------------------------ |
+| `bar()`   | `visdelta/bar`   | How do categories compare?                       |
+| `line()`  | `visdelta/line`  | How does a value change in order?                |
+| `area()`  | `visdelta/area`  | How does magnitude or composition change?        |
+| `point()` | `visdelta/point` | How do two quantities relate?                    |
+| `unit()`  | `visdelta/unit`  | How many countable items are there?              |
+| `pie()`   | `visdelta/pie`   | What share of one total does each part take?     |
+
+Each builder accepts a [data source](/docs/concepts/data-and-transforms) and
+adds chart-specific methods on top of the shared grammar below.
+
+## Shared grammar
+
+Every chart state supports these methods:
+
+| Method                                | Meaning                                                    |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `.data(source)`                       | Replace the data source                                    |
+| `.x(field, options?)`, `.y(field, options?)` | Map fields to position                              |
+| `.channel(name, field, options?)`     | Declare another channel                                    |
+| `.color(valueOrField, options?)`      | Declare a constant colour or a data-driven colour          |
+| `.size(field, options?)`              | Declare a quantitative size mapping                        |
+| `.key(fieldOrFields)`                 | Identify the same mark across states                       |
+| `.datumKey(fieldOrFields)`            | Override inferred source-record identity                   |
+| `.tooltip(fieldOrFields)`             | Declare tooltip fields                                     |
+| `.sort(field, order?)`                | Sort the current rows                                      |
+| `.where(selector)`                    | Keep matching rows; other marks exit                       |
+| `.highlight(selector, options?)`      | Keep all rows; dim non-matching marks                      |
+| `.focus(selector)`                    | Keep all rows; fit the camera around matching marks        |
+| `.reset()`                            | Return to the declaration before the first semantic operation |
+| `.axis(config)`                       | Change the coordinate view or axis order                   |
+| `.transition({ duration?, ease?, stagger? })` | Set timing for this state's transitions            |
+| `.repeat(field, options?)`            | Partition into [small multiples](/docs/charts/repeat)      |
+| `.rows(source?)`                      | Read the tidy rows after all declared transforms           |
+| `.toSpec()`                           | Return a detached, serializable view spec                  |
+
+## Mappings are explicit
+
+VisDelta never decides that a field should mean x, y, colour, size or detail.
+For example, `.breakdown('region')` declares detail but does not silently add
+`.color('region')`. Presentation defaults such as radius, line width, margins
+and duration are supplied for you. Field meanings are not.
+
+Without a declared colour channel, marks use the chart style's neutral ink and
+there is no colour legend.
+
+```ts
+// A constant colour is Appearance.
+base.color('#4269d0');
+
+// A field-driven colour is Encoding.
+base.color('region');
+```
+
+## Channel options
+
+Channel methods accept options such as `type`, `title`, `format`, `domain`,
+`scale`, `sort`, `aggregate`, `timeUnit` and `bin`.
+
+```ts
+line(rows)
+  .x('date', { type: 'temporal', title: 'Date' })
+  .y('close', { title: 'Close (USD)', format: '$.2f' });
+```
+
+- **Type.** Core detects `quantitative`, `temporal` and `nominal` from the data
+  and fills only missing types. An authored type always wins.
+- **Format.** A [D3 format specifier](https://d3js.org/d3-format) for a
+  quantitative axis, such as `"~s"`.
+- **Scale.** Quantitative position channels support `{ type: 'linear' }`,
+  `{ type: 'sqrt' }` and `{ type: 'log', base? }`. Log scales default to base 10.
+
+### Colour
+
+For a colour field, omit `range` to use VisDelta's default categorical palette,
+provide `range` for exact colours, or name a
+[D3 Scale Chromatic](https://d3js.org/d3-scale-chromatic) scheme:
+
+```ts
+bar(rows).color('region', { scheme: 'Tableau10' });
+point(rows).color('score', { type: 'quantitative', scheme: 'Viridis' });
+```
+
+An explicit `range` takes precedence over `scheme`. Colours follow an explicit
+`domain` order when you supply one, otherwise the data-domain order. Filtering
+keeps every category's colour assignment and legend entry.
+
+## Plain specs
+
+`toSpec()` returns plain, serializable data. You can store it, send it and
+compare it. A plain spec can also be passed to `delta()` and `transition()`.
+Because a plain object cannot carry a reference to its chart module, rendering
+it requires registering that module first. Builders carry their module
+automatically.
+
+```ts
+import { barModule } from 'visdelta/bar';
+import { registerChartModule } from 'visdelta/plugins';
+
+registerChartModule(barModule);
+const change = await transition(savedSpecA, savedSpecB, { target: '#chart' });
+```
+
+Each focused entry exports its module: `barModule`, `lineModule`, `areaModule`,
+`pointModule`, `unitModule` and `pieModule`.

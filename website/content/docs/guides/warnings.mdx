@@ -1,0 +1,87 @@
+---
+title: Visualization warnings
+description: Advisory design checks that never change what renders.
+---
+
+VisDelta can point out common design problems, such as a truncated bar baseline
+or too many categories sharing one colour. Warnings are advice only: charts
+still render, and declarations and transition plans are unchanged.
+
+## Inspect without rendering
+
+```ts
+import { bar, visualizationWarnings } from 'visdelta';
+
+const chart = bar([
+  { category: 'A', value: 12 },
+  { category: 'B', value: 14 },
+])
+  .x('category')
+  .y('value', { domain: [10, 20] });
+
+const warnings = await visualizationWarnings(chart);
+warnings[0].code; // 'bar.truncated-baseline'
+```
+
+`visualizationWarnings(visualization, datasets?)` returns a promise of
+`VisualizationWarning[]`. Supply named data in `datasets`; the inspection does
+not fetch remote data. Plain specs need a registered chart module, just like
+transitions.
+
+Each warning has a `code`, `severity: 'warning'`, a `message`, a `suggestion`,
+`evidence`, and optionally a `field` and a `source` link to the design guidance
+behind it.
+
+## While rendering
+
+Rendering reports the same warnings in three ways:
+
+- as `console.warn` messages, deduplicated per host;
+- as a bubbling `visdelta:warnings` event whose `event.detail` is the warning
+  array;
+- as JSON in the chart scene element's `data-visdelta-warnings` attribute.
+
+```ts
+document.querySelector('#chart')!.addEventListener('visdelta:warnings', (event) => {
+  const warnings = (event as CustomEvent).detail;
+  console.table(warnings.map((warning: { code: string }) => warning.code));
+});
+```
+
+An empty array clears previously reported diagnostics. Warnings describe
+evaluated chart states, not every animation frame.
+
+## Rules
+
+| Code                               | Trigger                                                                 |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| `bar.too-many-stacked-columns`     | More than 10 categories in vertical stacked bars                         |
+| `bar.truncated-baseline`           | An explicit measure domain that excludes zero                           |
+| `point.too-many-dots-per-category` | More than 3 observations per category on a categorical × quantitative plot |
+| `point.small-sample`               | 1–4 observations on two quantitative axes                               |
+| `point.coincident-positions`       | Observations at identical x/y positions                                 |
+| `point.negative-size`              | Negative values in a mapped size field                                  |
+| `connection.unordered-axis`        | A Line or Area x channel that is nominal                                |
+| `connection.smoothing`             | Natural or cardinal interpolation with at least three x values         |
+| `color.too-many-categories`        | More than 5 nominal values sharing a colour channel                      |
+| `line.too-many-series`             | More than 10 series                                                      |
+| `area.too-many-series`             | More than 6 layers                                                       |
+| `area.nonzero-baseline`            | A single area with a nonzero baseline                                    |
+| `area.negative-components`         | Multiple layers with negative values                                     |
+| `pie.too-many-slices`              | More than four slices                                                    |
+| `pie.simple-share`                 | One or two slices                                                        |
+
+Counts use the transformed rows, so filtering and aggregation affect the
+advice. The thresholds are VisDelta heuristics, not universal perceptual laws.
+Warnings never collapse categories, recolour marks or rewrite domains.
+
+Some judgements are out of scope, because they depend on context the library
+cannot see: author intent, causal claims, annotation quality, label collisions,
+palette accessibility and whether pie slices form a complete whole. Review these
+yourself.
+
+## In a chart plugin
+
+A plugin declares an optional pure `warnings(spec, rows)` inspector through
+`defineChartType`. It receives the prepared spec and transformed rows. Plugins
+without this hook report no warnings.

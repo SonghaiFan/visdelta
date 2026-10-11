@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Rebuilt the documentation site from scratch with Fumadocs and a Next.js static
+  export in `website/`, deployed to the same GitHub Pages URL. It adds a
+  restructured information architecture (introduction, concepts, charts,
+  guides, examples, reference), a category-first playground and live examples
+  driven by real example modules verified against `delta()`, type tables
+  generated from the TypeScript source, static search, `llms.txt`, a sitemap
+  and redirects from the previous VitePress URLs. The VitePress site in `docs/`
+  is no longer deployed.
+- Documented the defaults of `PlayOptions`, `SequencePlayOptions` and the
+  controller members in JSDoc. Types and behaviour are unchanged.
+
 - Fixed simple and grouped Bar domains clipping negative values: bars start at
   zero or below it. When zero is not the plot edge (negative values or an
   authored domain above zero) the category labels stay at the edge, clear of

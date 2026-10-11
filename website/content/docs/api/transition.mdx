@@ -1,0 +1,78 @@
+---
+title: transition()
+description: Create one seekable transition between two states of the same chart type.
+---
+
+```ts
+import { transition } from 'visdelta/transition';
+
+function transition(
+  from: Visualization,
+  to: Visualization,
+  options: TransitionOptions,
+): Promise<VisualizationTransition>;
+```
+
+`transition()` resolves and loads both states' data, computes their
+[`delta()`](/docs/api/core#delta), loads the chart's renderer and mounts a
+seekable route into `options.target`. If setup fails, the target's previous
+contents are restored.
+
+```ts
+const change = await transition(from, to, {
+  target: '#chart',
+  data: { sales: rows },
+  height: 420,
+  chartStyle: paperChartStyle,
+});
+```
+
+`from` and `to` can be builder states or plain specs; plain specs need a
+[registered chart module](/docs/concepts/chart-states#plain-specs).
+
+## TransitionOptions
+
+<auto-type-table path="src/transition.ts" name="TransitionOptions" />
+
+`target` is a CSS selector or an element. The transition owns its contents until
+`destroy()`.
+
+## VisualizationTransition
+
+The returned controller.
+
+<auto-type-table path="src/transition.ts" name="VisualizationTransition" />
+
+| Method                     | Returns     | Notes                                                                     |
+| -------------------------- | ----------- | ------------------------------------------------------------------------- |
+| `progress(value)`          | controller  | Pauses playback and draws one frame. Finite values clamp to `[0, 1]`.      |
+| `play(options?)`           | controller  | Animates from `from` to `to`; see `PlayOptions`.                           |
+| `pause()`                  | controller  | Stops playback at the current frame.                                      |
+| `resize(options?)`         | controller  | Recompiles at the container's size and current theme, keeping progress. `{ height }` sets an explicit canvas height. |
+| `destroy()`                | `void`      | Stops playback, disconnects observers and removes the chart.              |
+
+Pair controllers observe their container's width and resize automatically.
+
+## PlayOptions
+
+<auto-type-table path="src/transition.ts" name="PlayOptions" />
+
+```ts
+change.play();                       // 0 → 1
+change.play({ from: 1, to: 0 });     // reverse
+change.play({ from: change.value });  // resume
+```
+
+## Errors
+
+| Message                                              | Cause                                    |
+| ---------------------------------------------------- | ---------------------------------------- |
+| `transition() requires two states of the same chart type.` | Endpoints from different chart families |
+| `VisDelta needs a target: …`                         | `options.target` is missing              |
+| `VisDelta target not found: …`                       | The selector matched no element          |
+| `transition(): missing dataset "…"`                  | A named source is not in `options.data`  |
+| `progress must be a finite number.`                  | `progress()` received `NaN` or `Infinity` |
+| `duration must be a finite non-negative number.`     | Invalid `play({ duration })`             |
+| `This transition has been destroyed.`                | The controller was used after `destroy()` |
+
+See [Troubleshooting](/docs/guides/troubleshooting) for fixes.

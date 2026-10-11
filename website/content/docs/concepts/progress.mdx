@@ -1,0 +1,83 @@
+---
+title: Progress and playback
+description: A transition is a function of one number. play(), pause() and progress() all move that number.
+---
+
+A transition has no hidden clock you must synchronize with. Its whole interface
+is **progress**, a number from `0` (the first state) to `1` (the second).
+
+```ts
+change.progress(0);     // the first state
+change.progress(0.5);   // halfway along the route
+change.progress(1);     // the second state
+change.value;           // the progress currently shown
+```
+
+`progress()` draws one frame synchronously and pauses any running playback.
+Finite values are clamped to `[0, 1]`; non-finite values throw.
+
+## Seeking in any order
+
+You can seek in any order. With fixed data, size and style, seeking directly to
+a value returns the same frame regardless of where you came from. The one
+documented exception is the opt-in directional easing used by Unit, see
+[Reverse means the same frames backward](/docs/concepts/transitions#reverse-means-the-same-frames-backward).
+
+The direction of motion is inferred from the previous value. Scrubbing from 0.6
+to 0.4 is a reverse step.
+
+## play()
+
+`play()` animates progress for you with `requestAnimationFrame`:
+
+```ts
+change.play();                          // 0 → 1, 800 ms per stage
+change.play({ duration: 1200 });        // slower
+change.play({ from: 1, to: 0 });        // backward along the same route
+change.play({ from: 0.5, to: 1 });      // the second half only
+```
+
+| Option     | Default | Meaning                                    |
+| ---------- | ------- | ------------------------------------------ |
+| `duration` | `800`   | Milliseconds for **one serial route stage** |
+| `from`     | `0`     | Start progress                             |
+| `to`       | `1`     | End progress                               |
+
+On a pair controller `from` defaults to `0`, not to the current value. Pass
+`from: change.value` to continue from the current frame.
+
+### Duration is per stage
+
+A route with generated intermediate states has several serial stages. `duration`
+applies to each, so a two-stage route played with `{ duration: 800 }` takes
+1600 ms. Changes that share one stage still take one duration. A partial play
+keeps the same clock in proportion to the span it covers.
+
+## pause()
+
+`pause()` stops owned playback and leaves the current frame on screen.
+
+## Sequences
+
+A [`sequence()`](/docs/api/sequence) controller uses **leg units** instead:
+`0` is the first state, `1` the second, `2` the third, and `1.5` is halfway
+between the second and third. Integer values always land exactly on an
+authored state, even when a leg contains generated stages.
+
+```ts
+story.progress(1.5);
+story.play({ to: 3 });   // from the current value to the fourth state
+```
+
+On a sequence, `play()` starts from the current value by default and ends at
+the last state.
+
+## Resize and lifecycle
+
+- **Resize.** A pair controller observes its container's width and recompiles
+  at the current progress automatically. Call `resize()` after changes it
+  cannot observe, such as a theme change or a height change:
+  `change.resize({ height: 480 })`.
+- **Destroy.** Call `destroy()` when the view is removed. It stops playback,
+  disconnects observers and removes the mounted chart. A destroyed controller
+  throws if you use it again.

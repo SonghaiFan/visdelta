@@ -1,0 +1,94 @@
+---
+title: Use with React
+description: Mount a transition in an effect, drive it from component state and destroy it on unmount.
+---
+
+VisDelta owns the contents of its target element. In React, give it an empty
+element through a ref, create the transition in an effect, and destroy it in
+the effect's cleanup.
+
+```tsx title="TransitionChart.tsx"
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { transition, type Visualization, type VisualizationTransition } from 'visdelta/transition';
+import 'visdelta/style.css';
+
+export function TransitionChart({ from, to }: { from: Visualization; to: Visualization }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const changeRef = useRef<VisualizationTransition | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    // A private mount per effect run: a creation still pending from a previous
+    // run (for example under Strict Mode) can never write into the new one.
+    const mount = document.createElement('div');
+    host.append(mount);
+    let cancelled = false;
+    let created: VisualizationTransition | null = null;
+
+    transition(from, to, { target: mount, height: 320 })
+      .then((change) => {
+        if (cancelled) return change.destroy();
+        created = change;
+        changeRef.current = change;
+      })
+      .catch((reason: unknown) => {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
+      });
+
+    return () => {
+      cancelled = true;
+      created?.destroy();
+      changeRef.current = null;
+      mount.remove();
+    };
+  }, [from, to]);
+
+  return (
+    <figure>
+      <div ref={hostRef} />
+      {error && <p role="alert">{error}</p>}
+      <input
+        type="range" min={0} max={1} step={0.01} value={progress}
+        aria-label="Transition progress"
+        onChange={(event) => {
+          const value = event.currentTarget.valueAsNumber;
+          setProgress(value);
+          changeRef.current?.progress(value);
+        }}
+      />
+      <button type="button" onClick={() => changeRef.current?.play({ duration: 800 })}>
+        Play
+      </button>
+    </figure>
+  );
+}
+```
+
+## Things to get right
+
+- **Keep states stable.** The effect re-runs whenever `from` or `to` changes
+  identity. Create states outside the component, or memoize them with
+  `useMemo`, so a re-render doesn't rebuild the transition.
+- **Don't render children into the target.** VisDelta replaces the target's
+  contents. Leave the host element empty in JSX.
+- **Handle asynchronous creation.** `transition()` returns a promise. If the
+  component unmounts first, destroy the controller as soon as it resolves, as
+  the `cancelled` flag does above.
+- **Run in the browser only.** Rendering needs the DOM. In frameworks with
+  server rendering, mark the component as a client component (as above) or load
+  it only on the client. `delta()` is DOM-free and can run on the server.
+- **Refresh after theme changes.** VisDelta reads colour tokens from CSS when it
+  renders. After changing a theme class, call `change.resize()` to re-read them.
+
+## Other frameworks
+
+The same three steps apply anywhere: create the transition when the element is
+attached, drive it with `progress()`/`play()`, and call `destroy()` when the
+element is removed. In Vue that is `onMounted`/`onBeforeUnmount`; in Svelte,
+`onMount` and its returned cleanup function.

@@ -1,0 +1,45 @@
+{
+  "name": "visdelta-website",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Documentation site for VisDelta, built with Fumadocs and Next.js static export.",
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/prepare.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/prepare.mjs",
+    "build": "next build && node scripts/postbuild.mjs",
+    "start": "node scripts/serve-out.mjs",
+    "lint": "eslint",
+    "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "examples:check": "node scripts/verify-examples.mjs",
+    "test": "playwright test",
+    "check": "npm run lint && npm run examples:check && npm run types:check && npm run build && npm test"
+  },
+  "dependencies": {
+    "cn": "^0.4.0",
+    "fumadocs-core": "16.17.1",
+    "fumadocs-mdx": "15.4.7",
+    "fumadocs-typescript": "5.5.1",
+    "fumadocs-ui": "npm:@fumadocs/base-ui@16.17.1",
+    "lucide-react": "^1.50.0",
+    "next": "16.3.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "visdelta": "file:.."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.3.8",
+    "postcss": "^8.5.28",
+    "serve": "^14.2.6",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3"
+  }
+}

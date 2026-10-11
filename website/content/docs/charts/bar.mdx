@@ -1,0 +1,71 @@
+---
+title: Bar
+description: Categorical comparison on a shared quantitative baseline, with stacked, grouped and flipped layouts.
+---
+
+```ts
+import { bar } from 'visdelta/bar';
+```
+
+`bar()` compares categories through a shared quantitative baseline.
+
+<LiveExample id="bar-split" />
+
+## Methods
+
+| Method                                              | Meaning                                       |
+| --------------------------------------------------- | --------------------------------------------- |
+| `.flip(options?)`                                   | Switch between vertical and horizontal bars   |
+| `.breakdown(field?, options?)`                      | Split totals into detail segments             |
+| `.rollup(groupby?, options?)`                       | Combine detail into totals                    |
+| `.segment(fieldOrConfig?, config?)`                 | Configure segmented bars explicitly           |
+| `.layout('simple' \| 'grouped' \| 'stacked', options?)` | Change the bar layout                     |
+
+`.breakdown()` defaults to a stacked layout and the `sum` operator. It declares
+detail, not colour; add `.color(field)` when the segments should be coloured.
+
+```ts
+const detailed = bar(sales)
+  .x('region')
+  .y('revenue')
+  .key(['region', 'channel'])
+  .breakdown('channel')
+  .color('channel');
+
+const totals = detailed.rollup();
+const grouped = detailed.layout('grouped');
+const horizontal = detailed.flip();
+```
+
+## Transition behaviour
+
+- **Baselines are preserved.** Entering and exiting bars grow from and shrink to
+  the baseline.
+- **Additive splits stay readable.** For `sum` and `count`, a total splitting
+  into grouped detail passes through a stacked stage that preserves the total.
+  The merge reuses the same frames backward.
+- **Reaggregation is composed.** Regrouping the same records, for example from
+  totals by year to totals by location, routes through their common grain.
+- **Focus and sorts are staged.** A focused detail merges before the focus
+  changes; detail merges before a sort by total.
+- **Orientation changes are coordinate transitions.** `.flip()` uses Bar's
+  direct coordinate route. A flip combined with a Grain change is not split into
+  planner stages.
+
+Bar marks always use square corners, in every layout and throughout
+transitions.
+
+## Examples
+
+<LiveExample id="bar-flip" code={false} />
+
+More Bar examples (filter, sort, highlight, focus, layout and small multiples)
+are in the [playground](/docs/examples/playground).
+
+## Limits
+
+Bar's declaration planner supports one aggregate measure over inline rows, with
+a category and optional detail field. Wide folds, multiple aggregates,
+unresolved data, mismatched aliases or mark keys, and reorientation combined
+with a Grain change are outside it. Those pairs keep Bar's chart-authored route
+or its ordinary direct transition.

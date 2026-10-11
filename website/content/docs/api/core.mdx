@@ -1,0 +1,148 @@
+---
+title: Core
+description: DOM-free inspection. delta(), declaration edits and planning, identity, lineage and camera helpers.
+---
+
+Everything on this page is exported from `visdelta/core` (and from the
+`visdelta` root) and runs without a DOM.
+
+## delta()
+
+```ts
+function delta(from: Visualization, to: Visualization): DeltaResult;
+```
+
+Compares two states of the same chart type. Throws
+`delta() requires two states of the same chart type.` otherwise.
+
+```ts
+import { delta } from 'visdelta/core';
+
+const change = delta(base, next);
+change.stateChanges;          // normalized facts in seven categories
+change.hasDelta('encoding.y'); // raw semantic check
+change.edits;                 // lossless declaration edits
+change.lineage;               // present when both states have inline data
+```
+
+| Field                  | Meaning                                                                  |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `stateChanges`         | `StateChange[]`; see [State changes](/docs/concepts/state-changes)       |
+| `deltas`               | Raw semantic differences                                                 |
+| `hasDelta(type, action?)` | Whether a raw difference of `type` exists                             |
+| `edits`                | `DeclarationEdit[]` describing exact serialized differences              |
+| `lineage`              | `LineageCorrespondence`; see [Identity and lineage](/docs/concepts/identity#lineage) |
+
+Grain entries in `stateChanges` include `previous` and `next` descriptions of
+their `groupby` and `measures`. See [Types](/docs/api/types#statechange).
+
+## visualizationSpec()
+
+```ts
+function visualizationSpec(input: Visualization): ViewSpec;
+```
+
+Resolves a builder or plain spec into a detached view spec, with field types
+inferred from inline data.
+
+## Declaration edits
+
+`delta().edits` describes exact changes to the serialized declaration. Each edit
+has a `path`, `previous` and `next`. Values distinguish absence from `null`,
+`false` and zero. Arrays, including ordered transform pipelines, are atomic.
+
+```ts
+import { applyDeclarationEdits, declarationEdits } from 'visdelta/core';
+
+const edits = declarationEdits(base.toSpec(), next.toSpec());
+const target = applyDeclarationEdits(base.toSpec(), edits); // detached copy
+```
+
+`applyDeclarationEdits()` rejects edits whose `previous` value no longer
+matches. Edits are declaration differences, not animation commands.
+
+## Declaration planning
+
+```ts
+function planDeclarationTransition(
+  from: ViewSpec,
+  to: ViewSpec,
+  codec: DeclarationOperationCodec,
+  options?: DeclarationPlanOptions,
+): DeclarationPlan;
+```
+
+Searches for a route of complete, valid declarations in which each step inserts,
+removes or updates exactly one canonical operation. A chart-owned
+**codec** decides what the operations are: it decomposes a spec into operations,
+evaluates operations back into a spec, normalizes and validates it.
+
+```ts
+import { bar, createBarGrainDeclarationOperationCodec } from 'visdelta/bar';
+import { planDeclarationTransition } from 'visdelta/core';
+
+const from = bar(data).x('state').y('population').rollup().toSpec();
+const to = bar(data).x('state').y('population').breakdown('age').toSpec();
+
+const plan = planDeclarationTransition(from, to, createBarGrainDeclarationOperationCodec());
+plan.status;                                   // 'planned'
+plan.stages.map((stage) => stage.operation.id); // ['__visdeltaBarGrain/grouping']
+```
+
+| `status`       | Meaning                                                        |
+| -------------- | -------------------------------------------------------------- |
+| `planned`      | `stages` holds a validated route, one operation per stage      |
+| `direct`       | The canonical declarations are equivalent; no stage is needed |
+| `unsupported`  | No valid route, or a state outside the codec; `reason` explains |
+| `search-limit` | The search exceeded `maxSearchStates` (default 2048)           |
+
+The search is bounded and deterministic. Every intermediate must pass the
+codec's validator and round-trip through its normalizer, and source data and
+datum identity are fixed boundaries. Unsupported results have an empty `stages`
+array; at runtime the chart then uses its own route or the ordinary direct
+transition. Built-in charts use this planner internally. Pie has no codec.
+
+A codec may also constrain individual route edges with
+`validateStep(from, to, endpoints)`. See the
+[language framework](https://github.com/SonghaiFan/visdelta/blob/main/docs/language-framework.md#transition-contracts)
+for the complete contract.
+
+## Identity
+
+```ts
+resolveMarkIdentity(...)   // explicit .key() first, then the chart's default mark key
+correspondMarks(...)       // one-to-one updates, enter and exit
+markKeyValue(...)          // the string value of a mark key
+```
+
+These serve chart plugins. Lineage (below) describes split, merge and
+reaggregation separately.
+
+## Lineage
+
+```ts
+compileLineage(rows, transforms, { key?, grain? })
+buildGroupingTree(table)
+correspondLineage(from, to, { fromField?, toField? })
+viewLineageCorrespondence(...)
+lineageMarkKey(...)
+```
+
+At the low level, `key` identifies immutable source records and `grain`
+identifies marks in one compiled view. Filtering, sorting, limiting, binning,
+time units and folding preserve lineage. `sum` and `count` produce additive
+contribution records. `mean`, `median` and other non-additive aggregates keep
+provenance but mark arithmetic decomposition as unsafe.
+
+## Data types
+
+```ts
+detectDataTypes(rows)       // field → 'quantitative' | 'temporal' | 'nominal'
+resolveEncodingTypes(...)   // fill missing channel types from data
+```
+
+## Camera
+
+`fitCamera`, `focusCamera`, `cameraPosition`, `cameraScale`, `cameraSize`,
+`pointBounds` and `rectBounds` implement the aspect-preserving camera used by
+`.focus()`. Chart plugins supply mark bounds; Core fits one pan and zoom.

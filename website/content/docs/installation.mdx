@@ -1,0 +1,83 @@
+---
+title: Installation
+description: Install VisDelta from npm or load it directly in a browser. Then import a chart module, the transition runtime and the stylesheet.
+---
+
+VisDelta is an ESM-only package. It depends only on the `d3-*` modules it
+renders with, and it runs declared transforms itself, so you don't need to
+install anything else.
+
+## From npm
+
+Use the package when your application already has a bundler.
+
+```npm
+npm install visdelta
+```
+
+Import the chart module you use, the transition runtime and the required CSS:
+
+```ts title="main.ts"
+import { bar } from 'visdelta/bar';
+import { transition } from 'visdelta/transition';
+import 'visdelta/style.css';
+```
+
+Focused entry points keep each chart module independent. Importing from the
+package root is also supported when one convenient entry is preferable:
+
+```ts
+import { bar, transition } from 'visdelta';
+```
+
+Chart renderers load lazily in both cases: a builder carries a reference to its
+module, and `transition()` imports the renderer when it first needs it.
+
+<Callout type="warn" title="The stylesheet is required">
+  Import `visdelta/style.css` once per page. Without it, chart roots, axes and
+  tooltips are unstyled.
+</Callout>
+
+## From a CDN, without a bundler
+
+The package root can be imported directly from jsDelivr. The `/+esm` suffix asks
+jsDelivr to rewrite VisDelta's bare `d3-*` imports to version-pinned CDN
+modules, which is the same convention D3 uses.
+
+```html title="index.html"
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
+<script type="module">
+  import * as vd from 'https://cdn.jsdelivr.net/npm/visdelta@0.3.0/+esm';
+
+  const state = vd.bar(rows).x('category').y('value');
+</script>
+```
+
+Pin the version for durable pages. `vd` is a local module namespace, not a
+global variable. See [Use without a bundler](/docs/guides/cdn) for a complete
+page, the global script and focused CDN entries.
+
+## Entry points
+
+| Import                                                        | Contents                                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `visdelta`                                                    | Every built-in builder plus `delta`, `transition`, `sequence` and helpers |
+| `visdelta/bar`, `/line`, `/area`, `/point`, `/unit`, `/pie`   | One focused chart builder and its module                                  |
+| `visdelta/transition`                                         | `transition()` and `sequence()`                                           |
+| `visdelta/core`                                               | DOM-free state, difference, identity, lineage and camera helpers          |
+| `visdelta/chart-style`                                        | Structural chart styles and presets                                       |
+| `visdelta/plugins`                                            | Define and register independent chart modules                             |
+| `visdelta/toolkit`                                            | Optional compiler tools, renderer base and plot-style composition         |
+| `visdelta/facet`                                              | `smallMultiples()` composition                                            |
+| `visdelta/browser`                                            | Browser-global dependency adapter                                         |
+| `visdelta/style.css`                                          | Required base stylesheet                                                  |
+| `visdelta/themes/default.css`, `dark.css`, `paper.css`        | Optional CSS token themes                                                 |
+
+See the [API reference](/docs/api) for what each entry exports.
+
+## Requirements
+
+- **Browsers**: rendering requires a DOM. `delta()` and the other `visdelta/core`
+  helpers are DOM-free and also run in Node.
+- **Node**: the published ESM package supports Node 18 and later.
+- **TypeScript**: declarations ship with the package. No `@types` package is needed.

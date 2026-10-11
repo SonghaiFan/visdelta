@@ -9,11 +9,11 @@ import type { TimedVisualizationTransition } from './runtime/transition-controll
 export interface SequenceOptions extends TransitionOptions {}
 
 export interface SequencePlayOptions {
-  /** Milliseconds for each serial route stage. */
+  /** Milliseconds for each serial route stage. Defaults to 800. */
   duration?: number;
-  /** Timeline position in leg units: 0 is the first state, 1 the second. */
+  /** Timeline position in leg units: 0 is the first state, 1 the second. Defaults to the current value. */
   from?: number;
-  /** Timeline position in leg units: 0 is the first state, 1 the second. */
+  /** Timeline position in leg units: 0 is the first state, 1 the second. Defaults to the last state. */
   to?: number;
 }
 
@@ -26,9 +26,11 @@ export interface VisualizationSequence {
   progress(value: number): VisualizationSequence;
   /** Play across adjacent legs. Duration applies to each serial route stage. */
   play(options?: SequencePlayOptions): VisualizationSequence;
+  /** Stop owned playback at the current frame. */
   pause(): VisualizationSequence;
   /** Recompile the active leg for the container's current size/theme. */
   resize(): VisualizationSequence;
+  /** Stop playback and remove every prepared leg. The controller cannot be used afterwards. */
   destroy(): void;
 }
 

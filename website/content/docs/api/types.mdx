@@ -1,0 +1,74 @@
+---
+title: Types
+description: The public types you are most likely to read or annotate, generated from the library's TypeScript source.
+---
+
+The tables on this page are generated at build time from the TypeScript source,
+so they always match the published declarations.
+
+## StateChange
+
+`delta().stateChanges` is a `StateChange[]`. It is a discriminated union on
+`category`:
+
+```ts
+type StateChange =
+  | { category: 'data'; action: 'add' | 'remove' | 'update' }
+  | {
+      category: 'grain';
+      action: 'split' | 'merge' | 'reaggregate' | 'change-reducer';
+      previous: GrainDescription;
+      next: GrainDescription;
+    }
+  | { category: 'encoding'; action: 'bind' | 'unbind' | 'remap'; channel: string }
+  | { category: 'coordinate'; action: 'rescale' | 'reorient'; channel?: 'x' | 'y' }
+  | { category: 'layout'; action: 'reorder' | 'rearrange' | 'reconnect' }
+  | { category: 'attention'; action: 'enter' | 'exit' | 'shift'; target: 'focus' | 'highlight' }
+  | { category: 'appearance'; action: 'restyle' | 'reshape'; property: string };
+```
+
+Narrow on `category` to read the extra fields:
+
+```ts
+for (const change of delta(from, to).stateChanges) {
+  if (change.category === 'encoding') console.log(change.channel);
+  if (change.category === 'grain') console.log(change.previous.groupby, '→', change.next.groupby);
+}
+```
+
+### GrainDescription
+
+<auto-type-table path="src/types/index.ts" name="GrainDescription" />
+
+### GrainMeasure
+
+<auto-type-table path="src/types/index.ts" name="GrainMeasure" />
+
+## VisualizationWarning
+
+Returned by `visualizationWarnings()` and dispatched in `visdelta:warnings`
+events. See [Visualization warnings](/docs/guides/warnings).
+
+<auto-type-table path="src/types/index.ts" name="VisualizationWarning" />
+
+## ChannelSpec
+
+The options accepted by `.x()`, `.y()`, `.color()`, `.size()` and `.channel()`.
+
+<auto-type-table path="src/types/index.ts" name="ChannelSpec" />
+
+## FacetLayout
+
+Options for `.repeat()` and `smallMultiples()`. See [Small multiples](/docs/charts/repeat).
+
+<auto-type-table path="src/facet.ts" name="FacetLayout" />
+
+## ChartStyleDefinition
+
+The input to `defineChartStyle()`. See [Styling and themes](/docs/guides/styling).
+
+<auto-type-table path="src/charts/style.ts" name="ChartStyleDefinition" />
+
+## DeclarationPlanOptions
+
+<auto-type-table path="src/grammar/declaration-plan.ts" name="DeclarationPlanOptions" />

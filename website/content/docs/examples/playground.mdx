@@ -1,0 +1,24 @@
+---
+title: Playground
+description: Every state-change category, live. Pick a category, choose an example, then play, reverse, scrub and restyle it.
+full: true
+---
+
+Each example is a real pair (or sequence) of VisDelta states rendered by the
+library itself. The categories are the seven that `delta()` reports; the strip
+under each chart lists the state changes it actually emits. The code beside
+each chart is the exact module that rendered it.
+
+<Playground />
+
+## Parameters
+
+- **Speed** scales the playback duration.
+- **Chart style** passes `d3ChartStyle`, `editorialChartStyle` or
+  `paperChartStyle` as the transition's `chartStyle`.
+- **ms/stage** is the `duration` passed to `play()`, applied to each serial route
+  stage.
+
+Changing the chart style recreates the transition and keeps the current
+progress. Every example links directly: append its id as a hash, for example
+[`#bar-split`](/docs/examples/playground#bar-split).

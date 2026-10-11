@@ -1,0 +1,97 @@
+---
+title: Controlling playback
+description: Drive one transition from buttons, a slider, scroll position or your own timeline.
+---
+
+VisDelta has no built-in controls. Every control calls the same controller
+methods: `progress()`, `play()` and `pause()`. The player on this site is built
+exactly this way.
+
+<LiveExample id="bar-sort" code={false} />
+
+## Buttons
+
+```ts
+const change = await transition(from, to, { target: '#chart' });
+
+playButton.addEventListener('click', () => change.play({ duration: 800 }));
+reverseButton.addEventListener('click', () => change.play({ from: 1, to: 0 }));
+pauseButton.addEventListener('click', () => change.pause());
+```
+
+On a pair controller, `play()` starts from `0` unless you pass `from`. To resume
+from the current frame, pass it explicitly:
+
+```ts
+resumeButton.addEventListener('click', () => {
+  change.play({ from: change.value, to: 1 });
+});
+```
+
+## A slider
+
+```ts
+slider.addEventListener('input', () => {
+  change.progress(slider.valueAsNumber); // 0 … 1
+});
+```
+
+`progress()` pauses any running playback, so a reader can grab the slider
+mid-animation.
+
+## Scroll position
+
+Map scroll position to progress. VisDelta draws whatever frame you ask for, in
+any order, so fast scrolling and scrolling backward need no special handling.
+
+```ts
+const section = document.querySelector<HTMLElement>('#story')!;
+
+function onScroll() {
+  const rect = section.getBoundingClientRect();
+  const travel = rect.height - window.innerHeight;
+  const t = Math.min(1, Math.max(0, -rect.top / travel));
+  change.progress(t);
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+```
+
+## Your own clock
+
+Because progress is just a number, VisDelta can follow any timeline, such as a
+media element, an animation library or a test harness:
+
+```ts
+video.addEventListener('timeupdate', () => {
+  change.progress(video.currentTime / video.duration);
+});
+```
+
+## Reflecting progress in the UI
+
+`play()` animates internally. Read `change.value` on each animation frame to keep
+a slider or label in sync while it plays:
+
+```ts
+function playAndTrack(to: number) {
+  change.play({ from: change.value, to });
+  const tick = () => {
+    slider.value = String(change.value);
+    if (change.value !== to) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+```
+
+## Respecting reduced motion
+
+Don't start animations automatically for readers who prefer reduced motion. A
+reader-initiated control is still fine, as is jumping straight to the end state:
+
+```ts
+const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduce) change.progress(1);
+else change.play();
+```

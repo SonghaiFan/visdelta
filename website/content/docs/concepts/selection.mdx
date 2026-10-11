@@ -1,0 +1,114 @@
+---
+title: where, highlight and focus
+description: Three selection words with three separate meanings. Membership, emphasis and camera.
+---
+
+VisDelta keeps three selection operations strictly apart. They accept the same
+selector but answer different questions:
+
+```ts
+base.where({ region: 'North' });     // remove other rows
+base.highlight({ region: 'North' }); // keep rows; change emphasis
+base.focus({ region: 'North' });     // keep rows; move the camera
+```
+
+| Method         | Changes                     | State-change category | Affects `rows()` |
+| -------------- | --------------------------- | --------------------- | ---------------- |
+| `.where()`     | Data membership             | Data                  | Yes              |
+| `.highlight()` | Emphasis of matching marks  | Attention             | No               |
+| `.focus()`     | The view camera             | Attention             | No               |
+
+## where(selector)
+
+Matching rows stay and non-matching rows exit. `where()` adds a filter
+transform, so `state.rows()` also returns only the matching rows.
+
+<LiveExample id="bar-filter" />
+
+## highlight(selector, options?)
+
+`highlight()` changes attention without changing rows, identity, layout, axes or
+scale domains. Matching marks keep full opacity. Non-matching marks use the chart
+style's `--vd-dim-opacity`, or the `opacity` you pass:
+
+```ts
+base.highlight({ country: 'Norway' });
+base.highlight({ sites: { gte: 10 } }, { opacity: 0.08 });
+```
+
+<LiveExample id="bar-highlight" code={false} />
+
+## focus(selector)
+
+`focus()` changes only the camera. Core finds the rendered bounds of the
+matching marks, then applies one aspect-preserving two-dimensional pan and zoom.
+Every row and mark identity remains. The visible scales and axes follow the
+camera; the underlying data domain is not recomputed.
+
+When nothing matches, the camera stays at the complete-chart view. Focus never
+zooms out farther than that view.
+
+<LiveExample id="bar-focus" code={false} />
+
+## Selectors
+
+A selector is always an object, never a string. Specs stay plain data that can
+be saved, sent and compared without a parser.
+
+### Field shorthand
+
+Use a scalar for equality, an array for membership or a constraint object for
+comparisons. Several fields in one object are joined with AND.
+
+```ts
+{ region: 'North' }                    // region equal "North"
+{ region: ['North', 'South'] }         // region oneOf [...]
+{ age: { gte: 18, lt: 65 } }           // 18 <= age < 65
+{ region: 'North', age: { gt: 80 } }   // region AND age
+{ cancelledAt: null }                  // equality with null
+```
+
+### Explicit comparison
+
+```ts
+{ field: 'sales', equal: 100 }
+{ field: 'region', oneOf: ['North', 'South'] }
+{ field: 'sales', gte: 10, lt: 100 }
+{ field: 'date', gte: '2026-01-01', lt: '2027-01-01' }
+```
+
+The supported operators are exactly `equal`, `notEqual`, `oneOf`, `gt`, `gte`,
+`lt` and `lte`. The operator is `equal`, not `equals`.
+
+Range operands must be finite numbers, `Date` values or valid ISO date strings.
+Missing values, empty strings, booleans and `NaN` never match a range.
+
+## Composition
+
+All conditions in one selector, and all repeated calls to the same method, are
+joined with AND. Each call narrows the previous state; it does not replace it.
+
+```ts
+const olderNorth = base
+  .where({ region: ['North', 'South'] })
+  .where({ region: 'North' })
+  .where({ age: { gt: 80 } });
+```
+
+The three scopes are independent and can coexist:
+
+```ts
+const next = base
+  .where({ year: 2022 })                             // membership
+  .highlight({ country: 'Sweden' }, { opacity: 0.1 }) // emphasis
+  .focus({ country: ['Denmark', 'Sweden'] });        // camera
+```
+
+Because a second `.focus()` narrows the first, `state.focus(north).focus(south)`
+means their intersection. To replace a condition, start from an earlier state
+or call `.reset()`, which returns the declaration before the chain's first
+semantic operation:
+
+```ts
+const south = state.reset().focus({ region: 'South' });
+```

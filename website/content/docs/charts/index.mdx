@@ -1,0 +1,40 @@
+---
+title: Choosing a chart
+description: Six peer chart modules, each answering one kind of question and owning its own transition rules.
+---
+
+Each chart module is an independent peer. Its builder adds chart-specific
+methods to the [shared grammar](/docs/concepts/chart-states#shared-grammar), and
+the module decides how its marks move. Both endpoints of a transition must use
+the same chart type.
+
+| Chart                         | Question it answers                          | Chart-owned rule                                         |
+| ----------------------------- | -------------------------------------------- | -------------------------------------------------------- |
+| [Bar](/docs/charts/bar)       | How do categories compare?                   | Bars share a quantitative baseline                       |
+| [Line](/docs/charts/line)     | How does a value change in order?            | Keys identify points inside paths; gaps stay honest       |
+| [Area](/docs/charts/area)     | How does magnitude or composition change?    | Explicit baseline and stacked boundaries                 |
+| [Point](/docs/charts/point)   | How do two quantities relate?                | Compact Cartesian axes; entering points grow in place    |
+| [Unit](/docs/charts/unit)     | How many countable items are there?          | Grid, force, unit-bar and beeswarm layouts; shortest travel |
+| [Pie](/docs/charts/pie)       | What share of one total does each part take? | Keyed angular motion; direct transitions only            |
+
+Every chart can also be partitioned into [small multiples](/docs/charts/repeat)
+with `.repeat()`.
+
+## Import only what you use
+
+```ts
+import { line } from 'visdelta/line';
+
+const chart = line(rows)
+  .x('date', { type: 'temporal' })
+  .y('close');
+```
+
+A builder carries its chart module, so `transition()` loads only the renderer
+it needs.
+
+## Design warnings
+
+Each chart module can also report advisory design warnings, such as too many
+stacked columns or a truncated bar baseline. They never change what renders.
+See [Visualization warnings](/docs/guides/warnings).

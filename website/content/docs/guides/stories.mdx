@@ -1,0 +1,67 @@
+---
+title: Multi-step stories
+description: Use sequence() to join several authored states into one seekable timeline.
+---
+
+When a chart moves through more than two states, build them all up front and
+pass them to `sequence()`. You get one controller for the whole timeline, with
+no empty frame between legs.
+
+<LiveExample id="bar-story" />
+
+## Build the states
+
+```ts
+import { bar } from 'visdelta/bar';
+import { sequence } from 'visdelta/transition';
+
+const revenue = bar(products).x('product').y('revenue');
+const profit = revenue.y('profit');
+const ranked = profit.sort('profit', 'descending');
+const emphasised = ranked.highlight({ product: 'Software' });
+
+const story = await sequence([revenue, profit, ranked, emphasised], {
+  target: '#chart',
+});
+```
+
+All states must use the same chart type. To return to the start, repeat the
+first state at the end: `[revenue, profit, ranked, revenue]`.
+
+## Seek in leg units
+
+A sequence's `value` runs from `0` to `states.length - 1`. Integers are the
+authored states; fractions are positions within a leg.
+
+```ts
+story.progress(0);      // revenue
+story.progress(1.5);    // halfway from profit to ranked
+story.progress(3);      // emphasised
+story.play({ to: 2 });  // from the current position to ranked
+```
+
+## Scroll-driven steps
+
+Map each step of a scrolling narrative to an integer, and the scroll between
+them to the fraction:
+
+```ts
+const steps = document.querySelectorAll<HTMLElement>('.step');
+
+function onScroll() {
+  let position = 0;
+  steps.forEach((step, index) => {
+    const rect = step.getBoundingClientRect();
+    const t = (window.innerHeight * 0.6 - rect.top) / rect.height;
+    if (t > 0) position = Math.min(steps.length - 1, index + Math.min(1, t));
+  });
+  story.progress(Math.min(position, story.states.length - 1));
+}
+```
+
+## Authored states are fixed
+
+Each state you pass is a boundary the planner keeps. Within each pair, the
+chart may still insert generated stages; these occupy the existing leg and do
+not shift integer positions. They do add playback time, because `duration`
+applies to every serial stage. See [Progress and playback](/docs/concepts/progress#duration-is-per-stage).

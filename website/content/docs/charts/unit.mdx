@@ -1,0 +1,54 @@
+---
+title: Unit
+description: Countable items as individually matched circles, in grid, force, unit-bar and beeswarm layouts.
+---
+
+```ts
+import { unit } from 'visdelta/unit';
+```
+
+`unit()` turns rows, or counts, into individually matched circles.
+
+<LiveExample id="unit-layout" />
+
+## Methods
+
+| Method                                            | Meaning                                              |
+| ------------------------------------------------- | ---------------------------------------------------- |
+| `.value(field, { unitValue?, maxUnits? })`        | Expand a count field into units                      |
+| `.group(field)`                                   | Declare categorical membership, without choosing colour |
+| `.layout('grid' \| 'force' \| 'bar' \| 'beeswarm', options?)` | Arrange the same units                   |
+| `.columns(number)`                                | Set grid or unit-bar columns                         |
+| `.radius(number)`                                 | Set the requested unit radius                        |
+| `.x(field, options?)`, `.y(field, options?)`      | Declare force targets; x also positions a beeswarm   |
+
+The available layout names are exported as `UNIT_LAYOUTS`.
+
+## Layouts
+
+- **`grid`** arranges units in rows of `columns`.
+- **`bar`** centres one stack of units on each category tick. It requires a
+  `.group()` field.
+- **`beeswarm`** places units without overlap along x. It requires an x field.
+- **`force`** records a D3 simulation's ticks as a reversible physical path and
+  maps progress to its cumulative movement. With no positional channel, units
+  are attracted to the plot centre. An explicit x or y channel supplies a
+  per-unit `forceX` or `forceY` target, so a categorical field forms labelled
+  attractor bands.
+
+Layout changes preserve matching keys. Remaining unmatched units use a global
+minimum-travel assignment, and layout changes use a short, bounded per-unit
+stagger unless you override it.
+
+## Quantity per circle
+
+`unitValue` sets how much each circle represents and defaults to `1`. A positive
+remainder gets one more circle, so 51 sites at `unitValue: 10` render 6 circles.
+Label the chart or legend with the unit value you choose. `maxUnits` is a
+whole-chart safety cap.
+
+Changing `unitValue` is a **Grain** change: a coarse circle is the parent of the
+finer circles from the same row, and the transition splits or merges them around
+the parent's centroid.
+
+<LiveExample id="unit-value" />

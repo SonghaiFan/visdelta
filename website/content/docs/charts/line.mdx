@@ -1,0 +1,59 @@
+---
+title: Line
+description: Ordered trends with keyed observations inside the path and honest gaps by default.
+---
+
+```ts
+import { line } from 'visdelta/line';
+```
+
+`line()` shows an ordered trend. `.key()` identifies observations **inside** the
+SVG path, not only as separate point elements, so a single observation can enter
+or leave a line.
+
+<LiveExample id="line-split" />
+
+## Methods
+
+| Method                              | Meaning                                         |
+| ----------------------------------- | ----------------------------------------------- |
+| `.curve(d3CurveName)`               | Use any exact D3 line-curve export              |
+| `.connect('adjacent' \| 'across')`  | Keep honest gaps, or connect across them        |
+| `.strokeWidth(number)`              | Set the line width                              |
+| `.pointSize(number)`                | Set the point radius                            |
+| `.flip(options?)`                   | Swap the position mappings in an explicit order |
+| `.breakdown(field, options?)`       | Split one line into series                      |
+| `.rollup(options?)`                 | Combine series into one line                    |
+
+Curve names are exact D3 exports such as `curveLinear`, `curveStep` and
+`curveMonotoneX`. Line also accepts `curveBundle`. The full list is exported as
+`D3_CURVE_NAMES`.
+
+```ts
+const prices = line(rows)
+  .x('date', { type: 'temporal' })
+  .y('close')
+  .key(['date', 'ticker'])
+  .breakdown('ticker')
+  .color('ticker');
+
+const average = prices.rollup({ op: 'mean' });
+```
+
+## Transition behaviour
+
+- **Adding an observation** extends the line to it before its point appears.
+- **Removing or filtering** runs the same frames backward: the point leaves
+  before the segment retracts.
+- **Gaps stay honest.** With the default `connect('adjacent')`, filtered
+  observations leave a visible gap. `connect('across')` joins across them.
+- **Split and merge** zip series out of, and back into, the summary line.
+
+<LiveExample id="line-add" code={false} />
+
+## Limits
+
+The declaration planner treats raw y remapping as an Encoding operation and a
+supported summary (source field, reducer and output alias) as one Grain
+operation. Raw-to-summary pairs keep Line's native route when eligible. Complex
+pipelines remain outside the planner and use the ordinary transition.

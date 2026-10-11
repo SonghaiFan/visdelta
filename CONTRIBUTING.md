@@ -49,6 +49,11 @@ Then add the focused package entry and update `docs/chart-types.md` plus
 `docs/reference.md`. A focused-module browser test must show that unrelated
 chart implementations are not loaded.
 
+Document the chart on the site as well: add `website/content/docs/charts/<name>.mdx`
+and at least one live example in `website/examples/`. See
+[website/README.md](website/README.md) for the example workflow and
+`npm run check` in `website/` for the site's gates.
+
 ## Transition review
 
 For every new transition, verify all of these:

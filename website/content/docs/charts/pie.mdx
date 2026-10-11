@@ -1,0 +1,49 @@
+---
+title: Pie
+description: Nonnegative parts of one positive total, with keyed angular motion and direct transitions.
+---
+
+```ts
+import { pie } from 'visdelta/pie';
+```
+
+`pie()` shows nonnegative parts of one positive total. Every row is one keyed
+slice.
+
+<LiveExample id="pie-donut" />
+
+## Methods
+
+| Method                                    | Meaning                                              |
+| ----------------------------------------- | ---------------------------------------------------- |
+| `.value(field, options?)`                 | Bind the slice magnitude (`encoding.angle`)          |
+| `.label(field)`                           | Bind the slice label (`encoding.label`)              |
+| `.labels('inside' \| 'outside' \| 'none')` | Place labels; `outside` is the default              |
+| `.innerRadius(fraction)`                  | Create a donut; the fraction must be in `[0, 1)`     |
+
+Input order determines clockwise slice order, starting at the top. `.sort()`
+changes that order explicitly. `.where()`, `.highlight()`, colour and tooltips
+are supported.
+
+Outside labels have leader lines and vertical spacing. Names that exceed the
+available gutter are shortened, and the full values stay in the tooltip.
+
+## Validation
+
+Pie validates its input instead of guessing:
+
+- Repeated categories are rejected; aggregate them before building the chart.
+- Negative, missing and non-finite values, and a non-positive total, are
+  rejected.
+- Zero-valued components have no visible sector.
+- Cartesian position channels, axes and `focus()` are rejected.
+
+## Transition behaviour
+
+Pie uses the direct runtime transition with recorded angular and radial motion
+and keyed enter and exit. Slices move as wedges rather than as interpolated SVG
+path strings.
+
+It has no declaration-operation planner, automatic intermediate states, focus
+camera or cross-chart geometry bridge. A Pie state cannot transition into
+another chart type.

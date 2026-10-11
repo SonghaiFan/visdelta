@@ -1,0 +1,74 @@
+---
+title: Overview
+description: VisDelta treats a chart change as data. Declare two states; get one transition you can play, reverse or scrub.
+---
+
+VisDelta is a declarative visualization-transition library for the browser.
+You describe a chart before and after a change as two immutable states.
+VisDelta reports what changed between them and renders one **seekable**
+transition. Any external control can drive it: a button, a slider, scroll
+position or an application timeline.
+
+<LiveExample id="bar-remap" />
+
+The chart above is not two screenshots crossfading. At every progress value the
+marks, scales, ticks and axis titles are evaluated together, so every frame is a
+truthful chart.
+
+## The model in one line
+
+```text
+Data → Chart state → Difference → Transition → Frame → Control
+```
+
+| Step            | What it is                                                         | API                          |
+| --------------- | ------------------------------------------------------------------ | ---------------------------- |
+| **Data**        | A tidy table: one observation per row, one variable per field.     | rows, `{ values }`, `{ url }` |
+| **Chart state** | An immutable description of one chart.                             | `bar()`, `line()`, `area()`, `point()`, `unit()`, `pie()` |
+| **Difference**  | What changed between two states, in seven named categories.        | `delta()`                    |
+| **Transition**  | A planned, reversible path between two states of one chart type.   | `transition()`, `sequence()` |
+| **Frame**       | The picture at one progress value from `0` to `1`.                 | `progress(t)`                |
+| **Control**     | Whatever supplies progress. It lives outside the library.          | your code                    |
+
+## What it is for
+
+- **Explanatory graphics and data stories** where the change itself is the
+  message: a total splitting into its parts, a ranking reordering, a camera
+  moving to a region of interest.
+- **Scroll-driven and scrubbable narratives**, because progress is a plain
+  number rather than a running clock.
+- **Interactive dashboards** that should animate between views without
+  hand-writing D3 transitions for every pair of states.
+
+## What it is not
+
+- **Not a data-wrangling library.** Clean, join and pivot your data first;
+  VisDelta expects tidy input.
+- **Not a chart-to-chart morpher.** Both endpoints of a transition must use the
+  same chart type. A Bar state cannot transition into a Line state.
+- **Not an inference engine for visual mappings.** VisDelta never decides that a
+  field should mean x, y, colour, size or detail. Every mapping is declared.
+
+## Chart types
+
+Six peer chart modules ship with the package. Each owns its builder, compiler,
+marks, axes, matching and transition rules. The generic core contains no
+branches for any of them.
+
+<Cards>
+  <Card title="Bar" href="/docs/charts/bar" description="Categorical comparison on a shared baseline. Stacked, grouped and flipped." />
+  <Card title="Line" href="/docs/charts/line" description="Ordered trends with honest gaps and keyed observations inside the path." />
+  <Card title="Area" href="/docs/charts/area" description="Ordered magnitude and composition: stacked layers and streamgraphs." />
+  <Card title="Point" href="/docs/charts/point" description="Scatterplots, dot plots, dumbbells and lollipops." />
+  <Card title="Unit" href="/docs/charts/unit" description="Countable items in grid, force, unit-bar and beeswarm layouts." />
+  <Card title="Pie" href="/docs/charts/pie" description="Parts of one positive total, with keyed angular motion." />
+</Cards>
+
+## Where to go next
+
+<Cards>
+  <Card title="Installation" href="/docs/installation" description="npm, a CDN module URL or a global script." />
+  <Card title="Quick start" href="/docs/quick-start" description="Your first transition in four steps." />
+  <Card title="State changes" href="/docs/concepts/state-changes" description="The seven categories delta() reports." />
+  <Card title="Playground" href="/docs/examples/playground" description="Twenty live examples, organized by category." />
+</Cards>
