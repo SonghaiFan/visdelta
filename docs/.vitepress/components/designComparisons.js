@@ -9,6 +9,40 @@ export const comparisonGuides = [
   { id: 'dot', title: 'Dots and ranges', url: academy + 'examples-of-datawrapper-dot-charts' },
   { id: 'pie', title: 'Pie alternatives', url: academy + 'what-to-consider-when-creating-a-pie-chart' }
 ];
+// Summaries in our own words, not quotations from the linked articles.
+export const guideExplanations = {
+  baseline: {
+    why: 'Readers compare bars by length. Cutting off the baseline makes a small numerical difference occupy a much larger fraction of the visible bar, exaggerating relative magnitudes. Dots encode position instead of filled length; a focused scale can therefore reveal small differences without implying the same length ratio.',
+    context: 'For a time trend, use a line with meaningful ordering. If change itself is the message, derive and label the change measure explicitly rather than clipping absolute values.',
+    detection: 'VisDelta warns when an explicit bar measure domain excludes zero after scale nicing. It preserves the domain and renders the chart.'
+  },
+  stack: {
+    why: 'A stack makes totals easy to see, but middle components start at different heights. Comparing those components requires judging thickness rather than aligned endpoints. Equal category slots also hide unequal time gaps. Many columns and long labels compete for limited screen width.',
+    context: 'Stacks remain useful for totals and a component at the baseline. Use shared-scale panels for comparing every part, lines for crossovers, and continuous time positions for irregular dates. Include components only: adding their total as another segment double-counts the amount. Grouping small parts is an editorial choice that should preserve the total.',
+    detection: 'VisDelta warns above 10 vertical stacked columns and for excessive color categories. It cannot infer which component matters, whether parts exhaust a whole, or whether an ordinal label denotes a date. Those examples require manual review.'
+  },
+  line: {
+    why: 'A connecting line suggests meaningful order and values between observations; arbitrary category names do not establish either. Smooth interpolation can suggest peaks or dips that were never observed. Equal emphasis on every series can make a particular comparison harder to follow.',
+    context: 'Lines suit trends, including irregular time intervals. Markers reveal actual observations. A focused vertical scale can be appropriate: lines do not always need zero. Context, highlights and explanatory notes should follow the intended message, rather than an automatic rule.',
+    detection: 'VisDelta detects nominal connections, natural/cardinal smoothing with at least three observations in a series, and high series/color counts. It does not infer missing context, causal events, percentage semantics or which series deserves emphasis.'
+  },
+  area: {
+    why: 'Filled areas emphasize magnitude and, when stacked, the combined total. Interior layers move with the layers beneath them, making their own changes and crossovers harder to compare. A nonzero fill baseline shows distance from a threshold, which readers may mistake for the full quantity.',
+    context: 'Use lines when individual trends or small differences matter most. Sparse, regularly spaced observations may be clearer as columns; irregular dates still need true temporal spacing, even with few observations. A threshold band can be intentional if its meaning is explained.',
+    detection: 'VisDelta detects nonzero single-area baselines, negative layered values, nominal connections, risky smoothing and high layer/color counts. It does not automatically reject sparse data, reorder for inferred importance, or combine minor layers.'
+  },
+  dot: {
+    why: 'Dots support comparisons on a common positional scale without relying on bar length. With many dots in one category, matching each point to its identity becomes harder. A connector can make the gap between a pair more apparent.',
+    context: 'Datawrapper’s companion dot-plot tutorial recommends at most three dots per row, while allowing four or five in suitable cases. A range emphasizes a gap; the choice depends on the reading goal. The examples guide illustrates these alternatives rather than defining universal errors.',
+    detection: 'VisDelta warns when a category has more than three finite observations on a categorical–quantitative Point chart. It excludes summary/detail views and does not apply this count to quantitative scatterplots.',
+    additionalUrl: academy + 'how-to-create-a-dot-plot'
+  },
+  pie: {
+    why: 'Similar angles are difficult to compare precisely. More slices also create more boundaries, colors and labels to track. Separate pies lack the shared aligned endpoints available in bars, which makes comparing components across totals harder.',
+    context: 'A few familiar proportions can work well in a pie. For one message, text may suffice; for precise comparisons, consider bars. Outside labels can identify small slices, and explicitly grouping minor parts may simplify the display without losing quantity.',
+    detection: 'VisDelta warns above four slices, following the Academy guide, and suggests text for one or two slices. These are contextual suggestions, not proof of a bad chart. It cannot infer completeness, the need for precision or label collisions.'
+  }
+};
 const palette = ['#176078', '#19a4c5', '#2ce5b4', '#00b69e'];
 const parts = ['Core', 'Growth', 'Services', 'Support'];
 const matrix = [[90, 20, 10, 30], [80, 30, 20, 40], [70, 20, 15, 50], [80, 40, 10, 30]];
@@ -234,5 +268,5 @@ for (const row of rows) {
 const grouped = [...cells.values()];
 ` + pieCode().replace('pie(rows)', 'pie(grouped)').replace(colors, '.color("part", { domain: ["Core", "Growth", "Services", "Others"], range: ["#176078", "#19a4c5", "#2ce5b4", "#d8e2e5"] })'), 'Minor slices explicitly combined')),
   entry('pie-space', 'pie', 'Use a wide layout efficiently', 'A compact pie can fit beside prose.', singlePart,
-    view('pie', pieCode(), 'Pie spanning the available column'), view('pie', pieCode(), 'Compact pie alongside the message', { compact: true, detail: 'Core represents 60% of this total. A compact chart leaves room for explanatory text.' }))
+    view('pie', pieCode(), 'Pie spanning the available column'), view('pie', pieCode('\n  .labels("inside")'), 'Compact pie alongside the message', { compact: true, detail: 'Core represents 60% of this total. A compact chart leaves room for explanatory text.' }))
 );

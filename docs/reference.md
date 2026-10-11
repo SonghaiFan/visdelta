@@ -703,6 +703,8 @@ specs and transformed rows. Plugins without this hook return no warnings.
 
 | Code | Trigger | Suggested response |
 | --- | --- | --- |
+| `bar.too-many-stacked-columns` | More than 10 observed categories in vertical stacked bars | Consider horizontal bars, dots or a table |
+| `point.too-many-dots-per-category` | More than 3 finite observations per category with one categorical and one quantitative axis; excludes summary/detail views | Filter or split comparisons; 4–5 dots can still be appropriate |
 | `bar.truncated-baseline` | Explicit two-ended measure domain still excludes zero after renderer nicing, including flipped bars | Include zero or use dots |
 | `connection.unordered-axis` | Line/Area x channel is nominal, inferred or declared | Use bars/dots, or declare ordinal if order is meaningful |
 | `color.too-many-categories` | More than 5 observed nominal/ordinal values share a color channel, in any built-in chart | Consider grouping, filtering or using small multiples; colors and legend entries remain unchanged |
@@ -729,6 +731,8 @@ These rules translate the expressiveness/effectiveness principles in
 Bar, Line, Area, Scatterplot and Bubble Plot sections motivate the chart rules;
 its category-discrimination guidance motivates the color warning.
 
+See [Design comparisons](./design-guides.md) for explanations, exceptions and linked Datawrapper guidance.
+
 The [Datawrapper line guide](https://www.datawrapper.de/academy/what-to-consider-when-creating-line-charts)
 informs interpolation advice, and its [area guide](https://www.datawrapper.de/academy/what-to-consider-when-creating-area-charts)
 informs baseline advice. Gallery viewers display the same system warnings with
@@ -737,8 +741,7 @@ threshold-band examples; declarations and rendering remain unchanged.
 
 Unsupported automatic judgements include author intent, causal claims,
 importance of a variable, precise-share comparison goals, annotation quality,
-label collisions, near-overlap in pixel space, palette accessibility and pie
-chart advice (VisDelta has no pie chart module). Bubble-radius scaling and
+label collisions, near-overlap in pixel space, palette accessibility, and whether pie slices represent a complete, mutually exclusive whole. Bubble-radius scaling and
 nonzero minimum-radius effects are not assessed by these warnings. No universal
 warning is emitted merely for using a stack, a focused line scale or a bubble
 chart. Advice requiring these contexts remains a manual design review.

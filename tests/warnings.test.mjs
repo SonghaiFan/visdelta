@@ -122,3 +122,32 @@ test('guide-backed baseline and interpolation advice preserves author choices', 
     assert.deepEqual(await codes(factory(pairs).x('x').y('y').breakdown('group').curve('curveNatural')), []);
   }
 });
+
+test('stacked column advice counts categories, respects orientation and preserves declarations', async () => {
+  const data = Array.from({ length: 11 }, (_, i) => ['A', 'B'].map(part => ({ label: `L${i}`, part, value: i + 1 }))).flat();
+  const chart = bar(data).x('label').y('value').breakdown('part');
+  const before = structuredClone(chart.toSpec());
+  const hints = await visualizationWarnings(chart);
+  assert.deepEqual(hints.map(hint => hint.code), ['bar.too-many-stacked-columns']);
+  assert.equal(hints[0].evidence.count, 11);
+  assert.match(hints[0].source, /stacked-column-charts$/);
+  assert.deepEqual(chart.toSpec(), before);
+  assert.deepEqual(await codes(chart.flip()), []);
+  assert.deepEqual(await codes(chart.layout('grouped')), []);
+  assert.deepEqual(await codes(chart.where({ field: 'value', lte: 10 })), []);
+});
+
+test('dot density advice counts finite observations per category after filtering', async () => {
+  const data = ['A', 'B'].flatMap(label => Array.from({ length: 4 }, (_, value) => ({ label, value })));
+  const chart = point(data).x('value').y('label').key(['label', 'value']);
+  const before = structuredClone(chart.toSpec());
+  const hints = await visualizationWarnings(chart);
+  assert.deepEqual(hints.map(hint => hint.code), ['point.too-many-dots-per-category']);
+  assert.deepEqual(hints[0].evidence, { categories: 2, maximum: 4, threshold: 3 });
+  assert.match(hints[0].source, /how-to-create-a-dot-plot$/);
+  assert.deepEqual(chart.toSpec(), before);
+  assert.deepEqual(await codes(chart.where({ field: 'value', lt: 3 })), []);
+  assert.deepEqual(await codes(point(data).x('label').y('value')), ['point.too-many-dots-per-category']);
+  const invalid = [0, 1, 2, null, '', 'invalid'].map(value => ({ label: 'A', value }));
+  assert.deepEqual(await codes(point(invalid).x('value', { type: 'quantitative' }).y('label')), []);
+});

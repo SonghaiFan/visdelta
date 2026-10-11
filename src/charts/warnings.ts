@@ -2,6 +2,8 @@ import type { VisualizationWarning, ViewSpec } from '../types/index.js';
 
 const academy = 'https://www.datawrapper.de/academy/';
 function guideSource(code: string): string | undefined {
+  if (code === 'bar.too-many-stacked-columns') return academy + 'what-to-consider-when-creating-stacked-column-charts';
+  if (code === 'point.too-many-dots-per-category') return academy + 'how-to-create-a-dot-plot';
   if (code.startsWith('pie.')) return academy + 'what-to-consider-when-creating-a-pie-chart';
   if (code.startsWith('area.')) return academy + 'what-to-consider-when-creating-area-charts';
   if (code.startsWith('line.') || code === 'connection.smoothing') return academy + 'what-to-consider-when-creating-line-charts';

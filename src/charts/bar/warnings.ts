@@ -1,7 +1,8 @@
 import { quantitativeScale } from '../../toolkit/scales.js';
 import type { ChartWarningInspector } from '../../types/index.js';
 import { barMeasureChannel } from './layout/index.js';
-import { colorWarnings, warning } from '../warnings.js';
+import { semanticBarState } from './semantic.js';
+import { categoryCount, colorWarnings, warning } from '../warnings.js';
 
 export const chartWarnings: ChartWarningInspector = (spec, rows) => {
   const result = colorWarnings(spec, rows);
@@ -9,6 +10,14 @@ export const chartWarnings: ChartWarningInspector = (spec, rows) => {
     result.push(warning('bar.independent-repeat-scales',
       'Repeated panels use independent numeric scales, so bar lengths cannot be compared across panels.',
       'Use shared scales when comparing component magnitudes.', {}, spec.encoding.facet.field));
+  }
+  const state = semanticBarState(spec);
+  const count = categoryCount(rows, state.categoryField);
+  if (state.layout === 'stacked' && state.orientation === 'vertical' && count > 10) {
+    result.push(warning('bar.too-many-stacked-columns',
+      `${count} stacked columns can crowd labels and components.`,
+      'Consider horizontal bars, dots or a table.',
+      { count, threshold: 10 }, state.categoryField ?? undefined));
   }
   const channel = barMeasureChannel(spec.encoding);
   const domain = channel.domain;

@@ -69,3 +69,41 @@ test('core Repeat syntax and plugin Pie examples remain usable on mobile', async
   await page.getByRole('button', { name: 'Play arcs', exact: true }).click();
   await page.getByRole('button', { name: 'Reverse arcs', exact: true }).click();
 });
+
+for (const width of [1100, 390]) {
+  test(`Datawrapper explanations and source links fit at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(site);
+    const header = await page.locator('.app-page-head').boundingBox();
+    for (const selector of ['.comparison-intro', '.design-comparisons']) {
+      const bounds = await page.locator(selector).boundingBox();
+      expect(Math.abs(bounds.x - header.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(bounds.width - header.width)).toBeLessThanOrEqual(1);
+    }
+    const blocks = page.locator('.datawrapper-guidance');
+    await expect(blocks).toHaveCount(6);
+    for (const block of await blocks.all()) {
+      await expect(block).toContainText('Why this can be less effective.');
+      await expect(block).toContainText('What VisDelta can detect.');
+      await expect(block.getByRole('link', { name: 'Source: Datawrapper Academy' })).toHaveAttribute('href', /^https:\/\/www.datawrapper.de\/academy\//);
+      expect(await block.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  });
+}
+
+for (const width of [1440, 390]) {
+  test(`compact pie remains visible beside its explanation at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto(site);
+    await page.getByRole('button', { name: 'Pie alternatives', exact: true }).click();
+    const compact = page.locator('[data-comparison="pie-space"] [data-side="after"]');
+    await compact.scrollIntoViewIfNeeded();
+    await expect(compact.locator('.vd-pie-slice')).toHaveCount(4);
+    const radii = await compact.locator('.vd-pie-slice').evaluateAll(nodes => nodes.map(node => Number(node.dataset.radius)));
+    expect(Math.min(...radii)).toBeGreaterThan(25);
+    await expect(compact.locator('.comparison-compact-message')).toContainText('60%');
+    expect(await compact.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await compact.screenshot({ path: `/tmp/visdelta-compact-pie-${width}.png` });
+  });
+}

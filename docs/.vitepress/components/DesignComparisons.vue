@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { comparisonGuides, designComparisons } from './designComparisons.js';
+import { comparisonGuides, designComparisons, guideExplanations } from './designComparisons.js';
 const selected = ref('all');
 const statuses = ref({});
 const advice = ref({});
@@ -114,6 +114,14 @@ onBeforeUnmount(() => { disposed = true; observer?.disconnect(); resizer?.discon
     </nav>
     <section v-for="guide in groups" :key="guide.id" :aria-label="guide.title" class="comparison-guide">
       <header><h2>{{ guide.title }}</h2><a :href="guide.url" target="_blank" rel="noopener">Read the Datawrapper Academy guide ↗</a></header>
+      <aside class="datawrapper-guidance" :aria-label="`${guide.title}: Datawrapper guidance`">
+        <span class="ui-label">Datawrapper guidance · paraphrased</span>
+        <p><strong>Why this can be less effective.</strong> {{ guideExplanations[guide.id].why }}</p>
+        <p><strong>When to choose an alternative.</strong> {{ guideExplanations[guide.id].context }}</p>
+        <p><strong>What VisDelta can detect.</strong> {{ guideExplanations[guide.id].detection }}</p>
+        <a :href="guide.url" target="_blank" rel="noopener">Source: Datawrapper Academy ↗</a>
+        <a v-if="guideExplanations[guide.id].additionalUrl" :href="guideExplanations[guide.id].additionalUrl" target="_blank" rel="noopener"> · Companion dot-plot tutorial ↗</a>
+      </aside>
       <article v-for="item in guide.examples" :id="item.id" :key="item.id" class="comparison-example" :data-comparison="item.id">
         <header><h3>{{ item.title }}</h3><p>{{ item.why }}</p></header>
         <div class="comparison-pair">
@@ -133,9 +141,10 @@ onBeforeUnmount(() => { disposed = true; observer?.disconnect(); resizer?.discon
                   <div :ref="element => register(item, side, index, element)" class="comparison-chart" :style="{ '--comparison-chart-height': `${item[side].height ?? (item[side].charts.length > 1 ? 180 : 280)}px` }"></div>
                   <p v-if="statuses[key(item, side, index)]" class="comparison-status" :role="statuses[key(item, side, index)].startsWith('Unable') ? 'alert' : 'status'">{{ statuses[key(item, side, index)] }}</p>
                 </div>
+                <p v-if="item[side].compact" class="comparison-compact-message">{{ item[side].detail }}</p>
               </div>
               <footer class="comparison-footer">
-                <span v-if="item[side].detail" class="comparison-detail">Note: {{ item[side].detail }}</span>
+                <span v-if="item[side].detail && !item[side].compact" class="comparison-detail">Note: {{ item[side].detail }}</span>
                 <span>Source: Illustrative data · Chart: VisDelta</span>
               </footer>
             </div>
@@ -154,3 +163,19 @@ onBeforeUnmount(() => { disposed = true; observer?.disconnect(); resizer?.discon
     </section>
   </div>
 </template>
+
+<style scoped>
+.datawrapper-guidance {
+  margin: 16px 0 28px;
+  padding: 18px 22px;
+  border-left: 3px solid var(--vp-c-brand-1);
+  background: var(--vp-c-bg-soft);
+  border-radius: 3px;
+  overflow-wrap: anywhere;
+}
+.datawrapper-guidance p { margin: 10px 0; line-height: 1.65; max-width: 90ch; }
+.datawrapper-guidance a { text-decoration: underline; }
+@media (max-width: 600px) {
+  .datawrapper-guidance { padding: 14px; }
+}
+</style>
