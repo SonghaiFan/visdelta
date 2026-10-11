@@ -6,7 +6,7 @@ test('every design comparison renders its supported chart sides with real librar
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(site);
-  await expect(page.locator('.comparison-example')).toHaveCount(48);
+  await expect(page.locator('.comparison-example')).toHaveCount(53);
   const panels = page.locator('.comparison-panel');
   for (let i = 0; i < await panels.count(); i++) {
     const panel = panels.nth(i);
@@ -17,6 +17,13 @@ test('every design comparison renders its supported chart sides with real librar
     await expect(panel.locator('.vd-figure-header')).toBeHidden();
     expect(await panel.locator('.vd-bar, .vd-pie-slice, .vd-point, .vd-line, .vd-area').count()).toBeGreaterThan(0);
   }
+  const frames = page.locator('.comparison-frame');
+  expect(await frames.count()).toBe(106);
+  for (const part of ['.comparison-headline', '.comparison-description', '.comparison-footer']) {
+    expect(await page.locator(`.comparison-frame ${part}`).count()).toBe(106);
+  }
+  await expect(page.locator('.comparison-footer').first()).toContainText('Source: Illustrative data');
+  expect(await page.locator('.vd-axis .tick text').evaluateAll(nodes => nodes.filter(node => /^\d,\d{3}(\.\d)?$/.test(node.textContent)).length)).toBe(0);
   const differences = page.locator('[data-comparison="bar-change"] [data-side="after"]');
   await differences.scrollIntoViewIfNeeded();
   expect(await differences.evaluate(node => {
@@ -36,7 +43,7 @@ test('every design comparison renders its supported chart sides with real librar
   await expect(split.locator('[data-side="after"] .vd-facet-panel')).toHaveCount(4);
   await page.screenshot({ path: '/tmp/visdelta-design-comparisons-desktop.png' });
   await page.getByRole('button', { name: 'Pie alternatives', exact: true }).click();
-  await expect(page.locator('.comparison-example')).toHaveCount(9);
+  await expect(page.locator('.comparison-example')).toHaveCount(10);
   await expect(page.locator('.comparison-limit')).toHaveCount(0);
 });
 

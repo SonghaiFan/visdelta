@@ -12,14 +12,15 @@ export const comparisonGuides = [
 const palette = ['#176078', '#19a4c5', '#2ce5b4', '#00b69e'];
 const parts = ['Core', 'Growth', 'Services', 'Support'];
 const matrix = [[90, 20, 10, 30], [80, 30, 20, 40], [70, 20, 15, 50], [80, 40, 10, 30]];
-const totals = matrix.map((values, i) => ({ label: String.fromCharCode(65 + i), year: 2020 + i, value: values.reduce((a, b) => a + b, 0) }));
-const stacked = matrix.flatMap((values, i) => values.map((value, j) => ({ label: String.fromCharCode(65 + i), year: 2020 + i, part: parts[j], value })));
+const regions = ['North', 'South', 'East', 'West'];
+const totals = matrix.map((values, i) => ({ label: regions[i], year: 2020 + i, value: values.reduce((a, b) => a + b, 0) }));
+const stacked = matrix.flatMap((values, i) => values.map((value, j) => ({ label: regions[i], year: 2020 + i, part: parts[j], value })));
 const dense = Array.from({ length: 16 }, (_, i) => ({ year: 2008 + i, label: String(2008 + i), part: parts[0], value: 65 + i * 2 + Math.sin(i) * 12 })).flatMap(row => parts.map((part, j) => ({ ...row, part, value: row.value / (j + 1) })));
 const irregular = stacked.map(row => ({ ...row, year: [2020, 2021, 2025, 2030][row.year - 2020], label: String([2020, 2021, 2025, 2030][row.year - 2020]) }));
 const colors = `.color("part", { domain: ${JSON.stringify(parts)}, range: ${JSON.stringify(palette)} })`;
 const bars = (extra = '', x = 'label') => `const chart = bar(rows)\n  .x("${x}", { type: "ordinal" })\n  .y("value", { title: "Units" })\n  .key(["${x}", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
 const connected = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { title: "Year" })\n  .y("value", { title: "Units" })\n  .key(["year", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
-const plain = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("label")\n  .y("value", { title: "Units" })\n  .key("label")${extra};`;
+const plain = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("label", { type: "ordinal" })\n  .y("value", { title: "Units" })\n  .key("label")${extra};`;
 const single = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { title: "Year" })\n  .y("value", { title: "Units" })\n  .key("year")${extra};`;
 const view = (mark, code, caption, options = {}) => ({ charts: [{ mark, code }], caption, ...options });
 const small = () => ({ caption: 'One chart; one panel per component; shared scales.', height: 480, charts: [{ mark: 'bar',
@@ -28,7 +29,27 @@ const small = () => ({ caption: 'One chart; one panel per component; shared scal
   ${colors}
   .repeat("part", { direction: "y", scales: "shared", minWidth: 180 });`
 }] });
-const entry = (id, guide, title, why, rows, before, after) => ({ id, guide, title, why, rows, before, after });
+const stories = new Map();
+const story = (rows, headline, description, y) => { const told = { headline, description, y }; stories.set(rows, told); return told; };
+const byYear = { description: 'Revenue by business line, 2020–2023, € million', y: 'Revenue (€m)' };
+// Uneven or long year spans need continuous positions; four even years read as ordinal labels.
+const continuousYears = new Set();
+function narrate(side, told, continuous) {
+  if (!side?.charts) return side;
+  return { ...side, charts: side.charts.map(chart => ({ ...chart, code: chart.code
+    .replaceAll('title: "Units"', `title: "${told.y}"`)
+    // A later .y() replaces the channel options, so a domain-only override keeps the unit title.
+    .replace(/\.y\("value", \{ domain: (\[[^\]]*\]) \}\)/g, `.y("value", { title: "${told.y}", domain: $1 })`)
+    .replaceAll('.x("year", { title: "Year" })', continuous ? '.x("year", { title: "Year", format: "d" })' : '.x("year", { title: "Year", type: "ordinal" })') })) };
+}
+const entry = (id, guide, title, why, rows, before, after, override = {}) => {
+  const usesYear = [before, after].some(side => side?.charts?.some(chart => chart.code.includes('.x("year"')));
+  const base = stories.get(rows) ?? {};
+  const { byYear: yearStory, ...plainStory } = base;
+  const told = { ...plainStory, ...(usesYear && yearStory ? yearStory : {}), ...override };
+  const continuous = continuousYears.has(rows);
+  return { id, guide, title, why, rows, story: told, before: narrate(before, told, continuous), after: narrate(after, told, continuous) };
+};
 const tiny = stacked.flatMap(row => row.part !== 'Support' ? [row] : Array.from({ length: 7 }, (_, i) => ({ ...row, part: `Small ${i + 1}`, value: row.value / 7 })));
 const combineTiny = `const grouped = rows.map(row => ({ ...row, part: row.part.startsWith("Small") ? "Others" : row.part }));\n`;
 const groupTinyBar = combineTiny + bars().replace('bar(rows)', 'bar(grouped)').replace(colors, '.color("part", { domain: ["Core", "Growth", "Services", "Others"], range: ["#176078", "#19a4c5", "#2ce5b4", "#d8e2e5"] })\n  .rollup(["label", "part"])');
@@ -42,15 +63,49 @@ const grouped = [...cells.values()];
 ` + connected('area').replace('area(rows)', 'area(grouped)').replace(colors, '.color("part", { domain: ["Core", "Growth", "Services", "Others"], range: ["#176078", "#19a4c5", "#2ce5b4", "#d8e2e5"] })');
 const focusedColors = '.color("part", { domain: ["Core", "Growth", "Services", "Support"], range: ["#00b69e", "#c9d1d4", "#dce1e3", "#edf0f1"] })';
 const sparse = totals.map(row => ({ ...row, value: row.value + 200 }));
-const narrow = totals.map((row, i) => ({ ...row, value: [96, 98, 97, 99][i] }));
+const narrow = totals.map((row, i) => ({ ...row, label: String(row.year), value: [96, 98, 97, 99][i] }));
 const jagged = [10, 12, 80, 12, 10, 12].map((value, i) => ({ year: 2020 + i, value }));
 const ordinal = [{ label: 'Retail', value: 35 }, { label: 'Services', value: 55 }, { label: 'Industry', value: 25 }];
-const singlePart = stacked.filter(row => row.label === 'A');
-const manyTotals = Array.from({ length: 14 }, (_, i) => parts.slice(0, 2).map((part, j) => ({ label: `Region ${i + 1}`, part, value: 30 + (i * 7 + j * 11) % 60 }))).flat();
-const longLabels = stacked.map(row => ({ ...row, label: { A: 'Northern metropolitan district', B: 'Southern coastal communities', C: 'Central rural municipalities', D: 'Western regional partnerships' }[row.label] }));
+const singlePart = stacked.filter(row => row.label === 'North');
+const manyTotals = Array.from({ length: 14 }, (_, i) => parts.slice(0, 2).map((part, j) => ({ label: `District ${i + 1}`, part, value: 30 + (i * 7 + j * 11) % 60 }))).flat();
+const longLabels = stacked.map(row => ({ ...row, label: { North: 'Northern metropolitan district', South: 'Southern coastal communities', East: 'Eastern rural municipalities', West: 'Western regional partnerships' }[row.label] }));
+const nearZero = totals.map((row, i) => ({ ...row, value: [2, 3, 1, 4][i] }));
+const pairs = stacked.filter(row => ['Core', 'Growth'].includes(row.part));
+const profit = [{ label: 'North', value: 12 }, { label: 'South', value: -4 }, { label: 'East', value: 7 }, { label: 'West', value: -9 }];
+const areas = ['Coast', 'Valley', 'Highlands', 'Lakes', 'Plains', 'Forest', 'Delta', 'Islands'];
+const satisfaction = areas.map((label, i) => ({ label, value: [64, 71, 58, 77, 69, 73, 61, 66][i] }));
+const temperatures = [['Coast', 4, 19], ['Valley', -3, 26], ['Highlands', -8, 17], ['Plains', -5, 28], ['Islands', 7, 18]]
+  .flatMap(([label, low, high]) => [{ label, bound: 'Lowest', value: low }, { label, bound: 'Highest', value: high }]);
+const survey = [{ part: 'Price', value: 62 }, { part: 'Quality', value: 48 }, { part: 'Delivery', value: 35 }, { part: 'Support', value: 20 }];
+
+// Our own illustrative stories. Both sides of a pair tell the same story in two forms.
+story(totals, 'South earns the most revenue', 'Total revenue by region, € million', 'Revenue (€m)').byYear = { headline: 'Revenue peaked in 2021', description: 'Total revenue, 2020–2023, € million' };
+story(stacked, 'Core leads revenue in every region', 'Revenue by region and business line, € million', 'Revenue (€m)');
+stories.get(stacked).byYear = { headline: 'Growth overtook Support in 2023', ...byYear };
+story(irregular, 'Core remains the largest line through 2030', 'Revenue by business line in surveyed years, € million', 'Revenue (€m)');
+story(dense, 'All four lines follow the same cycle', 'Revenue by business line, 2008–2023, € million', 'Revenue (€m)');
+story(tiny, 'Four lines earn most of the revenue', 'Revenue by business line; Support is split into seven small units, € million', 'Revenue (€m)');
+stories.get(tiny).byYear = { headline: 'Four lines earn most of the revenue', ...byYear };
+story(narrow, 'Broadband reached 99% of households', 'Share of households with a broadband connection, 2020–2023', 'Households (%)');
+story(sparse, 'Revenue held steady around €360 million', 'Total revenue, 2020–2023, € million', 'Revenue (€m)');
+story(jagged, 'Visitors spiked once, in 2022', 'Visitors per year, thousands', 'Visitors (thousands)');
+story(ordinal, 'Services employ the most people', 'Employment by sector, thousands', 'Employees (thousands)');
+story(nearZero, 'Inflation never rose above 4%', 'Annual inflation rate, 2020–2023', 'Inflation (%)');
+story(singlePart, 'Core earns 60% of the North’s revenue', 'Revenue by business line, North region, € million', 'Revenue (€m)');
+story(manyTotals, 'Revenue differs widely between districts', 'Revenue by district and business line, € million', 'Revenue (€m)');
+story(longLabels, 'Core leads in every district', 'Revenue by district and business line, € million', 'Revenue (€m)');
+story(pairs, 'Core out-earns Growth in every region', 'Revenue of two business lines by region, € million', 'Revenue (€m)');
+story(profit, 'Two regions made a loss in 2023', 'Operating profit by region, 2023, € million', 'Profit (€m)');
+story(satisfaction, 'Lakes residents are the most satisfied', 'Average satisfaction score by area, 0–100', 'Score');
+story(temperatures, 'Island temperatures vary the least', 'Lowest and highest monthly mean temperature by area, °C', 'Temperature (°C)');
+story(survey, 'Price matters to most customers', 'Share of respondents naming each factor; several answers allowed', 'Respondents (%)');
+continuousYears.add(irregular).add(dense);
+
 export const designComparisons = [
   entry('bar-zero', 'baseline', 'Preserve the magnitude', 'A filled length needs zero.', narrow,
     view('bar', plain('bar', '\n  .y("value", { domain: [95, 100] })'), 'Truncated baseline'), view('bar', plain('bar', '\n  .y("value", { domain: [0, 100] })'), 'Full magnitudes')),
+  entry('bar-negative', 'baseline', 'Keep losses below zero', 'Bars start at zero, or below it when values are negative.', profit,
+    view('bar', plain('bar', '\n  .y("value", { domain: [0, 15] })'), 'Floor at zero hides the losses'), view('bar', plain('bar'), 'Losses extend below the baseline')),
   entry('bar-dots', 'baseline', 'Inspect small differences', 'Dots allow a focused positional scale.', narrow,
     view('bar', plain('bar', '\n  .y("value", { domain: [95, 100] })'), 'Truncated bars'), view('point', plain('point', '\n  .y("value", { domain: [95, 100] })'), 'Focused dots')),
   entry('bar-trend', 'baseline', 'Follow an ordered trend', 'Use position when changes matter.', narrow,
@@ -97,7 +152,7 @@ export const designComparisons = [
     view('line', connected('line'), 'No observation symbols'), view('line', connected('line', '\n  .pointSize(4)'), 'Symbols at measured years')),
   entry('line-labels', 'line', 'Check identification on mobile', 'A compact key can remain legible.', stacked,
     view('line', connected('line').replace(colors, '.color("part", { title: "Core / Growth / Services / Support component classifications" })'), 'Long key heading'), view('line', connected('line'), 'Short, stable component names', { detail: 'VisDelta does not currently provide direct endpoint labels. This uses its supported legend.' })),
-  entry('line-near-zero', 'line', 'Show nearby zero', 'Include the nearby reference when helpful.', totals.map((row, i) => ({ ...row, value: [2, 3, 1, 4][i] })),
+  entry('line-near-zero', 'line', 'Show nearby zero', 'Include the nearby reference when helpful.', nearZero,
     view('line', single('line', '\n  .y("value", { domain: [1, 4] })'), 'Tight range'), view('line', single('line', '\n  .y("value", { domain: [0, 4] })'), 'Zero is visible')),
   entry('line-near-full', 'line', 'Show nearby 100%', 'Retain the full-scale reference for shares.', narrow,
     view('line', single('line', '\n  .y("value", { domain: [96, 99], title: "Share (%)" })'), 'Missing upper reference'), view('line', single('line', '\n  .y("value", { domain: [95, 100], title: "Share (%)" })'), '100% is visible')),
@@ -107,6 +162,10 @@ export const designComparisons = [
     view('area', plain('area'), 'Filled continuity'), view('bar', plain('bar'), 'Category magnitudes')),
   entry('area-total-secondary', 'area', 'Prioritize individual trends', 'Lines suit a secondary combined total.', stacked,
     view('area', connected('area'), 'Floating layer positions'), view('line', connected('line'), 'Independent trajectories')),
+  entry('area-shares', 'area', 'Show shares that add up to 100%', 'Stacked shares make the whole explicit.', stacked,
+    view('line', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('line').replace('line(rows)', 'line(shares)').replace('title: "Units"', 'title: "Share of revenue (%)"'), 'Separate share lines'),
+    view('area', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('area').replace('area(rows)', 'area(shares)').replace('title: "Units"', 'title: "Share of revenue (%)"'), 'Every year fills to 100%'),
+    { headline: 'Core’s share fell from 60% to 50%', description: 'Share of revenue by business line, 2020–2023' }),
   entry('area-small-differences', 'area', 'Reveal small changes', 'A focused line scale can help.', narrow,
     view('area', single('area', '\n  .y("value", { domain: [0, 100] })'), 'Small changes within large fill'), view('line', single('line', '\n  .y("value", { domain: [95, 100] })'), 'Focused positions')),
   entry('area-single', 'area', 'Read one trajectory', 'A line can express a single trend.', sparse,
@@ -125,8 +184,12 @@ export const designComparisons = [
     view('area', connected('area').replace(colors, '.color("part")'), 'Many thin layers'), view('area', groupTinyArea, 'Author-defined Others; lighter color')),
   entry('area-irregular-exception', 'area', 'Keep uneven intervals visible', 'Few observations can still require continuous spacing.', irregular,
     view('bar', bars(), 'Uniform category spacing'), view('area', connected('area'), 'Actual spacing between years')),
-  entry('dot-pairs', 'dot', 'Emphasize the paired gap', 'A connector makes the distance explicit.', stacked.filter(row => ['Core', 'Growth'].includes(row.part)),
-    view('point', 'const chart = point(rows).x("value").y("label").key(["label", "part"]).color("part");', 'Two unconnected dots'), view('point', 'const chart = point(rows).x("value").y("label").key(["label", "part"]).color("part").connector({ by: "label" });', 'A range per category')),
+  entry('dot-sorted', 'dot', 'Rank the values', 'Sorting turns a dot plot into a ranking.', satisfaction,
+    view('point', 'const chart = point(rows).x("value", { title: "Units", domain: [50, 80] }).y("label").key("label");', 'Unsorted areas'), view('point', 'const chart = point(rows).x("value", { title: "Units", domain: [50, 80] }).y("label").key("label").sort("value", "ascending");', 'Sorted; the highest score on top')),
+  entry('dot-range', 'dot', 'Show a spread, not two magnitudes', 'A range plot draws the distance between two values.', temperatures,
+    view('bar', 'const chart = bar(rows).x("label").y("value", { title: "Units" }).key(["label", "bound"]).breakdown("bound").color("bound").layout("grouped");', 'Paired bars from zero'), view('point', 'const chart = point(rows).x("value", { title: "Units" }).y("label").key(["label", "bound"]).color("bound").connector({ by: "label" });', 'One range per area')),
+  entry('dot-pairs', 'dot', 'Emphasize the paired gap', 'A connector makes the distance explicit.', pairs,
+    view('point', 'const chart = point(rows).x("value", { title: "Units" }).y("label").key(["label", "part"]).color("part");', 'Two unconnected dots'), view('point', 'const chart = point(rows).x("value").y("label").key(["label", "part"]).color("part").connector({ by: "label" });', 'A range per category')),
 ];
 const pieCode = (extra = '') => `const chart = pie(rows)
   .value("value")
@@ -134,17 +197,27 @@ const pieCode = (extra = '') => `const chart = pie(rows)
   .label("part")
   ${colors}${extra};`;
 const pieRows = singlePart.map(row => ({ ...row, value: { Core: 26, Growth: 25, Services: 24, Support: 25 }[row.part] }));
-const manyPie = tiny.filter(row => row.label === 'A');
+const manyPie = tiny.filter(row => row.label === 'North');
 const namedPie = singlePart.map(row => ({ ...row, part: { Core: 'Essential operations', Growth: 'Growth investments', Services: 'Customer services', Support: 'Administrative support' }[row.part] }));
+const renewals = [{ part: 'Renewed early', value: 25 }, { part: 'Other customers', value: 75 }];
+const coreShare = [{ part: 'Core', value: 90 }, { part: 'Remaining', value: 60 }];
+story(renewals, 'One in four customers renewed early', 'Share of customers by renewal timing, %');
+story(coreShare, 'Core makes up 60% of revenue', 'Revenue, Core against all other lines, € million');
+story(pieRows, 'Revenue is split almost evenly', 'Share of revenue by business line, %');
+story(manyPie, 'Four lines earn most of the North’s revenue', 'Revenue by business line, North region; Support split into seven units');
+story(namedPie, 'Essential operations is the largest share', 'Revenue by business line, North region');
 designComparisons.push(
-  entry('pie-familiar', 'pie', 'Recognize a familiar proportion', 'Rounded fractions can be recognizable in a pie.', [{ part: 'Selected', value: 25 }, { part: 'Remaining', value: 75 }],
+  entry('pie-exclusive', 'pie', 'Use bars when answers overlap', 'A pie needs parts of one whole; multiple answers exceed 100%.', survey,
+    view('pie', 'const chart = pie(rows)\n  .value("value")\n  .key("part")\n  .label("part")\n  .color("part");', 'Slices imply exclusive answers'),
+    view('bar', 'const chart = bar(rows).x("part").y("value", { title: "Units", domain: [0, 100] }).key("part").sort("value", "ascending").flip();', 'Each factor against 100%')),
+  entry('pie-familiar', 'pie', 'Recognize a familiar proportion', 'Rounded fractions can be recognizable in a pie.', renewals,
     view('pie', pieCode().replace(colors, '.color("part")'), 'A valid familiar proportion', { label: 'Also suitable' }),
     { caption: 'A simpler single-message alternative.', text: '25%', detail: 'One quarter of the total.', label: 'Simpler alternative' }),
   entry('pie-precise', 'pie', 'Compare similar shares', 'Position supports precise comparisons.', pieRows,
     view('pie', pieCode(), 'Similar angles are hard to distinguish'), view('bar', 'const chart = bar(rows).x("part").y("value", { title: "Share (%)" }).key("part").flip();', 'Compare on a common baseline')),
   entry('pie-many', 'pie', 'Handle many components', 'An aligned stack makes a compact alternative.', manyPie,
     view('pie', pieCode().replace(colors, '.color("part")'), 'Ten slices compete for attention'), view('bar', bars('\n  .flip()').replace(colors, '.color("part")'), 'A horizontal total with its components')),
-  entry('pie-one-share', 'pie', 'Communicate a single share', 'Text can carry the message directly.', [{ part: 'Core', value: 90 }, { part: 'Remaining', value: 60 }],
+  entry('pie-one-share', 'pie', 'Communicate a single share', 'Text can carry the message directly.', coreShare,
     view('pie', pieCode().replace(colors, '.color("part")'), 'Only one fact to communicate'), { caption: 'State the share.', text: '60%', detail: 'Core: 90 of 150 units.' }),
   entry('pie-multiple', 'pie', 'Compare several totals', 'Aligned stacks compare composition.', stacked,
     { caption: 'Four separate pies', charts: totals.map(row => ({ mark: 'pie', code: pieCode(`\n  .where({ label: "${row.label}" })`) })) }, view('bar', bars('\n  .flip()'), 'One aligned total per row')),

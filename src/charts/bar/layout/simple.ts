@@ -1,4 +1,4 @@
-import { bandOrLinear, channelDomain, position, quantitativeDomain } from '../../../toolkit/scales.js';
+import { bandOrLinear, baselineDomain, channelDomain, position } from '../../../toolkit/scales.js';
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
 import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
 import {
@@ -59,7 +59,7 @@ export function createSimpleBarRenderer(runtime: ChartRuntime, kit: BarRenderKit
       ? asRuntimeScale(scaleBand().domain(channelDomain(rows, categoryChannel) as string[]).range(categoryRange).padding(0.22))
       : bandOrLinear(rows, categoryChannel, categoryRange);
     const baseMeasureScale = asRuntimeScale(scaleLinear()
-      .domain(quantitativeDomain(domainRows, measureChannel, 0))
+      .domain(baselineDomain(domainRows, measureChannel, 0))
       .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;

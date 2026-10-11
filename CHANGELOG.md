@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Fixed simple and grouped Bar domains clipping negative values: bars start at
+  zero or below it. When zero is not the plot edge (negative values or an
+  authored domain above zero) the category labels stay at the edge, clear of
+  the bars, and remain pinned there while scrubbing.
+- Reworked the design comparisons in the style of a published chart: every
+  pair tells one illustrative story with a headline, description, notes and
+  source, uses named data and readable year axes, and adds pairs for negative
+  bars, 100% stacked areas, sorted dot plots, range plots and multi-answer
+  surveys.
 - Repeat keeps canvas height by default; opt-in `autoHeight` and `minHeight` reserve a stable route canvas. Standalone transitions automatically re-evaluate retained progress on container width changes.
 
 - Keep repeated Line as the native Line type; add staged ordinary Line ↔ repeat motion with shared/independent scales, scrubbing and canonical reverse. Show the bridge in the Line Playground.

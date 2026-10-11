@@ -839,14 +839,30 @@ body:has(.ontology-home) { --ui-color-accent: var(--ui-gray-800); --ui-color-acc
 .comparison-example h3 { margin: 0; font-size: 22px; }
 .comparison-example header p { margin: var(--ui-space-2) 0 var(--ui-space-4); color: var(--ui-color-text-muted); }
 .comparison-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-4); }
-.comparison-side { margin: 0; min-width: 0; padding: var(--ui-space-4); background: var(--ui-color-surface); border: var(--ui-border); border-radius: 4px; }
-.comparison-side figcaption p { margin: var(--ui-space-2) 0; color: var(--ui-color-text-muted); }
+.comparison-side { display: grid; align-content: start; gap: var(--ui-space-3); margin: 0; min-width: 0; }
+/* Verdict sits outside the chart, the way a style guide annotates a figure. */
+.comparison-verdict { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px var(--ui-space-2); }
+.comparison-verdict .ui-label { grid-column: 2; }
+.comparison-mark { grid-row: 1 / 3; display: grid; width: var(--ui-control-sm); height: var(--ui-control-sm); place-items: center; border-radius: 50%; color: #fff; font-size: var(--ui-text-md); font-weight: var(--ui-weight-heavy); }
+.comparison-mark[data-verdict="before"] { background: var(--ui-color-danger); }
+.comparison-mark[data-verdict="after"] { background: var(--ui-color-success); }
+.comparison-form { grid-column: 2; color: var(--ui-color-text-muted); font-size: var(--ui-text-base); }
+/* The figure itself reads like a published chart: headline, description,
+   graphic, then notes and source. */
+.comparison-frame { display: grid; gap: var(--ui-space-1); padding: var(--ui-space-5) var(--ui-space-5) var(--ui-space-4); border: var(--ui-border); border-radius: var(--ui-radius-sm); background: var(--ui-color-raised); }
+.comparison-side[data-side="before"] .comparison-frame { border-top: 3px solid var(--ui-color-danger); }
+.comparison-side[data-side="after"] .comparison-frame { border-top: 3px solid var(--ui-color-success); }
+.comparison-headline { margin: 0 !important; color: var(--ui-color-text); font-size: var(--ui-text-xl); font-weight: var(--ui-weight-heavy); letter-spacing: -.02em; line-height: 1.25; }
+.comparison-description { margin: 0 0 var(--ui-space-2) !important; color: var(--ui-color-text-muted); font-size: var(--ui-text-base); line-height: 1.45; }
+.comparison-footer { display: grid; gap: 2px; margin-top: var(--ui-space-2); color: var(--ui-color-text-subtle); font-size: var(--ui-text-sm); line-height: 1.45; }
+.comparison-footer .comparison-detail { color: var(--ui-color-text-muted); font-size: inherit; }
+.comparison-tools { display: grid; gap: 2px; }
 .comparison-charts.is-multiple { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ui-space-2); }
 .comparison-panel, .comparison-chart { min-width: 0; width: 100%; }
 .comparison-code, .comparison-hints { font-size: var(--ui-text-md); margin-top: var(--ui-space-2); }
 .comparison-code summary, .comparison-hints summary { cursor: pointer; }
 .comparison-code .doc-code-block { max-height: 420px; overflow: auto; }
-.comparison-statement { min-height: 240px; display: grid; place-items: center; font-size: 64px; font-weight: 600; }
+.comparison-statement { min-height: 240px; display: grid; place-items: center; color: var(--ui-color-text); font-size: 72px; font-weight: var(--ui-weight-heavy); letter-spacing: -.04em; }
 .comparison-limit, .comparison-detail, .comparison-status { font-size: var(--ui-text-md); color: var(--ui-color-text-muted); }
 @media (max-width: 720px) {
   .comparison-pair { grid-template-columns: minmax(0, 1fr); }
