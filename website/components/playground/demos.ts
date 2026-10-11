@@ -1,31 +1,57 @@
 /**
- * The playground's curated transitions, grouped by the state-change category
- * each one teaches. Each shows one idea on real data; the Δ line still reports
- * every change it emits.
+ * The playground's curated stories, grouped by the state-change category each
+ * one teaches. A story starts from working chart code and then edits it, one
+ * chained call at a time. Every edit is a valid state, so every edit is a
+ * transition, and the playground keeps each one as a keyframe.
  *
- * `a` must declare `const a`; `b` must declare `const b` and usually derives
- * from `a`, so the code for B reads as the change itself. Both run with the
- * chart factory, `rows` (the parsed CSV) and `d3` in scope.
+ * Code runs with the chart factory, `rows` (the parsed CSV) and `d3` in scope
+ * and must assign the state to `const chart`.
  */
 import type { LabChart } from '@/components/interactive/corpus';
 import type { StateChangeCategory } from '@/examples/registry';
 
+/** One authoring step: add a chained call, remove one, or rewrite text in place. */
+export type Edit = { add: string } | { remove: string } | { replace: string; with: string };
+
 export interface PlaygroundDemo {
   id: string;
   title: string;
-  /** The category this demo teaches; its primary navigation. */
+  /** The category this story teaches; its primary navigation. */
   category: StateChangeCategory;
   chart: LabChart;
   /** One plain sentence: what to watch. */
   line: string;
   /** Repository CSV, served under <base>/data/. Omit for inline data. */
   data?: string;
-  a: string;
-  b: string;
-  height?: number;
+  code: string;
+  edits: Edit[];
+}
+
+function applyEdit(code: string, edit: Edit): string {
+  if ('add' in edit) {
+    if (!/;\s*$/.test(code)) throw new Error('Story code must end with a semicolon.');
+    return code.replace(/;\s*$/, `\n  ${edit.add};`);
+  }
+  const find = 'remove' in edit ? `\n  ${edit.remove}` : edit.replace;
+  const index = code.indexOf(find);
+  if (index < 0 || code.indexOf(find, index + 1) >= 0) throw new Error(`Story edit must match once: ${find.trim()}`);
+  return code.slice(0, index) + ('remove' in edit ? '' : edit.with) + code.slice(index + find.length);
+}
+
+/** Every version of a story's code, from the starting code to the last edit. */
+export function storyFrames(demo: Pick<PlaygroundDemo, 'code' | 'edits'>): string[] {
+  const frames = [demo.code];
+  for (const edit of demo.edits) frames.push(applyEdit(frames.at(-1)!, edit));
+  return frames;
 }
 
 const POPULATION = './data/us-population-state-age-tidy.csv';
+
+const underTen = `const chart = bar(rows)
+  .x("state")
+  .y("population", { title: "Residents under 10", format: "~s" })
+  .key(["state", "age"])
+  .where({ age: "<10" });`;
 
 export const playgroundDemos: PlaygroundDemo[] = [
   {
@@ -33,36 +59,33 @@ export const playgroundDemos: PlaygroundDemo[] = [
     title: 'Filter',
     category: 'data',
     chart: 'bar',
-    line: 'Only states with a million children under ten stay. The rest leave, and the survivors take their room.',
+    line: 'Keep the states with a million children under ten. Lower the bar and states come back.',
     data: POPULATION,
-    a: `const a = bar(rows)
-  .x("state")
-  .y("population", { title: "Residents under 10", format: "~s" })
-  .key(["state", "age"])
-  .where({ age: "<10" })
-  .sort("population", "descending");`,
-    b: `const b = a.where({ population: { gte: 1000000 } });`,
+    code: underTen,
+    edits: [
+      { add: '.where({ population: { gte: 1000000 } })' },
+      { replace: 'gte: 1000000', with: 'gte: 500000' },
+    ],
   },
   {
     id: 'split',
     title: 'Split',
     category: 'grain',
     chart: 'bar',
-    line: 'Each total opens into its age groups. The stack keeps every total readable on the way.',
+    line: 'Delete one line and every total opens into its age groups. Then set them side by side.',
     data: POPULATION,
-    a: `const ages = ["<10", "10-19", "20-29", "30-39",
+    code: `const ages = ["<10", "10-19", "20-29", "30-39",
   "40-49", "50-59", "60-69", "70-79", "≥80"];
 
-const detail = bar(rows)
+const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ state: ["CA", "TX", "FL", "NY", "PA", "IL"] })
   .breakdown("age")
-  .color("age", { domain: ages, scheme: "Blues" });
-
-const a = detail.rollup();`,
-    b: `const b = detail.layout("grouped");`,
+  .color("age", { domain: ages, scheme: "Blues" })
+  .rollup();`,
+    edits: [{ remove: '.rollup()' }, { add: '.layout("grouped")' }],
   },
   {
     id: 'regroup',
@@ -70,16 +93,19 @@ const a = detail.rollup();`,
     category: 'grain',
     chart: 'bar',
     line: 'Totals by year become totals by place. The same four records split, move and merge.',
-    a: `const cases = [
+    code: `const cases = [
   { id: "r1", year: 2020, location: "A", cases: 10 },
   { id: "r2", year: 2020, location: "B", cases: 5 },
   { id: "r3", year: 2021, location: "A", cases: 12 },
   { id: "r4", year: 2021, location: "B", cases: 8 }
 ];
 
-const base = bar(cases).datumKey("id").y("cases");
-const a = base.x("year").rollup("year");`,
-    b: `const b = base.x("location").rollup("location");`,
+const chart = bar(cases)
+  .datumKey("id")
+  .y("cases")
+  .x("year")
+  .rollup("year");`,
+    edits: [{ replace: '.x("year")\n  .rollup("year")', with: '.x("location")\n  .rollup("location")' }],
   },
   {
     id: 'zip',
@@ -88,15 +114,14 @@ const a = base.x("year").rollup("year");`,
     chart: 'line',
     line: 'One average line unzips into the two stocks it was made from.',
     data: './data/line-lab.csv',
-    a: `const prices = line(rows)
+    code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
-  .color("ticker");
-
-const a = prices.rollup({ op: "mean" });`,
-    b: `const b = prices;`,
+  .color("ticker")
+  .rollup({ op: "mean" });`,
+    edits: [{ remove: '.rollup({ op: "mean" })' }],
   },
   {
     id: 'summarize',
@@ -105,50 +130,59 @@ const a = prices.rollup({ op: "mean" });`,
     chart: 'point',
     line: 'Six cars gather into two averages, sized by how many cars they stand for.',
     data: './data/mtcars.csv',
-    a: `const a = point(rows)
+    code: `const chart = point(rows)
   .x("wt", { title: "Weight (1000 lb)" })
   .y("mpg", { title: "Miles per gallon" })
   .key("name")
   .where({ name: ["Datsun 710", "Fiat 128", "Honda Civic",
     "Duster 360", "Camaro Z28", "Maserati Bora"] })
   .color("cyl", { type: "nominal", domain: [4, 8] });`,
-    b: `const b = a.rollup("cyl", {
-  key: "cyl",
-  x: { op: "mean" },
-  y: { op: "mean" },
-  size: { op: "count", range: [10, 24] }
-});`,
+    edits: [
+      {
+        add: `.rollup("cyl", {
+    key: "cyl",
+    x: { op: "mean" },
+    y: { op: "mean" },
+    size: { op: "count", range: [10, 24] }
+  })`,
+      },
+    ],
   },
   {
     id: 'remap',
     title: 'Remap',
     category: 'encoding',
     chart: 'point',
-    line: 'Every car slides from its weight to its horsepower. Same cars, new question.',
+    line: 'Ask a new question of the same cars: weight becomes horsepower, then colour shows cylinders.',
     data: './data/mtcars.csv',
-    a: `const a = point(rows)
+    code: `const chart = point(rows)
   .x("wt", { title: "Weight (1000 lb)" })
   .y("mpg", { title: "Miles per gallon" })
-  .key("name")
-  .color("cyl", { type: "nominal" });`,
-    b: `const b = a.x("hp", { title: "Horsepower" });`,
+  .key("name");`,
+    edits: [
+      { replace: '.x("wt", { title: "Weight (1000 lb)" })', with: '.x("hp", { title: "Horsepower" })' },
+      { add: '.color("cyl", { type: "nominal" })' },
+    ],
   },
   {
     id: 'log',
     title: 'Log scale',
     category: 'coordinate',
     chart: 'point',
-    line: 'Same field, new ruler. On a log scale the crowded low end spreads out.',
+    line: 'Same field, new ruler: a log scale spreads the crowded low end. Then turn the chart on its side.',
     data: './data/mtcars.csv',
-    a: `const a = point(rows)
+    code: `const chart = point(rows)
   .x("hp", { title: "Horsepower" })
   .y("mpg", { title: "Miles per gallon" })
   .key("name")
   .color("cyl", { type: "nominal" });`,
-    b: `const b = a.x("hp", {
-  title: "Horsepower (log₂)",
-  scale: { type: "log", base: 2 }
-});`,
+    edits: [
+      {
+        replace: '.x("hp", { title: "Horsepower" })',
+        with: '.x("hp", { title: "Horsepower (log₂)", scale: { type: "log", base: 2 } })',
+      },
+      { add: '.flip()' },
+    ],
   },
   {
     id: 'sort',
@@ -157,12 +191,8 @@ const a = prices.rollup({ op: "mean" });`,
     chart: 'bar',
     line: 'Fifty-two bars find their rank. Nothing changes but the order.',
     data: POPULATION,
-    a: `const a = bar(rows)
-  .x("state")
-  .y("population", { title: "Residents under 10", format: "~s" })
-  .key(["state", "age"])
-  .where({ age: "<10" });`,
-    b: `const b = a.sort("population", "descending");`,
+    code: underTen,
+    edits: [{ add: '.sort("population", "descending")' }, { replace: '"descending"', with: '"ascending"' }],
   },
   {
     id: 'stream',
@@ -171,13 +201,13 @@ const a = prices.rollup({ op: "mean" });`,
     chart: 'area',
     line: 'The same layers lift off a fixed baseline and settle into a stream.',
     data: './data/area-lab.csv',
-    a: `const a = area(rows)
+    code: `const chart = area(rows)
   .x("date", { title: "Date" })
   .y("unemployed", { title: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");`,
-    b: `const b = a.layout("stream", { offset: "wiggle", order: "insideOut" });`,
+    edits: [{ add: '.layout("stream", { offset: "wiggle", order: "insideOut" })' }],
   },
   {
     id: 'swarm',
@@ -186,39 +216,39 @@ const a = prices.rollup({ op: "mean" });`,
     chart: 'unit',
     line: 'One hundred and fifty flowers leave the grid for their petal lengths.',
     data: './data/iris.csv',
-    a: `const a = unit(rows)
+    code: `const chart = unit(rows)
   .key("flowerId")
   .layout("grid", { columns: 15, radius: 6 })
   .color("species");`,
-    b: `const b = a.x("petalLength").layout("beeswarm");`,
+    edits: [{ replace: '.layout("grid", { columns: 15, radius: 6 })', with: '.x("petalLength")\n  .layout("beeswarm")' }],
   },
   {
     id: 'focus',
     title: 'Focus',
     category: 'attention',
     chart: 'point',
-    line: 'The camera moves to the four-cylinder cars. Every car stays in the data.',
+    line: 'The camera moves to the four-cylinder cars, then lets go and lights them up instead. Every car stays.',
     data: './data/mtcars.csv',
-    a: `const a = point(rows)
+    code: `const chart = point(rows)
   .x("wt", { title: "Weight (1000 lb)" })
   .y("mpg", { title: "Miles per gallon" })
   .key("name")
   .color("cyl", { type: "nominal" });`,
-    b: `const b = a.focus({ cyl: 4 });`,
+    edits: [{ add: '.focus({ cyl: 4 })' }, { replace: '.focus({ cyl: 4 })', with: '.highlight({ cyl: 4 })' }],
   },
   {
     id: 'steps',
     title: 'Steps',
     category: 'appearance',
     chart: 'line',
-    line: 'The same closing prices, redrawn as steps: each price holds until the next trading day.',
+    line: 'The same closing prices, drawn as steps, then with a heavier line.',
     data: './data/line-lab.csv',
-    a: `const a = line(rows)
+    code: `const chart = line(rows)
   .x("date", { title: "Date" })
   .y("close", { title: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker");`,
-    b: `const b = a.curve("curveStepAfter");`,
+    edits: [{ add: '.curve("curveStepAfter")' }, { add: '.strokeWidth(3)' }],
   },
 ];

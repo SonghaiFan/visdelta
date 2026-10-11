@@ -1,10 +1,11 @@
 ---
 title: Overview
-description: Describe a chart before and after a change. VisDelta draws every frame in between.
+description: Write a chart one chained call at a time. Every call is a new state, and VisDelta draws the change.
 ---
 
-You describe a chart twice: before a change and after it. VisDelta works out
-what changed and draws every frame in between.
+You write a chart one chained call at a time. Every call gives you a new
+state, and every state can move to the next one: VisDelta works out what
+changed and draws every frame in between.
 
 <LiveExample id="bar-remap" />
 
@@ -14,13 +15,13 @@ backward.
 
 ## Three ideas
 
-**A state is a value.** `bar(rows).x("product").y("revenue")` describes a chart.
-It draws nothing and never changes. Calling `.y("profit")` on it gives you a
-second state.
+**Every call is a state.** `bar(rows).x("product").y("revenue")` describes a
+chart. It draws nothing and never changes. Add `.y("profit")` and you have the
+next state; the one before it is still there.
 
-**A transition connects two states.** `transition(a, b)` matches the marks
-that stay, the ones that leave and the ones that arrive, and plans a route
-between them.
+**Any change can move.** `transition(a, b)` matches the marks that stay, the
+ones that leave and the ones that arrive, and plans a route from one state to
+the next. `sequence([a, b, c])` strings many states into one timeline.
 
 **Progress is just a number.** `progress(0.42)` shows one frame. A button, a
 slider, scroll position or a timeline can supply that number. VisDelta never
@@ -35,7 +36,7 @@ type into another. A Bar state transitions to another Bar state.
 
 <Cards>
   <Card title="Quick start" href="/docs/quick-start" description="Your first transition, in four steps." />
-  <Card title="Playground" href="/playground" description="Edit two states on real data." />
+  <Card title="Playground" href="/playground" description="Write a chart and watch every edit animate." />
   <Card title="Gallery" href="/gallery" description="What each chart type can draw." />
   <Card title="API" href="/docs/api" description="Every function and option." />
 </Cards>

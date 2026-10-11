@@ -404,3 +404,96 @@ html > body[data-scroll-locked] {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Playground keyframe track: kept states as diamonds, the replay head in amber. */
+.pg-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 2.5rem;
+}
+.pg-track-line,
+.pg-track-fill {
+  position: absolute;
+  top: 50%;
+  left: 7px;
+  height: 1px;
+  pointer-events: none;
+}
+.pg-track-line {
+  right: 7px;
+  background: var(--color-fd-border);
+}
+.pg-track-fill {
+  background: var(--color-delta);
+}
+.pg-track input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.pg-track:has(input:focus-visible) {
+  border-radius: var(--radius-sm, 4px);
+  outline: 1px solid color-mix(in srgb, var(--color-fd-foreground) 35%, transparent);
+  outline-offset: 2px;
+}
+.pg-key {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  place-items: center;
+  animation: pg-key-in 450ms var(--ease-out-quint);
+}
+.pg-key::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--color-fd-foreground);
+  transform: rotate(45deg);
+  transition:
+    transform 300ms var(--ease-out-quint),
+    background-color 200ms;
+}
+.pg-key:hover::before,
+.pg-key:focus-visible::before {
+  transform: rotate(45deg) scale(1.35);
+}
+.pg-key[data-current]::before {
+  background: var(--color-delta);
+  transform: rotate(45deg) scale(1.35);
+}
+.pg-key-label {
+  position: absolute;
+  top: 17px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-fd-muted-foreground);
+}
+.pg-track[data-dense] .pg-key-label {
+  display: none;
+}
+.pg-head {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 2px;
+  height: 20px;
+  margin: -10px 0 0 -1px;
+  border-radius: 1px;
+  background: var(--color-delta);
+  pointer-events: none;
+}
+@keyframes pg-key-in {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}

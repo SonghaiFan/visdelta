@@ -6,8 +6,9 @@
   export in `website/`, deployed to the same GitHub Pages URL. It adds a
   restructured information architecture (introduction, concepts, charts,
   guides, reference) in plain English, a homepage whose code edits itself and
-  drives the real transition, an editable A/B playground with curated demos
-  organized by the seven state-change categories, the idiom gallery, live
+  drives the real transition, a playground where every valid edit animates and
+  kept keyframes replay as a sequence, with curated stories organized by the
+  seven state-change categories, the idiom gallery, live
   examples driven by real example modules verified against `delta()`, type
   tables generated from the TypeScript source, static search, `llms.txt`, a
   sitemap and redirects from the previous VitePress URLs. The VitePress site in

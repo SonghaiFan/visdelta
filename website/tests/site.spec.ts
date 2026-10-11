@@ -138,46 +138,89 @@ test.describe('live examples', () => {
 });
 
 test.describe('playground', () => {
-  test('opens a curated transition and plays it from A to B', async ({ page }) => {
+  const chart = (page: Page) => page.getByLabel('Chart', { exact: true });
+  const keys = (page: Page) => page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key');
+  /** Bars drawn on screen (prepared legs of a sequence stay hidden). */
+  const visibleBars = (page: Page) =>
+    chart(page)
+      .locator('svg rect[data-key]')
+      .evaluateAll((rects) => rects.filter((rect) => rect.checkVisibility({ visibilityProperty: true }) && rect.getBoundingClientRect().width > 0).length);
+
+  test('a story writes itself: every edit animates and becomes a keyframe', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/');
-    // Categories are the primary navigation; the default demo is Layout → Sort.
+    // Categories are the primary navigation; the default story is Layout → Sort.
     const kinds = page.getByRole('navigation', { name: 'Kinds of change' });
     await expect(kinds.getByRole('button')).toHaveCount(7);
     await expect(kinds.getByRole('button', { name: 'Layout' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', { name: 'Sort', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByLabel('Chart', { exact: true }).locator('svg').first()).toBeVisible();
+    await expect(chart(page).locator('svg').first()).toBeVisible();
+    // Start, sort descending, sort ascending: three kept states.
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    await expect(page.getByLabel('Chart code')).toContainText('.sort("population", "ascending")');
     await expect(page.getByText('layout.reorder')).toBeVisible();
-    await expect.poll(() => progressOf(page.locator('main')), { timeout: 10_000 }).toBe(1);
+    await expect(page.getByRole('button', { name: 'Keyframe 2: layout.reorder' })).toBeVisible();
+
     await kinds.getByRole('button', { name: 'Grain' }).click();
     await expect(page).toHaveURL(/#split$/);
-    await expect(page.getByRole('navigation', { name: 'Transitions' }).getByRole('button')).toHaveText(['Split', 'Regroup', 'Zip', 'Summarize']);
+    await expect(page.getByRole('navigation', { name: 'Stories' }).getByRole('button')).toHaveText(['Split', 'Regroup', 'Zip', 'Summarize']);
     await page.getByRole('button', { name: 'Zip', exact: true }).click();
     await expect(page).toHaveURL(/#zip$/);
-    await expect(page.getByLabel('Chart', { exact: true }).locator('svg path.vd-line').first()).toBeVisible();
-    await expect(page.getByText('grain.split').first()).toBeVisible();
+    await expect(chart(page).locator('svg path.vd-line').first()).toBeVisible();
+    await expect(page.getByText('grain.split').first()).toBeVisible({ timeout: 15_000 });
     expect(errors).toEqual([]);
   });
 
-  test('editing B re-plans the transition; a broken edit keeps the last chart', async ({ page }) => {
+  test('a reader edit animates from the chart on screen; a broken edit keeps it', async ({ page }) => {
     const errors = trackErrors(page);
-    await page.goto('playground/#split');
-    await expect(page.getByText('layout.rearrange')).toBeVisible();
-    const editorB = page.getByLabel('Code for state B');
-    await typeInto(page, editorB, 'const b = detail.flip();');
-    await expect(page.getByText('coordinate.reorient')).toBeVisible({ timeout: 10_000 });
-    await expect.poll(() => progressOf(page.locator('main')), { timeout: 10_000 }).toBe(1);
+    await page.goto('playground/#zip');
+    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    const editor = page.getByLabel('Chart code');
+    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await expect(page.getByText('appearance.reshape')).toBeVisible({ timeout: 10_000 });
+    // The new state is live but not kept until the reader keeps it.
+    await expect(keys(page)).toHaveCount(2);
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect(keys(page)).toHaveCount(3);
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect(page.getByText('This is already keyframe 3.')).toBeVisible();
 
-    await typeInto(page, editorB, 'const b = detail.nope();');
-    await expect(page.getByRole('alert').filter({ hasText: 'detail.nope is not a function' })).toBeVisible();
-    await expect(page.getByText('coordinate.reorient')).toBeVisible();
-    await expect(page.getByLabel('Chart', { exact: true }).locator('svg').first()).toBeVisible();
+    await typeInto(page, editor, 'const chart = line(rows).nope();');
+    await expect(page.getByRole('alert').filter({ hasText: 'is not a function' })).toBeVisible();
+    await expect(chart(page).locator('svg path.vd-line').first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('kept keyframes replay as one sequence, and the code follows the playhead', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#filter');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    const editor = page.getByLabel('Chart code');
+    await expect(editor).toContainText('gte: 500000');
+    const timeline = page.getByLabel('Keyframe timeline');
+    await timeline.fill('0');
+    await expect(editor).not.toContainText('population: { gte');
+    await expect(page.getByText(/Replaying 3 keyframes/)).toBeVisible();
+    await timeline.fill('1');
+    await expect(editor).toContainText('gte: 1000000');
+    await expect(page.getByText('data.remove')).toBeVisible();
+    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
+    const bars = await visibleBars(page);
+
+    await page.getByRole('button', { name: 'Play keyframes' }).click();
+    await expect(editor).toContainText('gte: 500000', { timeout: 10_000 });
+    await expect(page.getByRole('button', { name: 'Play keyframes' })).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => visibleBars(page)).toBeGreaterThan(bars);
+
+    // Clicking a keyframe travels there along the timeline.
+    await page.getByRole('button', { name: /^Keyframe 1$/ }).click();
+    await expect(editor).not.toContainText('population: { gte', { timeout: 10_000 });
     expect(errors).toEqual([]);
   });
 
   test('your own rows replace the dataset', async ({ page }) => {
     await page.goto('playground/#sort');
-    await expect(page.getByText('layout.reorder')).toBeVisible();
+    await expect(chart(page).locator('svg').first()).toBeVisible();
     await page.getByLabel('Use your own CSV or JSON rows').setInputFiles({
       name: 'states.csv',
       mimeType: 'text/csv',
@@ -185,7 +228,7 @@ test.describe('playground', () => {
     });
     await expect(page.getByText('states.csv · 3 records')).toBeVisible();
     await expect
-      .poll(() => page.getByLabel('Chart', { exact: true }).locator('svg rect.vd-bar, svg g rect').count(), { timeout: 10_000 })
+      .poll(() => chart(page).locator('svg rect.vd-bar, svg g rect').count(), { timeout: 10_000 })
       .toBeLessThan(10);
   });
 });
@@ -242,7 +285,8 @@ test.describe('site', () => {
     await dialog.getByRole('link', { name: 'Edit in Playground →' }).click();
     await expect(page).toHaveURL(new RegExp(`playground/#idiom=${id}$`));
     await expect(page.getByLabel('Chart', { exact: true }).locator('svg').first()).toBeVisible();
-    await expect(page.getByText('no state change yet')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key')).toHaveCount(1);
+    await expect(page.getByText('edit the code; the chart follows')).toBeVisible();
     expect(errors).toEqual([]);
   });
 

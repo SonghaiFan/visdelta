@@ -30,7 +30,7 @@ npm run dev        # http://localhost:3000
 | `npm start`              | Serve `out/` the way GitHub Pages does                                 |
 | `npm run lint`           | ESLint (Next.js rules)                                                  |
 | `npm run types:check`    | Generate MDX and route types, then `tsc --noEmit`                       |
-| `npm run examples:check` | Verify every live example and playground demo against the real `delta()` |
+| `npm run examples:check` | Verify every live example and playground story against the real `delta()` |
 | `npm test`               | Playwright tests against the exported site in `out/`                    |
 | `npm run check`          | All of the above, as CI runs it                                         |
 
@@ -61,7 +61,7 @@ website/
   examples/                  Live example modules and their registry
   components/live/           The transition player, example loaders, error boundary
   components/interactive/    Shared runtime: code evaluation, data loading, editor, scrubber
-  components/playground/     The A/B playground and its curated demos (demos.ts)
+  components/playground/     The playground, its keyframe timeline and curated stories (demos.ts)
   components/gallery/        The idiom gallery
   components/home/           Homepage: self-editing code pipeline and scroll story
   components/demos/          Interactive figures used inside docs pages
@@ -130,19 +130,29 @@ transition's `delta().stateChanges` as the **Δ** line.
 
 ### Playground
 
-The playground (`/playground`) shows two editable states, A and B, and the real
-transition between them. Edits re-run after a short pause; the chart moves from
-what is on screen to the edited state, then the full A → B transition is ready
-to play and scrub. A broken edit shows its error and keeps the last chart.
-Readers can replace the dataset with their own CSV or JSON rows.
+The playground (`/playground`) is one editor and one chart. Every valid edit is
+a transition: shortly after typing stops, the code runs and the chart moves
+from what is on screen to the new state. If more edits arrive while the chart
+is moving, only the newest one runs next, so the motion never jumps. A broken
+edit shows its error and keeps the last chart.
 
-Its demos are a short, curated list in `components/playground/demos.ts`: one
-idea each, on real data, with a one-line caption. Prefer a demo whose motion
-teaches something over one that covers another API. `npm run examples:check`
-runs `scripts/verify-playground.mjs`, which evaluates every demo's A and B with
-the built library and fails if a demo draws no marks or reports no change.
+**Keep** (⌘S) saves the current state as a keyframe. Kept keyframes replay as
+one real `sequence()`: play or scrub the track, or click a keyframe to travel
+to it. The code and the Δ line follow the playhead, and the next edit moves on
+from the keyframe on screen. Readers can replace the dataset with their own
+CSV or JSON rows.
 
-Gallery idioms open in the playground as state A (`/playground#idiom=<id>`).
+Its stories are a short, curated list in `components/playground/demos.ts`,
+filed under the seven state-change categories, which are the playground's
+primary navigation. A story is starting code plus a few edits (add a chained
+call, remove one, or rewrite text in place). The playground types each edit,
+animates it and keeps it as a keyframe; under reduced motion it applies them
+all at once. `npm run examples:check` runs `scripts/verify-playground.mjs`,
+which evaluates every version of every story with the built library and fails
+if a version is invalid, an edit changes nothing, a story never emits its
+category, or a category has no story.
+
+Gallery idioms open in the playground as editable code (`/playground#idiom=<id>`).
 
 ### Design language
 
