@@ -629,8 +629,57 @@ html > body[data-scroll-locked] {
   }
 }
 
+.pg-viewbar {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem 0;
+}
+.pg-viewbar[data-floating] {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--color-fd-border);
+  cursor: grab;
+  touch-action: none;
+}
+.pg-viewbar[data-floating]:active {
+  cursor: grabbing;
+}
+.pg-resize {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+.pg-resize[data-edge='n'],
+.pg-resize[data-edge='s'] {
+  left: 10px;
+  right: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.pg-resize[data-edge='e'],
+.pg-resize[data-edge='w'] {
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.pg-resize[data-edge='n'] { top: -4px; }
+.pg-resize[data-edge='s'] { bottom: -4px; }
+.pg-resize[data-edge='e'] { right: -4px; }
+.pg-resize[data-edge='w'] { left: -4px; }
+.pg-resize[data-edge='ne'],
+.pg-resize[data-edge='nw'],
+.pg-resize[data-edge='se'],
+.pg-resize[data-edge='sw'] {
+  width: 14px;
+  height: 14px;
+}
+.pg-resize[data-edge='ne'] { top: -5px; right: -5px; cursor: nesw-resize; }
+.pg-resize[data-edge='sw'] { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.pg-resize[data-edge='nw'] { top: -5px; left: -5px; cursor: nwse-resize; }
+.pg-resize[data-edge='se'] { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
 @media (min-width: 1024px) {
   .pg-app {
+    position: relative;
     --pg-side: 13.5rem;
     display: grid;
     /* A fixed size, not flex: content (a long table) must never size the panes. */
@@ -654,6 +703,40 @@ html > body[data-scroll-locked] {
     display: block;
     margin: 0 -3px;
     z-index: 1;
+  }
+  /* Floating: the preview is a window over the editor, which takes the whole width. */
+  .pg-app[data-placement='float'] {
+    grid-template-columns: var(--pg-side) minmax(0, 1fr);
+    grid-template-areas:
+      'tool tool'
+      'side edit'
+      'side time'
+      'status status';
+  }
+  .pg-app[data-placement='float'] .pg-splitter {
+    display: none;
+  }
+  .pg-app[data-placement='float'] .pg-preview {
+    position: absolute;
+    z-index: 30;
+    grid-area: auto;
+    top: calc(var(--pg-bar) + 0.75rem);
+    right: 1rem;
+    width: min(34rem, 60%);
+    height: min(28rem, 62%);
+    min-width: 300px;
+    min-height: 220px;
+    border: 1px solid var(--color-fd-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-fd-background);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.06),
+      0 12px 32px rgb(0 0 0 / 0.14);
+  }
+  .dark .pg-app[data-placement='float'] .pg-preview {
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 12px 32px rgb(0 0 0 / 0.5);
   }
   .pg-editor {
     border-right: 0;
@@ -722,8 +805,22 @@ html > body[data-scroll-locked] {
   height: 100%;
   overflow: hidden;
 }
+/* Fit: a layer is the chart's container and fills the stage, so "auto" follows it. */
 .pg-layer {
+  height: 100%;
   transition: opacity 220ms var(--ease-out-quint);
+}
+/* Fixed: the chart keeps its size and a smaller stage scrolls. */
+.pg-stage[data-size='fixed'] {
+  overflow: auto;
+}
+.pg-stage[data-size='fixed'] .pg-layer {
+  height: auto;
+  width: max-content;
+}
+.pg-stage[data-size='fixed'] .pg-layer[data-state='hidden'] {
+  height: auto;
+  inset: 0 auto auto 0;
 }
 .pg-layer[data-state='hidden'] {
   position: absolute;

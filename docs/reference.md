@@ -606,11 +606,29 @@ change.play({ duration: 800, from: 0, to: 1 });
 change.pause();
 change.resize();
 change.resize({ height: 640 }); // Explicit canvas height; retain current progress.
+change.resize({ width: "auto", height: "auto" }); // Follow the container in both dimensions.
 change.stageCount();             // Serial route stages; a full play() lasts stageCount() × duration.
 change.destroy();
 ```
 
 See [Transition runtime](/runtime-api) for lifecycle details.
+
+### Canvas size
+
+`width` and `height` each take a number of CSS pixels (fixed) or `"auto"`
+(follow the container). They apply to `transition()`, `sequence()` and
+`resize()`; `resize()` leaves a dimension it omits as it was.
+
+| Option | Omitted | Number | `"auto"` |
+| --- | --- | --- | --- |
+| `width` | The container's width, re-fit when it changes. | Fixed. A narrower container overflows; the chart is not shrunk or clipped. | The container's width. |
+| `height` | The chart's own height (an authored `height`, else 500). | Fixed; overrides the chart's own height. | The container's height, re-fit when it changes. The container needs a height of its own (a fixed height, or a flex or grid track); otherwise the chart keeps its own height. |
+
+An explicit `height` is the canvas height, not a floor under it: the view's
+`min-height` is released, so a 300px chart is not given 420px of room. The chart
+figure (canvas plus any theme border) is what fills the container, so a
+bordered theme never overflows it. The canvas is measured inside the
+container's padding.
 
 ## `sequence(states, options)`
 

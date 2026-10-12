@@ -238,3 +238,11 @@ function resizeCanvas(change: ResizableTransition) { return change.resize({ heig
 void resizeCanvas;
 function playTime(change: ResizableTransition, duration: number): number { return change.stageCount() * duration; }
 void playTime;
+import type { CanvasSize, TransitionOptions as SizedOptions, VisualizationSequence as SizedSequence } from "visdelta/transition";
+const fixedSize: SizedOptions = { target: "#chart", width: 640, height: 360 };
+const fitSize: SizedOptions = { target: "#chart", width: "auto", height: "auto" };
+function fitContainer(change: ResizableTransition, story: SizedSequence, size: CanvasSize) {
+  change.resize({ width: size, height: "auto" });
+  return story.resize({ width: "auto", height: size });
+}
+void fixedSize; void fitSize; void fitContainer;

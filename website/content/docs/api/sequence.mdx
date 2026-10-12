@@ -44,7 +44,17 @@ by default.
 
 ## Resizing
 
-Call `resize()` after the container changes size or theme. It recompiles the
-active leg and keeps the current position.
+A sequence takes the same `width` and `height` as `transition()`: a number of
+pixels, or `"auto"` to follow the container. A dimension set to `"auto"` re-fits
+the leg on screen when the container changes. Call `resize()` after a theme
+change, or to change the requested size for every leg:
+
+```ts
+story.resize({ width: 'auto', height: 'auto' });
+```
+
+`resize()` recompiles the active leg and keeps the current position; the other
+legs pick the new size up when they are shown. A dimension left out keeps its
+request.
 
 See [Multi-step stories](/docs/guides/stories) for scroll-driven usage.

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- `transition()` and `sequence()` take `width` and `height`, each a number of
+  pixels (fixed) or `"auto"` (follow the container), and `resize()` accepts both.
+  A fixed width overflows a narrower container instead of shrinking the chart;
+  `height: "auto"` fills a container that has a height and keeps the chart's own
+  height in one that does not. Omitting them is unchanged: the container's width
+  and the chart's own height. Two small changes ride along: an explicit `height`
+  now releases the view's default `min-height` so it is the canvas height rather
+  than a floor under it, and a sequence re-fits the leg on screen when its
+  container changes in a dimension set to `"auto"`, and its `resize()` takes the
+  same size options (previously the playground could not resize a replaying
+  sequence's height).
+
 - `VisualizationTransition.stageCount()` is now part of the public type: the
   number of serial route stages planned for a pair. `play({ duration })` already
   gives each stage `duration` ms, so a full play lasts `stageCount() × duration`.
