@@ -13,14 +13,34 @@ import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
+import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
+import type { CanvasSize } from './runtime/canvas-size.js';
+
+export type { CanvasSize } from './runtime/canvas-size.js';
 
 export type { Visualization } from './core.js';
 
 export interface TransitionOptions extends RuntimeOptions {
   /** Named sources for visualizations that use .data("name"). */
   data?: Record<string, unknown>;
-  /** Explicit canvas height in pixels. Overrides the chart's default height. */
-  height?: number;
+  /**
+   * Outer width of the canvas (the SVG), margins included, as in Observable Plot.
+   * A number is a fixed width in pixels: a container narrower than that overflows
+   * instead of the chart shrinking. `"auto"` makes the canvas exactly the
+   * container's content width and re-fits when it changes; the figure's own
+   * border gives way on that axis. Omitted: the container's width, inside the
+   * figure's own border.
+   */
+  width?: CanvasSize;
+  /**
+   * Outer height of the canvas (the SVG), margins included. A number is a fixed
+   * height in pixels and overrides the chart's default. `"auto"` makes the canvas
+   * exactly the container's content height and re-fits when it changes; the
+   * figure's border and empty title strip give way. The container needs a height
+   * of its own (a fixed height, a flex or grid track), otherwise the chart keeps
+   * its default height. Omitted: the chart's default height.
+   */
+  height?: CanvasSize;
 }
 
 export interface PlayOptions {
@@ -49,8 +69,12 @@ export interface VisualizationTransition {
   play(options?: PlayOptions): VisualizationTransition;
   /** Stop owned playback at the current frame. */
   pause(): VisualizationTransition;
-  /** Recompile at the container's current size/theme, retaining progress and data. */
-  resize(options?: { height?: number }): VisualizationTransition;
+  /**
+   * Recompile at the container's current size/theme, retaining progress and data.
+   * `width` and `height` change the requested canvas size as in `TransitionOptions`;
+   * a dimension left out keeps its current request.
+   */
+  resize(options?: { width?: CanvasSize; height?: CanvasSize }): VisualizationTransition;
   /**
    * Serial route stages planned for this pair (at least 1). Stages split progress
    * equally and `play({ duration })` gives each one `duration` ms, so a full
@@ -81,6 +105,8 @@ export async function transition(
   }
   validateTransforms(source.transform ?? []);
   validateTransforms(target.transform ?? []);
+  assertCanvasSize('transition() width', options.width);
+  assertCanvasSize('transition() height', options.height);
   const declared = cloneState(options.data ?? {});
   const sourceCache = new Map<string, Promise<unknown[]>>();
   const resolveData = async (spec: ViewSpec): Promise<ViewSpec> => {
@@ -173,10 +199,11 @@ export async function transition(
     },
     pause() { assertAlive(); stop(); return controller; },
     stageCount() { return surface.stageCount(); },
-    resize({ height } = {}) {
+    resize({ width, height } = {}) {
       assertAlive();
-      if (height != null && (!Number.isFinite(height) || height <= 0)) throw new Error('resize height must be finite and positive.');
-      surface.resize(height); show(value, lastDirection); return controller;
+      assertCanvasSize('resize width', width);
+      assertCanvasSize('resize height', height);
+      surface.resize({ width, height }); show(value, lastDirection); return controller;
     },
     destroy() {
       if (destroyed) return;
@@ -190,11 +217,16 @@ export async function transition(
     show(0);
     surface.commitMount();
     if (typeof ResizeObserver !== 'undefined') {
+      // Re-fit when a dimension that follows the container changes.
       let width = host.clientWidth;
+      let height = contentHeight(host);
       resizeObserver = new ResizeObserver(() => {
-        if (destroyed || host.clientWidth === width) return;
+        if (destroyed) return;
+        const follows = surface.follows();
+        const changed = (follows.width && host.clientWidth !== width) || (follows.height && contentHeight(host) !== height);
         width = host.clientWidth;
-        controller.resize();
+        height = contentHeight(host);
+        if (changed) controller.resize();
       });
       resizeObserver.observe(host);
     }

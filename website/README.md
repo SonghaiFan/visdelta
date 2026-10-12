@@ -161,6 +161,14 @@ code, then the chart.
   planned for it (`stageCount()`; `play()` gives each stage the same duration).
   Play, scrub, or click a keyframe to travel to it. The code and the Δ line
   follow the playhead, and the next edit moves on from the keyframe on screen.
+- **Chart size.** The preview's **Fit / Fixed** switch sets the `width` and
+  `height` every chart is built with: `"auto"` follows the preview (the library
+  re-fits when it changes, including during a keyframe replay), **Fixed** keeps
+  a width and height in pixels and the preview scrolls when it is smaller. The
+  choice is remembered per viewer. **Float** turns the preview into a window
+  over the editor that is dragged by its title bar and resized from its edges;
+  a chart set to Fit follows the window. Floating needs the wide layout, so
+  phones stay docked. The window is mouse and touch only; Dock returns it.
 - **Share** puts the code, and the rows when they were edited or uploaded, in
   a compressed `#share=` hash and copies the link. Code from a link is shown
   but does not run until the reader presses Run. Rows too large for a URL are
@@ -253,9 +261,6 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
   code in the editor with `new Function` in the reader's own tab, as the
   previous site did. There is no sandbox; nothing is sent anywhere. Code that
   arrives in a share link runs only after the reader presses Run.
-- **Replay height.** A live edit's chart follows its pane's height on resize.
-  A replaying `sequence()` keeps the height it was built with until the next
-  edit or replay, because `sequence().resize()` takes no height.
 - **Sequence theme tokens.** `sequence()` resolves CSS tokens on a hidden
   preparation mount attached to `document.body`, so tokens scoped to a chart's
   container do not reach sequence legs. The site sets its dark-mode `--vd-*`

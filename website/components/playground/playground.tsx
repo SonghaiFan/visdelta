@@ -3,7 +3,7 @@
 import { Link2, PanelLeft, Play, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DeltaResult, StateChange } from 'visdelta/core';
-import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
+import type { CanvasSize, VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
 import { CodeEditor, type CodeHints } from '@/components/interactive/code-editor';
 import { loadIdioms, type LabChart } from '@/components/interactive/corpus';
 import {
@@ -20,9 +20,11 @@ import { categories } from '@/examples/registry';
 import { cn } from '@/lib/cn';
 import { datasetName, decodeShare, encodeShare, formatOf, inlineData, loadText, parseRows, type Dataset, type SharedCode } from './data';
 import { playgroundDemos, storyFrames, type PlaygroundDemo as Story } from './demos';
+import { EDGES, useFloatingWindow } from './floating';
 import { Explorer } from './explorer';
 import { useMedia, useModifierKey, usePreference } from './preferences';
 import { RowsPanel, type RowsView } from './rows-panel';
+import { SIZE_LIMITS, SizeControls, type SizeMode } from './size-controls';
 import { Timeline } from './timeline';
 
 /** A curated story, gallery code, or code from a share link (no category). */
@@ -53,7 +55,15 @@ const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
-const STORAGE = { split: 'visdelta.playground.split', autoRun: 'visdelta.playground.autorun' };
+const STORAGE = {
+  split: 'visdelta.playground.split',
+  autoRun: 'visdelta.playground.autorun',
+  sizeMode: 'visdelta.playground.size-mode',
+  fixedWidth: 'visdelta.playground.fixed-width',
+  fixedHeight: 'visdelta.playground.fixed-height',
+  placement: 'visdelta.playground.placement',
+};
+const FIXED_DEFAULT = { width: 640, height: 400 };
 
 type Controller = VisualizationTransition | VisualizationSequence;
 interface Version {
@@ -101,6 +111,9 @@ export function Playground() {
   const editorPaneRef = useRef<HTMLElement>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const floatRef = useRef<HTMLElement>(null);
+  /** What every chart is asked for: fit its layer, or a fixed canvas. */
+  const sizeRef = useRef<{ width: CanvasSize; height: CanvasSize }>({ width: 'auto', height: 'auto' });
   const factoriesRef = useRef<Awaited<ReturnType<typeof loadFactories>> | null>(null);
   const membersRef = useRef(new Map<ChartName, string[]>());
   const displayRef = useRef<Display | null>(null);
@@ -155,7 +168,19 @@ export function Playground() {
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
   const [flash, setFlash] = useState('');
 
+  const [sizeModePreference, setSizeModePreference] = usePreference(STORAGE.sizeMode, 'fit');
+  const [fixedWidthPreference, setFixedWidthPreference] = usePreference(STORAGE.fixedWidth, String(FIXED_DEFAULT.width));
+  const [fixedHeightPreference, setFixedHeightPreference] = usePreference(STORAGE.fixedHeight, String(FIXED_DEFAULT.height));
+  const [placementPreference, setPlacementPreference] = usePreference(STORAGE.placement, 'dock');
+
   const autoRun = autoRunPreference !== 'false';
+  const sizeMode: SizeMode = sizeModePreference === 'fixed' ? 'fixed' : 'fit';
+  const inRange = (text: string, fallback: number) => {
+    const number = Number(text);
+    return Number.isFinite(number) ? Math.min(SIZE_LIMITS.max, Math.max(SIZE_LIMITS.min, number)) : fallback;
+  };
+  const fixedWidth = inRange(fixedWidthPreference, FIXED_DEFAULT.width);
+  const fixedHeight = inRange(fixedHeightPreference, FIXED_DEFAULT.height);
   const autoRunRef = useRef(autoRun);
   useEffect(() => {
     autoRunRef.current = autoRun;
@@ -163,6 +188,10 @@ export function Playground() {
   const split = dragSplit ?? clamp(Number(splitPreference) || DEFAULT_SPLIT, SPLIT_RANGE);
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
+  /** Floating needs room beside the editor, so narrow screens stay docked. */
+  const floating = placementPreference === 'float' && wide;
+  const floatingWindow = useFloatingWindow(appRef, floatRef, '.pg-toolbar');
+  const { contain: containFloat, reset: resetFloat } = floatingWindow;
 
   const writeCode = useCallback((text: string) => {
     codeRef.current = text;
@@ -180,8 +209,8 @@ export function Playground() {
     flashTimer.current = window.setTimeout(() => setFlash(''), 3200);
   }, []);
 
-  /** The chart's height follows its pane. */
-  const stageHeight = useCallback(() => Math.max(220, Math.floor(stageRef.current?.clientHeight || 400)), []);
+  /** The size every new chart is built with. */
+  const canvas = useCallback(() => ({ ...sizeRef.current }), []);
 
   /** Build a controller in a hidden layer of the stage. */
   const mount = useCallback(async <C extends Controller>(build: (target: HTMLElement) => Promise<C>) => {
@@ -258,7 +287,7 @@ export function Playground() {
     async (target: Version) => {
       const from = shownRef.current;
       const { transition } = await loadRuntime();
-      const options = (layer: HTMLElement) => ({ target: layer, height: stageHeight() });
+      const options = (layer: HTMLElement) => ({ target: layer, ...canvas() });
       if (from && displayRef.current && from.state.toSpec().mark === target.state.toSpec().mark) {
         const difference = await compare(from.state, target.state);
         if (unchanged(difference)) {
@@ -292,7 +321,7 @@ export function Playground() {
       }
       show(next, 'live', 0, true);
     },
-    [mount, settle, show, stageHeight],
+    [canvas, mount, settle, show],
   );
 
   /** Queue a move. Only the newest pending version runs; motion never jumps. */
@@ -461,7 +490,7 @@ export function Playground() {
       if (editTimer.current !== null) window.clearTimeout(editTimer.current);
       await queueRef.current.running;
       const { sequence } = await loadRuntime();
-      const next = await mount((layer) => sequence(frames.map((frame) => frame.state) as never, { target: layer, height: stageHeight() }));
+      const next = await mount((layer) => sequence(frames.map((frame) => frame.state) as never, { target: layer, ...canvas() }));
       if (keyframesRef.current !== frames) {
         next.controller.destroy();
         next.layer.remove();
@@ -476,7 +505,7 @@ export function Playground() {
       follow(position);
       return next.controller;
     },
-    [follow, mount, show, stageHeight],
+    [canvas, follow, mount, show],
   );
 
   const onScrub = useCallback(
@@ -706,31 +735,22 @@ export function Playground() {
     };
   }, [open]);
 
-  // The chart follows its pane: width and height come from the layout.
+  // A change of size mode, size or place reaches the chart on screen; charts built
+  // later read the same request. With "auto" the library follows the container itself.
   useEffect(() => {
-    const stage = stageRef.current;
-    if (!stage || typeof ResizeObserver === 'undefined') return;
-    let size = '';
-    let frame = 0;
-    const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const next = `${stage.clientWidth}x${stage.clientHeight}`;
-        if (next === size) return;
-        const first = !size;
-        size = next;
-        const display = displayRef.current;
-        if (first || !display) return;
-        if (display.kind === 'live') (display.controller as VisualizationTransition).resize({ height: stageHeight() });
-        else display.controller.resize();
-      });
-    });
-    observer.observe(stage);
-    return () => {
-      observer.disconnect();
-      cancelAnimationFrame(frame);
-    };
-  }, [stageHeight]);
+    const request = sizeMode === 'fixed' ? { width: fixedWidth, height: fixedHeight } : { width: 'auto' as const, height: 'auto' as const };
+    sizeRef.current = request;
+    displayRef.current?.controller.resize(request);
+  }, [sizeMode, fixedWidth, fixedHeight]);
+
+  // A floating window stays inside the workspace when the workspace shrinks.
+  useEffect(() => {
+    const app = appRef.current;
+    if (!floating || !app || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(containFloat);
+    observer.observe(app);
+    return () => observer.disconnect();
+  }, [containFloat, floating]);
 
   // A narrow layout shows the examples as a drawer; Escape closes it.
   useEffect(() => {
@@ -907,6 +927,7 @@ export function Playground() {
       className="pg-app"
       // "auto" lets the layout decide until the reader toggles the examples.
       data-explorer={explorerChoice === null ? 'auto' : explorerOpen ? 'open' : 'closed'}
+      data-placement={floating ? 'float' : 'dock'}
       data-dragging={dragging || undefined}
       style={{ '--pg-left': `${split * 100}fr`, '--pg-right': `${(1 - split) * 100}fr` } as CSSProperties}
     >
@@ -1030,10 +1051,45 @@ export function Playground() {
         onDoubleClick={() => setSplitPreference(String(DEFAULT_SPLIT))}
       />
 
-      <section ref={previewPaneRef} aria-label="Preview" className="pg-preview">
-        <p className="min-h-9 shrink-0 px-4 pt-2.5 text-sm text-fd-muted-foreground">{story?.line}</p>
+      <section
+        ref={(element) => {
+          previewPaneRef.current = element;
+          floatRef.current = element;
+        }}
+        aria-label="Preview"
+        className="pg-preview"
+        style={
+          floating && floatingWindow.rect
+            ? { left: floatingWindow.rect.x, top: floatingWindow.rect.y, width: floatingWindow.rect.w, height: floatingWindow.rect.h, right: 'auto' }
+            : undefined
+        }
+      >
+        <div
+          className="pg-viewbar"
+          data-floating={floating || undefined}
+          onPointerDown={floating ? floatingWindow.startMove : undefined}
+          onDoubleClick={floating ? resetFloat : undefined}
+        >
+          <SizeControls
+            mode={sizeMode}
+            width={fixedWidth}
+            height={fixedHeight}
+            onMode={setSizeModePreference}
+            onSize={({ width, height }) => {
+              if (width != null) setFixedWidthPreference(String(width));
+              if (height != null) setFixedHeightPreference(String(height));
+            }}
+            floating={floating}
+            canFloat={wide}
+            onFloat={() => {
+              resetFloat();
+              setPlacementPreference(floating ? 'dock' : 'float');
+            }}
+          />
+        </div>
+        {!floating && <p className="min-h-6 shrink-0 px-4 pt-1 text-sm text-fd-muted-foreground">{story?.line}</p>}
         <div className="relative min-h-0 flex-1 px-4">
-          <div ref={stageRef} className="pg-stage vd-docs-chart" aria-label="Chart" aria-busy={busy} />
+          <div ref={stageRef} className="pg-stage vd-docs-chart" data-size={sizeMode} aria-label="Chart" aria-busy={busy} />
           {review && (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
               <div className="max-w-sm">
@@ -1057,6 +1113,10 @@ export function Playground() {
           {changes.length ? changes.map((change, index) => <span key={index} className="text-fd-foreground/80">{formatChange(change)}</span>) : <span>edit the code; the chart follows</span>}
           {changes.length > 0 && changeStages > 1 && <span className="ml-auto font-sans">planned in {changeStages} stages</span>}
         </p>
+        {floating &&
+          EDGES.map((edge) => (
+            <span key={edge} aria-hidden="true" className="pg-resize" data-edge={edge} onPointerDown={floatingWindow.startResize(edge)} />
+          ))}
       </section>
 
       <Timeline

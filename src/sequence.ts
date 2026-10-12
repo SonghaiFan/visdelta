@@ -4,6 +4,8 @@ import { transition } from './transition.js';
 import type { TransitionOptions, VisualizationTransition } from './transition.js';
 import { resolveTarget } from './runtime/target.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
+import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
+import type { CanvasSize } from './runtime/canvas-size.js';
 
 /** Options for a timeline of adjacent visualization states. */
 export interface SequenceOptions extends TransitionOptions {}
@@ -28,8 +30,12 @@ export interface VisualizationSequence {
   play(options?: SequencePlayOptions): VisualizationSequence;
   /** Stop owned playback at the current frame. */
   pause(): VisualizationSequence;
-  /** Recompile the active leg for the container's current size/theme. */
-  resize(): VisualizationSequence;
+  /**
+   * Recompile the active leg for the container's current size/theme. `width` and
+   * `height` change the requested canvas size for every leg, as in
+   * `TransitionOptions`; a dimension left out keeps its current request.
+   */
+  resize(options?: { width?: CanvasSize; height?: CanvasSize }): VisualizationSequence;
   /** Stop playback and remove every prepared leg. The controller cannot be used afterwards. */
   destroy(): void;
 }
@@ -56,8 +62,13 @@ export async function sequence(states: readonly Visualization[], options: Sequen
     typeof (state as { toSpec?: unknown }).toSpec === 'function' ? state : cloneState(state)
   ));
 
+  assertCanvasSize('sequence() width', options.width);
+  assertCanvasSize('sequence() height', options.height);
   const host = resolveTarget(options.target);
   const segments: Segment[] = [];
+  /** The canvas size every leg is asked for; legs not on screen pick it up when shown. */
+  const requested: { width?: CanvasSize; height?: CanvasSize } = { width: options.width, height: options.height };
+  let resizeObserver: ResizeObserver | null = null;
   let activeIndex = -1;
   let value = 0;
   let animation: number | null = null;
@@ -67,7 +78,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
     for (let index = 0; index < authoredStates.length - 1; index += 1) {
       // D3 schedules named transitions on connected nodes. Prepare each leg in
       // a same-sized, hidden document mount; the visible host stays untouched.
-      const mount = preparationMount(host, options.height);
+      const mount = preparationMount(host, options);
       let controller: VisualizationTransition | undefined;
       try {
         controller = await transition(authoredStates[index], authoredStates[index + 1], { ...options, target: mount });
@@ -138,7 +149,7 @@ export async function sequence(states: readonly Visualization[], options: Sequen
     const next = segments[index];
     host.replaceChildren(next.root);
     activeIndex = index;
-    next.controller.resize();
+    next.controller.resize(requested);
   }
 
   const controller: VisualizationSequence = {
@@ -182,14 +193,19 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       stop();
       return controller;
     },
-    resize() {
+    resize({ width, height } = {}) {
       assertAlive();
-      if (activeIndex >= 0) segments[activeIndex].controller.resize();
+      assertCanvasSize('resize width', width);
+      assertCanvasSize('resize height', height);
+      if (width != null) requested.width = width;
+      if (height != null) requested.height = height;
+      if (activeIndex >= 0) segments[activeIndex].controller.resize(requested);
       return controller;
     },
     destroy() {
       if (destroyed) return;
       stop();
+      resizeObserver?.disconnect();
       segments.forEach(segment => {
         segment.controller.destroy();
         segment.mount.remove();
@@ -199,13 +215,28 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   };
 
   controller.progress(0);
+  if (typeof ResizeObserver !== 'undefined') {
+    // The legs observe their hidden mounts, so the sequence watches the host and
+    // re-fits the leg on screen when a dimension that follows the container changes.
+    let width = host.clientWidth;
+    let height = contentHeight(host);
+    resizeObserver = new ResizeObserver(() => {
+      if (destroyed) return;
+      const changed = (typeof requested.width !== 'number' && host.clientWidth !== width)
+        || (requested.height === 'auto' && contentHeight(host) !== height);
+      width = host.clientWidth;
+      height = contentHeight(host);
+      if (changed) controller.resize();
+    });
+    resizeObserver.observe(host);
+  }
   return controller;
 }
 
-function preparationMount(host: Element, height: number | undefined): HTMLDivElement {
+function preparationMount(host: Element, options: Pick<TransitionOptions, 'width' | 'height'>): HTMLDivElement {
   const mount = document.createElement('div');
-  const width = Math.max(60, host.clientWidth || 720);
-  const measuredHeight = Math.max(1, host.clientHeight || height || 500);
+  const width = Math.max(60, typeof options.width === 'number' ? options.width : host.clientWidth || 720);
+  const measuredHeight = Math.max(1, typeof options.height === 'number' ? options.height : host.clientHeight || 500);
   mount.style.cssText = `position:fixed;left:-100000px;top:0;width:${width}px;height:${measuredHeight}px;visibility:hidden;pointer-events:none;`;
   document.body.append(mount);
   return mount;

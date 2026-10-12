@@ -606,11 +606,35 @@ change.play({ duration: 800, from: 0, to: 1 });
 change.pause();
 change.resize();
 change.resize({ height: 640 }); // Explicit canvas height; retain current progress.
+change.resize({ width: "auto", height: "auto" }); // Follow the container in both dimensions.
 change.stageCount();             // Serial route stages; a full play() lasts stageCount() × duration.
 change.destroy();
 ```
 
 See [Transition runtime](/runtime-api) for lifecycle details.
+
+### Canvas size
+
+`width` and `height` are the outer size of the canvas, the SVG, margins
+included, as `width` and `height` are in Observable Plot. Each takes a number of
+CSS pixels (fixed) or `"auto"` (exactly the container). They apply to
+`transition()`, `sequence()` and `resize()`; `resize()` leaves a dimension it
+omits as it was.
+
+| Option | Omitted | Number | `"auto"` |
+| --- | --- | --- | --- |
+| `width` | The container's width, inside the figure's own border; re-fit when it changes. | Exactly this wide. A narrower container overflows; the chart is not shrunk or clipped. | Exactly the container's content width, re-fit when it changes. |
+| `height` | The chart's own height (an authored `height`, else 500). | Exactly this tall; overrides the chart's own height. | Exactly the container's content height, re-fit when it changes. The container needs a height of its own (a fixed height, or a flex or grid track); otherwise the chart keeps its own height. |
+
+Unlike Plot, a chart is wrapped in a figure that a theme may give a border and
+an (always empty) title strip. A number is always the canvas itself, so that
+chrome sits outside it. For `"auto"`, the figure's border on that axis, and on
+the height axis the title strip, give way, so the canvas is exactly the
+container and nothing overflows it. Omitted dimensions keep the chrome.
+
+An explicit `height` is the canvas height, not a floor under it: the view's
+`min-height` is released, so a 300px chart is not given 420px of room. The
+container's padding is not part of its content box.
 
 ## `sequence(states, options)`
 

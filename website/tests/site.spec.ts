@@ -296,6 +296,123 @@ test.describe('playground', () => {
     expect(errors).toEqual([]);
   });
 
+  test('the chart fits its container, or keeps a fixed size that scrolls', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#sort');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    const stage = chart(page);
+    const figure = stage.locator('figure').first();
+    const canvas = stage.locator('svg').first();
+    const box = async (locator: Locator) => locator.evaluate((node) => ({ width: Math.round(node.getBoundingClientRect().width), height: Math.round(node.getBoundingClientRect().height) }));
+    const sizeGroup = page.getByRole('group', { name: 'Chart size' });
+    await expect(sizeGroup.getByRole('button', { name: 'Fit' })).toHaveAttribute('aria-pressed', 'true');
+
+    // Fit: the chart is exactly as big as the room its container gives it.
+    const room = await box(stage);
+    await expect.poll(() => box(figure)).toEqual(room);
+
+    // Fixed: exactly the width and height asked for, whatever the container is.
+    await sizeGroup.getByRole('button', { name: 'Fixed' }).click();
+    await expect.poll(async () => (await box(canvas)).height).toBe(400);
+    expect(await box(canvas)).toEqual({ width: 640, height: 400 });
+    await page.getByLabel('Chart width in pixels').fill('1500');
+    await page.getByLabel('Chart height in pixels').fill('520');
+    await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 520 });
+    // A canvas larger than its container scrolls instead of being clipped or shrunk.
+    const scrolls = () => stage.evaluate((node) => ({ x: node.scrollWidth > node.clientWidth, y: node.scrollHeight > node.clientHeight }));
+    expect(await scrolls()).toEqual({ x: true, y: false });
+    await page.getByLabel('Chart height in pixels').fill('1100');
+    await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 1100 });
+    expect(await scrolls()).toEqual({ x: true, y: true });
+    await page.getByLabel('Chart height in pixels').fill('520');
+    await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 520 });
+    // Out-of-range input is ignored.
+    await page.getByLabel('Chart width in pixels').fill('20');
+    await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 520 });
+
+    // Kept keyframes replay at the same size, and a new edit keeps it too.
+    await page.getByLabel('Keyframe timeline').fill('0.9');
+    await expect.poll(async () => (await box(stage.locator('svg:visible').first()))).toEqual({ width: 1500, height: 520 });
+    await page.reload();
+    await expect(sizeGroup.getByRole('button', { name: 'Fixed' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByLabel('Chart width in pixels')).toHaveValue('1500');
+
+    // Back to fit: it follows its container again, including while replaying keyframes.
+    await sizeGroup.getByRole('button', { name: 'Fit' }).click();
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    await page.getByLabel('Keyframe timeline').fill('0.5');
+    await expect.poll(async () => JSON.stringify(await box(stage.locator('figure:visible').first()))).toEqual(JSON.stringify(await box(stage)));
+    expect(errors).toEqual([]);
+  });
+
+  test('the chart floats in a window it can be dragged and resized in, and follows it', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#sort');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    const preview = page.getByRole('region', { name: 'Preview' });
+    const stage = chart(page);
+    const canvasWidth = () => stage.locator('svg').first().evaluate((svg) => Math.round(svg.getBoundingClientRect().width));
+    const windowBox = async () => (await preview.boundingBox())!;
+    const docked = await windowBox();
+
+    await page.getByRole('button', { name: 'Float' }).click();
+    await expect(page.getByRole('button', { name: 'Dock' })).toHaveAttribute('aria-pressed', 'true');
+    // A floating preview is a window over the editor, no longer a column beside it.
+    await expect.poll(async () => (await windowBox()).width).toBeLessThan(docked.width);
+    expect(await preview.evaluate((node) => getComputedStyle(node).position)).toBe('absolute');
+    const editor = (await page.getByRole('region', { name: 'Editor' }).boundingBox())!;
+    expect(editor.width).toBeGreaterThan(docked.width);
+    const narrow = await canvasWidth();
+
+    // Drag the title bar: the window moves and stays inside the workspace.
+    const before = await windowBox();
+    const bar = (await preview.locator('.pg-viewbar').boundingBox())!;
+    await page.mouse.move(bar.x + bar.width - 140, bar.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(bar.x + bar.width - 340, bar.y + 120, { steps: 6 });
+    await page.mouse.up();
+    const moved = await windowBox();
+    expect(Math.round(before.x - moved.x)).toBe(200);
+    expect(Math.round(moved.y - before.y)).toBe(116);
+
+    // Resize from its corner: the chart is set to fit, so it follows the window.
+    const corner = (await preview.locator('.pg-resize[data-edge=se]').boundingBox())!;
+    await page.mouse.move(corner.x + 6, corner.y + 6);
+    await page.mouse.down();
+    await page.mouse.move(corner.x + 6 + 120, corner.y + 6 + 60, { steps: 6 });
+    await page.mouse.up();
+    const grown = await windowBox();
+    expect(Math.round(grown.width - moved.width)).toBe(120);
+    expect(Math.round(grown.height - moved.height)).toBe(60);
+    await expect.poll(canvasWidth).toBeGreaterThan(narrow + 100);
+    const workspace = (await page.locator('.pg-app').boundingBox())!;
+    expect(grown.x).toBeGreaterThanOrEqual(workspace.x);
+    expect(grown.x + grown.width).toBeLessThanOrEqual(workspace.x + workspace.width + 1);
+
+    // Dragging a window past the edge clamps it.
+    await page.mouse.move(bar.x + bar.width - 340 + 100, bar.y + 120 + 4);
+    await page.mouse.down();
+    await page.mouse.move(-400, -400, { steps: 4 });
+    await page.mouse.up();
+    const clamped = await windowBox();
+    expect(clamped.x).toBeGreaterThanOrEqual(workspace.x);
+    expect(clamped.y).toBeGreaterThanOrEqual(workspace.y + 40);
+
+    await page.getByRole('button', { name: 'Dock' }).click();
+    await expect.poll(async () => Math.round((await windowBox()).width)).toBe(Math.round(docked.width));
+    await expect(stage.locator('svg').first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('on a phone the chart stays docked and fits its column', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('playground/#sort');
+    await expect(chart(page).locator('svg').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Float' })).toHaveCount(0);
+    const fits = await chart(page).evaluate((stage) => stage.querySelector('figure')!.getBoundingClientRect().width <= stage.clientWidth + 1);
+    expect(fits).toBe(true);
+  });
+
   test('rows are a file: upload your own or edit them, and the chart follows', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#sort');

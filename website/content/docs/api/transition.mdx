@@ -34,6 +34,36 @@ const change = await transition(from, to, {
 
 <auto-type-table path="src/transition.ts" name="TransitionOptions" />
 
+### Canvas size
+
+`width` and `height` are the outer size of the canvas (the SVG), margins included,
+as in Observable Plot. Each takes a number of CSS pixels or `"auto"`.
+
+| Option   | Omitted                                                                   | A number                                                          | `"auto"`                                                                                                  |
+| -------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `width`  | The container's width, inside the figure's own border, re-fit on change.  | Exactly this wide. A narrower container overflows; nothing is clipped. | Exactly the container's content width, re-fit when it changes.                                            |
+| `height` | The chart's own height (an authored `height`, else 500).                  | Exactly this tall; overrides the chart's own height.              | Exactly the container's content height, re-fit when it changes. The container needs a height of its own.  |
+
+```ts
+// Fixed: always 640 × 360, whatever the container is.
+await transition(from, to, { target: '#chart', width: 640, height: 360 });
+
+// Fit: follow the container, e.g. a resizable or floating panel with a height.
+await transition(from, to, { target: '#panel', width: 'auto', height: 'auto' });
+```
+
+A chart is wrapped in a figure that a theme may give a border and an empty title
+strip. A number is always the canvas itself, so that chrome sits outside it. For
+`"auto"` the figure's border on that axis (and on the height axis the title strip)
+gives way, so the canvas is exactly the container and nothing overflows it.
+
+`height: 'auto'` reads the room the container gives the chart. A container with
+no height of its own (its height comes from its content) gives none, so the
+chart keeps its own height instead of growing in a loop. Give the container a
+fixed height, or make it a flex or grid track. An explicit `height` also
+releases the view's default `min-height`, so it is the canvas height rather
+than a floor under it.
+
 `target` is a CSS selector or an element. The transition owns its contents until
 `destroy()`.
 
@@ -48,7 +78,7 @@ The returned controller.
 | `progress(value)`          | controller  | Pauses playback and draws one frame. Finite values clamp to `[0, 1]`.      |
 | `play(options?)`           | controller  | Animates from `from` to `to`; see `PlayOptions`.                           |
 | `pause()`                  | controller  | Stops playback at the current frame.                                      |
-| `resize(options?)`         | controller  | Recompiles at the container's size and current theme, keeping progress. `{ height }` sets an explicit canvas height. |
+| `resize(options?)`         | controller  | Recompiles at the container's size and current theme, keeping progress. `{ width, height }` change the requested canvas size; a dimension left out keeps its request. |
 | `stageCount()`             | `number`    | Serial route stages VisDelta planned for the pair (at least 1). They split progress equally, and `play({ duration })` gives each stage `duration` ms, so a full play lasts `stageCount() × duration`. |
 | `destroy()`                | `void`      | Stops playback, disconnects observers and removes the chart.              |
 
