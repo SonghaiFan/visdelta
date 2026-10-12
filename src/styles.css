@@ -149,6 +149,21 @@
   min-height: 420px;
 }
 
+/* A legend above the canvas is a second SVG after the canvas in the document, so
+   code that takes the view's first SVG still gets the canvas; it is shown first. */
+.vd-view[data-legend='outside'] {
+  display: flex;
+  flex-direction: column;
+}
+
+.vd-view[data-legend='outside'] > svg {
+  flex: none;
+}
+
+.vd-view[data-legend='outside'] > .vd-legend-svg {
+  order: -1;
+}
+
 .vd-view svg {
   display: block;
   max-width: 100%;

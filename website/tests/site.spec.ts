@@ -598,6 +598,30 @@ test.describe('site', () => {
     expect(errors).toEqual([]);
   });
 
+  test('gallery thumbnails with a legend fit their card: the legend sits above the canvas and nothing is clipped', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('gallery/');
+    await page.getByPlaceholder(/stacked/).fill('stacked');
+    const tiles = page.locator('[data-idiom-tile]');
+    await expect(tiles.first().locator('svg').first()).toBeVisible({ timeout: 20_000 });
+    const withLegend = tiles.filter({ has: page.locator('.vd-legend-svg') });
+    await expect(withLegend.first()).toBeVisible({ timeout: 20_000 });
+    const count = await withLegend.count();
+    expect(count).toBeGreaterThan(1);
+    for (let index = 0; index < count; index += 1) {
+      const tile = withLegend.nth(index);
+      await tile.scrollIntoViewIfNeeded();
+      const fit = await tile.evaluate((element) => {
+        const frame = element.querySelector('span.relative')!.getBoundingClientRect();
+        const canvas = element.querySelector('svg')!.getBoundingClientRect();
+        const legend = element.querySelector('.vd-legend-svg')!.getBoundingClientRect();
+        return { canvasBelowLegend: canvas.top >= legend.bottom - 1, canvasInside: canvas.bottom <= frame.bottom + 1, legendInside: legend.top >= frame.top - 1 };
+      });
+      expect(fit).toEqual({ canvasBelowLegend: true, canvasInside: true, legendInside: true });
+    }
+    expect(errors).toEqual([]);
+  });
+
   test('search finds API pages', async ({ page }) => {
     await page.goto('docs/');
     const input = page.getByPlaceholder(/search/i);

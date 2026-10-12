@@ -527,6 +527,20 @@ container (`height: "auto"`) the canvas is laid out for one room, so the heading
 holds the room of the taller text throughout, and a `sequence()` holds the tallest
 heading of all its states for every leg.
 
+### Legend placement
+
+A top legend is figure chrome like a heading: it is drawn in a block above the
+canvas, outside the chart's SVG, so it never counts toward the canvas's `width`
+or `height`. This changes where the legend lives, not what it means: it remains
+advisory presentation derived from the declared color binding, still emits no
+state change of its own, and is still measured with the same wrapping that draws
+it. Like margins, its block is one height for a whole pair, the tallest among the
+route states, so the canvas never moves and a legend that appears or disappears
+only fades by progress. Each chart type reports the height it will draw through
+`legendHeight`; a state that draws no top-level legend, such as repeated panels,
+reports 0. A style with `legendPosition: "right"` keeps its legend inside the
+canvas, in its right margin.
+
 ### Pie bindings and fallback
 
 Pie adds quantitative `encoding.angle` and nominal `encoding.label` bindings;

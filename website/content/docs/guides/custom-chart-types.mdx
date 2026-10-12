@@ -96,8 +96,10 @@ export const plugin = defineChartType({
 
 Supply only the hooks your chart needs. Useful ones include `createRenderer`,
 `createSpecCompiler`, `prepareSpec`, `layoutChannels`, `warnings`,
-`defaultHeight` and `transition` (with `intermediateSpecs`, `canonicalPair` and
-`plan`).
+`defaultHeight`, `legendHeight` and `transition` (with `intermediateSpecs`,
+`canonicalPair` and `plan`). `defineChartType` already supplies `legendHeight`
+from the runtime that draws the legend; return 0 from it only when your renderer
+draws no legend above the canvas.
 
 ## 4. Recorded motion, not D3 transitions
 

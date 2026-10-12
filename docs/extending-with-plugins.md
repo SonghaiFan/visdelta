@@ -505,6 +505,19 @@ const intermediateSpecs = composeIntermediatePolicies(
 This selects a route inside one authored pair. It does not turn builder history
 into an animation script or cross the boundaries supplied to `sequence()`.
 
+### Legend block height
+
+A top legend is drawn in a block above the canvas, outside the chart's SVG.
+`defineChartType` supplies `legendHeight(spec, viewport, margin)` from the same
+runtime that draws the legend, so wrapping and height never disagree; a plugin
+whose renderer draws no top-level legend (for example one that draws a legend in
+each panel) returns 0, as repeated states do. A transition holds the tallest
+block among its route states for the whole pair, so the canvas below never
+moves. The viewport's `legendOutside` flag tells `defaultMargin` that margins
+reserve no room for the legend; a compositor that draws a legend inside its own
+panel leaves it unset. A chart type that omits `legendHeight` gets no block
+above its canvas.
+
 ### Optional content height
 
 A plugin may provide `defaultHeight(spec, viewport, margin)` through

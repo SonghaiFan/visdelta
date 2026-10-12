@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- A top legend moved out of the chart's SVG into a block above the canvas, as in
+  Observable Plot, so `width` and `height` are the canvas alone and a legend no
+  longer takes room from its top margin. The block is a second
+  `<svg class="vd-legend-svg">` that exists only while there is a legend, placed
+  after the canvas in the document and above it on screen, so
+  `querySelector('svg')` is still the canvas and a chart without a legend has one
+  SVG. A transition holds the tallest legend block of the pair, so the canvas
+  never moves and a legend that appears or disappears only fades; with
+  `height: "auto"` the canvas fills what the heading and legend leave. A style
+  with `legendPosition: "right"` keeps its legend inside the canvas, and repeated
+  panels keep theirs inside the panels. Charts with a legend are taller by the
+  block, and their plot sits higher in the canvas than before. Chart types gain an
+  optional `legendHeight(spec, viewport, margin)` that `defineChartType` supplies;
+  the viewport gains `legendOutside`.
 - `.title(text)` and `.subtitle(text)` on every chart state put a heading above
   the chart, in the figure and outside the canvas, so it never changes `width`
   or `height`. A change is Appearance `restyle` with property `title` or

@@ -162,7 +162,9 @@ code, then the chart.
   Play, scrub, or click a keyframe to travel to it. The code and the Δ line
   follow the playhead, and the next edit moves on from the keyframe on screen.
 - **Chart size.** The preview's **Fit / Fixed** switch sets the `width` and
-  `height` every chart is built with: `"auto"` follows the preview (the library
+  `height` every chart is built with (the canvas alone: a title, a subtitle and a
+  top legend sit above it and take their room from the preview under Fit; a fixed
+  size is added to theirs): `"auto"` follows the preview (the library
   re-fits when it changes, including during a keyframe replay), **Fixed** keeps
   a width and height in pixels and the preview scrolls when it is smaller. The
   choice is remembered per viewer. **Float** turns the preview into a window

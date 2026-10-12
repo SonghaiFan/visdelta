@@ -99,7 +99,7 @@ export function IdiomGallery() {
       if (disposed.current || tiles.current.get(id) !== target) return;
       const state = await evaluateIdiom(idiom);
       if (disposed.current || tiles.current.get(id) !== target) return;
-      const frozen = await renderFrozen(state, target, 220);
+      const frozen = await renderFrozen(state, target, 220, { fit: true });
       if (disposed.current || tiles.current.get(id) !== target) return;
       target.replaceChildren(...frozen);
       drawnWidths.current.set(id, target.clientWidth);

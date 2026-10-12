@@ -63,6 +63,10 @@ export function defineChartType<S extends ViewSpec = ViewSpec>(
         defaultMargin: (spec, viewport) => viewport
           ? runtime.layoutMargins(config.layoutChannels?.(spec, viewport) ?? spec.encoding ?? {}, viewport, presentation.plot)
           : presentation.plot.margin,
+        // Repeated panels draw their own legends, so a repeated state has no legend above the canvas.
+        legendHeight: chartType.legendHeight ?? ((spec, viewport, margin) => spec.encoding?.facet
+          ? 0
+          : runtime.legendHeight(config.layoutChannels?.(spec, viewport) ?? spec.encoding ?? {}, viewport, margin)),
         transitionEvaluation: config.transitionEvaluation ?? chartType.transitionEvaluation,
         declarationPlanning: config.declarationPlanning ?? chartType.declarationPlanning,
         declarationPlanningOrder: config.declarationPlanningOrder ?? chartType.declarationPlanningOrder,

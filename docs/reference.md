@@ -667,6 +667,17 @@ An explicit `height` is the canvas height, not a floor under it: the view's
 `min-height` is released, so a 300px chart is not given 420px of room. The
 container's padding is not part of its content box.
 
+Like Plot, VisDelta draws the title, the subtitle and a top legend outside the
+canvas: they sit above it in the figure and never count toward `width` or
+`height`. With `"auto"` they take their room from the container and the canvas
+fills the rest. The legend is a second `<svg class="vd-legend-svg">` that exists
+only while there is a legend to show; it comes after the canvas in the document
+and above it on screen, so `querySelector("svg")` is still the canvas. A
+transition holds the tallest legend block of the pair, so the canvas never
+moves; a legend that appears or disappears only fades. A style that sets
+`legendPosition: "right"` keeps its legend inside the canvas, in its right
+margin. A chart that repeats panels draws its legends inside the panels.
+
 ## `sequence(states, options)`
 
 `sequence()` makes an ordered set of authored states a single seekable

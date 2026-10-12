@@ -96,9 +96,13 @@ export function createTransitionSurface(
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
   const heading = createHeading(shell.heading, authored.from, authored.to, options.headingReservation);
+  // A top legend sits in a block above the canvas, outside the SVG, so `width` and
+  // `height` are the canvas alone. A side legend stays in the right margin.
+  const legendOutside = options.chartStyle?.legendPosition !== 'right';
   const config: ViewConfig = {
     // "auto" is measured at layout time; until then the chart's own height stands in.
-    height: (typeof options.height === 'number' ? options.height : undefined) ?? from.height ?? to.height ?? 500
+    height: (typeof options.height === 'number' ? options.height : undefined) ?? from.height ?? to.height ?? 500,
+    legendOutside
   };
   const scenes = { scene: inferTransition(source, target) };
   // Cache only when the selected chart type explicitly opts into reusable-frame
@@ -227,17 +231,22 @@ export function createTransitionSurface(
         // The heading's own room is read before the canvas is laid out for what is left.
         heading.measure();
         const width = node.clientWidth || 720;
-        // "auto" reads the room the container gives the view. A container with
-        // no height of its own gives none, and the chart keeps its own height.
-        const room = requestedHeight === 'auto' ? node.clientHeight : 0;
+        // The legend block is as tall as the tallest legend of the pair, so the
+        // canvas under it holds still. Its wrapping depends on the side margins,
+        // which depend on the width alone, so it is known before the height.
+        const sizing = { width, height: from.height ?? to.height ?? 500 };
+        config.legendHeight = legendOutside ? legendBlockHeight(chartType, layoutStates, sizing) : 0;
+        // "auto" reads the room the container gives the view, less the legend block.
+        // A container with no height of its own gives none, and the chart keeps its own height.
+        const room = requestedHeight === 'auto' ? node.clientHeight - config.legendHeight : 0;
         const fixedHeight = typeof requestedHeight === 'number' ? requestedHeight : room > 0 ? room : undefined;
         const baseHeight = fixedHeight ?? from.height ?? to.height ?? 500;
-        config.margin = invariantTransitionMargin(chartType, layoutStates, width, baseHeight);
+        config.margin = invariantTransitionMargin(chartType, layoutStates, width, baseHeight, legendOutside);
         config.height = fixedHeight != null || from.height != null || to.height != null ? baseHeight
           : Math.max(baseHeight, ...layoutStates.map(spec => chartType.defaultHeight?.(spec, {
             width, height: baseHeight, rows: applyTransforms(viewRows(spec.data, {}) as DataRow[], spec.transform ?? [])
           }, { ...spec.margin, ...config.margin }) ?? baseHeight));
-        config.margin = invariantTransitionMargin(chartType, layoutStates, width, config.height);
+        config.margin = invariantTransitionMargin(chartType, layoutStates, width, config.height, legendOutside);
         layoutDirty = false;
       }
       value = canonicalProgress(value);
@@ -278,15 +287,25 @@ export function createTransitionSurface(
 }
 
 /** One margin for both endpoints, so a clip edge never moves independently of its marks. */
-function invariantTransitionMargin(chartType: ChartType, states: ViewLayoutSpec[], width: number, height: number): Partial<MarginSpec> {
+function invariantTransitionMargin(chartType: ChartType, states: ViewLayoutSpec[], width: number, height: number, legendOutside = false): Partial<MarginSpec> {
   const margins = states.map(spec => {
     const sourceRows = viewRows(spec.data, {}) as DataRow[];
     const rows = applyTransforms(sourceRows, domainTransforms(spec.transform || []));
-    return { ...chartType.defaultMargin(spec, { width, height, rows }), ...(spec.margin || {}) };
+    return { ...chartType.defaultMargin(spec, { width, height, rows, legendOutside }), ...(spec.margin || {}) };
   });
   const sides = ['top', 'right', 'bottom', 'left'] as const;
   return Object.fromEntries(sides.map((side) => [
     side,
     Math.max(...margins.map(margin => Number(margin[side]) || 0))
   ])) as Partial<MarginSpec>;
+}
+
+/** The tallest legend block among a pair's states, measured with the pair's shared side margins. */
+function legendBlockHeight(chartType: ChartType, states: ViewLayoutSpec[], size: { width: number; height: number }): number {
+  if (!chartType.legendHeight) return 0;
+  const shared = invariantTransitionMargin(chartType, states, size.width, size.height, true);
+  return Math.max(0, ...states.map(spec => {
+    const rows = applyTransforms(viewRows(spec.data, {}) as DataRow[], domainTransforms(spec.transform || []));
+    return chartType.legendHeight!(spec, { ...size, rows, legendOutside: true }, { ...shared, ...(spec.margin || {}) });
+  }));
 }

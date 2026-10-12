@@ -4,7 +4,7 @@ import { createColors } from './colors.js';
 import { createAxes } from './axes.js';
 import { createGrid } from './grid.js';
 import { createLegend } from './legend.js';
-import { createPlotLayout } from './plot-layout.js';
+import { createLegendHeight, createPlotLayout } from './plot-layout.js';
 import { bindTooltip } from './mark-tooltip.js';
 import { motion } from './recorder.js';
 import { showTooltip, moveTooltip, hideTooltip, svgTooltipPosition } from './tooltip.js';
@@ -23,6 +23,7 @@ export function createChartRuntime(context: RenderContext = {}) {
     bindTooltip,
     colorScale: colors.colorScale,
     layoutMargins: createPlotLayout(context, themeValue, colors),
+    legendHeight: createLegendHeight(context, themeValue, colors),
     drawLegend: createLegend(context, themeValue, colors),
     ...createAxes(themeValue),
     ...createGrid(themeValue)

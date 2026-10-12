@@ -7,6 +7,37 @@ import type { ChartStyleRule } from '../charts/style.js';
 import { format } from 'd3-format';
 import { createTextMeasure } from './text-measure.js';
 
+/** Room between the legend block and the canvas below it, in CSS pixels. */
+const LEGEND_GAP = 4;
+
+/** The color channel a legend explains, or null when there is none to show. */
+function legendChannelOf(colors: ReturnType<typeof createColors>, rows: ChartViewport['rows'], channels: EncodingSpec) {
+  const active = colors.resolveColorChannel(rows, channels.color);
+  if (!active || active.value) return null;
+  const channel = active.hue?.field ? active.hue : active.luminance?.field ? active.luminance : active;
+  return channel.field ? channel : null;
+}
+
+/**
+ * Height of the legend block above the canvas. It uses the same wrapping as
+ * drawing and as the in-canvas margin, so the three never disagree.
+ */
+export function createLegendHeight(context: RenderContext, themeValue: ThemeValue, colors: ReturnType<typeof createColors>) {
+  return (channels: EncodingSpec, viewport: ChartViewport, margin: Partial<MarginSpec>): number => {
+    // A side legend stays inside the canvas's right margin.
+    if (context.chartStyle?.legendPosition === 'right') return 0;
+    const channel = legendChannelOf(colors, viewport.rows, channels);
+    if (!channel) return 0;
+    const measure = createTextMeasure(context, themeValue);
+    const labels = legendEntries(viewport.rows, channel).map(entry => entry.label);
+    const inset = context.chartStyle?.legendInset ?? { top: 8, left: 8 };
+    const swatch = themeValue('--vd-legend-swatch-size', 9);
+    const innerWidth = viewport.width - (margin.left ?? 0) - (margin.right ?? 0);
+    const layout = legendLayout(labels, Math.max(1, innerWidth - inset.left), swatch, measure);
+    return layout.height ? inset.top + layout.height + LEGEND_GAP : 0;
+  };
+}
+
 export function createPlotLayout(context: RenderContext, themeValue: ThemeValue, colors: ReturnType<typeof createColors>) {
   return (channels: EncodingSpec, viewport: ChartViewport, plot: Readonly<ChartStyleRule>): MarginSpec => {
     const measure = createTextMeasure(context, themeValue);
@@ -35,10 +66,10 @@ export function createPlotLayout(context: RenderContext, themeValue: ThemeValue,
       // Default empty space has a 20% budget per dimension. Text has priority.
       margin[side] = Math.max(floors[side], preferred[side] * Math.min(1, length * 0.2 / Math.max(1, pair)));
     }
-    const active = colors.resolveColorChannel(rows, channels.color);
-    if (!active || active.value) return margin;
-    const channel = active.hue?.field ? active.hue : active.luminance?.field ? active.luminance : active;
-    if (!channel.field) return margin;
+    // A legend drawn above the canvas takes no room from its margins.
+    if (viewport.legendOutside) return margin;
+    const channel = legendChannelOf(colors, rows, channels);
+    if (!channel) return margin;
     const labels = legendEntries(rows, channel).map(entry => entry.label);
     const swatch = themeValue('--vd-legend-swatch-size', 9);
     const inset = context.chartStyle?.legendInset ?? { top: 8, left: 8 };

@@ -115,15 +115,21 @@ export function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
-export async function renderFrozen(state: ChartState, target: HTMLElement, height: number) {
+/**
+ * `height` is the canvas height. With `fit` it is instead the height of the whole
+ * figure: a heading and a top legend sit outside the canvas, so a fixed card must
+ * give the canvas what they leave or the chart's bottom is clipped.
+ */
+export async function renderFrozen(state: ChartState, target: HTMLElement, height: number, { fit = false } = {}) {
   const { transition } = await loadRuntime();
   const host = document.createElement('div');
   host.className = 'vd-frozen-render';
+  if (fit) host.style.height = `${height}px`;
   target.append(host);
   let controller: VisualizationTransition | null = null;
   try {
     // A same-state pair already drew its only frame when it was created.
-    controller = await transition(state as never, state as never, { target: host, height });
+    controller = await transition(state as never, state as never, { target: host, ...(fit ? { width: 'auto', height: 'auto' } : { height }) } as never);
     const nodes = [...host.childNodes].map((node) => node.cloneNode(true));
     return nodes;
   } finally {

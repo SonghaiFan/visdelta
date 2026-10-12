@@ -12,7 +12,7 @@ import { resolveSceneTransition } from '../transitions/index.js';
 
 import { domainTransforms, viewRows } from './data.js';
 import { resolveSpecDataTypes } from '../data/types.js';
-import { getScene, recordSceneDiagnostics, resetSceneToEmptySource, resizeScene } from './scene.js';
+import { getScene, recordSceneDiagnostics, resetSceneToEmptySource, resizeLegendBlock, resizeScene } from './scene.js';
 import { clamp } from './utils.js';
 import { clearSceneTransitionProgress, createSceneTransitionProgress } from '../transition-progress.js';
 import { createViewCompiler } from './view-compile.js';
@@ -51,8 +51,13 @@ export function prepareChartSpec(
 }
 
 export interface ViewConfig {
+  /** Canvas height, excluding any legend block above it. */
   height?: number;
   margin?: Partial<MarginSpec>;
+  /** Draw the top legend above the canvas, outside the SVG. */
+  legendOutside?: boolean;
+  /** Height of the legend block, fixed for a whole pair so the canvas never moves. */
+  legendHeight?: number;
 }
 
 export interface ViewLayoutSpec extends ViewSpec {
@@ -270,9 +275,10 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
   const width = Math.max(60, node.clientWidth || 720);
   const layoutSpec = effectiveViewSpec as ViewLayoutSpec;
   const baseHeight = viewConfig.height ?? layoutSpec.height ?? 500;
+  const legendOutside = Boolean(viewConfig.legendOutside);
   const height = viewConfig.height != null || layoutSpec.height != null ? baseHeight
     : chartType?.defaultHeight?.(renderSpec, { width, height: baseHeight, rows }, {
-      ...chartType.defaultMargin(renderSpec, { width, height: baseHeight, rows: domainRows }),
+      ...chartType.defaultMargin(renderSpec, { width, height: baseHeight, rows: domainRows, legendOutside }),
       ...layoutSpec.margin, ...viewConfig.margin
     }) ?? baseHeight;
   resizeScene(scene, width, height);
@@ -283,10 +289,14 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
     right: 44,
     bottom: 64,
     left: 68,
-    ...(chartType?.defaultMargin?.(renderSpec, { width, height, rows: domainRows }) || {}),
+    ...(chartType?.defaultMargin?.(renderSpec, { width, height, rows: domainRows, legendOutside }) || {}),
     ...(layoutSpec.margin || {}),
     ...(viewConfig.margin || {})
   });
+  // A pair fixes the block's height up front; a lone state measures its own.
+  resizeLegendBlock(scene, width, legendOutside
+    ? viewConfig.legendHeight ?? chartType?.legendHeight?.(renderSpec, { width, height, rows: domainRows, legendOutside }, margin) ?? 0
+    : 0);
   scene.svg
     .attr('class', `vd-chart vd-chart-${rendererKey}`)
     .attr('data-chart-type', rendererKey);

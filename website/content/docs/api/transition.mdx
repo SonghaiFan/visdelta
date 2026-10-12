@@ -52,10 +52,16 @@ await transition(from, to, { target: '#chart', width: 640, height: 360 });
 await transition(from, to, { target: '#panel', width: 'auto', height: 'auto' });
 ```
 
-A chart is wrapped in a figure that a theme may give a border and an empty title
-strip. A number is always the canvas itself, so that chrome sits outside it. For
-`"auto"` the figure's border on that axis (and on the height axis the title strip)
-gives way, so the canvas is exactly the container and nothing overflows it.
+A chart is wrapped in a figure that a theme may give a border. A number is always
+the canvas itself, so that chrome sits outside it. A title, a subtitle and a top
+legend also sit outside the canvas, above it, and never count toward `width` or
+`height`. For `"auto"` the figure's border on that axis gives way and the heading
+and legend take their room from the container, so the canvas fills exactly what
+is left and nothing overflows the container. The legend is a second
+`<svg class="vd-legend-svg">` that exists only while there is a legend, after the
+canvas in the document, so `querySelector('svg')` is still the canvas. A
+transition holds the tallest legend block of the pair, so the canvas never moves.
+A style with `legendPosition: 'right'` keeps its legend inside the canvas.
 
 `height: 'auto'` reads the room the container gives the chart. A container with
 no height of its own (its height comes from its content) gives none, so the

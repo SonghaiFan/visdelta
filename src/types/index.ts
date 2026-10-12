@@ -647,6 +647,12 @@ export interface ChartViewport {
   width: number;
   height: number;
   rows: DataRow[];
+  /**
+   * The caller draws the top legend in a block above the canvas, outside the SVG,
+   * so margins reserve no room for it. Set by the transition surface; a compositor
+   * that draws a legend inside its own panel leaves it unset.
+   */
+  legendOutside?: boolean;
 }
 
 export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitionPolicy<S> {
@@ -659,6 +665,11 @@ export interface ChartType<S extends ViewSpec = ViewSpec> extends ChartTransitio
   defaultMargin(spec: S, viewport?: ChartViewport): Partial<MarginSpec>;
   /** Optional chart-owned content height, used only without an explicit height. */
   defaultHeight?(spec: S, viewport: ChartViewport, margin: Partial<MarginSpec>): number;
+  /**
+   * Height of the legend block drawn above the canvas for this state (0 for none).
+   * Omitted, a chart reserves no block and the legend has no room above the canvas.
+   */
+  legendHeight?(spec: S, viewport: ChartViewport, margin: Partial<MarginSpec>): number;
   /** Chart-owned default object identity. Explicit `.key()` overrides it in Core. */
   defaultMarkKey?(spec: S): import('../identity/mark-correspondence.js').MarkKeySpec | null;
   readonly scenes: readonly string[];

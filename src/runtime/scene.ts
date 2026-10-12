@@ -18,6 +18,8 @@ export interface SceneHostElement extends HTMLElement {
 
 export interface RuntimeScene extends ChartSceneContext {
   node: SceneHostElement;
+  /** The SVG that holds `legend` above the canvas; absent when the legend is drawn inside the canvas. */
+  legendSvg?: ChartSelection<SVGSVGElement>;
   /** The library-owned D3 runtime; motion() reads it through the mount element. */
   frame: ChartSelection<SVGGElement>;
   empty: ChartSelection<HTMLDivElement>;
@@ -77,6 +79,31 @@ export function resizeScene(scene: RuntimeScene, width: number, height: number):
   scene.width = width;
   scene.height = height;
   scene.svg.attr('viewBox', `0 0 ${width} ${height}`);
+}
+
+/**
+ * Size the legend block above the canvas. The block is a second SVG that exists
+ * only while there is a legend to show, so a chart without one has one SVG, as
+ * before; it comes after the canvas in the document and above it on screen (the
+ * view orders it first), so `querySelector('svg')` stays the canvas.
+ */
+export function resizeLegendBlock(scene: RuntimeScene, width: number, height: number): void {
+  if (height > 0 && !scene.legendSvg) {
+    // Right after the canvas, ahead of the empty-state message.
+    const block = select(scene.node).insert('svg', '.vd-empty')
+      .attr('class', 'vd-legend-svg')
+      .attr('role', 'group')
+      .attr('aria-label', 'Legend');
+    // The legend group moves with its drawing code unchanged.
+    block.node()!.append(scene.legend.node()!);
+    scene.node.dataset.legend = 'outside';
+    scene.legendSvg = block as ChartSelection<SVGSVGElement>;
+  }
+  const block = scene.legendSvg;
+  if (!block) return;
+  block.attr('viewBox', `0 0 ${width} ${Math.max(0, height)}`);
+  if (height > 0) block.style('display', null);
+  else block.style('display', 'none');
 }
 
 export function resetSceneToEmptySource(scene: RuntimeScene): void {
