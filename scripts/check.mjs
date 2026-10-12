@@ -19,7 +19,10 @@ const staleTextTargets = [
   "examples",
   "scrollytelling",
   "tests",
-  "src"
+  "src",
+  "website/content",
+  "website/examples",
+  "website/components"
 ];
 const forbiddenRepoText = [
   "scrolly-grammar-template",
@@ -99,7 +102,7 @@ async function collect(dir) {
 async function collectText(path) {
   const entries = await readdir(path, { withFileTypes: true }).catch(() => null);
   if (!entries) {
-    if (/\.(css|html|js|md|mjs|ts)$/.test(path)) textFiles.push(path);
+    if (/\.(css|html|js|md|mdx|mjs|ts|tsx)$/.test(path)) textFiles.push(path);
     return;
   }
 
@@ -108,7 +111,7 @@ async function collectText(path) {
     const childPath = join(path, entry.name);
     if (entry.isDirectory()) {
       await collectText(childPath);
-    } else if (/\.(css|html|js|md|mjs|ts)$/.test(entry.name)) {
+    } else if (/\.(css|html|js|md|mdx|mjs|ts|tsx)$/.test(entry.name)) {
       textFiles.push(childPath);
     }
   }

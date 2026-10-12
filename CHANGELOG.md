@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+- `transition()` and `sequence()` take `width` and `height`, each a number of
+  pixels (fixed) or `"auto"` (follow the container), and `resize()` accepts both.
+  As in Observable Plot they are the outer size of the canvas, margins included:
+  a number is exactly that size, and `"auto"` is exactly the container's content
+  box, with the figure's theme border (and, vertically, its empty title strip)
+  giving way on that axis. A fixed width overflows a narrower container instead
+  of shrinking the chart; `height: "auto"` fills a container that has a height
+  and keeps the chart's own height in one that does not. Omitting them is unchanged: the container's width
+  and the chart's own height. Two small changes ride along: an explicit `height`
+  now releases the view's default `min-height` so it is the canvas height rather
+  than a floor under it, and a sequence re-fits the leg on screen when its
+  container changes in a dimension set to `"auto"`, and its `resize()` takes the
+  same size options (previously the playground could not resize a replaying
+  sequence's height).
+
+- `VisualizationTransition.stageCount()` is now part of the public type: the
+  number of serial route stages planned for a pair. `play({ duration })` already
+  gives each stage `duration` ms, so a full play lasts `stageCount() × duration`.
+  Runtime behaviour is unchanged.
+- Moved the Playground and Gallery out of the documentation chrome into a
+  full-screen studio with its own app bar. The playground is now an online
+  editor: an examples tree filed by the seven state-change categories, `rows`
+  and `chart.js` file tabs (editable CSV/JSON rows, line numbers, completions
+  from the chart's own methods and the rows' fields), an auto-run switch, a
+  draggable editor/preview divider, share links that run only when the reader
+  presses Run, a status bar, and a real-time keyframe timeline whose clips show
+  each leg's planned route stages.
+
+- Rebuilt the documentation site from scratch with Fumadocs and a Next.js static
+  export in `website/`, deployed to the same GitHub Pages URL. It adds a
+  restructured information architecture (introduction, concepts, charts,
+  guides, reference) in plain English, a homepage whose code edits itself and
+  drives the real transition, a playground where every valid edit animates and
+  kept keyframes replay as a sequence, with curated stories organized by the
+  seven state-change categories, the idiom gallery, live
+  examples driven by real example modules verified against `delta()`, type
+  tables generated from the TypeScript source, static search, `llms.txt`, a
+  sitemap and redirects from the previous VitePress URLs. The VitePress site in
+  `docs/` is no longer deployed.
+- Documented the defaults of `PlayOptions`, `SequencePlayOptions` and the
+  controller members in JSDoc. Types and behaviour are unchanged.
+
 - Fixed simple and grouped Bar domains clipping negative values: bars start at
   zero or below it. When zero is not the plot edge (negative values or an
   authored domain above zero) the category labels stay at the edge, clear of

@@ -1,0 +1,96 @@
+---
+title: Styling and themes
+description: Structural chart styles, CSS token themes and dark mode. Style changes presentation, never meaning.
+---
+
+Style changes presentation. It never changes data meaning or transition meaning:
+a style can recolour an already-declared colour mapping, but it cannot decide to
+map a field to colour.
+
+<ChartStyleGallery />
+
+## Structural presets
+
+Pass a chart style to the transition. Both endpoints use the same style.
+
+```ts
+import { paperChartStyle } from 'visdelta/chart-style';
+
+const change = await transition(from, to, {
+  target: '#chart',
+  chartStyle: paperChartStyle,
+});
+```
+
+| Preset                | Character                                                   |
+| --------------------- | ----------------------------------------------------------- |
+| `d3ChartStyle`        | The default                                                 |
+| `paperChartStyle`     | Print-like: square figure, warm paper surface               |
+| `darkChartStyle`      | Dark surface with a monochrome blue series palette          |
+| `editorialChartStyle` | Ink on paper: hairline grids, tabular numerals, flat figure |
+
+`chartStylePresets` collects them by key (`d3`, `paper`, `dark`, `editorial`).
+The runtime scopes each preset to its own `.vd-style-*` root, so transitions on
+one page can use different styles. Bars keep square corners in every style.
+
+Choose a preset above to restyle five chart types at once; the shared slider
+seeks all five transitions.
+
+## Define a structural style
+
+A chart style sets spacing, margins, grid policy, domain lines, title placement
+and legend placement:
+
+```ts
+import { defineChartStyle } from 'visdelta/chart-style';
+
+const compact = defineChartStyle({
+  key: 'compact',
+  tickSpacing: { x: 56, y: 44 },
+  legendPosition: 'right',
+  plot: { grid: 'horizontal', margin: { top: 48, right: 88 } },
+});
+```
+
+Values merge in order: neutral defaults, the chart module's own defaults, then
+the style's overrides. An authored `spec.margin` is the final override. Margins
+are preferred spacing, not fixed reservations: whitespace adapts to the
+container while axis text keeps its size. A transition uses the largest margins
+any of its states needs, so scrubbing never moves the plot bounds on its own.
+
+## CSS tokens
+
+VisDelta reads its colours, type and line weights from CSS custom properties
+when it renders. Import `visdelta/style.css` once; it defines the default
+`--vd-*` tokens. Optional token themes are available as
+`visdelta/themes/default.css`, `dark.css` and `paper.css`.
+
+Override tokens on a wrapper to restyle charts without changing any state:
+
+```css
+.my-chart .vd-transition-root {
+  --vd-color-surface: #ffffff;
+  --vd-color-mark-default: #17171a;
+  --vd-grid: #e8e8e4;
+  --vd-axis-text: #5f5f66;
+}
+```
+
+Without a colour declaration, marks use the style's neutral ink
+(`--vd-color-mark-default`) and draw no colour legend. Declared categorical
+palettes use `--vd-series-1` to `--vd-series-10` unless the state names a
+`scheme` or `range`. The defaults are VisDelta's logo blue, amber and coral,
+followed by seven more hues.
+
+## Dark mode
+
+The charts on this site follow the site theme by overriding tokens under a
+`.dark` ancestor. Because tokens are read at render time, refresh the chart after
+the theme changes:
+
+```ts
+themeToggle.addEventListener('click', () => {
+  document.documentElement.classList.toggle('dark');
+  change.resize(); // re-reads tokens, keeps the current progress
+});
+```

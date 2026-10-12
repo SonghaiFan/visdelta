@@ -1,0 +1,73 @@
+---
+title: Small multiples
+description: Partition any chart into panels with .repeat(), in one SVG with one transition controller.
+---
+
+`.repeat(field, options)` partitions a chart into small multiples. The x and y
+bindings keep their meaning, each panel gets its own coordinate frame, and one
+transition controller drives the whole chart.
+
+<RepeatDemo />
+
+```ts
+const repeated = chart.repeat('component', {
+  direction: 'y',
+  scales: 'shared',
+});
+```
+
+`smallMultiples(chart, field, options)` from `visdelta/facet` is the functional
+form of the same operation.
+
+## Options
+
+| Option       | Default    | Meaning                                                           |
+| ------------ | ---------- | ----------------------------------------------------------------- |
+| `direction`  | `'grid'`   | `'y'` places panels in rows, `'x'` in columns, `'grid'` responsively |
+| `scales`     | `'shared'` | `'independent'` derives numeric domains per panel                 |
+| `columns`    | `2`        | Maximum columns for a grid                                        |
+| `gap`        | `24`       | Pixels between panels                                             |
+| `minWidth`   | `240`      | Minimum panel width; narrow containers reduce the column count    |
+| `autoHeight` | `false`    | Grow the canvas to fit every panel row                            |
+| `minHeight`  | `240`      | Minimum complete panel height, used with `autoHeight`             |
+
+Shared scales compute numeric domains from all transformed rows. Independent
+scales help inspect patterns within a panel, but lengths can no longer be
+compared across panels, and Bars emit a non-blocking warning. Explicit domains
+always take priority. Categorical domains and colours stay consistent across
+panels.
+
+Calling `.repeat()` again replaces the panel binding instead of nesting panels.
+Missing, null or non-scalar facet values are rejected.
+
+## Size and resize
+
+Repeat keeps the outer canvas height by default; the container width controls
+the layout, and panels are laid out again rather than scaled. With
+`autoHeight: true`, the canvas grows to fit the panel rows. An explicit chart or
+transition `height` takes priority. During a transition the canvas reserves the
+largest height its route needs, so playback never changes the outer size.
+
+## State changes
+
+| Change                                  | Category                  |
+| --------------------------------------- | ------------------------- |
+| Binding, removing or changing the field | Encoding (`bind`, `unbind`, `remap`) |
+| Direction, columns, gap or minimum width | Layout (`rearrange`)     |
+| Shared vs independent numeric scales    | Coordinate (`rescale`)    |
+
+## Supported transitions
+
+| Chart              | Flat ↔ repeated                     | Repeated ↔ repeated |
+| ------------------ | ----------------------------------- | ------------------- |
+| Bar                | Supported, with unchanged membership and grain and globally unique keys | Supported |
+| Line               | Supported for an existing breakdown field, with unchanged observations and bindings | Supported |
+| Area, Point, Unit  | Not supported                       | Supported           |
+
+When existing panels change arrangement, each keyed panel first moves as a
+container in separate x/width and y/height stages; then the chart inside
+reflows using its own transition. Reverse replays both levels backward.
+
+Combining expansion or rearrangement with a flip in one leg is unsupported; use
+a [sequence](/docs/api/sequence) to separate them. Nested small multiples are
+unsupported.

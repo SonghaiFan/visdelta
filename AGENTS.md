@@ -13,6 +13,10 @@ rule set here.
 - `src/grammar/state-changes.ts` implements its classification.
 - [docs/reference.md](docs/reference.md) records the implemented API, supported
   operation subsets and fallback boundaries.
+- The published documentation site is the Fumadocs project in `website/`; see
+  [website/README.md](website/README.md). Its live examples are real modules in
+  `website/examples/`, checked against `delta()` by `npm run examples:check`.
+  Public API changes must also update the affected site pages.
 - For vocabulary or public API changes, update constitution, types, classifier,
   reference, examples and tests together as applicable.
 - Document only behavior that exists in the current checkout. Mark uncertain
@@ -50,6 +54,15 @@ rule set here.
 - Avoid hard-coded visual fixes when behavior can be derived from data,
   geometry or container size. Bar marks always use square corners; do not add
   corner-radius style or transition geometry to Bars.
+- Keep React chart-host callback refs stable across status updates. An inline
+  ref callback changes identity on every render, causing detach/attach callbacks;
+  if those callbacks clear render caches or re-register visibility observers,
+  completing one chart can enqueue the same charts indefinitely. Use a
+  module-level host component with a dependency-stable `useCallback` ref.
+  Wrapping the registration function alone is insufficient if JSX still passes
+  a new inline wrapper. Preserve cleanup for actual unmounts and invalidation
+  for real size or input changes. This caused the Gallery and Design Comparisons
+  redraw loops fixed on 2026-10-12.
 
 ## Verification
 
@@ -69,6 +82,12 @@ rule set here.
   desktop layouts for docs UI changes.
 - Regression tests must retain the behavioral assertion. Where practical,
   verify that the test fails with the old behavior, especially for runtime fixes.
+- For static chart galleries, measure render invocations after loading settles:
+  an idle page must not keep drawing unchanged thumbnails. Merely finding an SVG
+  or passing a build does not detect a redraw loop. Verify all tiles load when
+  scrolled into view, filtering and clearing the filter remount charts correctly,
+  and resizing redraws at the new dimensions then settles. Check desktop and
+  narrow layouts against a frozen production build.
 - Run the narrowest relevant tests first, then the available release gates.
   Verify public export or packaging changes through an installed package
   consumer as well as source imports. Report environment or pre-existing

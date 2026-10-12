@@ -1,0 +1,71 @@
+---
+title: Point
+description: Scatterplots, dot plots, dumbbells and lollipops on compact Cartesian axes.
+---
+
+```ts
+import { point } from 'visdelta/point';
+```
+
+`point()` places observations on compact Cartesian axes. It covers scatterplots,
+dot plots, dumbbells and lollipops without changing datum identity.
+
+<LiveExample id="point-remap" />
+
+## Methods
+
+| Method                                   | Meaning                                         |
+| ---------------------------------------- | ----------------------------------------------- |
+| `.pointSize(number)`, `.radius(number)`  | Set a constant point radius                     |
+| `.connector({ from, channel? })`         | Draw a lollipop stem from a quantitative baseline |
+| `.connector({ by, orderBy? })`           | Connect adjacent dots within each ordered group |
+| `.flip(options?)`                        | Swap x and y in an explicit order               |
+| `.rollup(groupby, options?)`             | Combine details into summary points             |
+| `.breakdown(detail?, options?)`          | Reveal detailed points                          |
+
+## Connectors
+
+Connectors are derived geometry drawn behind the dots. They never change the
+data grain or datum identity.
+
+```ts
+// Lollipops: stems from a constant baseline.
+point(rows).x('region').y('sales').connector({ from: 0 });
+
+// Dumbbells: connect each country's dots in year order.
+point(rows)
+  .x('value')
+  .y('country')
+  .color('year')
+  .connector({ by: 'country', orderBy: 'year' });
+```
+
+A baseline connector infers its channel when exactly one positional channel is
+quantitative; set `channel` when both are.
+
+## Summaries
+
+`.rollup()` combines detailed points into summaries with explicit reducers for
+each position, and optionally a count mapped to size:
+
+```ts
+const summary = detailed.rollup('cyl', {
+  key: 'cyl',
+  x: { op: 'mean' },
+  y: { op: 'mean' },
+  size: { op: 'count', range: [10, 24] },
+});
+```
+
+## Transition behaviour
+
+An ordinary entering point grows at its target position. Summary and detail
+motion may use a declared parent position, because that movement carries
+meaning.
+
+<LiveExample id="point-log" code={false} />
+
+## Try it
+
+Edit the motor-cars scatter in the playground: [summarize](/playground#summarize)
+or [focus](/playground#focus).

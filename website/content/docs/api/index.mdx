@@ -1,0 +1,74 @@
+---
+title: API overview
+description: Entry points, what each exports, and where each part of the API is documented.
+---
+
+VisDelta's API has three parts: **builders** that create immutable chart
+states, **`delta()`** to inspect what changed, and **`transition()`** and
+**`sequence()`** to render a seekable path.
+
+<TransitionWorkbench />
+
+The workbench above is a real controller. Seek in either direction, then switch
+the inspector to **Delta** for `change.delta` or **Spec** for the resolved
+endpoints.
+
+```ts
+import { bar } from 'visdelta/bar';                         // builders
+import { delta } from 'visdelta/core';                       // inspection
+import { transition, sequence } from 'visdelta/transition';  // rendering
+import 'visdelta/style.css';
+```
+
+## Reference pages
+
+<Cards>
+  <Card title="transition()" href="/docs/api/transition" description="Options and the pair controller." />
+  <Card title="sequence()" href="/docs/api/sequence" description="Options and the timeline controller." />
+  <Card title="Builders" href="/docs/api/builders" description="Every builder method, by chart." />
+  <Card title="Core" href="/docs/api/core" description="delta(), declaration edits and planning, identity and lineage." />
+  <Card title="Types" href="/docs/api/types" description="StateChange, VisualizationWarning, styles and layout options." />
+</Cards>
+
+## Entry points
+
+| Entry                  | Main exports                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `visdelta`             | Every builder, `delta`, `transition`, `sequence`, `visualizationWarnings`, `smallMultiples`, chart styles, `defineChartType`, `registerChartModule` and the core helpers |
+| `visdelta/bar`         | `bar`, `BarState`, `barModule`, `createBarGrainDeclarationOperationCodec`                          |
+| `visdelta/line`        | `line`, `LineState`, `lineModule`, `D3_CURVE_NAMES`                                                |
+| `visdelta/area`        | `area`, `AreaState`, `areaModule`, `D3_AREA_CURVE_NAMES`                                           |
+| `visdelta/point`       | `point`, `PointState`, `pointModule`                                                               |
+| `visdelta/unit`        | `unit`, `UnitState`, `unitModule`, `UNIT_LAYOUTS`                                                  |
+| `visdelta/pie`         | `pie`, `PieState`, `pieModule`                                                                     |
+| `visdelta/transition`  | `transition`, `sequence`                                                                           |
+| `visdelta/core`        | `delta`, `visualizationSpec`, declaration edits and planning, identity, lineage and camera helpers |
+| `visdelta/facet`       | `smallMultiples`                                                                                   |
+| `visdelta/chart-style` | `defineChartStyle`, `d3ChartStyle`, `paperChartStyle`, `darkChartStyle`, `editorialChartStyle`, `chartStylePresets` |
+| `visdelta/plugins`     | `defineChartType`, `defineChartModule`, `ChartState`, `registerChartModule`, `motion`, `directionalEase` and SDK types |
+| `visdelta/toolkit`     | Optional scale, timing, geometry, topology, matching and policy helpers for plugins               |
+| `visdelta/browser`     | The browser-global adapter used by the `VisDelta` global bundle                                    |
+| `visdelta/style.css`   | The required base stylesheet                                                                       |
+| `visdelta/themes/*.css`| `default.css`, `dark.css` and `paper.css` token themes                                             |
+
+Importing an entry never registers chart types globally. A builder carries its
+own lazily loaded module; registration is needed only for plain JSON specs.
+
+## TypeScript
+
+Declarations ship with the package. Commonly used types:
+
+```ts
+import type { Visualization, VisualizationTransition, VisualizationSequence, TransitionOptions, PlayOptions } from 'visdelta/transition';
+import type { DeltaResult, StateChange, StateChangeCategory } from 'visdelta/core';
+import type { VisualizationWarning } from 'visdelta';
+import type { ChartStyleModule } from 'visdelta/chart-style';
+```
+
+## Current boundaries
+
+- Endpoint chart types must match; Bar-to-Line is rejected.
+- VisDelta depends on the `d3-*` modules it renders with; they are not injected
+  or configurable.
+- Declared transforms execute within VisDelta; data cleaning stays outside it.
+- Controls call `progress()` from outside the library.

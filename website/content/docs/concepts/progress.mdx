@@ -1,0 +1,43 @@
+---
+title: Progress
+description: A transition is a function of one number. Play, pause and seek all move that number.
+---
+
+A transition has one input: progress, from `0` (state A) to `1` (state B).
+
+```ts
+change.progress(0);     // A
+change.progress(0.5);   // halfway
+change.progress(1);     // B
+change.value;           // where it is now
+```
+
+`progress()` draws that frame immediately and stops any playback. You can seek
+in any order; the same number always draws the same frame.
+
+## Play
+
+```ts
+change.play();                     // 0 → 1
+change.play({ duration: 1200 });   // slower
+change.play({ from: 1, to: 0 });   // backward
+change.play({ from: change.value }); // carry on from here
+```
+
+`play()` starts at `0` unless you say otherwise, and `pause()` stops on the
+current frame.
+
+`duration` is per **stage**. A route with one stop has two stages, so
+`{ duration: 800 }` takes 1600 ms.
+
+## Sequences count in states
+
+For a [`sequence()`](/docs/api/sequence), progress runs from `0` to the number
+of states minus one. `1.5` is halfway between the second and third state.
+Whole numbers always land exactly on a state you wrote.
+
+## Resize and clean up
+
+A transition follows its container's width on its own. Call `resize()` after a
+theme change, or `resize({ height: 480 })` to change the height. Call
+`destroy()` when the chart leaves the page.

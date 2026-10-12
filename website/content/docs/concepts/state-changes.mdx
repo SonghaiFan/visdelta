@@ -1,0 +1,51 @@
+---
+title: State changes
+description: delta() names what changed between two states, using seven kinds of change.
+---
+
+`delta(a, b)` tells you what changed between two states. It is the **Δ** line
+under every chart on this site.
+
+```ts
+import { delta } from 'visdelta/core';
+
+delta(a, b).stateChanges;
+// [{ category: 'encoding', action: 'remap', channel: 'y' }]
+```
+
+It needs no browser, so it also runs in Node and in tests. A transition
+exposes the same result as `change.delta`.
+
+## Seven kinds of change
+
+<StateChangeCatalogue />
+
+Every entry is a fact about the two states: a **category**, an **action**, and
+sometimes a detail such as the channel. A few lines that are easy to mix up:
+
+- A colour **field** (`.color("region")`) is Encoding. A colour **value**
+  (`.color("#3366ff")`) is Appearance.
+- Mapping y to another field is Encoding. Changing the scale or flipping the
+  chart is Coordinate.
+- `where()` changes Data. `highlight()` and `focus()` change Attention: every
+  row stays.
+- Changing `sum` to `mean` is Grain, even if the groups stay the same.
+
+## Several at once
+
+One edit can produce several facts. Splitting totals into coloured detail is a
+Grain change, a new colour binding and a colour style change, all at once:
+
+<LiveExample id="bar-split" code={false} />
+
+## Not a schedule
+
+The list is for reading. Its order is fixed by category and says nothing about
+what moves first. How a chart moves is decided by its chart type; see
+[Transitions](/docs/concepts/transitions).
+
+## More detail
+
+The same result also carries the raw differences (`deltas`, `hasDelta()`),
+exact declaration `edits`, and `lineage` when both states have inline data. See
+[Core](/docs/api/core) and [Identity](/docs/concepts/identity).

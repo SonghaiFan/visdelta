@@ -21,9 +21,13 @@ import type { ChartTypeRegistry } from '../charts/index.js';
 import { select } from 'd3-selection';
 import { viewRows, domainTransforms } from './data.js';
 import { applyTransforms } from '../data/transforms.js';
+import type { CanvasSize } from './canvas-size.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
-  height?: number;
+  /** Canvas width: pixels, or "auto" (default) to follow the container. */
+  width?: CanvasSize;
+  /** Canvas height: pixels, or "auto" to follow the container. Defaults to the chart's own height. */
+  height?: CanvasSize;
   /** Force the reconstruction bridge even for chart types that allow cached frames. */
   reconstruct?: boolean;
 }
@@ -35,7 +39,10 @@ export interface TransitionSurface {
   commitMount(): void;
   rollbackMount(): void;
   progress(value: number, direction?: number): void;
-  resize(height?: number): void;
+  /** Change the requested canvas size; omitted dimensions keep their request. */
+  resize(size?: { width?: CanvasSize; height?: CanvasSize }): void;
+  /** Which dimensions follow the container, so the owner knows what to observe. */
+  follows(): { width: boolean; height: boolean };
   destroy(): void;
 }
 
@@ -79,7 +86,8 @@ export function createTransitionSurface(
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
   const config: ViewConfig = {
-    height: options.height ?? from.height ?? to.height ?? 500
+    // "auto" is measured at layout time; until then the chart's own height stands in.
+    height: (typeof options.height === 'number' ? options.height : undefined) ?? from.height ?? to.height ?? 500
   };
   const scenes = { scene: inferTransition(source, target) };
   // Cache only when the selected chart type explicitly opts into reusable-frame
@@ -99,7 +107,40 @@ export function createTransitionSurface(
   let previousChildren: Node[] = Array.from(host.childNodes);
   host.replaceChildren(root);
   let layoutDirty = true;
+  let requestedWidth = options.width;
   let requestedHeight = options.height;
+
+  const header = shell.figure.querySelector<HTMLElement>('.vd-figure-header');
+
+  /**
+   * Apply the requested canvas size to the chart's own elements. The canvas is
+   * the SVG, margins included. A fixed width lets the root shrink-wrap the view,
+   * so the host overflows instead of the chart being clipped. "auto" makes the
+   * canvas exactly the container's content box on that axis, so the figure's own
+   * chrome there (its theme border, and on the vertical axis the empty title
+   * strip) gives way. Omitted dimensions keep the chrome and the figure fits.
+   */
+  function applyCanvasStyles() {
+    const fixedWidth = typeof requestedWidth === 'number';
+    const fitWidth = requestedWidth === 'auto';
+    const explicitHeight = requestedHeight != null;
+    const fill = requestedHeight === 'auto';
+    const figure = shell.figure.style;
+    root.style.width = fixedWidth ? 'max-content' : '';
+    node.style.width = fixedWidth ? `${requestedWidth}px` : '';
+    // An explicit height is the canvas height, not a floor under the default one.
+    node.style.minHeight = explicitHeight ? '0' : '';
+    figure.borderLeftWidth = figure.borderRightWidth = fitWidth ? '0' : '';
+    figure.borderTopWidth = figure.borderBottomWidth = fill ? '0' : '';
+    if (header) header.style.display = fill ? 'none' : '';
+    root.style.height = fill ? '100%' : '';
+    figure.height = fill ? '100%' : '';
+    figure.boxSizing = fill ? 'border-box' : '';
+    figure.display = fill ? 'flex' : '';
+    figure.flexDirection = fill ? 'column' : '';
+    node.style.flex = fill ? '1 1 0' : '';
+  }
+  applyCanvasStyles();
 
   function compileFrames(): FrameEvaluator {
     disposeScene();
@@ -173,9 +214,13 @@ export function createTransitionSurface(
       hideTooltip(shell.tooltip);
       if (layoutDirty) {
         const width = node.clientWidth || 720;
-        const baseHeight = requestedHeight ?? from.height ?? to.height ?? 500;
+        // "auto" reads the room the container gives the view. A container with
+        // no height of its own gives none, and the chart keeps its own height.
+        const room = requestedHeight === 'auto' ? node.clientHeight : 0;
+        const fixedHeight = typeof requestedHeight === 'number' ? requestedHeight : room > 0 ? room : undefined;
+        const baseHeight = fixedHeight ?? from.height ?? to.height ?? 500;
         config.margin = invariantTransitionMargin(chartType, layoutStates, width, baseHeight);
-        config.height = requestedHeight != null || from.height != null || to.height != null ? baseHeight
+        config.height = fixedHeight != null || from.height != null || to.height != null ? baseHeight
           : Math.max(baseHeight, ...layoutStates.map(spec => chartType.defaultHeight?.(spec, {
             width, height: baseHeight, rows: applyTransforms(viewRows(spec.data, {}) as DataRow[], spec.transform ?? [])
           }, { ...spec.margin, ...config.margin }) ?? baseHeight));
@@ -207,7 +252,14 @@ export function createTransitionSurface(
         }
       }
     },
-    resize(height) { if (height != null) requestedHeight = height; cached = null; layoutDirty = true; },
+    resize({ width, height } = {}) {
+      if (width != null) requestedWidth = width;
+      if (height != null) requestedHeight = height;
+      applyCanvasStyles();
+      cached = null;
+      layoutDirty = true;
+    },
+    follows() { return { width: typeof requestedWidth !== 'number', height: requestedHeight === 'auto' }; },
     destroy() { cached = null; disposeScene(); root.remove(); }
   };
 }

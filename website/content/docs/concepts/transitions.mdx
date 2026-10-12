@@ -1,0 +1,56 @@
+---
+title: Transitions
+description: How VisDelta gets from one state to the other, and why every frame is a real chart.
+---
+
+Two states don't say *how* to get from one to the other. Each chart type
+chooses a route, following a few fixed rules.
+
+## Every frame is a real chart
+
+At any point between A and B, the marks agree with the axes that explain them.
+When the scale changes, the ticks, grid, title and marks move together.
+
+When marks come and go, the order keeps each frame honest:
+
+```text
+Leaving:  marks exit first, then the scale settles
+Arriving: the scale makes room first, then marks enter
+```
+
+A line reaches a new point before the point appears:
+
+<LiveExample id="line-add" code={false} />
+
+## Routes can have stops
+
+Sometimes the clearest route passes through a third state. Splitting totals
+into side-by-side groups goes through a stack first, so each total stays
+readable on the way:
+
+<LiveExample id="bar-grouped-split" code={false} />
+
+These stops are complete, valid charts. They never invent a field or a colour,
+and they never replace a state you wrote. When no good route exists, the
+chart moves directly.
+
+## Your own stops
+
+Pass several states to [`sequence()`](/docs/api/sequence) to choose the stops
+yourself. Each one is kept exactly.
+
+```ts
+const story = await sequence([revenue, profit, ranked], { target: '#chart' });
+```
+
+## Backward is the same frames
+
+Playing from B to A shows the frames of A to B in reverse, not a second
+animation. The one exception is Unit's opt-in directional easing, which can
+take a different path back while keeping both ends the same.
+
+## Who decides
+
+The core runtime has no special cases for any chart type. Each chart type owns
+its own route, matching and motion. See [Charts](/docs/charts) for each one, or
+[Custom chart types](/docs/guides/custom-chart-types) to add your own.

@@ -1,0 +1,15 @@
+{
+  "title": "Guides",
+  "pages": [
+    "controlling-playback",
+    "stories",
+    "updating-a-chart",
+    "react",
+    "cdn",
+    "styling",
+    "warnings",
+    "design-comparisons",
+    "custom-chart-types",
+    "troubleshooting"
+  ]
+}

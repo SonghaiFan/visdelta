@@ -17,22 +17,29 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # The site is served from https://songhaifan.github.io/visdelta/.
+      DOCS_BASE_PATH: /visdelta
+      SITE_URL: https://songhaifan.github.io/visdelta
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
+      # The site renders live examples with the library's built output.
       - run: npm ci
       - run: npm run build
-      # The site lives at https://songhaifan.github.io/visdelta/; the base is
-      # read by docs/.vitepress/config.mts. Labs import the built dist.
-      - run: npx vitepress build docs
-        env:
-          DOCS_BASE: /visdelta/
+      - run: npm ci
+        working-directory: website
+      - run: npm run build
+        working-directory: website
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/.vitepress/dist
+          path: website/out
 
   deploy:
     needs: build

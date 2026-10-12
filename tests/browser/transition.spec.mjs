@@ -669,10 +669,12 @@ test('play gives every inferred reaggregation stage its own duration', async ({ 
     await new Promise(resolve => window.setTimeout(resolve, 160));
     const reverseAfterOneStage = change.value;
     await new Promise(resolve => window.setTimeout(resolve, stageCount * 100 + 160));
-    return { stageCount, afterOneStage, final, reverseAfterOneStage, reverseFinal: change.value };
+    return { stageCount, publicStageCount: change.stageCount(), afterOneStage, final, reverseAfterOneStage, reverseFinal: change.value };
   });
 
   expect(result.stageCount).toBeGreaterThan(1);
+  // The public count is the one play() times: one duration per rendered stage.
+  expect(result.publicStageCount).toBe(result.stageCount);
   // The legacy whole-route budget would already be at 1 after 160ms.
   expect(result.afterOneStage).toBeGreaterThan(0);
   expect(result.afterOneStage).toBeLessThan(1);

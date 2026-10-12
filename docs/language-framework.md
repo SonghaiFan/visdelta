@@ -431,7 +431,8 @@ endpoint displays the complete state, without the preceding leg's exit marks
 or ticks. Progress still spans the pair's `0..1` interval, but playback time
 is stage-based: `play({ duration })` gives each serial route stage that
 duration. Thus two serial stages take `2 × duration`; parallel changes in one
-stage still take one duration. In an authored `sequence([A, B, C])`, progress
+stage still take one duration. A pair controller reports its count as
+`stageCount()`. In an authored `sequence([A, B, C])`, progress
 `1` still identifies B even if A-to-B contains generated intermediate states.
 
 For strict reversible routes, every adjacent leg is canonicalized independently.

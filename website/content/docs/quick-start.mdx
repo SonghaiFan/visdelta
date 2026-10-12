@@ -1,0 +1,94 @@
+---
+title: Quick start
+description: Your first transition in four steps.
+---
+
+<LiveExample id="bar-remap" code={false} />
+
+<Steps>
+<Step>
+
+### Describe a chart
+
+```ts
+import { bar } from 'visdelta/bar';
+
+const products = [
+  { product: 'Hardware', revenue: 12, profit: 5 },
+  { product: 'Software', revenue: 18, profit: 11 },
+  { product: 'Services', revenue: 9, profit: 7 },
+  { product: 'Support', revenue: 6, profit: 4 },
+];
+
+const a = bar(products)
+  .x('product', { title: 'Product line' })
+  .y('revenue', { title: 'Revenue ($M)' });
+```
+
+This is a description, not a drawing. Nothing renders yet.
+
+</Step>
+<Step>
+
+### Describe the change
+
+```ts
+const b = a.y('profit', { title: 'Profit ($M)' });
+```
+
+`a` is untouched. `b` is a new state that differs in one line.
+
+</Step>
+<Step>
+
+### Connect them
+
+```ts
+import { transition } from 'visdelta/transition';
+import 'visdelta/style.css';
+
+const change = await transition(a, b, { target: '#chart' });
+```
+
+VisDelta draws `a` into `#chart` and prepares every frame up to `b`.
+
+</Step>
+<Step>
+
+### Move through it
+
+```ts
+change.play();                   // a → b
+change.play({ from: 1, to: 0 }); // b → a, the same frames backward
+change.progress(0.42);           // one exact frame
+```
+
+</Step>
+</Steps>
+
+## Drive it with anything
+
+```ts
+slider.addEventListener('input', () => change.progress(slider.valueAsNumber));
+```
+
+A slider, a button, scroll position or a video's clock. They all call
+`progress()`.
+
+## See what changed
+
+```ts
+import { delta } from 'visdelta/core';
+
+delta(a, b).stateChanges;
+// [{ category: 'encoding', action: 'remap', channel: 'y' }]
+```
+
+This is the **Δ** line under every chart on this site.
+
+<Cards>
+  <Card title="Playground" href="/playground" description="Write a chart and watch every edit animate." />
+  <Card title="Controlling playback" href="/docs/guides/controlling-playback" description="Buttons, sliders and scroll." />
+  <Card title="Use with React" href="/docs/guides/react" description="Mount and clean up in a component." />
+  <Card title="State changes" href="/docs/concepts/state-changes" description="The seven kinds of change." />
+</Cards>

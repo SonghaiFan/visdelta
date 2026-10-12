@@ -1,0 +1,158 @@
+---
+title: Troubleshooting
+description: The errors VisDelta throws, what causes them and how to fix them.
+---
+
+VisDelta validates declarations instead of guessing, so most problems surface
+as an explicit error. The messages below are quoted from the library.
+
+## Setup
+
+<Accordions type="multiple">
+<Accordion title="VisDelta needs a target: pass { target: &quot;#chart&quot; } or an element.">
+
+`transition()` and `sequence()` require a `target`. The library never guesses a
+host element.
+
+```ts
+await transition(from, to, { target: '#chart' });
+await transition(from, to, { target: document.querySelector('#chart')! });
+```
+
+</Accordion>
+<Accordion title="VisDelta target not found: #chart">
+
+The selector matched nothing when the transition was created. Create the
+transition after the element is in the document, for example in a component's
+mount effect, or pass the element itself.
+
+</Accordion>
+<Accordion title="transition() requires two states of the same chart type.">
+
+Both endpoints must come from the same chart family. A Bar state cannot
+transition into a Line state. `delta()` has the same rule. Use one chart type
+and change its encodings, layout or grain instead.
+
+</Accordion>
+<Accordion title="Unsupported chart type: bar">
+
+A **plain spec** was rendered without its chart module. Builders carry their
+module; plain objects cannot. Register the module first:
+
+```ts
+import { barModule } from 'visdelta/bar';
+import { registerChartModule } from 'visdelta/plugins';
+
+registerChartModule(barModule);
+```
+
+</Accordion>
+<Accordion title="Charts render without styles, or tooltips appear unstyled">
+
+Import the stylesheet once: `import 'visdelta/style.css'`, or link
+`dist/visdelta.css` from the CDN.
+
+</Accordion>
+<Accordion title="Failed to load module script / CORS errors when opening the page from disk">
+
+Browsers block ES modules on `file://`. Serve the folder with any static server,
+for example `npx serve`, and open the `http://` URL it prints.
+
+</Accordion>
+</Accordions>
+
+## Data
+
+<Accordions type="multiple">
+<Accordion title="VisDelta data source &quot;sales.csv&quot; is ambiguous.">
+
+A bare string could be a file or a named dataset. Be explicit:
+
+```ts
+bar({ url: 'sales.csv' });   // a file
+bar({ name: 'sales' });      // a named dataset, supplied in transition options
+```
+
+</Accordion>
+<Accordion title="transition(): missing dataset &quot;sales&quot;. Pass options.data or bind inline data.">
+
+A state uses `{ name: 'sales' }`, but the transition options do not provide it:
+
+```ts
+await transition(from, to, { target: '#chart', data: { sales: rows } });
+```
+
+</Accordion>
+<Accordion title="transition(): expected rows, { values }, or { url }.">
+
+The data source has an unsupported shape. Pass an array of objects,
+`{ values: rows }` or `{ url }`.
+
+</Accordion>
+<Accordion title="Unsupported property … / Expected one supported transform operation per entry.">
+
+A hand-written transform has an unknown key, or more than one operation in one
+entry. Each entry holds exactly one of `filter`, `timeUnit`, `fold`, `bin`,
+`aggregate`, `sort` or `limit`. See [Transforms](/docs/concepts/data-and-transforms#transforms).
+
+</Accordion>
+<Accordion title="A selector matches nothing, or matches too much">
+
+Selectors use the operator `equal`, not `equals`. Range operators (`gt`, `gte`,
+`lt`, `lte`) need finite numbers, `Date` values or ISO date strings, and
+missing values never match a range. Repeated calls narrow the selection with
+AND; use `.reset()` to start over. See [Selectors](/docs/concepts/selection#selectors).
+
+</Accordion>
+</Accordions>
+
+## Playback
+
+<Accordions type="multiple">
+<Accordion title="This transition has been destroyed.">
+
+A controller was used after `destroy()`. In component code, clear your reference
+in the cleanup function, and guard asynchronous callbacks. See
+[Use with React](/docs/guides/react).
+
+</Accordion>
+<Accordion title="progress must be a finite number.">
+
+`progress()` received `NaN` or `Infinity`, often from an empty input value.
+Finite values are clamped to `[0, 1]` automatically.
+
+</Accordion>
+<Accordion title="play() restarts from the beginning instead of resuming">
+
+On a pair controller, `play()` starts from `0` unless you pass `from`. Resume
+with `change.play({ from: change.value, to: 1 })`. A sequence's `play()`
+already starts from its current value.
+
+</Accordion>
+<Accordion title="The animation takes longer than the duration I set">
+
+`duration` applies to each **serial route stage**. A route with generated
+intermediate states has several stages, so it takes a multiple of `duration`.
+See [Progress](/docs/concepts/progress#play).
+
+</Accordion>
+<Accordion title="The chart keeps old colours after switching to dark mode">
+
+VisDelta reads CSS tokens when it renders. Call `change.resize()` after changing
+the theme. See [Dark mode](/docs/guides/styling#dark-mode).
+
+</Accordion>
+<Accordion title="Marks fade in and out instead of moving">
+
+Marks that should continue need matching identity at both endpoints. Add
+`.key()` with a field that identifies the same item in both states. See
+[Identity](/docs/concepts/identity).
+
+</Accordion>
+</Accordions>
+
+## Still stuck?
+
+Open an issue on [GitHub](https://github.com/SonghaiFan/visdelta/issues) with a
+minimal pair of states. `JSON.stringify(state.toSpec())` for both endpoints is
+usually enough to reproduce a problem.

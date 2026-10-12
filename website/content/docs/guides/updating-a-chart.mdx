@@ -1,0 +1,58 @@
+---
+title: Updating a chart in an app
+description: Keep a chart on screen and animate it to each new state your application produces.
+---
+
+There is no "mounted chart" object to mutate. A chart that stays on screen is a
+transition held at an endpoint, and your application owns the current state.
+
+```ts
+import { transition } from 'visdelta/transition';
+
+let state = byRegion;
+let held = await transition(state, state, { target: '#chart' });
+held.progress(1);
+
+async function go(next: typeof state) {
+  const change = await transition(state, next, { target: '#chart' });
+  held.destroy();
+  held = change;
+  state = next;
+  change.play({ duration: 700 });
+}
+
+await go(state.focus({ region: 'North' }));
+```
+
+`transition()` resolves both states before touching the target, so the
+previous chart stays visible until the next one is ready.
+
+## Replacing, not narrowing
+
+Every grammar call returns a new state, so `go(state.focus(...))` is the whole
+update. Remember that selections narrow. `state.focus(north).focus(south)` means
+their intersection; to move the camera from North to South, reset first:
+
+```ts
+await go(state.reset().focus({ region: 'South' }));
+```
+
+## Rapid updates
+
+If updates can arrive faster than a transition is prepared, serialize them so
+that each new transition starts from the state that is actually on screen:
+
+```ts
+let queue = Promise.resolve();
+
+function update(next: typeof state) {
+  queue = queue.then(() => go(next));
+  return queue;
+}
+```
+
+## Known paths
+
+When the states are known up front, prefer [`sequence()`](/docs/guides/stories).
+It prepares every leg in advance and hands off at shared endpoints, so `A → B → C`
+never shows an empty frame between legs.

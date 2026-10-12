@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "---Introduction---",
+    "index",
+    "installation",
+    "quick-start",
+    "---Concepts---",
+    "...concepts",
+    "---Charts---",
+    "...charts",
+    "---Guides---",
+    "...guides",
+    "---Examples---",
+    "[Playground](/playground)",
+    "[Gallery](/gallery)",
+    "---Reference---",
+    "...api"
+  ]
+}

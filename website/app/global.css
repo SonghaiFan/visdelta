@@ -1,0 +1,1016 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/preset.css';
+
+/*
+ * VisDelta — design tokens.
+ *
+ * Ink on paper, and three brand colours that always mean the same thing,
+ * taken from the logo: a blue circle, a coral triangle and the amber overlap.
+ *
+ *   A  blue   the first state
+ *   B  coral  the second state
+ *   Δ  amber  the difference — the frame in between, a changed line of code
+ *
+ * Nothing else in the interface is coloured.
+ */
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-state-a: #4269d0;
+  --color-state-b: #ff725c;
+  --color-delta: #efb118;
+
+  --color-fd-background: #fafaf8;
+  --color-fd-foreground: #141416;
+  --color-fd-muted: #f1f1ee;
+  --color-fd-muted-foreground: #6b6b72;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #141416;
+  --color-fd-card: #ffffff;
+  --color-fd-card-foreground: #141416;
+  --color-fd-border: #e6e6e1;
+  --color-fd-primary: #141416;
+  --color-fd-primary-foreground: #fafaf8;
+  --color-fd-secondary: #f1f1ee;
+  --color-fd-secondary-foreground: #141416;
+  --color-fd-accent: #efefeb;
+  --color-fd-accent-foreground: #141416;
+  --color-fd-ring: #4269d0;
+  --color-fd-overlay: rgb(15 15 18 / 0.24);
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+  --radius-xl: 9px;
+  --radius-2xl: 11px;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme static {
+  --color-fd-info: #4269d0;
+  --color-fd-warning: #b7801a;
+  --color-fd-error: #d9482f;
+  --color-fd-success: #2f8f5b;
+  --color-fd-idea: #b7801a;
+  --color-fd-diff-remove: rgb(217 72 47 / 0.1);
+  --color-fd-diff-remove-symbol: #d9482f;
+  --color-fd-diff-add: rgb(47 143 91 / 0.1);
+  --color-fd-diff-add-symbol: #2f8f5b;
+}
+
+.dark {
+  --color-state-a: #7f9ef0;
+  --color-state-b: #ff8a76;
+  --color-delta: #f2c14a;
+  --color-fd-background: #0c0c0d;
+  --color-fd-foreground: #ededeb;
+  --color-fd-muted: #161618;
+  --color-fd-muted-foreground: #9a9aa1;
+  --color-fd-popover: #131315;
+  --color-fd-popover-foreground: #ededeb;
+  --color-fd-card: #111113;
+  --color-fd-card-foreground: #ededeb;
+  --color-fd-border: #232326;
+  --color-fd-primary: #ededeb;
+  --color-fd-primary-foreground: #0c0c0d;
+  --color-fd-secondary: #18181b;
+  --color-fd-secondary-foreground: #ededeb;
+  --color-fd-accent: #1b1b1e;
+  --color-fd-accent-foreground: #ededeb;
+  --color-fd-ring: #7f9ef0;
+  --color-fd-overlay: rgb(0 0 0 / 0.5);
+}
+
+html {
+  scrollbar-gutter: stable;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-delta) 35%, transparent);
+}
+
+/* Prose: quiet headings, underlined links, tabular numerals. */
+.prose {
+  --tw-prose-headings: var(--color-fd-foreground);
+  --tw-prose-links: var(--color-fd-foreground);
+}
+.prose :where(h1, h2, h3, h4):not(:where(.not-prose *)) {
+  letter-spacing: -0.018em;
+  font-weight: 600;
+}
+.prose :where(a):not(:where(.not-prose *)) {
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms;
+}
+.prose :where(a):not(:where(.not-prose *)):hover {
+  text-decoration-color: currentColor;
+}
+.prose :where(table):not(:where(.not-prose *)) {
+  font-variant-numeric: tabular-nums;
+}
+.prose :where(code):not(:where(pre *, .not-prose *)) {
+  font-size: 0.875em;
+}
+
+/* Small uppercase mono label: the only "decoration" the interface uses. */
+.vd-label {
+  font: 500 0.66rem/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fd-muted-foreground);
+}
+
+/*
+ * Live charts. VisDelta reads its colour tokens from CSS at render time; the
+ * default style follows the site theme, explicit presets keep their surfaces.
+ */
+.vd-docs-chart {
+  --vd-color-surface: transparent;
+  --vd-figure-bg: transparent;
+  --vd-figure-border: none;
+  --vd-figure-radius: 0;
+  --vd-type-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --vd-font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+.vd-docs-chart .vd-view {
+  min-height: 0;
+}
+.vd-docs-chart .vd-figure-header {
+  display: none;
+}
+.vd-docs-chart .vd-transition-root.vd-style-d3 {
+  --vd-grid: #ececE8;
+  --vd-color-outline-variant: #ececE8;
+}
+
+/*
+ * Dark charts. These tokens are set on the document, not on chart containers:
+ * sequence() resolves colours against its preparation mount, which lives
+ * outside the visible host. Explicit presets still override them on their
+ * own .vd-style-* roots.
+ */
+.dark {
+  --vd-color-surface: #0c0c0d;
+  --vd-color-bg: #0c0c0d;
+  --vd-color-on-surface: #ededeb;
+  --vd-color-on-surface-variant: #8a8a92;
+  --vd-color-mark-default: #ededeb;
+  --vd-color-muted: #9a9aa1;
+  --vd-color-border: #232326;
+  --vd-color-outline: #55555c;
+  --vd-color-outline-variant: #1f1f22;
+  --vd-fg: #ededeb;
+  --vd-muted: #9a9aa1;
+  --vd-border: #232326;
+  --vd-grid: #1f1f22;
+  --vd-axis: #55555c;
+  --vd-axis-text: #9a9aa1;
+  --vd-axis-title: #ededeb;
+  --vd-legend-text: #9a9aa1;
+  --vd-mark-stroke: #0c0c0d;
+}
+.dark .vd-docs-chart .vd-transition-root.vd-style-d3 {
+  color-scheme: dark;
+  --vd-grid: #1f1f22;
+  --vd-color-outline-variant: #1f1f22;
+}
+.vd-gallery-thumb .vd-transition-root,
+.vd-gallery-thumb .vd-chart-root {
+  height: 100%;
+}
+
+/*
+ * Code. Quiet and monochrome; the only highlight is Δ amber on a changed line.
+ */
+.vd-code-surface {
+  --code-bg: #f3f3f0;
+  --code-text: #1d1d20;
+  --code-muted: #8b8b92;
+  --code-keyword: #8b8b92;
+  --code-string: #2c6e60;
+  --code-number: #1d1d20;
+  --code-function: #1d1d20;
+  background: var(--code-bg);
+  color: var(--code-text);
+}
+.dark .vd-code-surface {
+  --code-bg: #141416;
+  --code-text: #e6e6e3;
+  --code-muted: #75757c;
+  --code-keyword: #75757c;
+  --code-string: #8fcbb9;
+  --code-number: #e6e6e3;
+  --code-function: #e6e6e3;
+}
+.vd-code-view {
+  margin: 0;
+  padding: 14px 0;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  background: transparent;
+}
+.vd-code-line {
+  display: inline-block;
+  min-width: 100%;
+  padding: 0 16px;
+  white-space: pre-wrap;
+  transition:
+    background-color 600ms var(--ease-out-quint),
+    box-shadow 600ms var(--ease-out-quint);
+}
+.vd-code-line[data-changed] {
+  background: color-mix(in srgb, var(--color-delta) 18%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-delta);
+}
+.vd-code-gutter {
+  display: inline-block;
+  width: 1.75rem;
+  margin-right: 0.75rem;
+  text-align: right;
+  color: var(--code-muted);
+  user-select: none;
+}
+
+/* State-change categories: one ink glyph each, never a colour code. */
+.vd-category-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  color: currentColor;
+  --icon-cutout: var(--color-fd-background);
+}
+.vd-category-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * The A → B scrubber. A blue end, a coral end and an amber playhead: the
+ * transition between two states, drawn with the logo's three colours.
+ */
+.vd-scrub {
+  position: relative;
+  height: 28px;
+}
+.vd-scrub input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.vd-scrub input:disabled {
+  cursor: default;
+}
+.vd-scrub input::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+.vd-scrub input::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+.vd-scrub input::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+}
+.vd-scrub input::-moz-range-thumb {
+  width: 14px;
+  height: 28px;
+  background: transparent;
+  border: 0;
+}
+.vd-scrub-track {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 50%;
+  height: 1px;
+  background: var(--color-fd-border);
+  pointer-events: none;
+}
+.vd-scrub-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--color-fd-foreground) 55%, transparent);
+}
+.vd-scrub-end {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+}
+.vd-scrub-end[data-end='a'] {
+  left: -3.5px;
+  background: var(--color-state-a);
+}
+.vd-scrub-end[data-end='b'] {
+  right: -3.5px;
+  width: 0;
+  height: 0;
+  margin-top: -4px;
+  border-radius: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid var(--color-state-b);
+}
+.vd-scrub-end[data-end='leg'] {
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  margin-left: -2.5px;
+  background: var(--color-fd-muted-foreground);
+}
+.vd-scrub-head {
+  position: absolute;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  margin: -8px 0 0 -1.5px;
+  border-radius: 2px;
+  background: var(--color-delta);
+  box-shadow: 0 0 0 3px var(--color-fd-background);
+  pointer-events: none;
+}
+.vd-scrub input:focus-visible {
+  outline: none;
+}
+.vd-scrub:has(input:focus-visible) .vd-scrub-head {
+  box-shadow:
+    0 0 0 3px var(--color-fd-background),
+    0 0 0 5px var(--color-fd-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Playground: an editor workspace. Toolbar, examples, editor | preview with a
+ * draggable divider, the keyframe timeline docked below, and a status bar.
+ * Narrow screens stack it in reading order: rows and code, then the chart.
+ */
+.pg-app {
+  --pg-bar: 2.5rem;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.pg-app[data-dragging] {
+  cursor: col-resize;
+  user-select: none;
+}
+.pg-toolbar {
+  grid-area: tool;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  height: var(--pg-bar);
+  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--color-fd-border);
+}
+.pg-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  justify-content: center;
+  padding: 0 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--color-fd-muted-foreground);
+  transition: background-color 150ms, color 150ms;
+}
+.pg-tool:hover:not(:disabled) {
+  background: var(--color-fd-accent);
+  color: var(--color-fd-foreground);
+}
+.pg-tool:disabled {
+  opacity: 0.4;
+}
+.pg-tool-primary,
+.pg-tool-primary:hover:not(:disabled) {
+  background: var(--color-fd-foreground);
+  color: var(--color-fd-background);
+}
+.pg-tool-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-fd-foreground) 85%, transparent);
+}
+.pg-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--color-fd-muted-foreground);
+  cursor: pointer;
+}
+.pg-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pg-switch-track {
+  position: relative;
+  width: 1.5rem;
+  height: 0.875rem;
+  border-radius: 999px;
+  background: var(--color-fd-border);
+  transition: background-color 150ms;
+}
+.pg-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 999px;
+  background: var(--color-fd-background);
+  transition: transform 200ms var(--ease-out-quint);
+}
+.pg-switch input:checked + .pg-switch-track {
+  background: var(--color-fd-foreground);
+}
+.pg-switch input:checked + .pg-switch-track::after {
+  transform: translateX(0.625rem);
+}
+.pg-switch input:focus-visible + .pg-switch-track {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+.pg-explorer {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--color-fd-border);
+  background: var(--color-fd-background);
+}
+.pg-explorer > nav {
+  flex: 1;
+}
+.pg-backdrop {
+  display: none;
+}
+.pg-editor {
+  grid-area: edit;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.pg-tabs {
+  display: flex;
+  flex-shrink: 0;
+  height: 2.25rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--code-muted) 22%, transparent);
+  overflow-x: auto;
+}
+.pg-tab {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--code-muted);
+  transition: color 150ms;
+}
+.pg-tab:hover,
+.pg-tab[aria-selected='true'] {
+  color: var(--code-text);
+}
+.pg-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px;
+  height: 2px;
+  background: var(--color-delta);
+}
+.pg-panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.pg-panel[hidden] {
+  display: none;
+}
+.pg-panel .cm-editor {
+  height: 100%;
+}
+.pg-problem {
+  flex-shrink: 0;
+  max-height: 6rem;
+  overflow: auto;
+  padding: 0.5rem 0.875rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-fd-error) 35%, transparent);
+  background: color-mix(in srgb, var(--color-fd-error) 7%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-fd-error);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-fd-error);
+  white-space: pre-wrap;
+}
+.pg-splitter {
+  grid-area: split;
+  position: relative;
+  display: none;
+  cursor: col-resize;
+  touch-action: none;
+}
+.pg-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 6px;
+  background: var(--color-fd-border);
+  transition: background-color 150ms, inset 150ms;
+}
+.pg-splitter:hover::before,
+.pg-splitter:focus-visible::before,
+.pg-app[data-dragging] .pg-splitter::before {
+  inset: 0 5px;
+  background: var(--color-delta);
+}
+.pg-splitter:focus-visible {
+  outline: none;
+}
+.pg-preview {
+  grid-area: view;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.pg-timeline {
+  grid-area: time;
+  padding: 0.25rem 1rem 0.375rem;
+  border-top: 1px solid var(--color-fd-border);
+}
+.pg-status {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  height: 1.625rem;
+  padding: 0 0.75rem;
+  border-top: 1px solid var(--color-fd-border);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--color-fd-muted-foreground);
+  white-space: nowrap;
+}
+.pg-status-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-fd-muted-foreground);
+}
+.pg-status [data-tone='live'] .pg-status-dot {
+  background: var(--color-fd-success);
+}
+.pg-status [data-tone='busy'] .pg-status-dot {
+  background: var(--color-delta);
+  animation: pg-pulse 1s ease-in-out infinite alternate;
+}
+.pg-status [data-tone='error'] {
+  color: var(--color-fd-error);
+}
+.pg-status [data-tone='error'] .pg-status-dot {
+  background: var(--color-fd-error);
+}
+@keyframes pg-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+
+.pg-viewbar {
+  flex-shrink: 0;
+  padding: 0.5rem 1rem 0;
+}
+.pg-viewbar[data-floating] {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--color-fd-border);
+  cursor: grab;
+  touch-action: none;
+}
+.pg-viewbar[data-floating]:active {
+  cursor: grabbing;
+}
+.pg-resize {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+.pg-resize[data-edge='n'],
+.pg-resize[data-edge='s'] {
+  left: 10px;
+  right: 10px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.pg-resize[data-edge='e'],
+.pg-resize[data-edge='w'] {
+  top: 10px;
+  bottom: 10px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.pg-resize[data-edge='n'] { top: -4px; }
+.pg-resize[data-edge='s'] { bottom: -4px; }
+.pg-resize[data-edge='e'] { right: -4px; }
+.pg-resize[data-edge='w'] { left: -4px; }
+.pg-resize[data-edge='ne'],
+.pg-resize[data-edge='nw'],
+.pg-resize[data-edge='se'],
+.pg-resize[data-edge='sw'] {
+  width: 14px;
+  height: 14px;
+}
+.pg-resize[data-edge='ne'] { top: -5px; right: -5px; cursor: nesw-resize; }
+.pg-resize[data-edge='sw'] { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.pg-resize[data-edge='nw'] { top: -5px; left: -5px; cursor: nwse-resize; }
+.pg-resize[data-edge='se'] { bottom: -5px; right: -5px; cursor: nwse-resize; }
+
+@media (min-width: 1024px) {
+  .pg-app {
+    position: relative;
+    --pg-side: 13.5rem;
+    display: grid;
+    /* A fixed size, not flex: content (a long table) must never size the panes. */
+    flex: none;
+    height: calc(100dvh - 2.75rem);
+    grid-template-columns: var(--pg-side) minmax(0, var(--pg-left, 42fr)) 7px minmax(0, var(--pg-right, 58fr));
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'tool tool tool tool'
+      'side edit split view'
+      'side time time time'
+      'status status status status';
+  }
+  .pg-app[data-explorer='closed'] {
+    --pg-side: 0px;
+  }
+  .pg-app[data-explorer='closed'] .pg-explorer {
+    display: none;
+  }
+  .pg-splitter {
+    display: block;
+    margin: 0 -3px;
+    z-index: 1;
+  }
+  /* Floating: the preview is a window over the editor, which takes the whole width. */
+  .pg-app[data-placement='float'] {
+    grid-template-columns: var(--pg-side) minmax(0, 1fr);
+    grid-template-areas:
+      'tool tool'
+      'side edit'
+      'side time'
+      'status status';
+  }
+  .pg-app[data-placement='float'] .pg-splitter {
+    display: none;
+  }
+  .pg-app[data-placement='float'] .pg-preview {
+    position: absolute;
+    z-index: 30;
+    grid-area: auto;
+    top: calc(var(--pg-bar) + 0.75rem);
+    right: 1rem;
+    width: min(34rem, 60%);
+    height: min(28rem, 62%);
+    min-width: 300px;
+    min-height: 220px;
+    border: 1px solid var(--color-fd-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-fd-background);
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.06),
+      0 12px 32px rgb(0 0 0 / 0.14);
+  }
+  .dark .pg-app[data-placement='float'] .pg-preview {
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 12px 32px rgb(0 0 0 / 0.5);
+  }
+  .pg-editor {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .pg-explorer {
+    position: fixed;
+    top: 2.75rem;
+    bottom: 0;
+    left: 0;
+    z-index: 35;
+    width: min(17rem, 85vw);
+    box-shadow: 0 0 0 1px var(--color-fd-border), 0 12px 32px rgb(0 0 0 / 0.12);
+    transform: translateX(-102%);
+    visibility: hidden;
+    transition:
+      transform 260ms var(--ease-out-quint),
+      visibility 0s 260ms;
+  }
+  .pg-app[data-explorer='open'] .pg-explorer {
+    transform: none;
+    visibility: visible;
+    transition: transform 260ms var(--ease-out-quint);
+  }
+  .pg-app[data-explorer='open'] .pg-backdrop {
+    position: fixed;
+    inset: 2.75rem 0 0;
+    z-index: 34;
+    display: block;
+    background: var(--color-fd-overlay);
+  }
+  .pg-panel {
+    flex: none;
+  }
+  .pg-panel .cm-editor {
+    height: auto;
+    min-height: 9rem;
+    max-height: 26rem;
+  }
+  #pg-panel-rows {
+    height: 24rem;
+  }
+  .pg-stage {
+    height: clamp(17rem, 88vw, 26rem);
+  }
+  .pg-status {
+    gap: 0.75rem;
+  }
+}
+
+/* Offscreen host used only to count a pair's planned route stages. */
+.pg-measure {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 640px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Playground stage: prepared layers wait hidden, then swap or cross-fade. */
+.pg-stage {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+/* Fit: a layer is the chart's container and fills the stage, so "auto" follows it. */
+.pg-layer {
+  height: 100%;
+  transition: opacity 220ms var(--ease-out-quint);
+}
+/* Fixed: the chart keeps its size and a smaller stage scrolls. */
+.pg-stage[data-size='fixed'] {
+  overflow: auto;
+}
+.pg-stage[data-size='fixed'] .pg-layer {
+  height: auto;
+  width: max-content;
+}
+.pg-stage[data-size='fixed'] .pg-layer[data-state='hidden'] {
+  height: auto;
+  inset: 0 auto auto 0;
+}
+.pg-layer[data-state='hidden'] {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.pg-layer[data-state='entering'] {
+  opacity: 0;
+}
+.pg-layer[data-state='leaving'] {
+  position: absolute;
+  inset: 0 0 auto 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/*
+ * Playground timeline: an editing track in real time. Each leg between kept
+ * keyframes is a clip as long as it plays, cut into its planned route stages.
+ */
+.pg-track {
+  --pg-pad: 7px;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 3.75rem;
+}
+.pg-ruler {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 14px;
+  pointer-events: none;
+}
+.pg-tick {
+  position: absolute;
+  top: 0;
+  height: 14px;
+  padding-left: 3px;
+  border-left: 1px solid color-mix(in srgb, var(--color-fd-foreground) 18%, transparent);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 10px;
+  color: var(--color-fd-muted-foreground);
+}
+.pg-tick:empty {
+  top: 8px;
+  height: 6px;
+}
+.pg-clips {
+  position: absolute;
+  inset: 16px 0 0;
+}
+.pg-clips input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ew-resize;
+}
+.pg-track:has(input:focus-visible) {
+  border-radius: var(--radius-sm, 4px);
+  outline: 1px solid color-mix(in srgb, var(--color-fd-foreground) 35%, transparent);
+  outline-offset: 2px;
+}
+.pg-clip {
+  position: absolute;
+  top: 2px;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-fd-foreground) 16%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-fd-foreground) 5%, transparent);
+  pointer-events: none;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
+  animation: pg-key-in 450ms var(--ease-out-quint);
+}
+.pg-clip[data-active] {
+  border-color: color-mix(in srgb, var(--color-delta) 70%, transparent);
+  background: color-mix(in srgb, var(--color-delta) 14%, transparent);
+}
+@media (max-width: 639.98px) {
+  /* Narrow screens give the track its own row under the controls. */
+  .pg-track {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
+/* The lane below: every route stage VisDelta planned, one block per stage. */
+.pg-stage-block {
+  position: absolute;
+  top: 26px;
+  height: 5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--color-fd-foreground) 22%, transparent);
+  box-shadow: inset -2px 0 0 var(--color-fd-background);
+  pointer-events: none;
+  transition: background-color 150ms;
+}
+.pg-stage-block[data-active] {
+  background: var(--color-delta);
+}
+.pg-clip-label {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 18px;
+  color: var(--color-fd-muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-clip[data-active] .pg-clip-label {
+  color: var(--color-fd-foreground);
+}
+.pg-clip-stages {
+  margin-left: 0.75em;
+  opacity: 0.65;
+}
+.pg-key {
+  position: absolute;
+  top: 12px;
+  z-index: 1;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  place-items: center;
+  animation: pg-key-in 450ms var(--ease-out-quint);
+}
+.pg-key::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--color-fd-background);
+  background: var(--color-fd-foreground);
+  transform: rotate(45deg);
+  transition:
+    transform 300ms var(--ease-out-quint),
+    background-color 200ms;
+}
+.pg-key:hover::before,
+.pg-key:focus-visible::before {
+  transform: rotate(45deg) scale(1.3);
+}
+.pg-key[data-current]::before {
+  background: var(--color-delta);
+  transform: rotate(45deg) scale(1.3);
+}
+.pg-key-label {
+  position: absolute;
+  top: 24px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--color-fd-muted-foreground);
+}
+.pg-track[data-dense] .pg-key-label {
+  display: none;
+}
+.pg-head {
+  position: absolute;
+  top: 0;
+  bottom: 4px;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--color-delta);
+  pointer-events: none;
+}
+.pg-head::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 8px;
+  height: 6px;
+  border-radius: 1px 1px 0 0;
+  background: var(--color-delta);
+  clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 100%, 0 50%);
+}
+@keyframes pg-key-in {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}

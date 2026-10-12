@@ -1,0 +1,59 @@
+---
+title: Design principles
+description: The rules VisDelta is built on, and which a chart module must keep.
+---
+
+These principles explain behaviour you will observe in every chart type. The
+complete normative text, including vocabulary governance and transition
+contracts, is the
+[language framework](https://github.com/SonghaiFan/visdelta/blob/main/docs/language-framework.md)
+in the repository.
+
+## Every frame is true
+
+Marks always agree with the scales, ticks, grid lines and titles that explain
+them, at every progress value. Exit marks before changing the scale; change the
+scale before entering marks.
+
+## State is fact; history is not a script
+
+Planning consumes endpoint states, not the sequence of builder calls that
+produced them. Two chains that reach the same normalized state produce the same
+transition. Transform order is still part of a state's meaning: sorting before a
+limit can change which rows remain.
+
+## Data meaning is explicit
+
+VisDelta expects tidy data and does not clean, pivot, join or repair it. Every
+visual encoding is declared. Presentation defaults such as radius, line width,
+margins and duration are supplied for you, but a field never becomes x, y,
+colour, size or detail unless you map it. Generated intermediate states may not
+invent or remap a colour channel.
+
+## Selection words have separate meanings
+
+`where()` changes membership, `highlight()` changes emphasis and `focus()` moves
+the camera. Focus never filters data; highlight never changes scales. See
+[where, highlight and focus](/docs/concepts/selection).
+
+## Correspondence is evidence, not a route
+
+Shared source records establish relationships between marks. They do not by
+themselves justify a particular motion. Missing or unsafe evidence keeps the
+chart's ordinary transition.
+
+## Reverse means the same frames backward
+
+For a reversible route, progress `p` played forward and `1 − p` played backward
+show the same frame. Explicit directional easing is the documented exception.
+
+## Core knows no chart types
+
+The generic runtime contains no branches for any built-in chart. Each chart
+module owns its builder, compiler, marks, axes, matching and motion, and the
+modules are peers. Adding a chart type should not require editing the runtime.
+
+## Keep the language small
+
+One word for one concept. Builder syntax, emitted state-change actions,
+correspondence operations and transition phases stay visibly distinct.

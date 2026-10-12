@@ -8,7 +8,9 @@ const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'))
 if (lock.version !== pkg.version || lock.packages[''].version !== pkg.version) {
   throw new Error('Package and lockfile release versions disagree.');
 }
-const files = ['README.md', 'llms.txt', 'index.html', ...await walk('docs'), ...await walk('examples')];
+// The Fumadocs site's MDX pages and live examples carry CDN URLs too.
+const files = ['README.md', 'llms.txt', 'index.html', ...await walk('docs'), ...await walk('examples'),
+  ...await walk('website/content'), ...await walk('website/examples')];
 let urls = 0;
 for (const file of files) {
   const source = await readFile(join(root, file), 'utf8');
@@ -57,7 +59,7 @@ async function walk(dir) {
     if (entry.isDirectory() && entry.name === '.vitepress') continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) files.push(...await walk(path));
-    else if (/\.(md|html|js|txt)$/.test(path)) files.push(path);
+    else if (/\.(md|mdx|html|js|ts|txt)$/.test(path)) files.push(path);
   }
   return files;
 }

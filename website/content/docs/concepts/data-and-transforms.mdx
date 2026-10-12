@@ -1,0 +1,116 @@
+---
+title: Data and transforms
+description: VisDelta expects tidy data. Declared transforms change which rows a state uses; they are not a data-cleaning API.
+---
+
+## Tidy input
+
+VisDelta expects **tidy** data: one observation per row and one variable per
+field. Clean, join, pivot and otherwise reshape data before passing it to the
+library. VisDelta does not repair data.
+
+## Data sources
+
+Every builder accepts one of four source forms:
+
+```ts
+bar(rows);                                  // an inline array of objects
+bar({ values: rows });                      // the same, wrapped
+bar({ url: './data.csv' });                 // type inferred from the extension
+bar({ url: './data.json', type: 'json' });  // explicit type
+bar({ name: 'sales' });                     // resolved from transition options
+```
+
+A named source is supplied when the transition is created:
+
+```ts
+await transition(from, to, { target: '#chart', data: { sales: rows } });
+```
+
+A bare string is rejected, because the library will not guess whether
+`"sales.csv"` names a file or a dataset. URLs are loaded by `transition()`, and
+a source shared by both endpoints is loaded once per transition.
+
+`state.rows()` returns the current state's tidy rows after all declared
+transforms. Inline data is read directly; pass source rows only when the state
+uses a named dataset:
+
+```ts
+const all = bar(rows).x('country').y('sites');
+const nordic = all.where({ country: ['Norway', 'Sweden'] });
+
+all.rows();     // every row
+nordic.rows();  // Norway and Sweden only
+```
+
+## Field types
+
+Core detects three field types from the rows. Detection fills only missing
+channel types; a type you declare always wins.
+
+| Detected as    | When                                                       |
+| -------------- | ---------------------------------------------------------- |
+| `quantitative` | Numbers and numeric strings                                |
+| `temporal`     | ISO date strings and valid `Date` objects                  |
+| `nominal`      | Mixed or unknown values                                    |
+
+Declare `ordinal` yourself when order is meaningful for a categorical field.
+
+## Transforms
+
+Builder methods such as `.where()`, `.sort()`, `.breakdown()` and `.rollup()`
+produce strict, declared transforms. They run in declaration order inside
+VisDelta, with no other runtime dependency.
+
+| Operation   | Supported form                                                         |
+| ----------- | ---------------------------------------------------------------------- |
+| `filter`    | One field comparison: `{ field, equal \| notEqual \| oneOf \| gt \| gte \| lt \| lte }` |
+| `timeUnit`  | `month`                                                                |
+| `fold`      | Explicit fields and output names                                       |
+| `bin`       | Positive `step` or positive integer `maxbins`                          |
+| `aggregate` | `count`, `sum`, `mean`, `min`, `max`, `median`                         |
+| `sort`      | One field or an ordered field list                                     |
+| `limit`     | A non-negative integer                                                 |
+
+Each transform entry contains exactly one operation. Unknown properties and
+unknown operation names are errors, never silently ignored.
+
+Transforms are part of a state's meaning, so their order matters. Filtering
+source rows before an aggregate is different from filtering aggregate rows after
+it:
+
+```ts
+base.where({ region: 'North' }).rollup();    // filter sources, then total
+base.rollup().where({ sales: { gt: 100 } }); // total, then filter totals
+```
+
+A selector's fields must exist at that point in the pipeline. An aggregate can
+remove source fields that are not part of its output grain.
+
+### Writing a spec by hand
+
+The same transforms can be written directly in a plain view spec:
+
+```ts
+const spec = {
+  mark: 'bar',
+  data: { values: rows },
+  transform: [
+    { filter: { field: 'sales', gte: 0 } },
+    {
+      aggregate: {
+        groupby: ['region'],
+        fields: [{ op: 'sum', field: 'sales', as: 'sales' }],
+      },
+    },
+    { sort: { field: 'sales', order: 'descending' } },
+  ],
+  encoding: {
+    x: { field: 'region', type: 'nominal' },
+    y: { field: 'sales', type: 'quantitative' },
+  },
+};
+```
+
+Plain specs need their chart module registered before rendering; see
+[Plain specs](/docs/concepts/chart-states#plain-specs).

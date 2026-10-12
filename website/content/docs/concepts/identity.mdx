@@ -1,0 +1,53 @@
+---
+title: Identity
+description: How VisDelta knows which mark is the same mark in both states.
+---
+
+To move a mark, VisDelta has to know it is the same mark in A and B. Marks that
+match move; the others enter or leave.
+
+## Keys
+
+Give marks a key when they should keep their identity through a change:
+
+```ts
+point(cars).x('weight').y('mpg').key('name');
+bar(sales).x('region').y('revenue').key(['region', 'channel']);
+```
+
+Without `.key()`, each chart type uses a sensible default. If marks fade in and
+out when you expected them to move, add a key.
+
+<LiveExample id="point-remap" code={false} />
+
+## Records and marks are different
+
+A **record** is a row of your data. A **mark** is something drawn. When you
+total rows, many records become one mark, and the records still keep their own
+identity.
+
+VisDelta finds record identity on its own: a unique `id` field if there is one,
+otherwise the smallest set of text fields that tells rows apart. Override it
+only when that guess would be wrong:
+
+```ts
+bar(rows).datumKey('id');
+```
+
+## Lineage
+
+With inline data, VisDelta also traces which records feed which marks in both
+states. That is how it knows a total **split** into parts, parts **merged**
+into a total, or groups were **reaggregated**:
+
+<LiveExample id="bar-split" code={false} />
+
+```ts
+delta(byYear, byLocation).lineage.mode; // 'reaggregate'
+```
+
+Lineage is evidence, not an order. Bar uses it to keep sums readable while they
+split and merge; averages and medians keep their history but move directly,
+because their parts don't add up to the whole.
+
+The functions behind this are in [Core](/docs/api/core#lineage).

@@ -1,0 +1,60 @@
+---
+title: sequence()
+description: Join several authored states into one seekable timeline of adjacent transitions.
+---
+
+```ts
+import { sequence } from 'visdelta/transition';
+
+function sequence(
+  states: readonly Visualization[],
+  options: SequenceOptions,
+): Promise<VisualizationSequence>;
+```
+
+`sequence()` prepares a transition for every adjacent pair (`A → B`, `B → C`, …)
+and hands off between them at shared endpoints, so the chart host stays mounted
+and never shows an empty frame between legs.
+
+```ts
+const story = await sequence([revenue, profit, ranked, revenue], {
+  target: '#chart',
+});
+
+story.progress(1.5);            // halfway through profit → ranked
+story.play({ duration: 850 });  // from the current position to the end
+```
+
+It requires at least two states, all of the same chart type. `SequenceOptions`
+accepts the same fields as [`TransitionOptions`](/docs/api/transition#transitionoptions).
+
+## VisualizationSequence
+
+<auto-type-table path="src/sequence.ts" name="VisualizationSequence" />
+
+`value` runs from `0` to `states.length - 1`. Integer values identify authored
+states exactly, even when a leg contains generated intermediate stages.
+
+## SequencePlayOptions
+
+<auto-type-table path="src/sequence.ts" name="SequencePlayOptions" />
+
+Unlike a pair controller, a sequence's `play()` starts from the current value
+by default.
+
+## Resizing
+
+A sequence takes the same `width` and `height` as `transition()`: a number of
+pixels, or `"auto"` to follow the container. A dimension set to `"auto"` re-fits
+the leg on screen when the container changes. Call `resize()` after a theme
+change, or to change the requested size for every leg:
+
+```ts
+story.resize({ width: 'auto', height: 'auto' });
+```
+
+`resize()` recompiles the active leg and keeps the current position; the other
+legs pick the new size up when they are shown. A dimension left out keeps its
+request.
+
+See [Multi-step stories](/docs/guides/stories) for scroll-driven usage.

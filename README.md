@@ -15,7 +15,7 @@ control play or seek the transition.
 </p>
 
 Every frame above is `change.progress(t)` — the same frames play forward,
-backward, or under a scrollbar. Try it in the [live labs](https://songhaifan.github.io/visdelta/).
+backward, or under a scrollbar. Try it in the [documentation and playground](https://songhaifan.github.io/visdelta/).
 
 ```text
 Data -> Chart state -> Difference -> Transition -> Frame
@@ -59,7 +59,7 @@ as D3:
 </script>
 ```
 
-See the [complete CDN example](docs/for-cdn-users.md) for a slider-controlled
+See the [complete CDN example](https://songhaifan.github.io/visdelta/docs/guides/cdn/) for a slider-controlled
 transition and the optional focused entry points.
 
 VisDelta depends only on the `d3-*` modules it renders with. Declared transforms
@@ -112,8 +112,11 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 - `focus()` is a camera move, never a data filter.
 - Core stays chart-agnostic; chart-specific behavior stays in its module.
 
-See the [design principles](docs/language-framework.md), [API
-reference](docs/reference.md), and the [five live labs](docs/examples.md).
+Read the [documentation](https://songhaifan.github.io/visdelta/docs/), the
+[API reference](https://songhaifan.github.io/visdelta/docs/api/) and the
+[playground](https://songhaifan.github.io/visdelta/playground/).
+The [design principles](docs/language-framework.md) are the semantic
+constitution the implementation follows.
 
 ## Development
 
@@ -125,14 +128,18 @@ npm run docs:check
 npm run test:browser
 ```
 
-Run the docs locally:
+The documentation site lives in [`website/`](website/README.md), a separate
+Fumadocs project that renders live examples with the built library:
 
 ```sh
-npm run docs:dev
+npm run build
+cd website
+npm ci
+npm run dev
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a chart type. Generated
-`dist/`, VitePress output, test results, and screenshots are not source files.
+`dist/`, site output, test results, and screenshots are not source files.
 
 Released under the MIT License.
 
