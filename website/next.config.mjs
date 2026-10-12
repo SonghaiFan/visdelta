@@ -21,6 +21,10 @@ const config = {
   reactStrictMode: true,
   images: { unoptimized: true },
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
+  // Next blocks dev resources (including the client bundle's hot-reload socket)
+  // requested from an origin it does not list. Opened as 127.0.0.1 rather than
+  // localhost, no page hydrates and the playground never leaves "Loading".
+  allowedDevOrigins: ['127.0.0.1'],
   turbopack: { root: repositoryRoot },
   outputFileTracingRoot: repositoryRoot,
 };

@@ -254,6 +254,16 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
 
 ## Known limitations
 
+- **The site runs the built library.** It imports `visdelta` from the repository's
+  `dist/`, so rebuild it (`npm run build` in the root) after pulling changes to
+  `src/`. `predev`, `prebuild` and `types:check` stop with that instruction when
+  `dist/` is older than `src/`, because an out-of-date library draws nothing for
+  options it does not know (set `VISDELTA_ALLOW_STALE_DIST=1` to skip the check).
+- **Open the dev server as `localhost` or `127.0.0.1`.** Next blocks dev resources
+  requested from any other origin, and then no page hydrates (the playground
+  stays on "Loading"). Add another host to `allowedDevOrigins` in
+  `next.config.mjs`.
+
 - **Build warnings.** Next.js's CSS optimizer reports two warnings about
   `::highlight(fd-search)` in Fumadocs UI's stylesheet. The selector is valid
   CSS (the Custom Highlight API); the warning is upstream and harmless.
