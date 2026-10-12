@@ -1,5 +1,9 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { categories } from '@/examples/registry';
+import type { KeyframePreview } from './keyframe-previews';
 import { Pause, Play } from 'lucide-react';
 import type { StateChange } from 'visdelta/core';
 import { formatChange } from '@/components/live/transition-player';
@@ -14,6 +18,8 @@ export interface TimelineKey {
 
 interface TimelineProps {
   keyframes: TimelineKey[];
+  previews: Record<number, KeyframePreview>;
+  onPreview: (id: number | null) => void;
   /** Playhead in keyframe units (the sequence's own position), shown while replaying. */
   value: number;
   /** Real playback time of one route stage, in milliseconds. */
@@ -38,6 +44,30 @@ const describeLeg = (key: TimelineKey) => (key.changes.length ? key.changes.map(
 const describe = (key: TimelineKey, index: number, at: number) =>
   `Keyframe ${index + 1}${key.changes.length ? `: ${key.changes.map(formatChange).join(', ')}` : ''}`.concat(index ? ` (${seconds(at)})` : '');
 
+/** Shared time geometry for overview, stage strip, category lanes and scrubbing. */
+export function timelineGeometry(keyframes: TimelineKey[], stageDuration: number) {
+  const count = keyframes.length;
+  const legs = keyframes.slice(1).map((key) => Math.max(1, key.stages) * stageDuration);
+  /** When each keyframe is reached. */
+  const times = keyframes.map((_, index) => legs.slice(0, index).reduce((sum, leg) => sum + leg, 0));
+  const total = times.at(-1) ?? 0;
+
+  const timeOf = (position: number) => {
+    if (count < 2) return 0;
+    const index = Math.min(count - 2, Math.max(0, Math.floor(position)));
+    return times[index] + legs[index] * Math.min(1, Math.max(0, position - index));
+  };
+  const positionOf = (time: number) => {
+    if (count < 2) return 0;
+    const index = Math.max(0, Math.min(count - 2, times.findLastIndex((start) => start <= time)));
+    return index + Math.min(1, Math.max(0, (time - times[index]) / legs[index]));
+  };
+  const x = (time: number) => `calc(var(--pg-pad) + (100% - 2 * var(--pg-pad)) * ${total ? time / total : 0})`;
+  const width = (duration: number) => `calc((100% - 2 * var(--pg-pad)) * ${total ? duration / total : 0})`;
+
+  return { legs, times, total, timeOf, positionOf, x, width };
+}
+
 /** Ruler steps, in milliseconds, from fine to coarse. */
 const STEPS = [250, 500, 1000, 2000, 5000, 10_000];
 
@@ -50,6 +80,8 @@ const STEPS = [250, 500, 1000, 2000, 5000, 10_000];
  */
 export function Timeline({
   keyframes,
+  previews,
+  onPreview,
   value,
   stageDuration,
   replaying,
@@ -64,25 +96,34 @@ export function Timeline({
   mod = '⌘',
   className,
 }: TimelineProps) {
+  const [expanded, setExpanded] = useState(true);
+  const [hover, setHover] = useState<{ id: number; left: number; top: number } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerInside = useRef(false);
+  const cancelTimer = () => { if (timer.current) clearTimeout(timer.current); };
+  const close = () => { cancelTimer(); setHover(null); };
+  const leave = () => { cancelTimer(); timer.current = setTimeout(() => { if (!pointerInside.current && !document.activeElement?.matches('.pg-key:focus-visible')) setHover(null); }, 120); };
+  const open = (id: number, button: HTMLElement, immediate = false) => {
+    cancelTimer();
+    const rect = button.getBoundingClientRect();
+    const show = () => setHover({ id, left: Math.max(8, Math.min(window.innerWidth - 328, rect.left + rect.width / 2 - 160)), top: rect.top >= 290 ? rect.top - 282 : Math.max(8, Math.min(window.innerHeight - 280, rect.bottom + 8)) });
+    if (immediate) show(); else timer.current = setTimeout(show, 150);
+  };
+  useEffect(() => {
+    onPreview(hover?.id ?? null);
+  }, [hover, previews, onPreview]);
+  useEffect(() => {
+    const dismiss = (event: KeyboardEvent) => { if (event.key === 'Escape') { if (timer.current) clearTimeout(timer.current); setHover(null); } };
+    const resize = () => setHover(null);
+    window.addEventListener('keydown', dismiss);
+    window.addEventListener('resize', resize);
+    return () => { if (timer.current) clearTimeout(timer.current); window.removeEventListener('keydown', dismiss); window.removeEventListener('resize', resize); };
+  }, []);
+  const visibleCategories = categories.filter(category => keyframes.some(key => key.changes.some(change => change.category === category.id)));
+  const previewIndex = hover ? keyframes.findIndex(key => key.id === hover.id) : -1;
   const count = keyframes.length;
-  const legs = keyframes.slice(1).map((key) => Math.max(1, key.stages) * stageDuration);
-  /** When each keyframe is reached. */
-  const times = keyframes.map((_, index) => legs.slice(0, index).reduce((sum, leg) => sum + leg, 0));
-  const total = times.at(-1) ?? 0;
+  const { legs, times, total, timeOf, positionOf, x, width } = timelineGeometry(keyframes, stageDuration);
   const stages = keyframes.reduce((sum, key) => sum + key.stages, 0);
-
-  const timeOf = (position: number) => {
-    if (count < 2) return 0;
-    const index = Math.min(count - 2, Math.max(0, Math.floor(position)));
-    return times[index] + legs[index] * Math.min(1, Math.max(0, position - index));
-  };
-  const positionOf = (time: number) => {
-    if (count < 2) return 0;
-    const index = Math.max(0, Math.min(count - 2, times.findLastIndex((start) => start <= time)));
-    return index + Math.min(1, Math.max(0, (time - times[index]) / legs[index]));
-  };
-  const x = (time: number) => `calc(var(--pg-pad) + (100% - 2 * var(--pg-pad)) * ${total ? time / total : 0})`;
-  const width = (duration: number) => `calc((100% - 2 * var(--pg-pad)) * ${total ? duration / total : 0})`;
 
   const now = replaying ? timeOf(value) : total;
   const current = replaying && Math.abs(value - Math.round(value)) < 0.002 ? Math.round(value) : -1;
@@ -118,7 +159,7 @@ export function Timeline({
             {count} {count === 1 ? 'key' : 'keys'} · {stages} {stages === 1 ? 'stage' : 'stages'}
           </span>
         </div>
-        <div className="pg-track" data-dense={count > 12 || undefined}>
+        <div className="pg-track" data-expanded={expanded && visibleCategories.length > 0 || undefined} data-dense={count > 12 || undefined}>
           <div className="pg-ruler" aria-hidden="true">
             {ticks.map((tick) => (
               <span key={tick} className="pg-tick" style={{ left: x(tick) }}>
@@ -166,7 +207,7 @@ export function Timeline({
                 value={now / 1000}
                 aria-label="Keyframe timeline"
                 aria-valuetext={`${seconds(now)} of ${seconds(total)}`}
-                onChange={(event) => onScrub(positionOf(event.currentTarget.valueAsNumber * 1000))}
+                onChange={(event) => { close(); onScrub(positionOf(event.currentTarget.valueAsNumber * 1000)); }}
               />
             )}
             {keyframes.map((key, index) => (
@@ -178,8 +219,12 @@ export function Timeline({
                 data-time={times[index] / 1000}
                 style={{ left: x(times[index]) }}
                 aria-label={describe(key, index, times[index])}
-                title={describe(key, index, times[index])}
-                onClick={() => onSeek(index)}
+                onPointerEnter={(event) => { if (event.pointerType !== 'touch') { pointerInside.current = true; open(key.id, event.currentTarget); } }}
+                onPointerLeave={() => { pointerInside.current = false; leave(); }}
+                onFocus={(event) => { if (event.currentTarget.matches(':focus-visible')) open(key.id, event.currentTarget, true); }}
+                onBlur={leave}
+                aria-describedby={hover?.id === key.id ? 'pg-key-preview' : undefined}
+                onClick={() => { close(); onSeek(index); }}
               >
                 <span className="pg-key-label" aria-hidden="true">
                   {index + 1}
@@ -187,6 +232,21 @@ export function Timeline({
               </button>
             ))}
           </div>
+          {expanded && visibleCategories.length > 0 && <div className="pg-category-scroll">
+            {visibleCategories.map(category => <div className="pg-category-row" key={category.id} data-category={category.id}>
+              <span className="pg-category-name">{category.label}</span>
+              <div className="pg-category-time">
+                {keyframes.slice(1).map((key, index) => {
+                  const changes = key.changes.filter(change => change.category === category.id);
+                  if (!changes.length) return null;
+                  const active = replaying && value > index && value < index + 1;
+                  const label = changes.map(formatChange).join(' · ');
+                  return <span key={key.id} className="pg-category-block" data-active={active || undefined} title={`${category.label}: ${label}${active ? ' — current transition' : ''}`} style={{ left: x(times[index]), width: width(legs[index]) }}>{label}</span>;
+                })}
+                {replaying && <span className="pg-category-head" aria-hidden="true" style={{ left: x(now) }} />}
+              </div>
+            </div>)}
+          </div>}
           {replaying && <span className="pg-head" aria-hidden="true" style={{ left: x(now) }} />}
         </div>
         <button
@@ -200,6 +260,19 @@ export function Timeline({
           Keep
         </button>
       </div>
+      {visibleCategories.length > 0 && <div className="pg-category-help">
+        <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Hide categories' : 'Show categories'}</button>
+        {expanded && <span>Lanes show changes in each transition; stage markers show planned timing.</span>}
+      </div>}
+      {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
+        <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>
+        {previews[hover.id]?.image
+          // Serialized local SVG, not a remote image for Next image optimization.
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={previews[hover.id].image} alt={`Saved chart at keyframe ${previewIndex + 1}`} width={320} height={200} />
+          : <div className="pg-preview-placeholder">{previews[hover.id]?.error ? 'Preview unavailable' : 'Loading preview…'}</div>}
+        <p>{previewIndex ? describeLeg(keyframes[previewIndex]) : 'Initial state'}</p>
+      </div>, document.body)}
       <p className="mt-0.5 flex items-baseline gap-3 pl-11 text-xs text-fd-muted-foreground" aria-live="polite">
         <span>{hint}</span>
         {count > 0 && (

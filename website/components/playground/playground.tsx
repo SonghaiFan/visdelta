@@ -9,6 +9,7 @@ import { loadIdioms, type LabChart } from '@/components/interactive/corpus';
 import {
   errorMessage,
   evaluateChart,
+  freezeState,
   loadFactories,
   loadRuntime,
   prefersReducedMotion,
@@ -26,6 +27,7 @@ import { useMedia, useModifierKey, usePreference } from './preferences';
 import { RowsPanel, type RowsView } from './rows-panel';
 import { SIZE_LIMITS, SizeControls, type SizeMode } from './size-controls';
 import { Timeline } from './timeline';
+import { useKeyframePreviews } from './keyframe-previews';
 
 /** A curated story, gallery code, or code from a share link (no category). */
 type Opened = Omit<Story, 'category'> & {
@@ -147,6 +149,7 @@ export function Playground() {
   const [tab, setTab] = useState<'code' | 'rows'>('code');
   const [rowsView, setRowsView] = useState<RowsView>('table');
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
+  const keyframePreviews = useKeyframePreviews(keyframes);
   const [replaying, setReplaying] = useState(false);
   const [value, setValue] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -387,6 +390,8 @@ export function Playground() {
     if (!version) return;
     const frames = keyframesRef.current;
     const last = frames.at(-1);
+    version = { ...version, state: (await freezeState(version.state)).state };
+    if (keyframesRef.current !== frames) return;
     let difference: StateChange[] = [];
     if (last) {
       if (last.state.toSpec().mark !== version.state.toSpec().mark) {
@@ -1122,6 +1127,8 @@ export function Playground() {
       <Timeline
         className="pg-timeline"
         keyframes={keyframes}
+        previews={keyframePreviews.previews}
+        onPreview={keyframePreviews.request}
         value={value}
         stageDuration={STAGE_DURATION}
         replaying={replaying}

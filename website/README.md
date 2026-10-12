@@ -289,3 +289,17 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
   removing `docs/`.
   The semantic constitution (`docs/language-framework.md`) and the regression
   log remain the authoritative engineering records referenced by `AGENTS.md`.
+
+### Keyframe previews and category lanes
+
+Hover a numbered timeline marker, or focus it with the keyboard, to see a still
+preview of its saved state. Hovering leaves playback and code unchanged; click
+to travel to the keyframe, and press Escape to dismiss the preview. Touch taps
+continue to select keyframes directly. Previews fit the full figure into a
+480 × 300 frame, including its title, subtitle and top legend.
+
+Category lanes show each leg's changes under Data, Grain, Encoding, Coordinate,
+Layout, Attention and Appearance. Only categories present in the saved sequence
+appear. A transition can occupy several lanes at once: these blocks describe
+its changes, not independent animation schedules. The stage strip retains the
+actual planned stage timing. Use **Hide categories** to collapse the lanes.

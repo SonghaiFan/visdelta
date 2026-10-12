@@ -142,6 +142,17 @@ export async function renderFrozen(state: ChartState, target: HTMLElement, heigh
 export function svgSnapshot(host: Element): string | null {
   const svg = host.querySelector('svg');
   if (!svg) return null;
+  const figure = host.querySelector('.vd-chart-figure');
+  const header = figure?.querySelector<HTMLElement>('.vd-figure-header:not([hidden])');
+  const legend = figure?.querySelector('.vd-legend-svg');
+  if (figure && (header || legend)) return figureSnapshot(figure, header ?? null);
+  return snapshotUrl(cloneSvg(svg));
+}
+
+const snapshotUrl = (svg: SVGSVGElement) =>
+  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
+
+function cloneSvg(svg: SVGSVGElement): SVGSVGElement {
   const copy = svg.cloneNode(true) as SVGSVGElement;
   const originals = [svg, ...svg.querySelectorAll('*')];
   const copies = [copy, ...copy.querySelectorAll('*')];
@@ -157,7 +168,46 @@ export function svgSnapshot(host: Element): string | null {
       (copies[index] as SVGElement).style.setProperty(property, style.getPropertyValue(property));
     }
   });
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(copy))}`;
+  return copy;
+}
+
+/** Compose the real figure blocks; the first SVG alone is now only the canvas. */
+function figureSnapshot(figure: Element, header: HTMLElement | null): string {
+  const namespace = 'http://www.w3.org/2000/svg';
+  const bounds = figure.getBoundingClientRect();
+  const result = document.createElementNS(namespace, 'svg');
+  result.setAttribute('width', String(bounds.width));
+  result.setAttribute('height', String(bounds.height));
+  result.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+  for (const svg of figure.querySelectorAll<SVGSVGElement>('.vd-view > svg')) {
+    const rect = svg.getBoundingClientRect();
+    const copy = cloneSvg(svg);
+    copy.setAttribute('x', String(rect.left - bounds.left));
+    copy.setAttribute('y', String(rect.top - bounds.top));
+    copy.setAttribute('width', String(rect.width));
+    copy.setAttribute('height', String(rect.height));
+    result.append(copy);
+  }
+  if (header) {
+    const rect = header.getBoundingClientRect();
+    const block = document.createElementNS(namespace, 'foreignObject');
+    block.setAttribute('x', String(rect.left - bounds.left));
+    block.setAttribute('y', String(rect.top - bounds.top));
+    block.setAttribute('width', String(rect.width));
+    block.setAttribute('height', String(rect.height));
+    const copy = header.cloneNode(true) as HTMLElement;
+    const originals = [header, ...header.querySelectorAll<HTMLElement>('*')];
+    const copies = [copy, ...copy.querySelectorAll<HTMLElement>('*')];
+    originals.forEach((node, index) => {
+      const style = getComputedStyle(node);
+      for (const property of style) {
+        if (!property.startsWith('--')) copies[index].style.setProperty(property, style.getPropertyValue(property));
+      }
+    });
+    block.append(copy);
+    result.append(block);
+  }
+  return snapshotUrl(result);
 }
 
 export function errorMessage(cause: unknown) {

@@ -148,6 +148,77 @@ test.describe('playground', () => {
       .locator('svg rect[data-key]')
       .evaluateAll((rects) => rects.filter((rect) => rect.checkVisibility({ visibilityProperty: true }) && rect.getBoundingClientRect().width > 0).length);
 
+  test('keyframe previews are passive, cached, keyboard accessible and cleaned up', async ({ page }) => {
+    await page.goto('playground/#split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    await page.getByLabel('Keyframe timeline').fill('0');
+    const code = await page.locator('.cm-content').textContent();
+    const time = await page.getByLabel('Keyframe timeline').inputValue();
+    await page.evaluate(() => {
+      const counters = window as unknown as { previewRenders: number };
+      counters.previewRenders = 0;
+      new MutationObserver(records => {
+        for (const record of records) for (const node of record.addedNodes) {
+          if (node instanceof Element && node.matches('.pg-snapshot-render')) counters.previewRenders++;
+        }
+      }).observe(document.body, { childList: true });
+    });
+    await keys(page).nth(1).hover();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip.getByRole('img')).toBeVisible();
+    const image = await tooltip.getByRole('img').getAttribute('src');
+    expect(decodeURIComponent(image!)).toContain('<svg');
+    await expect(page.locator('.cm-content')).toHaveText(code!);
+    await expect(page.getByLabel('Keyframe timeline')).toHaveValue(time);
+    await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
+    await tooltip.hover();
+    await expect(tooltip).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(tooltip).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await keys(page).nth(1).hover();
+    await expect(tooltip.getByRole('img')).toHaveAttribute('src', image!);
+    expect(await page.evaluate(() => (window as unknown as { previewRenders: number }).previewRenders)).toBe(1);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Tab');
+    await keys(page).first().focus();
+    await expect(tooltip).toContainText('Initial state');
+    await page.getByRole('button', { name: 'clear', exact: true }).click();
+    await expect(tooltip).toHaveCount(0);
+    await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
+  });
+
+  test('category lanes share leg geometry without claiming stage timing', async ({ page }) => {
+    await page.goto('playground/#split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    await expect(page.getByText('Lanes show changes in each transition; stage markers show planned timing.')).toBeVisible();
+    const rows = page.locator('.pg-category-row');
+    expect(await rows.count()).toBeGreaterThan(0);
+    await expect.poll(() => page.locator('.pg-category-block').evaluateAll(blocks => {
+      const clips = [...document.querySelectorAll('.pg-clip')].map(clip => clip.getBoundingClientRect());
+      return blocks.every(block => {
+        const rect = block.getBoundingClientRect();
+        return clips.some(clip => Math.abs(clip.left - rect.left) < 1 && Math.abs(clip.width - rect.width) < 1);
+      });
+    })).toBe(true);
+    const count = await rows.count();
+    await page.getByLabel('Keyframe timeline').fill('1.25');
+    await expect(rows).toHaveCount(count);
+    await expect(page.locator('.pg-category-block[data-active]').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Hide categories' }).click();
+    await expect(rows).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show categories' }).click();
+    await expect(rows).toHaveCount(count);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByLabel('Keyframe timeline')).toBeVisible();
+    expect(await page.locator('.pg-stage').evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(272);
+    await keys(page).last().hover();
+    await expect(page.getByRole('tooltip').getByRole('img')).toBeVisible();
+    const bounds = await page.getByRole('tooltip').boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+  });
+
   test('an editor workspace: examples, files, chart, timeline and status', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/');
@@ -275,6 +346,8 @@ test.describe('playground', () => {
     await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
     await expect(keys(page).nth(2)).toHaveAttribute('data-time', '2.7');
     await expect(track).toContainText('2.70s / 2.70s');
+    // Measure the settled track, not the scale-in entrance transform.
+    await track.locator('.pg-clip').evaluateAll(clips => Promise.all(clips.flatMap(clip => clip.getAnimations().map(animation => animation.finished))));
     const clipWidths = await track.locator('.pg-clip').evaluateAll((clips) => clips.map((clip) => clip.getBoundingClientRect().width));
     expect(clipWidths[0] / clipWidths[1]).toBeCloseTo(2, 1);
 
