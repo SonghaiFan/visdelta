@@ -12,6 +12,10 @@ import { getMDXComponents } from '@/components/mdx';
 import type { Metadata } from 'next';
 import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { absoluteUrl, basePath, getPageMarkdownUrl, gitConfig, repositoryUrl } from '@/lib/shared';
+import { InlineEditorLoader } from '@/components/dev/inline-editor-loader';
+
+// `next dev` only: text on the page can be edited and saved back to its file.
+const editable = process.env.NODE_ENV === 'development';
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -22,11 +26,14 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   // Fetched by the browser, so it needs the deployment base path.
   const markdownUrl = `${basePath}${getPageMarkdownUrl(page).url}`;
   const sourceUrl = `${repositoryUrl}/blob/${gitConfig.branch}/website/content/docs/${page.path}`;
+  const field = (name: 'title' | 'description') => (editable ? { 'data-vd-src': `content/docs/${page.path}#${name}` } : {});
 
   return (
     <DocsPage toc={page.data.toc} full={page.data.full}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      <DocsTitle {...field('title')}>{page.data.title}</DocsTitle>
+      <DocsDescription className="mb-0" {...field('description')}>
+        {page.data.description}
+      </DocsDescription>
       <div className="flex flex-row items-center gap-2 border-b pb-6">
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover markdownUrl={markdownUrl} githubUrl={sourceUrl} />
@@ -38,6 +45,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
           })}
         />
       </DocsBody>
+      {editable && <InlineEditorLoader />}
     </DocsPage>
   );
 }

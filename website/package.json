@@ -14,7 +14,8 @@
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
     "examples:check": "node scripts/verify-examples.mjs && node scripts/verify-playground.mjs",
     "test": "playwright test",
-    "check": "npm run lint && npm run examples:check && npm run types:check && npm run build && npm test"
+    "test:unit": "node --test tests/*.test.ts",
+    "check": "npm run lint && npm run examples:check && npm run types:check && npm run test:unit && npm run build && npm test"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
