@@ -237,6 +237,20 @@ const chart = bar(cases)
     edits: [{ add: '.focus({ cyl: 4 })' }, { replace: '.focus({ cyl: 4 })', with: '.highlight({ cyl: 4 })' }],
   },
   {
+    id: 'headline',
+    title: 'Headline',
+    category: 'appearance',
+    chart: 'bar',
+    line: 'Add a title and a subtitle, then change the title. The text sits above the chart, which does not move.',
+    data: POPULATION,
+    code: underTen,
+    edits: [
+      { add: '.title("Residents under 10")' },
+      { add: '.subtitle("US Census, by state")' },
+      { replace: 'title("Residents under 10")', with: 'title("Children under ten")' },
+    ],
+  },
+  {
     id: 'steps',
     title: 'Steps',
     category: 'appearance',

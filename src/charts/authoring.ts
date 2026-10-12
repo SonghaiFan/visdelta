@@ -187,6 +187,28 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
     } as Partial<S>, { captureResetBaseline: true });
   }
 
+  /**
+   * A heading above the chart, outside the canvas, so it never changes the
+   * chart's `width` or `height`. Fixed styling, not a field binding. Text that
+   * is empty or only whitespace, or `null`, removes it.
+   */
+  title(text: string | null): this {
+    return this.heading('title', text);
+  }
+
+  /** A secondary line under the title. Text that is empty or only whitespace, or `null`, removes it. */
+  subtitle(text: string | null): this {
+    return this.heading('subtitle', text);
+  }
+
+  private heading(key: 'title' | 'subtitle', text: string | null): this {
+    if (text !== null && typeof text !== 'string') throw new Error(`.${key}() takes text, or null to remove it.`);
+    const next = cloneState(this.state) as ViewSpec;
+    if (text && text.trim()) next[key] = text;
+    else delete next[key];
+    return this.derive(next as S);
+  }
+
   /** Configure the chart axes, scales, orientation, and transition order. */
   axis(config: Partial<AxisSpec> = {}): this {
     return this.with({ axis: cloneState(config) } as Partial<S>, { captureResetBaseline: true });

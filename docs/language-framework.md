@@ -64,7 +64,9 @@ Category boundaries are strict:
 - **Layout** is the arrangement, order, or connection of the same objects.
 - **Attention** preserves the data and marks while focus moves the camera or
   highlight changes emphasis.
-- **Appearance** is fixed visual styling or form that does not bind a field.
+- **Appearance** is fixed visual styling or form that does not bind a field. A
+  `.title()` or `.subtitle()` is Appearance: it names the chart without binding
+  data.
 
 The array's stable categorical order is for inspection only. It is not a
 priority list, route, or playback schedule.
@@ -499,6 +501,31 @@ fit are chart-owned geometry, not a new encoding, grain, layout or mark key.
 The Area operation codec keeps this control in its own slot. Omitted labels
 retain the default of no direct labels; thin or narrow layers may omit text
 without changing the authored declaration or color legend.
+
+### Titles and subtitles
+
+`.title(text)` and `.subtitle(text)` are independently authored presentation
+controls on every chart state. A change emits Appearance `restyle` with property
+`title` or `subtitle`, using the existing public vocabulary; they are not an
+encoding, a grain or a mark key. Blank text and `null` declare no heading, so a
+state with a blank title is the same state as one without.
+
+A heading is figure text above the canvas, outside the SVG, so it never changes
+the canvas's `width` or `height` (see [the reference](/reference#canvas-size)).
+It belongs to the figure, not to the route: planning, the generated waypoints and
+the frame caches see each endpoint without its heading, so a heading change does
+not remove an intermediate route and no operation codec carries it. The heading
+is a function of the authored progress `p` of the pair alone: the old text fades
+out over the first half and the new text fades in over the second, so no frame
+shows both and reverse playback shows the same frames backward. The heading's
+room follows the same progress: its height runs between the natural height of the
+old heading and that of the new one, so the first frame is the old state drawn on
+its own, the last frame is the new state drawn on its own, and the canvas, whose
+layout does not depend on the heading, only slides. A `sequence()` hands over
+between legs at a state both draw identically. When the canvas height follows its
+container (`height: "auto"`) the canvas is laid out for one room, so the heading
+holds the room of the taller text throughout, and a `sequence()` holds the tallest
+heading of all its states for every leg.
 
 ### Pie bindings and fallback
 

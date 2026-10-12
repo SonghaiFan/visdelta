@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- `.title(text)` and `.subtitle(text)` on every chart state put a heading above
+  the chart, in the figure and outside the canvas, so it never changes `width`
+  or `height`. A change is Appearance `restyle` with property `title` or
+  `subtitle`. In a transition the old text fades out over the first half and the
+  new one fades in over the second, by the pair's authored progress, so reverse
+  playback shows the same frames backward. The heading's room follows the same
+  progress, so the first and last frames are the old and new states drawn alone
+  and the canvas only slides in between (with `height: "auto"` the heading holds
+  the room of the taller text instead). Headings are not part of route
+  planning, and a figure with no heading takes no room for one: the previously
+  always-present, always-empty title strip is gone, so charts without a title
+  are shorter by that strip under the default theme. The unused `.vd-mark-name`
+  element is removed, and the heading's padding and rule moved from
+  `.vd-figure-header` to a new inner `.vd-figure-heading`.
+
 - `transition()` and `sequence()` take `width` and `height`, each a number of
   pixels (fixed) or `"auto"` (follow the container), and `resize()` accepts both.
   As in Observable Plot they are the outer size of the canvas, margins included:

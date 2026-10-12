@@ -246,3 +246,6 @@ function fitContainer(change: ResizableTransition, story: SizedSequence, size: C
   return story.resize({ width: "auto", height: size });
 }
 void fixedSize; void fitSize; void fitContainer;
+const headed = bar([{ city: 'Oslo', visitors: 31 }]).x('city').y('visitors').title('Visitors').subtitle('March').subtitle(null);
+const headingText: string | null | undefined = headed.toSpec().title;
+void headingText;

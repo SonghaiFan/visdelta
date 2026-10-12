@@ -22,6 +22,8 @@ import { select } from 'd3-selection';
 import { viewRows, domainTransforms } from './data.js';
 import { applyTransforms } from '../data/transforms.js';
 import type { CanvasSize } from './canvas-size.js';
+import { bareLayout, createHeading } from './heading.js';
+import type { HeadingReservation } from './heading.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
   /** Canvas width: pixels, or "auto" (default) to follow the container. */
@@ -30,6 +32,8 @@ export interface TransitionSurfaceOptions extends RuntimeOptions {
   height?: CanvasSize;
   /** Force the reconstruction bridge even for chart types that allow cached frames. */
   reconstruct?: boolean;
+  /** Heading texts of the whole sequence this pair belongs to, so every leg reserves the same room. */
+  headingReservation?: HeadingReservation;
 }
 
 export interface TransitionSurface {
@@ -65,6 +69,12 @@ export function createTransitionSurface(
     renderSeekPhase, applySeekSequence } = createViewRenderer(chartTypes);
   const chartType = chartTypes.get(from);
   if (!chartType) throw new Error(`Unsupported chart type: ${String(from.mark)}`);
+  // Title and subtitle belong to the figure, not to the route: planning, drawing
+  // and the cached frames see the pair without them, and the heading follows the
+  // authored progress on its own.
+  const authored = { from, to };
+  from = bareLayout(from);
+  to = bareLayout(to);
   const canonical = canonicalTransitionPair(chartType, from, to);
   const source = canonical.from;
   const target = canonical.to;
@@ -85,6 +95,7 @@ export function createTransitionSurface(
   root.dataset.chartStyle = styleKey;
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
+  const heading = createHeading(shell.heading, authored.from, authored.to, options.headingReservation);
   const config: ViewConfig = {
     // "auto" is measured at layout time; until then the chart's own height stands in.
     height: (typeof options.height === 'number' ? options.height : undefined) ?? from.height ?? to.height ?? 500
@@ -110,8 +121,6 @@ export function createTransitionSurface(
   let requestedWidth = options.width;
   let requestedHeight = options.height;
 
-  const header = shell.figure.querySelector<HTMLElement>('.vd-figure-header');
-
   /**
    * Apply the requested canvas size to the chart's own elements. The canvas is
    * the SVG, margins included. A fixed width lets the root shrink-wrap the view,
@@ -132,13 +141,14 @@ export function createTransitionSurface(
     node.style.minHeight = explicitHeight ? '0' : '';
     figure.borderLeftWidth = figure.borderRightWidth = fitWidth ? '0' : '';
     figure.borderTopWidth = figure.borderBottomWidth = fill ? '0' : '';
-    if (header) header.style.display = fill ? 'none' : '';
     root.style.height = fill ? '100%' : '';
     figure.height = fill ? '100%' : '';
     figure.boxSizing = fill ? 'border-box' : '';
     figure.display = fill ? 'flex' : '';
     figure.flexDirection = fill ? 'column' : '';
     node.style.flex = fill ? '1 1 0' : '';
+    // A canvas that fills its container is laid out for one room, so the heading holds it.
+    heading.hold(fill);
   }
   applyCanvasStyles();
 
@@ -212,7 +222,10 @@ export function createTransitionSurface(
     },
     progress(value, direction = 0) {
       hideTooltip(shell.tooltip);
+      heading.progress(value);
       if (layoutDirty) {
+        // The heading's own room is read before the canvas is laid out for what is left.
+        heading.measure();
         const width = node.clientWidth || 720;
         // "auto" reads the room the container gives the view. A container with
         // no height of its own gives none, and the chart keeps its own height.

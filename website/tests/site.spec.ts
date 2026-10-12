@@ -413,6 +413,48 @@ test.describe('playground', () => {
     expect(fits).toBe(true);
   });
 
+  test('a title is figure text above the chart; Fit holds the canvas still, Fixed slides it', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#headline');
+    // Start, title, subtitle, new title: four kept states.
+    await expect(keys(page)).toHaveCount(4, { timeout: 30_000 });
+    const stage = chart(page);
+    const title = stage.locator('.vd-figure-title:visible').first();
+    await expect(title).toContainText('Children under ten');
+    await expect(changes(page)).toContainText('appearance.restyle(title)');
+    // The heading is outside the SVG, so the canvas is the same size with or without it.
+    expect(await stage.locator('svg').first().evaluate((svg) => svg.textContent?.includes('Children under ten'))).toBe(false);
+    expect(await stage.locator('figure').first().evaluate((figure) => figure.querySelector('figcaption') !== null && figure.querySelector('svg')!.closest('figcaption') === null)).toBe(true);
+
+    // Fit follows the container, so the canvas is laid out for one room: the heading holds the
+    // room of the tallest text and the canvas does not move at any frame.
+    const timeline = page.getByLabel('Keyframe timeline');
+    const canvas = () => stage.locator('svg:visible').first().evaluate((svg) => {
+      const box = svg.getBoundingClientRect();
+      return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top) };
+    });
+    await timeline.fill('0');
+    await expect(page.getByText(/Replaying 4 keyframes/)).toBeVisible();
+    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
+    const fitFirst = await canvas();
+    await timeline.fill('2.7');
+    await expect.poll(canvas).toEqual(fitFirst);
+
+    // Fixed leaves the canvas size alone, so the heading's room opens by progress and the
+    // first frame is the chart drawn without one.
+    await page.getByRole('group', { name: 'Chart size' }).getByRole('button', { name: 'Fixed' }).click();
+    await timeline.fill('0');
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
+    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
+    const first = await canvas();
+    await timeline.fill('2.7');
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(1);
+    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(first.top + 20);
+    const last = await canvas();
+    expect({ width: last.width, height: last.height }).toEqual({ width: first.width, height: first.height });
+    expect(errors).toEqual([]);
+  });
+
   test('rows are a file: upload your own or edit them, and the chart follows', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#sort');

@@ -82,6 +82,8 @@ base-2 tick selection.
 .focus(selector)
 .reset()
 .axis(config)
+.title(text | null)
+.subtitle(text | null)
 .transition({ duration?, ease?, stagger? })
 ```
 
@@ -89,6 +91,35 @@ base-2 tick selection.
 VisDelta owns its D3 runtime and executes transforms itself, so no runtime object is required.
 Inline data is read directly; pass source rows only when the state uses a named
 dataset.
+
+### Title and subtitle
+
+```ts
+.title(text | null)
+.subtitle(text | null)
+```
+
+A heading above the chart, in the figure and outside the canvas, so it never
+changes the canvas's `width` or `height`. Blank text and `null` remove it. They
+are fixed styling: a change is Appearance `restyle` with property `title` or
+`subtitle`.
+
+```js
+bar(rows).x("state").y("population").title("Residents under 10").subtitle("US Census, 2020");
+```
+
+In a transition the old text fades out over the first half and the new text
+fades in over the second, driven by the authored progress of the pair, so
+reverse playback shows the same frames backward. The heading's room follows the
+same progress: the first frame is the old state drawn on its own and the last
+frame the new one, with the room opening or closing in between, so the canvas
+only slides. With `height: "auto"` the canvas is laid out for one room, so the
+heading holds the room of the taller text throughout, and a `sequence()` holds
+the tallest heading of all its states for every leg. Headings are not part of
+route planning: a pair that differs in grain and in title keeps its automatic
+intermediate states. A figure with no heading takes no room for one. Themes
+style `.vd-figure-title` and `.vd-figure-subtitle`; the padding and rule under
+the heading belong to `.vd-figure-heading`.
 
 ### Selectors
 

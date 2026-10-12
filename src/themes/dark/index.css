@@ -56,7 +56,7 @@ body { color-scheme: dark; }
 .vd-figure {
   border-top: 2px solid var(--vd-color-primary);
 }
-.vd-figure-header {
+.vd-figure-heading {
   border-bottom: 1px solid var(--vd-color-border);
 }
 .vd-figure-title {

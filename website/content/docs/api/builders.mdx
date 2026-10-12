@@ -41,11 +41,36 @@ and [where, highlight and focus](/docs/concepts/selection).
 .focus(selector)
 .reset()
 .axis(config)
+.title(text | null)
+.subtitle(text | null)
 .transition({ duration?, ease?, stagger? })
 .repeat(field, { direction?, scales?, columns?, gap?, minWidth?, autoHeight?, minHeight? })
 .rows(source?)   // → tidy rows after transforms
 .toSpec()        // → detached view spec
 ```
+
+### Title and subtitle
+
+`.title(text)` and `.subtitle(text)` put a heading above the chart, in the
+figure and outside the canvas, so it never changes the canvas's `width` or
+`height`. Blank text and `null` remove it. They are fixed styling: a change is
+Appearance `restyle` with property `title` or `subtitle`.
+
+```ts
+bar(rows).x('state').y('population').title('Residents under 10').subtitle('US Census, 2020');
+```
+
+<LiveExample id="bar-title" />
+
+In a transition the old text fades out over the first half and the new text
+fades in over the second, driven by the pair's progress, so reverse playback
+shows the same frames backward. The heading's room follows the same progress, so
+the first frame is the old state drawn on its own and the last frame the new one,
+and the canvas only slides in between. With `height: 'auto'` the canvas is laid
+out for one room, so the heading holds the room of the taller text throughout
+(a `sequence()` holds the tallest of all its states). Headings are not part of
+route planning, so a grain change that also changes the title keeps its
+automatic intermediate states.
 
 ## Bar
 

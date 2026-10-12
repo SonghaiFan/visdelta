@@ -14,6 +14,7 @@ import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
+import { headingReservations } from './runtime/heading.js';
 import type { CanvasSize } from './runtime/canvas-size.js';
 
 export type { CanvasSize } from './runtime/canvas-size.js';
@@ -138,7 +139,9 @@ export async function transition(
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
-  const surface = createTransitionSurface(resolvedFrom, resolvedTo, { ...options, chartStyle }, chartTypes);
+  const surface = createTransitionSurface(resolvedFrom, resolvedTo, {
+    ...options, chartStyle, headingReservation: headingReservations.get(options)
+  }, chartTypes);
   let value = 0;
   let lastDirection = 1;
   let animation: number | null = null;

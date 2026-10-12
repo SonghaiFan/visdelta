@@ -56,7 +56,7 @@ const catalogue: { id: StateChangeCategory; name: string; question: string; synt
     id: 'appearance',
     name: 'Appearance',
     question: 'What fixed visual form or styling is used?',
-    syntax: ['.color("#…")', '.radius()', '.strokeWidth()', '.curve()'],
+    syntax: ['.color("#…")', '.title()', '.strokeWidth()', '.curve()'],
     actions: ['restyle', 'reshape'],
   },
 ];

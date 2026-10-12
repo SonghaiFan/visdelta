@@ -152,9 +152,6 @@ html > body[data-scroll-locked] {
 .vd-docs-chart .vd-view {
   min-height: 0;
 }
-.vd-docs-chart .vd-figure-header {
-  display: none;
-}
 .vd-docs-chart .vd-transition-root.vd-style-d3 {
   --vd-grid: #ececE8;
   --vd-color-outline-variant: #ececE8;

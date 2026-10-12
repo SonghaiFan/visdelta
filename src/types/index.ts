@@ -291,6 +291,10 @@ export interface ViewSpec {
   connector?: ConnectorSpec | null;
   meta?: SpecMeta;
   margin?: Partial<MarginSpec>;
+  /** Heading above the chart, outside the canvas. Appearance, not a data binding. */
+  title?: string | null;
+  /** Secondary line under the title. */
+  subtitle?: string | null;
   [field: string]: unknown;
 }
 
