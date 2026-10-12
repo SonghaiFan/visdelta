@@ -44,6 +44,12 @@ async function evaluateIdiom(idiom: Idiom): Promise<ChartState> {
   return evaluateChart(idiom.code, { [idiom.mark]: factory }, rows);
 }
 
+function TileHost({ id, register }: { id: string; register: (id: string, element: HTMLElement | null) => void }) {
+  // Status updates must not detach the host and invalidate its completed render.
+  const ref = useCallback((element: HTMLSpanElement | null) => register(id, element), [id, register]);
+  return <span ref={ref} data-idiom={id} className="vd-docs-chart vd-gallery-thumb block h-full" />;
+}
+
 /**
  * Every visual idiom VisDelta can express, drawn live from its code and a
  * bundled dataset. Tiles are frozen renders; the viewer is a live chart that
@@ -286,7 +292,7 @@ export function IdiomGallery() {
               return (
                 <button key={idiom.id} type="button" data-idiom-tile={idiom.id} aria-label={`Open ${idiom.title}`} onClick={() => void openIdiom(idiom)} className="group text-left focus-visible:outline-offset-4">
                   <span className="relative block h-56 overflow-hidden rounded-md bg-fd-card transition-[box-shadow] duration-300 group-hover:shadow-[0_0_0_1px_var(--color-fd-border)]">
-                    <span ref={(element) => registerTile(idiom.id, element)} data-idiom={idiom.id} className="vd-docs-chart vd-gallery-thumb block h-full" />
+                    <TileHost id={idiom.id} register={registerTile} />
                     {status?.startsWith('error:') ? (
                       <span role="alert" data-example-error="" className="absolute inset-0 grid place-items-center p-4 text-center font-mono text-xs text-fd-error">
                         {status.slice(6)}

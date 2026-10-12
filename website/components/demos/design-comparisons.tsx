@@ -39,6 +39,17 @@ interface Corpus {
 
 const key = (item: Comparison, side: 'before' | 'after', index: number) => `${item.id}/${side}/${index}`;
 
+function ComparisonHost({ item, side, index, register }: {
+  item: Comparison;
+  side: 'before' | 'after';
+  index: number;
+  register: (item: Comparison, side: 'before' | 'after', index: number, element: HTMLDivElement | null) => void;
+}) {
+  const ref = useCallback((element: HTMLDivElement | null) => register(item, side, index, element), [item, side, index, register]);
+  const view = item[side];
+  return <div ref={ref} className="vd-docs-chart" style={{ minHeight: view.height ?? (view.charts!.length > 1 ? 180 : 280) }} />;
+}
+
 /** Paired "Not ideal → Better" charts, drawn live, with VisDelta's own design hints. */
 export function DesignComparisons() {
   const [corpus, setCorpus] = useState<Corpus | null>(null);
@@ -212,11 +223,7 @@ export function DesignComparisons() {
                                 const status = statuses[id];
                                 return (
                                   <div key={index} className="relative">
-                                    <div
-                                      ref={(element) => register(item, side, index, element)}
-                                      className="vd-docs-chart"
-                                      style={{ minHeight: view.height ?? (view.charts!.length > 1 ? 180 : 280) }}
-                                    />
+                                    <ComparisonHost item={item} side={side} index={index} register={register} />
                                     {status && (
                                       <p role={status.startsWith('Unable') ? 'alert' : 'status'} className="absolute inset-0 grid place-items-center font-mono text-xs text-fd-muted-foreground">
                                         {status}
