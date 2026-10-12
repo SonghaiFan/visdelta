@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-// A chart's canvas is either a fixed number of pixels or "auto": it follows the
-// container it is mounted in, in width, in height, or in both.
+// A chart's canvas (its SVG, margins included) is either a fixed number of pixels
+// or "auto": exactly the container's content box, in width, in height, or both.
+// Omitted, the width follows the container inside the figure's own chrome.
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
@@ -44,59 +45,69 @@ test('a fixed width and height are exact, and a narrower container overflows ins
   expect(result.after).toEqual({ width: 640, height: 360 });
 });
 
-test('auto width follows the container; a fixed height stays', async ({ page }) => {
+test('auto width makes the canvas exactly the container wide and follows it; a fixed height stays', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const host = mountHost('width:400px');
-    const change = await sl.transition(base, next, { target: host, height: 300 });
+    const change = await sl.transition(base, next, { target: host, width: 'auto', height: 300 });
     change.progress(0.5);
-    // The figure is the chart with its theme chrome; the canvas is its content area.
     // A resize redraws, so the nodes are looked up again each time.
     const measure = () => {
       const svg = host.querySelector('svg');
-      return { figure: Math.round(rect(host.querySelector('figure')).width), canvas: Math.round(rect(svg).width), height: Math.round(rect(svg).height) };
+      return { canvas: Math.round(rect(svg).width), height: Math.round(rect(svg).height), viewBox: svg.getAttribute('viewBox') };
     };
     const narrow = measure();
     host.style.width = '700px';
     await settle();
-    return { narrow, wide: measure(), viewBox: host.querySelector('svg').getAttribute('viewBox') };
+    return { narrow, wide: measure() };
   });
-  expect(result.narrow).toMatchObject({ figure: 400, height: 300 });
-  expect(result.wide).toMatchObject({ figure: 700, height: 300 });
-  expect(result.wide.canvas).toBeLessThanOrEqual(700);
-  expect(result.viewBox).toBe(`0 0 ${result.wide.canvas} 300`);
+  expect(result.narrow).toEqual({ canvas: 400, height: 300, viewBox: '0 0 400 300' });
+  expect(result.wide).toEqual({ canvas: 700, height: 300, viewBox: '0 0 700 300' });
 });
 
-test('auto height fills a container that has a height, and follows it in both dimensions', async ({ page }) => {
+test('an omitted width follows the container inside the figure\'s own chrome', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const host = mountHost('width:400px');
+    const change = await sl.transition(base, next, { target: host, height: 300 });
+    change.progress(0.5);
+    const border = parseFloat(getComputedStyle(host.querySelector('figure')).borderLeftWidth);
+    return { figure: Math.round(rect(host.querySelector('figure')).width), canvas: Math.round(rect(host.querySelector('svg')).width), border };
+  });
+  expect(result.figure).toBe(400);
+  expect(result.border).toBeGreaterThan(0);
+  expect(result.canvas).toBe(400 - 2 * result.border);
+});
+
+test('auto makes the canvas exactly the container, and follows it in both dimensions', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const host = mountHost('width:500px;height:320px');
-    const change = await sl.transition(base, next, { target: host, height: 'auto' });
+    const change = await sl.transition(base, next, { target: host, width: 'auto', height: 'auto' });
     change.progress(0.5);
     const state = () => {
-      const view = host.querySelector('.vd-view');
       const svg = host.querySelector('svg');
-      return {
-        figure: Math.round(rect(host.querySelector('figure')).height),
-        svgIsView: Math.round(rect(svg).height) === view.clientHeight && Math.round(rect(svg).width) === view.clientWidth,
-        viewBox: svg.getAttribute('viewBox'),
-        view: `0 0 ${view.clientWidth} ${view.clientHeight}`
-      };
+      const box = rect(svg);
+      return { canvas: [Math.round(box.width), Math.round(box.height)], viewBox: svg.getAttribute('viewBox'), figure: [Math.round(rect(host.querySelector('figure')).width), Math.round(rect(host.querySelector('figure')).height)] };
     };
     const first = state();
     host.style.height = '480px';
     host.style.width = '640px';
     await settle();
-    const second = state();
-    return { first, second };
+    return { first, second: state() };
   });
-  // The figure (title area plus chart) exactly fills the container, and the
-  // canvas is exactly the room the figure leaves for the view.
-  expect(result.first.figure).toBe(320);
-  expect(result.first.svgIsView).toBe(true);
-  expect(result.first.viewBox).toBe(result.first.view);
-  expect(result.second.figure).toBe(480);
-  expect(result.second.svgIsView).toBe(true);
-  expect(result.second.viewBox).toBe(result.second.view);
-  expect(Number(result.second.viewBox.split(' ')[3])).toBeGreaterThan(Number(result.first.viewBox.split(' ')[3]));
+  // The canvas is the container: no border or empty title strip takes room from it.
+  expect(result.first).toEqual({ canvas: [500, 320], viewBox: '0 0 500 320', figure: [500, 320] });
+  expect(result.second).toEqual({ canvas: [640, 480], viewBox: '0 0 640 480', figure: [640, 480] });
+});
+
+test('auto height alone leaves the width as it was', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const host = mountHost('width:500px;height:320px');
+    const change = await sl.transition(base, next, { target: host, height: 'auto' });
+    change.progress(0.5);
+    const svg = host.querySelector('svg');
+    const border = parseFloat(getComputedStyle(host.querySelector('figure')).borderLeftWidth);
+    return { canvas: [Math.round(rect(svg).width), Math.round(rect(svg).height)], border };
+  });
+  expect(result.canvas).toEqual([500 - 2 * result.border, 320]);
 });
 
 test('auto height in a container with no height of its own keeps the chart default and does not grow', async ({ page }) => {
@@ -122,18 +133,17 @@ test('resize() switches between fixed and auto, and rejects bad sizes', async ({
     const change = await sl.transition(base, next, { target: host, height: 200 });
     change.progress(0.5);
     const svg = () => host.querySelector('svg');
-    const figure = () => host.querySelector('figure');
     const size = () => [Math.round(rect(svg()).width), Math.round(rect(svg()).height)];
-    const outer = () => [Math.round(rect(figure()).width), Math.round(rect(figure()).height)];
     change.resize({ width: 420, height: 260 });
     const resized = size();
     change.resize({ width: 'auto', height: 'auto' });
-    const filled = outer();
+    const filled = size();
     // Leaving a dimension out keeps its request: height stays "auto".
     change.resize({ width: 380 });
-    const keptAuto = [size()[0], outer()[1]];
+    const keptAuto = size();
+    // Fixed again: the chrome the "auto" request removed comes back around the canvas.
     change.resize({ width: 'auto', height: 200 });
-    const fixed = [outer()[0], size()[1]];
+    const fixed = size();
     const errors = [];
     for (const bad of [{ width: 0 }, { height: -4 }, { width: Infinity }, { height: 'fill' }, { width: NaN }]) {
       try { change.resize(bad); errors.push(null); } catch (error) { errors.push(error.message); }
@@ -162,7 +172,7 @@ test('a sequence takes the same sizes and applies a resize to every leg', async 
     // The new size reaches a leg that was prepared before the resize.
     journey.resize({ width: 'auto', height: 'auto' });
     journey.progress(1.5);
-    const outer = () => { const box = rect(host.querySelector('figure')); return [Math.round(box.width), Math.round(box.height)]; };
+    const outer = () => { const box = rect(host.querySelector('svg')); return [Math.round(box.width), Math.round(box.height)]; };
     const filled = outer();
     // And it follows the container on its own.
     host.style.width = '620px';

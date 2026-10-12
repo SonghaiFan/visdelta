@@ -110,25 +110,34 @@ export function createTransitionSurface(
   let requestedWidth = options.width;
   let requestedHeight = options.height;
 
+  const header = shell.figure.querySelector<HTMLElement>('.vd-figure-header');
+
   /**
-   * Apply the requested canvas size to the chart's own elements. A fixed width
-   * lets the root shrink-wrap the view, so the host overflows instead of the
-   * chart being clipped; "auto" height makes the view fill its container.
+   * Apply the requested canvas size to the chart's own elements. The canvas is
+   * the SVG, margins included. A fixed width lets the root shrink-wrap the view,
+   * so the host overflows instead of the chart being clipped. "auto" makes the
+   * canvas exactly the container's content box on that axis, so the figure's own
+   * chrome there (its theme border, and on the vertical axis the empty title
+   * strip) gives way. Omitted dimensions keep the chrome and the figure fits.
    */
   function applyCanvasStyles() {
     const fixedWidth = typeof requestedWidth === 'number';
+    const fitWidth = requestedWidth === 'auto';
     const explicitHeight = requestedHeight != null;
     const fill = requestedHeight === 'auto';
+    const figure = shell.figure.style;
     root.style.width = fixedWidth ? 'max-content' : '';
     node.style.width = fixedWidth ? `${requestedWidth}px` : '';
     // An explicit height is the canvas height, not a floor under the default one.
     node.style.minHeight = explicitHeight ? '0' : '';
+    figure.borderLeftWidth = figure.borderRightWidth = fitWidth ? '0' : '';
+    figure.borderTopWidth = figure.borderBottomWidth = fill ? '0' : '';
+    if (header) header.style.display = fill ? 'none' : '';
     root.style.height = fill ? '100%' : '';
-    shell.figure.style.height = fill ? '100%' : '';
-    // The theme may give the figure a border; it must stay inside the container.
-    shell.figure.style.boxSizing = fill ? 'border-box' : '';
-    shell.figure.style.display = fill ? 'flex' : '';
-    shell.figure.style.flexDirection = fill ? 'column' : '';
+    figure.height = fill ? '100%' : '';
+    figure.boxSizing = fill ? 'border-box' : '';
+    figure.display = fill ? 'flex' : '';
+    figure.flexDirection = fill ? 'column' : '';
     node.style.flex = fill ? '1 1 0' : '';
   }
   applyCanvasStyles();

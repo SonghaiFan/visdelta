@@ -24,17 +24,21 @@ export interface TransitionOptions extends RuntimeOptions {
   /** Named sources for visualizations that use .data("name"). */
   data?: Record<string, unknown>;
   /**
-   * Canvas width. A number is a fixed width in pixels: a container narrower than
-   * that overflows instead of the chart shrinking. `"auto"` (the default) follows
-   * the container's width and re-fits when it changes.
+   * Outer width of the canvas (the SVG), margins included, as in Observable Plot.
+   * A number is a fixed width in pixels: a container narrower than that overflows
+   * instead of the chart shrinking. `"auto"` makes the canvas exactly the
+   * container's content width and re-fits when it changes; the figure's own
+   * border gives way on that axis. Omitted: the container's width, inside the
+   * figure's own border.
    */
   width?: CanvasSize;
   /**
-   * Canvas height. A number is a fixed height in pixels and overrides the chart's
-   * default. `"auto"` fills the container's height and re-fits when it changes;
-   * the container needs a height of its own (a fixed height, a flex or grid
-   * track), otherwise the chart keeps its default height. Omitted: the chart's
-   * default height.
+   * Outer height of the canvas (the SVG), margins included. A number is a fixed
+   * height in pixels and overrides the chart's default. `"auto"` makes the canvas
+   * exactly the container's content height and re-fits when it changes; the
+   * figure's border and empty title strip give way. The container needs a height
+   * of its own (a fixed height, a flex or grid track), otherwise the chart keeps
+   * its default height. Omitted: the chart's default height.
    */
   height?: CanvasSize;
 }
