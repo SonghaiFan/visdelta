@@ -56,12 +56,15 @@ they serve whatever the last build produced.
 
 ```text
 website/
-  app/                       Routes: home, playground, gallery, docs, search, llms.txt, sitemap
+  app/                       Routes: home, docs, search, llms.txt, sitemap; (studio)/ holds
+                             playground and gallery under their own full-screen layout
   content/docs/              Documentation pages (MDX) and sidebar order (meta.json)
   examples/                  Live example modules and their registry
   components/live/           The transition player, example loaders, error boundary
   components/interactive/    Shared runtime: code evaluation, data loading, editor, scrubber
-  components/playground/     The playground, its keyframe timeline and curated stories (demos.ts)
+  components/studio/         The studio app bar (Playground, Gallery, Docs, theme)
+  components/playground/     The playground editor: examples tree, rows panel, timeline,
+                             share links and preferences, and curated stories (demos.ts)
   components/gallery/        The idiom gallery
   components/home/           Homepage: self-editing code pipeline and scroll story
   components/demos/          Interactive figures used inside docs pages
@@ -130,17 +133,38 @@ transition's `delta().stateChanges` as the **Δ** line.
 
 ### Playground
 
-The playground (`/playground`) is one editor and one chart. Every valid edit is
-a transition: shortly after typing stops, the code runs and the chart moves
-from what is on screen to the new state. If more edits arrive while the chart
-is moving, only the newest one runs next, so the motion never jumps. A broken
-edit shows its error and keeps the last chart.
+The playground (`/playground`) is an online editor for VisDelta. It and the
+gallery live in a full-screen **studio** (`app/(studio)/`) with their own app
+bar instead of the documentation chrome; both are the same Next.js build,
+running the real library.
 
-**Keep** (⌘S) saves the current state as a keyframe. Kept keyframes replay as
-one real `sequence()`: play or scrub the track, or click a keyframe to travel
-to it. The code and the Δ line follow the playhead, and the next edit moves on
-from the keyframe on screen. Readers can replace the dataset with their own
-CSV or JSON rows.
+The workspace has a toolbar, an examples tree, the editor, the preview, a
+keyframe timeline and a status bar. On wide screens the editor and preview sit
+side by side with a draggable divider (arrow keys nudge it; double-click resets
+it); on narrow screens the examples become a drawer and the page stacks rows,
+code, then the chart.
+
+- **Files.** `rows` is the dataset the code sees: a table, or its CSV/JSON
+  source, which can be edited or replaced by an upload. `chart.js` is the chart
+  code, with line numbers and completions: methods of the chart's own builder
+  after a dot (read from the factory's prototype), field names of the rows
+  inside strings.
+- **Every valid edit is a transition.** Shortly after typing stops, the code
+  runs and the chart moves from what is on screen to the new state. If more
+  edits arrive while the chart is moving, only the newest one runs next, so the
+  motion never jumps. A broken edit shows its error and keeps the last chart.
+  With **Auto-run** off, edits wait for **Run** (⌘/Ctrl+Enter) and land as one
+  transition; the switch is remembered per viewer.
+- **Keyframes.** **Keep** (⌘S) saves the current state as a keyframe. Kept
+  keyframes replay as one real `sequence()` on a real-time track: each leg is a
+  clip as long as it plays, and a lane below shows the route stages VisDelta
+  planned for it (`stageCount()`; `play()` gives each stage the same duration).
+  Play, scrub, or click a keyframe to travel to it. The code and the Δ line
+  follow the playhead, and the next edit moves on from the keyframe on screen.
+- **Share** puts the code, and the rows when they were edited or uploaded, in
+  a compressed `#share=` hash and copies the link. Code from a link is shown
+  but does not run until the reader presses Run. Rows too large for a URL are
+  left out, and the reader is told.
 
 Its stories are a short, curated list in `components/playground/demos.ts`,
 filed under the seven state-change categories, which are the playground's
@@ -227,7 +251,11 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
   CSS (the Custom Highlight API); the warning is upstream and harmless.
 - **Reader code runs in the page.** The playground and gallery evaluate the
   code in the editor with `new Function` in the reader's own tab, as the
-  previous site did. There is no sandbox; nothing is sent anywhere.
+  previous site did. There is no sandbox; nothing is sent anywhere. Code that
+  arrives in a share link runs only after the reader presses Run.
+- **Replay height.** A live edit's chart follows its pane's height on resize.
+  A replaying `sequence()` keeps the height it was built with until the next
+  edit or replay, because `sequence().resize()` takes no height.
 - **Sequence theme tokens.** `sequence()` resolves CSS tokens on a hidden
   preparation mount attached to `document.body`, so tokens scoped to a chart's
   container do not reach sequence legs. The site sets its dark-mode `--vd-*`

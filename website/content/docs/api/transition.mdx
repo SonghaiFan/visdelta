@@ -49,6 +49,7 @@ The returned controller.
 | `play(options?)`           | controller  | Animates from `from` to `to`; see `PlayOptions`.                           |
 | `pause()`                  | controller  | Stops playback at the current frame.                                      |
 | `resize(options?)`         | controller  | Recompiles at the container's size and current theme, keeping progress. `{ height }` sets an explicit canvas height. |
+| `stageCount()`             | `number`    | Serial route stages VisDelta planned for the pair (at least 1). They split progress equally, and `play({ duration })` gives each stage `duration` ms, so a full play lasts `stageCount() × duration`. |
 | `destroy()`                | `void`      | Stops playback, disconnects observers and removes the chart.              |
 
 Pair controllers observe their container's width and resize automatically.

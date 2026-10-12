@@ -51,6 +51,12 @@ export interface VisualizationTransition {
   pause(): VisualizationTransition;
   /** Recompile at the container's current size/theme, retaining progress and data. */
   resize(options?: { height?: number }): VisualizationTransition;
+  /**
+   * Serial route stages planned for this pair (at least 1). Stages split progress
+   * equally and `play({ duration })` gives each one `duration` ms, so a full
+   * play lasts `stageCount() × duration`.
+   */
+  stageCount(): number;
   /** Stop playback and remove the mounted transition. The controller cannot be used afterwards. */
   destroy(): void;
 }

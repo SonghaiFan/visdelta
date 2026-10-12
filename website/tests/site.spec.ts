@@ -140,34 +140,45 @@ test.describe('live examples', () => {
 test.describe('playground', () => {
   const chart = (page: Page) => page.getByLabel('Chart', { exact: true });
   const keys = (page: Page) => page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key');
+  const changes = (page: Page) => page.getByRole('status', { name: 'State changes' });
+  const examples = (page: Page) => page.getByRole('navigation', { name: 'Examples' });
   /** Bars drawn on screen (prepared legs of a sequence stay hidden). */
   const visibleBars = (page: Page) =>
     chart(page)
       .locator('svg rect[data-key]')
       .evaluateAll((rects) => rects.filter((rect) => rect.checkVisibility({ visibilityProperty: true }) && rect.getBoundingClientRect().width > 0).length);
 
-  test('a story writes itself: every edit animates and becomes a keyframe', async ({ page }) => {
+  test('an editor workspace: examples, files, chart, timeline and status', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/');
-    // Categories are the primary navigation; the default story is Layout → Sort.
-    const kinds = page.getByRole('navigation', { name: 'Kinds of change' });
-    await expect(kinds.getByRole('button')).toHaveCount(7);
-    await expect(kinds.getByRole('button', { name: 'Layout' })).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Sort', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    // The studio has its own app bar, outside the docs navigation.
+    await expect(page.getByRole('navigation', { name: 'Studio' }).getByRole('link', { name: 'Playground' })).toHaveAttribute('aria-current', 'page');
+    // Categories are the folders of the examples tree; the default story is Layout → Sort.
+    const tree = examples(page);
+    for (const label of ['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']) {
+      await expect(tree.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-expanded', 'true');
+    }
+    await expect(tree.getByRole('button', { name: 'Sort', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('tab', { name: 'chart.js' })).toHaveAttribute('aria-selected', 'true');
     await expect(chart(page).locator('svg').first()).toBeVisible();
-    // Start, sort descending, sort ascending: three kept states.
+    // The editor, the preview and the timeline fill the window; the page does not scroll.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
+    // Start, sort descending, sort ascending: three kept states, each leg labelled.
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     await expect(page.getByLabel('Chart code')).toContainText('.sort("population", "ascending")');
-    await expect(page.getByText('layout.reorder')).toBeVisible();
+    await expect(changes(page)).toContainText('layout.reorder');
     await expect(page.getByRole('button', { name: 'Keyframe 2: layout.reorder' })).toBeVisible();
+    await expect(page.locator('.pg-clip')).toHaveCount(2);
+    await expect(page.locator('footer.pg-status')).toContainText('Live');
 
-    await kinds.getByRole('button', { name: 'Grain' }).click();
-    await expect(page).toHaveURL(/#split$/);
-    await expect(page.getByRole('navigation', { name: 'Stories' }).getByRole('button')).toHaveText(['Split', 'Regroup', 'Zip', 'Summarize']);
-    await page.getByRole('button', { name: 'Zip', exact: true }).click();
+    // Folders collapse; a story opens from the tree and its hash.
+    await tree.getByRole('button', { name: 'Data', exact: true }).click();
+    await expect(tree.getByRole('button', { name: 'Filter', exact: true })).toHaveCount(0);
+    await tree.getByRole('button', { name: 'Zip', exact: true }).click();
     await expect(page).toHaveURL(/#zip$/);
+    await expect(page.getByRole('toolbar', { name: 'Playground' })).toContainText('Grain/Zip');
     await expect(chart(page).locator('svg path.vd-line').first()).toBeVisible();
-    await expect(page.getByText('grain.split').first()).toBeVisible({ timeout: 15_000 });
+    await expect(changes(page)).toContainText('grain.split', { timeout: 15_000 });
     expect(errors).toEqual([]);
   });
 
@@ -177,7 +188,7 @@ test.describe('playground', () => {
     await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
-    await expect(page.getByText('appearance.reshape')).toBeVisible({ timeout: 10_000 });
+    await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
     // The new state is live but not kept until the reader keeps it.
     await expect(keys(page)).toHaveCount(2);
     await page.keyboard.press('ControlOrMeta+s');
@@ -187,7 +198,40 @@ test.describe('playground', () => {
 
     await typeInto(page, editor, 'const chart = line(rows).nope();');
     await expect(page.getByRole('alert').filter({ hasText: 'is not a function' })).toBeVisible();
+    await expect(page.locator('footer.pg-status')).toContainText('Error');
     await expect(chart(page).locator('svg path.vd-line').first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('completions offer the chart\'s own methods and the rows\' fields', async ({ page }) => {
+    await page.goto('playground/#zip');
+    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    const editor = page.getByLabel('Chart code');
+    await typeInto(page, editor, 'const chart = line(rows).cur');
+    const list = page.locator('.cm-tooltip-autocomplete');
+    await expect(list.getByRole('option', { name: 'curve' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.keyboard.type('ve("');
+    await page.keyboard.press('Control+Space');
+    await expect(list.getByRole('option', { name: /ticker/ })).toBeVisible();
+  });
+
+  test('with auto-run off, edits wait for Run and land as one transition', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#zip');
+    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    await page.getByRole('switch', { name: 'Auto-run' }).uncheck({ force: true });
+    const editor = page.getByLabel('Chart code');
+    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await page.waitForTimeout(800);
+    await expect(changes(page)).not.toContainText('appearance.reshape');
+    await expect(page.locator('footer.pg-status')).toContainText('to run');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
+    // The preference is per viewer and survives a reload.
+    await page.reload();
+    await expect(page.getByRole('switch', { name: 'Auto-run' })).not.toBeChecked();
+    await page.getByRole('switch', { name: 'Auto-run' }).check({ force: true });
     expect(errors).toEqual([]);
   });
 
@@ -201,9 +245,10 @@ test.describe('playground', () => {
     await timeline.fill('0');
     await expect(editor).not.toContainText('population: { gte');
     await expect(page.getByText(/Replaying 3 keyframes/)).toBeVisible();
-    await timeline.fill('1');
+    // The track is in real time: keyframe 2 sits where its leg ends.
+    await timeline.fill((await keys(page).nth(1).getAttribute('data-time'))!);
     await expect(editor).toContainText('gte: 1000000');
-    await expect(page.getByText('data.remove')).toBeVisible();
+    await expect(changes(page)).toContainText('data.remove');
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const bars = await visibleBars(page);
 
@@ -218,18 +263,121 @@ test.describe('playground', () => {
     expect(errors).toEqual([]);
   });
 
-  test('your own rows replace the dataset', async ({ page }) => {
+  test('the timeline is in real time and shows each leg\'s planned route stages', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    const track = page.getByRole('region', { name: 'Keyframes' });
+    // Split is planned in two route stages, the grouped layout in one: 3 × 0.9s.
+    await expect(track.locator('.pg-clip')).toHaveCount(2);
+    await expect(track.locator('.pg-stage-block')).toHaveCount(3);
+    await expect(track.locator('.pg-clip').first()).toContainText('2 stages');
+    await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
+    await expect(keys(page).nth(2)).toHaveAttribute('data-time', '2.7');
+    await expect(track).toContainText('2.70s / 2.70s');
+    const clipWidths = await track.locator('.pg-clip').evaluateAll((clips) => clips.map((clip) => clip.getBoundingClientRect().width));
+    expect(clipWidths[0] / clipWidths[1]).toBeCloseTo(2, 1);
+
+    // Scrubbing to 1.25s sits in the first leg's second stage.
+    await page.getByLabel('Keyframe timeline').fill('1.25');
+    await expect(track).toContainText('1.25s / 2.70s');
+    await expect(track.locator('.pg-clip').first()).toHaveAttribute('data-active', 'true');
+    await expect(track.locator('.pg-stage-block[data-active]')).toHaveCount(1);
+    expect(await track.locator('.pg-stage-block').evaluateAll((blocks) => blocks.findIndex((block) => block.hasAttribute('data-active')))).toBe(1);
+
+    // Playing from the start takes the real duration: one 0.9s per stage, not per leg.
+    await page.getByLabel('Keyframe timeline').fill('0');
+    const started = Date.now();
+    await page.getByRole('button', { name: 'Play keyframes' }).click();
+    await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Play keyframes' })).toBeVisible({ timeout: 10_000 });
+    expect(Date.now() - started).toBeGreaterThan(2_300);
+    await expect(track).toContainText('2.70s / 2.70s');
+    expect(errors).toEqual([]);
+  });
+
+  test('rows are a file: upload your own or edit them, and the chart follows', async ({ page }) => {
+    const errors = trackErrors(page);
     await page.goto('playground/#sort');
-    await expect(chart(page).locator('svg').first()).toBeVisible();
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    await page.getByRole('tab', { name: /us-population-state-age-tidy\.csv/ }).click();
+    await expect(page.getByRole('tabpanel')).toContainText('468 records · 3 fields');
     await page.getByLabel('Use your own CSV or JSON rows').setInputFiles({
       name: 'states.csv',
       mimeType: 'text/csv',
       buffer: Buffer.from('state,age,population\nAA,<10,5\nBB,<10,9\nCC,<10,2\n'),
     });
-    await expect(page.getByText('states.csv · 3 records')).toBeVisible();
-    await expect
-      .poll(() => chart(page).locator('svg rect.vd-bar, svg g rect').count(), { timeout: 10_000 })
-      .toBeLessThan(10);
+    await expect(page.getByRole('tab', { name: /states\.csv\s*3/ })).toBeVisible();
+    await expect.poll(() => visibleBars(page), { timeout: 10_000 }).toBe(3);
+
+    // Editing the CSV source reruns the code against the new rows.
+    await page.getByRole('group', { name: 'Rows view' }).getByRole('button', { name: 'CSV' }).click();
+    const source = page.getByLabel('Rows source');
+    await source.click();
+    await page.keyboard.press('ControlOrMeta+End');
+    await page.keyboard.type('DD,<10,7\n');
+    await expect.poll(() => visibleBars(page), { timeout: 10_000 }).toBe(4);
+    await expect(page.getByRole('tab', { name: /states\.csv\s*4/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test('a share link carries the code and opens it only when the reader runs it', async ({ page, context }) => {
+    const errors = trackErrors(page);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto('playground/#zip');
+    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    const editor = page.getByLabel('Chart code');
+    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
+    await page.getByRole('button', { name: 'Share' }).click();
+    await expect(page.locator('footer.pg-status')).toContainText(/Link (copied|is in the address bar)/);
+    await expect(page).toHaveURL(/#share=[\w-]+$/);
+    const link = page.url();
+
+    const other = await context.newPage();
+    const otherErrors = trackErrors(other);
+    await other.goto(link);
+    await expect(other.getByLabel('Chart code')).toContainText('curveStepAfter');
+    await expect(other.getByRole('toolbar', { name: 'Playground' })).toContainText('Link/Shared code');
+    // Nothing from the link has run yet.
+    await expect(other.getByLabel('Chart', { exact: true }).locator('svg')).toHaveCount(0);
+    await expect(other.locator('footer.pg-status')).toContainText('Not run yet');
+    await other.getByRole('button', { name: 'Run this code' }).click();
+    await expect(other.getByLabel('Chart', { exact: true }).locator('svg path.vd-line').first()).toBeVisible();
+    await expect(other.getByRole('region', { name: 'Keyframes' }).locator('.pg-key')).toHaveCount(1);
+    expect([...errors, ...otherErrors]).toEqual([]);
+  });
+
+  test('the divider resizes the editor and the chart follows its pane', async ({ page }) => {
+    await page.goto('playground/#sort');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    const svgWidth = () => chart(page).locator('svg').first().evaluate((svg) => svg.getBoundingClientRect().width);
+    const before = await svgWidth();
+    const divider = page.getByRole('separator', { name: 'Resize editor and preview' });
+    const box = (await divider.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(box.x - 200, box.y + 200, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(svgWidth).toBeGreaterThan(before + 100);
+    const value = Number(await divider.getAttribute('aria-valuenow'));
+    await divider.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(divider).toHaveAttribute('aria-valuenow', String(value + 2));
+  });
+
+  test('on a phone the examples are a drawer and the page reads rows, code, then chart', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('playground/#split');
+    await expect(examples(page)).toBeHidden();
+    const order = await page.evaluate(() =>
+      ['[aria-label="Files"]', '[aria-label="Chart code"]', '[aria-label="Chart"]'].map((selector) => document.querySelector(selector)!.getBoundingClientRect().top),
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    await page.getByRole('button', { name: 'Show examples' }).click();
+    await examples(page).getByRole('button', { name: 'Remap', exact: true }).click();
+    await expect(page).toHaveURL(/#remap$/);
+    await expect(examples(page)).toBeHidden();
   });
 });
 
@@ -286,6 +434,7 @@ test.describe('site', () => {
     await expect(page).toHaveURL(new RegExp(`playground/#idiom=${id}$`));
     await expect(page.getByLabel('Chart', { exact: true }).locator('svg').first()).toBeVisible();
     await expect(page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key')).toHaveCount(1);
+    await expect(page.getByRole('toolbar', { name: 'Playground' })).toContainText('Gallery/');
     await expect(page.getByText('edit the code; the chart follows')).toBeVisible();
     expect(errors).toEqual([]);
   });

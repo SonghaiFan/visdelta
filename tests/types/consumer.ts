@@ -236,3 +236,5 @@ void autoHeightLine;
 import type { VisualizationTransition as ResizableTransition } from "visdelta/transition";
 function resizeCanvas(change: ResizableTransition) { return change.resize({ height: 640 }); }
 void resizeCanvas;
+function playTime(change: ResizableTransition, duration: number): number { return change.stageCount() * duration; }
+void playTime;

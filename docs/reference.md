@@ -606,6 +606,7 @@ change.play({ duration: 800, from: 0, to: 1 });
 change.pause();
 change.resize();
 change.resize({ height: 640 }); // Explicit canvas height; retain current progress.
+change.stageCount();             // Serial route stages; a full play() lasts stageCount() × duration.
 change.destroy();
 ```
 

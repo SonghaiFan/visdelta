@@ -1,38 +1,46 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link2, PanelLeft, Play, RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DeltaResult, StateChange } from 'visdelta/core';
 import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
-import { CodeEditor } from '@/components/interactive/code-editor';
-import { loadIdioms } from '@/components/interactive/corpus';
+import { CodeEditor, type CodeHints } from '@/components/interactive/code-editor';
+import { loadIdioms, type LabChart } from '@/components/interactive/corpus';
 import {
   errorMessage,
   evaluateChart,
-  loadCsv,
-  loadD3,
   loadFactories,
   loadRuntime,
   prefersReducedMotion,
   type ChartName,
   type ChartState,
-  type Rows,
 } from '@/components/interactive/runtime';
-import { StateChangeIcon } from '@/components/interactive/state-change-icon';
 import { formatChange } from '@/components/live/transition-player';
 import { categories } from '@/examples/registry';
 import { cn } from '@/lib/cn';
+import { datasetName, decodeShare, encodeShare, formatOf, inlineData, loadText, parseRows, type Dataset, type SharedCode } from './data';
 import { playgroundDemos, storyFrames, type PlaygroundDemo as Story } from './demos';
+import { Explorer } from './explorer';
+import { useMedia, useModifierKey, usePreference } from './preferences';
+import { RowsPanel, type RowsView } from './rows-panel';
 import { Timeline } from './timeline';
 
-/** A curated story, or gallery code opened on its own (no category). */
-type Opened = Omit<Story, 'category'> & { category?: Story['category'] };
+/** A curated story, gallery code, or code from a share link (no category). */
+type Opened = Omit<Story, 'category'> & {
+  category?: Story['category'];
+  /** Where uncategorized code came from. */
+  origin?: 'Gallery' | 'Link';
+  /** Rows carried by a share link. */
+  rows?: SharedCode['rows'];
+  /** Code from a link runs only when the reader presses Run. */
+  review?: boolean;
+};
 
 const CHARTS: ChartName[] = ['bar', 'line', 'area', 'point', 'unit'];
-const HEIGHT = 420;
-/** One live edit. */
+/** One route stage of a live edit. */
 const EDIT_DURATION = 750;
-/** One leg between kept keyframes. */
-const LEG_DURATION = 900;
+/** One route stage between kept keyframes; a leg plays its stage count × this. */
+const STAGE_DURATION = 900;
 /** Quiet time after a keystroke before the code runs. */
 const SETTLE = 280;
 const TYPE_DELAY = 24;
@@ -40,6 +48,12 @@ const DELETE_DELAY = 12;
 /** Hold between a story's edits. */
 const STEP_PAUSE = 1100;
 const DEFAULT_STORY = 'sort';
+/** Editor share of the editor + preview width. */
+const DEFAULT_SPLIT = 0.42;
+const SPLIT_RANGE = [0.25, 0.72] as const;
+/** Builder members that are not chainable authoring calls. */
+const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
+const STORAGE = { split: 'visdelta.playground.split', autoRun: 'visdelta.playground.autorun' };
 
 type Controller = VisualizationTransition | VisualizationSequence;
 interface Version {
@@ -49,20 +63,19 @@ interface Version {
 interface Keyframe extends Version {
   id: number;
   changes: StateChange[];
+  /** Route stages VisDelta plans for the leg into this keyframe; 0 for the first. */
+  stages: number;
 }
 interface Display {
   layer: HTMLElement;
   controller: Controller;
   kind: 'live' | 'replay';
 }
-interface Dataset {
-  name: string;
-  rows: Rows;
-}
 
 const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-const datasetName = (url?: string) => (url ? url.split('/').at(-1)! : 'inline data');
 const lineAt = (text: string, offset: number) => text.slice(0, offset).split('\n').length;
+const clamp = (value: number, [low, high]: readonly [number, number]) => Math.min(high, Math.max(low, value));
+const chartOf = (code: string): LabChart => (code.match(/\b(bar|line|area|point|unit)\s*\(/)?.[1] as LabChart) ?? 'bar';
 
 /** Lines of `after` that are new since `before` (1-based), ignoring where a chain ends. */
 function changedLines(before: string | null | undefined, after: string): number[] {
@@ -79,13 +92,17 @@ async function compare(a: ChartState, b: ChartState): Promise<DeltaResult> {
 const unchanged = (result: DeltaResult) => !result.stateChanges.length && !result.edits.length && !result.deltas.length;
 
 /**
- * Write a chart and watch it change. Every valid edit is a transition from the
+ * An online editor for VisDelta. Every valid edit is a transition from the
  * chart on screen to the new code. Keep any moment as a keyframe; kept
- * keyframes replay as one continuous `sequence()`.
+ * keyframes replay as one continuous `sequence()` on the timeline.
  */
 export function Playground() {
+  const appRef = useRef<HTMLDivElement>(null);
+  const editorPaneRef = useRef<HTMLElement>(null);
+  const previewPaneRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const factoriesRef = useRef<Awaited<ReturnType<typeof loadFactories>> | null>(null);
+  const membersRef = useRef(new Map<ChartName, string[]>());
   const displayRef = useRef<Display | null>(null);
   /** The state on screen, or the one the live motion is heading to. */
   const shownRef = useRef<Version | null>(null);
@@ -93,38 +110,81 @@ export function Playground() {
   const latestRef = useRef<Version | null>(null);
   const keyframesRef = useRef<Keyframe[]>([]);
   const replayOf = useRef<Keyframe[] | null>(null);
-  const datasetRef = useRef<Dataset>({ name: 'inline data', rows: [] });
+  const datasetRef = useRef<Dataset>(inlineData);
   const codeRef = useRef('');
   const queueRef = useRef<{ running: Promise<void> | null; pending: Version | null }>({ running: null, pending: null });
   const storyRun = useRef(0);
   const evalRun = useRef(0);
   const replayRun = useRef(0);
   const editTimer = useRef<number | null>(null);
+  const rowsTimer = useRef<number | null>(null);
+  const flashTimer = useRef<number | null>(null);
   const nextKey = useRef(1);
   const shownKey = useRef(-1);
+  const reviewRef = useRef(false);
+  /** The last live edit and the route stages it was planned with. */
+  const lastMoveRef = useRef<{ from: ChartState; to: ChartState; stages: number } | null>(null);
 
   const [story, setStory] = useState<Opened | null>(null);
   const [code, setCode] = useState('');
+  const [ranCode, setRanCode] = useState('');
   const [marked, setMarked] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [dataset, setDataset] = useState<Dataset>({ name: 'inline data', rows: [] });
-  const [showRows, setShowRows] = useState(false);
+  const [dataset, setDataset] = useState<Dataset>(inlineData);
+  const [tab, setTab] = useState<'code' | 'rows'>('code');
+  const [rowsView, setRowsView] = useState<RowsView>('table');
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
   const [replaying, setReplaying] = useState(false);
   const [value, setValue] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [changes, setChanges] = useState<StateChange[]>([]);
+  /** Route stages of the motion the Δ line describes. */
+  const [changeStages, setChangeStages] = useState(0);
   const [writing, setWriting] = useState(false);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(true);
+  const [review, setReview] = useState(false);
+  const [autoRunPreference, setAutoRunPreference] = usePreference(STORAGE.autoRun, 'true');
+  const [splitPreference, setSplitPreference] = usePreference(STORAGE.split, String(DEFAULT_SPLIT));
+  /** The divider while it is being dragged. */
+  const [dragSplit, setDragSplit] = useState<number | null>(null);
+  /** null follows the layout: open on wide screens, closed on narrow ones. */
+  const [explorerChoice, setExplorerChoice] = useState<boolean | null>(null);
+  const wide = useMedia('(min-width: 1024px)', true);
+  const mod = useModifierKey();
+  const [cursor, setCursor] = useState({ line: 1, column: 1 });
+  const [flash, setFlash] = useState('');
+
+  const autoRun = autoRunPreference !== 'false';
+  const autoRunRef = useRef(autoRun);
+  useEffect(() => {
+    autoRunRef.current = autoRun;
+  }, [autoRun]);
+  const split = dragSplit ?? clamp(Number(splitPreference) || DEFAULT_SPLIT, SPLIT_RANGE);
+  const dragging = dragSplit !== null;
+  const explorerOpen = explorerChoice ?? wide;
 
   const writeCode = useCallback((text: string) => {
     codeRef.current = text;
     setCode(text);
   }, []);
 
+  const setLatest = useCallback((version: Version) => {
+    latestRef.current = version;
+    setRanCode(version.code);
+  }, []);
+
+  const say = useCallback((text: string) => {
+    setFlash(text);
+    if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(''), 3200);
+  }, []);
+
+  /** The chart's height follows its pane. */
+  const stageHeight = useCallback(() => Math.max(220, Math.floor(stageRef.current?.clientHeight || 400)), []);
+
   /** Build a controller in a hidden layer of the stage. */
-  const mount = useCallback(async (build: (target: HTMLElement) => Promise<Controller>) => {
+  const mount = useCallback(async <C extends Controller>(build: (target: HTMLElement) => Promise<C>) => {
     const layer = document.createElement('div');
     layer.className = 'pg-layer';
     layer.dataset.state = 'hidden';
@@ -158,6 +218,18 @@ export function Playground() {
     }
   }, []);
 
+  /** Remove the chart on screen, as for code that has not run yet. */
+  const clearStage = useCallback(() => {
+    const display = displayRef.current;
+    displayRef.current = null;
+    shownRef.current = null;
+    latestRef.current = null;
+    setRanCode('');
+    if (!display) return;
+    display.controller.destroy();
+    display.layer.remove();
+  }, []);
+
   /** Resolve once `controller` reaches `target`, stops moving, or leaves the screen. */
   const settle = useCallback(
     (controller: Controller, target: number, onFrame?: (value: number) => void) =>
@@ -186,7 +258,7 @@ export function Playground() {
     async (target: Version) => {
       const from = shownRef.current;
       const { transition } = await loadRuntime();
-      const options = (layer: HTMLElement) => ({ target: layer, height: HEIGHT });
+      const options = (layer: HTMLElement) => ({ target: layer, height: stageHeight() });
       if (from && displayRef.current && from.state.toSpec().mark === target.state.toSpec().mark) {
         const difference = await compare(from.state, target.state);
         if (unchanged(difference)) {
@@ -195,8 +267,11 @@ export function Playground() {
         }
         try {
           const next = await mount((layer) => transition(from.state as never, target.state as never, options(layer)));
+          const stages = next.controller.stageCount();
+          lastMoveRef.current = { from: from.state, to: target.state, stages };
           shownRef.current = target;
           setChanges(difference.stateChanges);
+          setChangeStages(stages);
           setMarked(changedLines(from.code, target.code));
           show(next, 'live', 0);
           if (prefersReducedMotion()) {
@@ -211,10 +286,13 @@ export function Playground() {
       }
       const next = await mount((layer) => transition(target.state as never, target.state as never, options(layer)));
       shownRef.current = target;
-      if (!from || from.state.toSpec().mark !== target.state.toSpec().mark) setChanges([]);
+      if (!from || from.state.toSpec().mark !== target.state.toSpec().mark) {
+        setChanges([]);
+        setChangeStages(0);
+      }
       show(next, 'live', 0, true);
     },
-    [mount, settle, show],
+    [mount, settle, show, stageHeight],
   );
 
   /** Queue a move. Only the newest pending version runs; motion never jumps. */
@@ -252,41 +330,28 @@ export function Playground() {
     setReplaying(false);
   }, []);
 
-  /** Run code; if it is a valid state, the chart moves to it. */
-  const run = useCallback(
-    async (source: string) => {
-      const request = ++evalRun.current;
-      try {
-        const state = await evaluate(source);
-        if (request !== evalRun.current) return;
-        setError(null);
-        const version = { state, code: source };
-        latestRef.current = version;
-        goLive();
-        await present(version);
-      } catch (cause) {
-        if (request === evalRun.current) setError(errorMessage(cause));
-      }
-    },
-    [evaluate, goLive, present],
-  );
-
-  const onEdit = useCallback(
-    (text: string) => {
-      storyRun.current += 1; // the reader takes over from a story
-      setWriting(false);
-      setNotice('');
-      writeCode(text);
-      if (editTimer.current !== null) window.clearTimeout(editTimer.current);
-      editTimer.current = window.setTimeout(() => void run(text), SETTLE);
-    },
-    [run, writeCode],
-  );
-
-  const runNow = useCallback(() => {
-    if (editTimer.current !== null) window.clearTimeout(editTimer.current);
-    void run(codeRef.current);
-  }, [run]);
+  /**
+   * How many serial route stages VisDelta plans between two states: the live
+   * edit's own count when it was this pair, otherwise an offscreen transition.
+   */
+  const measureStages = useCallback(async (from: ChartState, to: ChartState) => {
+    const move = lastMoveRef.current;
+    if (move && move.from === from && move.to === to) return move.stages;
+    const { transition } = await loadRuntime();
+    const host = document.createElement('div');
+    host.className = 'pg-measure vd-docs-chart';
+    document.body.append(host);
+    try {
+      const controller = await transition(from as never, to as never, { target: host, height: 240 });
+      const stages = controller.stageCount();
+      controller.destroy();
+      return stages;
+    } catch {
+      return 1; // No route: the replay reports the failure when it is built.
+    } finally {
+      host.remove();
+    }
+  }, []);
 
   /** Keep a version as the next keyframe. */
   const keep = useCallback(async (version: Version | null = latestRef.current) => {
@@ -306,10 +371,54 @@ export function Playground() {
       }
       difference = result.stateChanges;
     }
-    keyframesRef.current = [...frames, { ...version, id: nextKey.current++, changes: difference }];
+    const stages = last ? await measureStages(last.state, version.state) : 0;
+    if (keyframesRef.current !== frames) return; // cleared or kept meanwhile
+    keyframesRef.current = [...frames, { ...version, id: nextKey.current++, changes: difference, stages }];
     setKeyframes(keyframesRef.current);
     setNotice('');
-  }, []);
+  }, [measureStages]);
+
+  /** Run code; if it is a valid state, the chart moves to it. */
+  const run = useCallback(
+    async (source: string) => {
+      const request = ++evalRun.current;
+      try {
+        const state = await evaluate(source);
+        if (request !== evalRun.current) return;
+        setError(null);
+        const version = { state, code: source };
+        setLatest(version);
+        goLive();
+        const first = reviewRef.current;
+        reviewRef.current = false;
+        setReview(false);
+        await present(version);
+        if (first && request === evalRun.current) await keep(version);
+      } catch (cause) {
+        if (request === evalRun.current) setError(errorMessage(cause));
+      }
+    },
+    [evaluate, goLive, keep, present, setLatest],
+  );
+
+  const onEdit = useCallback(
+    (text: string) => {
+      storyRun.current += 1; // the reader takes over from a story
+      setWriting(false);
+      setNotice('');
+      writeCode(text);
+      if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+      if (autoRunRef.current && !reviewRef.current) editTimer.current = window.setTimeout(() => void run(text), SETTLE);
+    },
+    [run, writeCode],
+  );
+
+  const runNow = useCallback(() => {
+    storyRun.current += 1;
+    setWriting(false);
+    if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+    void run(codeRef.current);
+  }, [run]);
 
   const clearKeyframes = useCallback(() => {
     goLive();
@@ -326,16 +435,17 @@ export function Playground() {
       const nearest = Math.min(frames.length - 1, Math.max(0, Math.round(position)));
       const leg = Math.min(frames.length - 1, Math.max(1, Math.ceil(position - 1e-6)));
       setChanges(frames[leg]?.changes ?? []);
+      setChangeStages(frames[leg]?.stages ?? 0);
       if (nearest === shownKey.current) return;
       shownKey.current = nearest;
       const keyframe = frames[nearest];
       shownRef.current = keyframe;
-      latestRef.current = keyframe;
+      setLatest(keyframe);
       writeCode(keyframe.code);
       setMarked(changedLines(frames[nearest - 1]?.code, keyframe.code));
       setError(null);
     },
-    [writeCode],
+    [setLatest, writeCode],
   );
 
   /** Show the kept keyframes as one sequence, starting at `position`. */
@@ -351,7 +461,7 @@ export function Playground() {
       if (editTimer.current !== null) window.clearTimeout(editTimer.current);
       await queueRef.current.running;
       const { sequence } = await loadRuntime();
-      const next = await mount((layer) => sequence(frames.map((frame) => frame.state) as never, { target: layer, height: HEIGHT }));
+      const next = await mount((layer) => sequence(frames.map((frame) => frame.state) as never, { target: layer, height: stageHeight() }));
       if (keyframesRef.current !== frames) {
         next.controller.destroy();
         next.layer.remove();
@@ -366,7 +476,7 @@ export function Playground() {
       follow(position);
       return next.controller;
     },
-    [follow, mount, show],
+    [follow, mount, show, stageHeight],
   );
 
   const onScrub = useCallback(
@@ -402,7 +512,7 @@ export function Playground() {
         return;
       }
       setPlaying(true);
-      controller.play({ from: start, to, duration: LEG_DURATION });
+      controller.play({ from: start, to, duration: STAGE_DURATION });
       await settle(controller, to, (position) => token === replayRun.current && follow(position));
       if (token === replayRun.current) setPlaying(false);
     },
@@ -455,34 +565,49 @@ export function Playground() {
     [writeCode],
   );
 
+  /** The rows a story, idiom or link declares. */
+  const loadDataset = useCallback(async (next: Opened): Promise<Dataset> => {
+    if (next.rows) return { ...next.rows, rows: await parseRows(next.rows.text, next.rows.format) };
+    if (!next.data) return inlineData;
+    const text = await loadText(next.data);
+    return { name: datasetName(next.data), format: 'csv', text, rows: await parseRows(text, 'csv'), source: next.data };
+  }, []);
+
   /** Open a story: draw its code, then write each edit, keeping every state. */
   const open = useCallback(
     async (next: Opened) => {
       const token = ++storyRun.current;
       evalRun.current += 1;
       if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+      if (rowsTimer.current !== null) window.clearTimeout(rowsTimer.current);
       goLive();
       setStory(next);
       setError(null);
       setNotice('');
-      setShowRows(false);
+      setTab('code');
       setChanges([]);
       setMarked([]);
       setBusy(true);
+      reviewRef.current = Boolean(next.review);
+      setReview(Boolean(next.review));
       keyframesRef.current = [];
       setKeyframes([]);
       const frames = storyFrames(next);
       writeCode(frames[0]);
       try {
-        const rows = next.data ? await loadCsv(next.data) : [];
+        const rows = await loadDataset(next);
         if (token !== storyRun.current) return;
-        datasetRef.current = { name: datasetName(next.data), rows };
-        setDataset(datasetRef.current);
+        datasetRef.current = rows;
+        setDataset(rows);
+        if (next.review) {
+          clearStage();
+          return;
+        }
         if (prefersReducedMotion()) {
           for (const frame of frames) {
             const version = { state: await evaluate(frame), code: frame };
             if (token !== storyRun.current) return;
-            latestRef.current = version;
+            setLatest(version);
             await keep(version);
           }
           writeCode(frames.at(-1)!);
@@ -491,7 +616,7 @@ export function Playground() {
         }
         const first = { state: await evaluate(frames[0]), code: frames[0] };
         if (token !== storyRun.current) return;
-        latestRef.current = first;
+        setLatest(first);
         await present(first);
         await keep(first);
         setBusy(false);
@@ -503,7 +628,7 @@ export function Playground() {
           setWriting(false);
           const version = { state: await evaluate(frame), code: frame };
           if (token !== storyRun.current) return;
-          latestRef.current = version;
+          setLatest(version);
           await present(version);
           if (token !== storyRun.current) return;
           await keep(version);
@@ -517,13 +642,33 @@ export function Playground() {
         }
       }
     },
-    [evaluate, goLive, keep, present, typeTo, writeCode],
+    [clearStage, evaluate, goLive, keep, loadDataset, present, setLatest, typeTo, writeCode],
   );
 
-  // Route: #sort, #zip … or #idiom=<gallery idiom id>.
+  // Route: #sort, #zip …, #idiom=<gallery idiom id> or #share=<code>.
   useEffect(() => {
     const route = async () => {
       const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (hash.startsWith('share=')) {
+        try {
+          const shared = await decodeShare(hash.slice(6));
+          return void open({
+            id: 'shared',
+            title: 'Shared code',
+            origin: 'Link',
+            chart: shared.chart && CHARTS.includes(shared.chart) ? (shared.chart as LabChart) : chartOf(shared.code),
+            line: 'Opened from a link. Read the code, then run it.',
+            data: shared.data,
+            rows: shared.rows,
+            code: shared.code,
+            edits: [],
+            review: true,
+          });
+        } catch (cause) {
+          await open(playgroundDemos.find((item) => item.id === DEFAULT_STORY)!);
+          return setError(errorMessage(cause));
+        }
+      }
       if (hash.startsWith('idiom=')) {
         const { idioms } = await loadIdioms();
         const idiom = idioms.find((item) => item.id === hash.slice(6));
@@ -531,6 +676,7 @@ export function Playground() {
           return void open({
             id: hash,
             title: idiom.title,
+            origin: 'Gallery',
             chart: idiom.mark,
             line: 'From the gallery. Change any line; every valid edit animates.',
             data: idiom.data,
@@ -547,22 +693,76 @@ export function Playground() {
     const theme = new MutationObserver(() => displayRef.current?.controller.resize());
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     const runs = { story: storyRun, evaluation: evalRun, replay: replayRun };
+    const timers = [editTimer, rowsTimer, flashTimer];
     return () => {
       window.removeEventListener('hashchange', route);
       theme.disconnect();
       runs.story.current += 1;
       runs.evaluation.current += 1;
       runs.replay.current += 1;
-      if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+      for (const timer of timers) if (timer.current !== null) window.clearTimeout(timer.current);
       displayRef.current?.controller.destroy();
       displayRef.current = null;
     };
   }, [open]);
 
+  // The chart follows its pane: width and height come from the layout.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === 'undefined') return;
+    let size = '';
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const next = `${stage.clientWidth}x${stage.clientHeight}`;
+        if (next === size) return;
+        const first = !size;
+        size = next;
+        const display = displayRef.current;
+        if (first || !display) return;
+        if (display.kind === 'live') (display.controller as VisualizationTransition).resize({ height: stageHeight() });
+        else display.controller.resize();
+      });
+    });
+    observer.observe(stage);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [stageHeight]);
+
+  // A narrow layout shows the examples as a drawer; Escape closes it.
+  useEffect(() => {
+    if (wide || !explorerOpen) return;
+    const close = (event: globalThis.KeyboardEvent) => event.key === 'Escape' && setExplorerChoice(false);
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [explorerOpen, wide]);
+
   const select = (next: Opened) => {
     window.history.replaceState(null, '', `#${next.id}`);
+    if (!wide) setExplorerChoice(false);
     void open(next);
   };
+
+  const toggleAutoRun = (on: boolean) => {
+    autoRunRef.current = on;
+    setAutoRunPreference(String(on));
+    if (on && codeRef.current !== latestRef.current?.code && !reviewRef.current) runNow();
+  };
+
+  /** New rows: rerun the code on screen against them. */
+  const applyRows = useCallback(
+    async (next: Dataset) => {
+      storyRun.current += 1;
+      setWriting(false);
+      datasetRef.current = next;
+      setDataset(next);
+      if (!reviewRef.current) await run(codeRef.current);
+    },
+    [run],
+  );
 
   const replaceRows = async (input: HTMLInputElement) => {
     const file = input.files?.[0];
@@ -570,165 +770,336 @@ export function Playground() {
     if (!file) return;
     try {
       const text = await file.text();
-      const d3 = await loadD3();
-      const rows = /\.json$/i.test(file.name) ? JSON.parse(text) : d3.csvParse(text, d3.autoType);
-      if (!Array.isArray(rows) || !rows.length) throw new Error('Use a non-empty CSV table or a JSON array of rows.');
-      storyRun.current += 1;
-      setWriting(false);
-      datasetRef.current = { name: file.name, rows: rows as Rows };
-      setDataset(datasetRef.current);
-      await run(codeRef.current);
+      const format = formatOf(file.name);
+      const rows = await parseRows(text, format);
+      if (!rows.length) throw new Error('Use a non-empty CSV table or a JSON array of rows.');
+      await applyRows({ name: file.name, format, text, rows });
     } catch (cause) {
       setError(errorMessage(cause));
     }
   };
 
-  const columns = useMemo(() => [...new Set(dataset.rows.slice(0, 50).flatMap((row) => Object.keys(row)))], [dataset]);
+  const onRowsEdit = useCallback(
+    (text: string) => {
+      const edited: Dataset = { ...datasetRef.current, text, source: undefined };
+      datasetRef.current = edited;
+      if (rowsTimer.current !== null) window.clearTimeout(rowsTimer.current);
+      rowsTimer.current = window.setTimeout(async () => {
+        try {
+          const rows = await parseRows(text, edited.format);
+          if (datasetRef.current.text !== text) return;
+          const next = { ...datasetRef.current, rows };
+          if (autoRunRef.current) await applyRows(next);
+          else {
+            datasetRef.current = next;
+            setDataset(next);
+          }
+        } catch (cause) {
+          setError(`Rows: ${errorMessage(cause)}`);
+        }
+      }, SETTLE);
+    },
+    [applyRows],
+  );
+
+  /** Put the code and its rows in the URL and copy it. */
+  const share = async () => {
+    const current = datasetRef.current;
+    const payload: SharedCode = { code: codeRef.current, chart: chartOf(codeRef.current) };
+    if (current.source) payload.data = current.source;
+    else if (current.text) payload.rows = { name: current.name, format: current.format, text: current.text };
+    try {
+      const { hash, rowsOmitted } = await encodeShare(payload);
+      window.history.replaceState(null, '', `#${hash}`);
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        copied = true;
+      } catch {
+        // No clipboard access: the link is in the address bar.
+      }
+      say(rowsOmitted ? 'Link ready, without your rows: they are too large for a URL' : copied ? 'Link copied' : 'Link is in the address bar');
+    } catch (cause) {
+      say(`Could not make a link: ${errorMessage(cause)}`);
+    }
+  };
+
+  const hints = useMemo<CodeHints>(
+    () => ({
+      members() {
+        const chart = chartOf(codeRef.current);
+        const factory = factoriesRef.current?.[chart];
+        if (!factory) return [];
+        let names = membersRef.current.get(chart);
+        if (!names) {
+          const found = new Set<string>();
+          for (let proto = Object.getPrototypeOf(factory([])); proto && proto !== Object.prototype; proto = Object.getPrototypeOf(proto)) {
+            for (const name of Object.getOwnPropertyNames(proto)) {
+              if (!INTERNAL_MEMBERS.has(name) && typeof proto[name] === 'function') found.add(name);
+            }
+          }
+          names = [...found].sort();
+          membersRef.current.set(chart, names);
+        }
+        return names;
+      },
+      strings: () => [...new Set(datasetRef.current.rows.slice(0, 50).flatMap((row) => Object.keys(row)))],
+      names: () => ['chart', 'rows', 'd3', ...CHARTS],
+    }),
+    [],
+  );
+
+  const onCursor = useCallback((line: number, column: number) => setCursor({ line, column }), []);
+
+  /** Drag the divider between the editor and the preview. */
+  const startDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const editor = editorPaneRef.current?.getBoundingClientRect();
+    const preview = previewPaneRef.current?.getBoundingClientRect();
+    if (!editor || !preview) return;
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    const width = preview.right - editor.left - handle.offsetWidth;
+    let current = split;
+    setDragSplit(current);
+    const move = (moveEvent: globalThis.PointerEvent) => {
+      current = clamp((moveEvent.clientX - editor.left) / width, SPLIT_RANGE);
+      setDragSplit(current);
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      setSplitPreference(current.toFixed(3));
+      setDragSplit(null);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+  const nudgeSplit = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = { ArrowLeft: -0.02, ArrowRight: 0.02 }[event.key];
+    const jump = { Home: SPLIT_RANGE[0], End: SPLIT_RANGE[1] }[event.key];
+    if (step === undefined && jump === undefined) return;
+    event.preventDefault();
+    setSplitPreference((jump ?? clamp(split + step!, SPLIT_RANGE)).toFixed(3));
+  };
+
+  const group = story?.category ? categories.find((category) => category.id === story.category)?.label : story?.origin;
+  const dirty = !review && !autoRun && code !== ranCode;
+  const status = error
+    ? { tone: 'error', text: 'Error' }
+    : review
+      ? { tone: 'idle', text: 'Not run yet' }
+      : busy
+        ? { tone: 'busy', text: 'Loading' }
+        : writing
+          ? { tone: 'busy', text: 'Story is editing the code' }
+          : replaying
+            ? { tone: 'live', text: playing ? 'Replaying keyframes' : 'On the timeline' }
+            : dirty
+              ? { tone: 'idle', text: `Edited · ${mod}↵ to run` }
+              : { tone: 'live', text: 'Live' };
 
   return (
-    <div>
-      <nav aria-label="Kinds of change" className="flex flex-wrap gap-x-5 gap-y-2 border-b pb-3">
-        {categories.map((category) => {
-          const active = story?.category === category.id;
-          return (
-            <button
-              key={category.id}
-              type="button"
-              aria-pressed={active}
-              title={category.summary}
-              onClick={() => select(playgroundDemos.find((item) => item.category === category.id)!)}
-              className={cn(
-                'relative flex items-center gap-1.5 pb-1 text-[0.95rem] transition-colors',
-                active ? 'text-fd-foreground' : 'text-fd-muted-foreground hover:text-fd-foreground',
-              )}
-            >
-              <StateChangeIcon category={category.id} className="size-3.5" />
-              {category.label}
-              <span
-                aria-hidden="true"
-                className={cn(
-                  'absolute inset-x-0 -bottom-[3px] h-px bg-fd-foreground transition-transform duration-300 ease-out-quint md:-bottom-[13px]',
-                  active ? 'scale-x-100' : 'scale-x-0',
-                )}
-              />
-            </button>
-          );
-        })}
-      </nav>
-      {story?.category && (
-        <nav aria-label="Stories" className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          {playgroundDemos
-            .filter((item) => item.category === story.category)
-            .map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={story.id === item.id}
-                onClick={() => select(item)}
-                className={cn(
-                  'font-mono text-sm transition-colors',
-                  story.id === item.id ? 'text-fd-foreground' : 'text-fd-muted-foreground hover:text-fd-foreground',
-                )}
-              >
-                {item.title}
-              </button>
-            ))}
-        </nav>
-      )}
-      <p className="mt-3 min-h-6 text-fd-muted-foreground">
-        {story?.line}
-        {story && <span className="vd-label ml-3">{story.chart}</span>}
-      </p>
-
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <div className="min-w-0">
-          <div className="text-sm">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-fd-muted-foreground">
-              <span className="vd-label">rows</span>
-              <span className="font-mono text-xs">
-                {dataset.name} · {dataset.rows.length} records
-              </span>
-              {dataset.rows.length > 0 && (
-                <button type="button" className="text-xs underline-offset-4 hover:text-fd-foreground hover:underline" onClick={() => setShowRows((shown) => !shown)}>
-                  {showRows ? 'hide' : 'view'}
-                </button>
-              )}
-              <label className="cursor-pointer text-xs underline-offset-4 hover:text-fd-foreground hover:underline">
-                use your own
-                <input type="file" accept=".csv,.json" className="sr-only" aria-label="Use your own CSV or JSON rows" onChange={(event) => void replaceRows(event.currentTarget)} />
-              </label>
-              {story && (
-                <button type="button" className="ml-auto text-xs underline-offset-4 hover:text-fd-foreground hover:underline" onClick={() => void open(story)}>
-                  start over
-                </button>
-              )}
-            </div>
-            {showRows && (
-              <div className="mt-2 max-h-64 overflow-auto rounded-md border">
-                <table className="w-full whitespace-nowrap text-left font-mono text-[0.7rem] tabular-nums">
-                  <thead className="sticky top-0 bg-fd-background">
-                    <tr>
-                      {columns.map((field) => (
-                        <th key={field} className="px-3 py-2 font-medium text-fd-muted-foreground">
-                          {field}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dataset.rows.slice(0, 200).map((row, index) => (
-                      <tr key={index} className="border-t">
-                        {columns.map((field) => (
-                          <td key={field} className="px-3 py-1.5">
-                            {row[field] instanceof Date ? (row[field] as Date).toISOString().slice(0, 10) : String(row[field] ?? '')}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className={cn('vd-code-surface mt-4 overflow-hidden rounded-md transition-shadow', error && 'shadow-[inset_2px_0_0_var(--color-fd-error)]')}>
-            <CodeEditor value={code} onChange={onEdit} onRun={runNow} onSave={() => void keep()} markedLines={marked} ariaLabel="Chart code" />
-          </div>
-          {error ? (
-            <p role="alert" className="mt-1.5 font-mono text-xs text-fd-error">
-              {error}
-            </p>
-          ) : (
-            <p className="mt-1.5 text-xs text-fd-muted-foreground">
-              <span className="sr-only" aria-live="polite">
-                {writing ? 'The story is editing the code.' : ''}
-              </span>
-              Every valid edit animates · <kbd className="font-mono">⌘S</kbd> keeps a keyframe · code runs in your browser
-            </p>
+    <div
+      ref={appRef}
+      className="pg-app"
+      // "auto" lets the layout decide until the reader toggles the examples.
+      data-explorer={explorerChoice === null ? 'auto' : explorerOpen ? 'open' : 'closed'}
+      data-dragging={dragging || undefined}
+      style={{ '--pg-left': `${split * 100}fr`, '--pg-right': `${(1 - split) * 100}fr` } as CSSProperties}
+    >
+      <div role="toolbar" aria-label="Playground" className="pg-toolbar">
+        <h1 className="sr-only">Playground</h1>
+        <button
+          type="button"
+          className="pg-tool"
+          aria-label={explorerOpen ? 'Hide examples' : 'Show examples'}
+          aria-expanded={explorerOpen}
+          aria-controls="pg-explorer"
+          title="Examples"
+          onClick={() => setExplorerChoice(!explorerOpen)}
+        >
+          <PanelLeft className="size-4" />
+        </button>
+        <p className="flex min-w-0 items-baseline gap-1.5 truncate text-sm">
+          {group && <span className="text-fd-muted-foreground">{group}</span>}
+          {group && (
+            <span aria-hidden="true" className="text-fd-muted-foreground/60">
+              /
+            </span>
           )}
-        </div>
-
-        <div className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-          <div ref={stageRef} className="pg-stage vd-docs-chart" style={{ minHeight: HEIGHT }} aria-label="Chart" aria-busy={busy} />
-          <p className="mt-1.5 flex min-h-5 flex-wrap items-baseline gap-x-2.5 gap-y-1 font-mono text-xs text-fd-muted-foreground" aria-live="polite">
-            <span className="font-sans font-semibold text-[var(--color-delta)]">Δ</span>
-            {changes.length ? changes.map((change, index) => <span key={index} className="text-fd-foreground/80">{formatChange(change)}</span>) : <span>edit the code; the chart follows</span>}
-          </p>
-          <Timeline
-            keyframes={keyframes}
-            value={value}
-            replaying={replaying}
-            playing={playing}
-            onScrub={(position) => void onScrub(position)}
-            onSeek={(index) => void playTo(index)}
-            onPlay={onPlay}
-            onKeep={() => void keep()}
-            onClear={clearKeyframes}
-            canKeep={!busy && !error}
-            notice={notice}
-          />
+          <span className="truncate font-medium">{story?.title}</span>
+          {story && <span className="vd-label ml-1.5">{story.chart}</span>}
+        </p>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <label className="pg-switch" title="Run the code shortly after each edit">
+            <input type="checkbox" role="switch" checked={autoRun} onChange={(event) => toggleAutoRun(event.currentTarget.checked)} />
+            <span aria-hidden="true" className="pg-switch-track" />
+            <span className="hidden sm:inline">Auto-run</span>
+            <span className="sr-only sm:hidden">Auto-run</span>
+          </label>
+          <button type="button" className="pg-tool pg-tool-primary" onClick={runNow} title={`Run (${mod}↵)`}>
+            <Play aria-hidden="true" className="size-3.5" />
+            <span>Run</span>
+          </button>
+          <button type="button" className="pg-tool" onClick={() => story && void open(story)} disabled={!story} title="Open this example again from the start">
+            <RotateCcw aria-hidden="true" className="size-3.5" />
+            <span className="hidden md:inline">Reset</span>
+            <span className="sr-only md:hidden">Reset</span>
+          </button>
+          <button type="button" className="pg-tool" onClick={() => void share()} title="Copy a link to this code">
+            <Link2 aria-hidden="true" className="size-3.5" />
+            <span className="hidden md:inline">Share</span>
+            <span className="sr-only md:hidden">Share</span>
+          </button>
         </div>
       </div>
+
+      <aside id="pg-explorer" className="pg-explorer">
+        <Explorer stories={playgroundDemos} activeId={story?.id} activeCategory={story?.category} onOpen={select} />
+      </aside>
+      <button type="button" className="pg-backdrop" aria-label="Close examples" tabIndex={-1} onClick={() => setExplorerChoice(false)} />
+
+      <section ref={editorPaneRef} aria-label="Editor" className="pg-editor vd-code-surface">
+        <div role="tablist" aria-label="Files" className="pg-tabs">
+          <button
+            type="button"
+            role="tab"
+            id="pg-tab-rows"
+            aria-selected={tab === 'rows'}
+            aria-controls="pg-panel-rows"
+            className="pg-tab"
+            onClick={() => setTab('rows')}
+            title={`${dataset.name} · ${dataset.rows.length} records`}
+          >
+            <span className="max-w-[14rem] truncate">{dataset.name}</span>
+            <span className="text-[var(--code-muted)] tabular-nums">{dataset.rows.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="pg-tab-code"
+            aria-selected={tab === 'code'}
+            aria-controls="pg-panel-code"
+            className="pg-tab"
+            onClick={() => setTab('code')}
+          >
+            chart.js
+            {dirty && <span aria-label="not run" className="size-1.5 rounded-full bg-[var(--color-delta)]" />}
+          </button>
+        </div>
+        <div role="tabpanel" id="pg-panel-code" aria-labelledby="pg-tab-code" hidden={tab !== 'code'} className="pg-panel">
+          <CodeEditor
+            className="h-full"
+            value={code}
+            onChange={onEdit}
+            onRun={runNow}
+            onSave={() => void keep()}
+            onCursor={onCursor}
+            markedLines={marked}
+            hints={hints}
+            lineNumbers
+            ariaLabel="Chart code"
+          />
+        </div>
+        {tab === 'rows' && (
+          <div role="tabpanel" id="pg-panel-rows" aria-labelledby="pg-tab-rows" className="pg-panel">
+            <RowsPanel dataset={dataset} view={rowsView} onView={setRowsView} onEdit={onRowsEdit} onUpload={(input) => void replaceRows(input)} onRun={runNow} />
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="pg-problem">
+            {error}
+          </p>
+        )}
+      </section>
+
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize editor and preview"
+        aria-valuemin={Math.round(SPLIT_RANGE[0] * 100)}
+        aria-valuemax={Math.round(SPLIT_RANGE[1] * 100)}
+        aria-valuenow={Math.round(split * 100)}
+        tabIndex={0}
+        className="pg-splitter"
+        onPointerDown={startDrag}
+        onKeyDown={nudgeSplit}
+        onDoubleClick={() => setSplitPreference(String(DEFAULT_SPLIT))}
+      />
+
+      <section ref={previewPaneRef} aria-label="Preview" className="pg-preview">
+        <p className="min-h-9 shrink-0 px-4 pt-2.5 text-sm text-fd-muted-foreground">{story?.line}</p>
+        <div className="relative min-h-0 flex-1 px-4">
+          <div ref={stageRef} className="pg-stage vd-docs-chart" aria-label="Chart" aria-busy={busy} />
+          {review && (
+            <div className="absolute inset-0 grid place-items-center px-6 text-center">
+              <div className="max-w-sm">
+                <p className="text-sm text-fd-muted-foreground">
+                  Code from a link runs in this page only when you ask. Read it in the editor, then run it.
+                </p>
+                <button type="button" className="pg-tool pg-tool-primary mx-auto mt-3" onClick={runNow}>
+                  <Play aria-hidden="true" className="size-3.5" />
+                  Run this code
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <p
+          role="status"
+          aria-label="State changes"
+          className="flex min-h-7 shrink-0 flex-wrap items-baseline gap-x-2.5 gap-y-1 px-4 py-1 font-mono text-xs text-fd-muted-foreground"
+        >
+          <span className="font-sans font-semibold text-[var(--color-delta)]">Δ</span>
+          {changes.length ? changes.map((change, index) => <span key={index} className="text-fd-foreground/80">{formatChange(change)}</span>) : <span>edit the code; the chart follows</span>}
+          {changes.length > 0 && changeStages > 1 && <span className="ml-auto font-sans">planned in {changeStages} stages</span>}
+        </p>
+      </section>
+
+      <Timeline
+        className="pg-timeline"
+        keyframes={keyframes}
+        value={value}
+        stageDuration={STAGE_DURATION}
+        replaying={replaying}
+        playing={playing}
+        onScrub={(position) => void onScrub(position)}
+        onSeek={(index) => void playTo(index)}
+        onPlay={onPlay}
+        onKeep={() => void keep()}
+        onClear={clearKeyframes}
+        canKeep={!busy && !error && !review}
+        notice={notice}
+        mod={mod}
+      />
+
+      <footer className="pg-status">
+        <span className="flex min-w-0 items-center gap-1.5" data-tone={status.tone}>
+          <span aria-hidden="true" className="pg-status-dot" />
+          <span className="truncate">{status.text}</span>
+        </span>
+        <span className="sr-only" aria-live="polite">
+          {writing ? 'The story is editing the code.' : ''}
+        </span>
+        {flash && (
+          <span role="status" className="truncate text-fd-foreground">
+            {flash}
+          </span>
+        )}
+        <span className="ml-auto hidden truncate sm:inline">
+          rows · {dataset.name} · {dataset.rows.length}
+        </span>
+        <span className="hidden md:inline">
+          Ln {cursor.line}, Col {cursor.column}
+        </span>
+        <span className="hidden lg:inline">
+          {mod}↵ run · {mod}S keep · Ctrl+Space complete
+        </span>
+        <span className="ml-auto sm:ml-0">Runs in your browser</span>
+      </footer>
     </div>
   );
 }

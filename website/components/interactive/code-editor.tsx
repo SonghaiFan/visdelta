@@ -4,6 +4,16 @@ import { useEffect, useRef } from 'react';
 import type { StateEffectType } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
 
+/** Completions the editor offers; each is read when the reader asks. */
+export interface CodeHints {
+  /** After a dot: methods of the chain being written. */
+  members(): string[];
+  /** Inside a string literal, such as field names. */
+  strings(): string[];
+  /** Bare identifiers in scope. */
+  names(): string[];
+}
+
 interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -15,6 +25,13 @@ interface CodeEditorProps {
   markedLines?: readonly number[];
   ariaLabel: string;
   className?: string;
+  /** JavaScript (default) or plain text such as CSV. */
+  language?: 'javascript' | 'plain';
+  /** A line-number gutter and the active line, as in a full editor. */
+  lineNumbers?: boolean;
+  hints?: CodeHints;
+  /** The caret moved: 1-based line and column. */
+  onCursor?: (line: number, column: number) => void;
 }
 
 /**
@@ -23,30 +40,42 @@ interface CodeEditorProps {
  * external `value` is applied as the smallest edit that produces it, with the
  * cursor at the end of that edit, so code written by the page reads as typing.
  */
-export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLabel, className }: CodeEditorProps) {
+export function CodeEditor({
+  value,
+  onChange,
+  onRun,
+  onSave,
+  markedLines,
+  ariaLabel,
+  className,
+  language: mode = 'javascript',
+  lineNumbers = false,
+  hints,
+  onCursor,
+}: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const markRef = useRef<StateEffectType<readonly number[]> | null>(null);
   const applying = useRef(false);
-  const callbacks = useRef({ onChange, onRun, onSave });
+  const callbacks = useRef({ onChange, onRun, onSave, hints, onCursor });
   const initialValue = useRef(value);
   const marks = useRef<readonly number[]>(markedLines ?? []);
 
   useEffect(() => {
-    callbacks.current = { onChange, onRun, onSave };
-  }, [onChange, onRun, onSave]);
+    callbacks.current = { onChange, onRun, onSave, hints, onCursor };
+  }, [onChange, onRun, onSave, hints, onCursor]);
 
   useEffect(() => {
     let destroyed = false;
     (async () => {
       const [
         { minimalSetup },
-        { EditorView: View, Decoration, keymap },
-        { StateEffect, StateField, RangeSetBuilder },
+        { EditorView: View, Decoration, keymap, lineNumbers: gutter, highlightActiveLine, highlightActiveLineGutter },
+        { StateEffect, StateField, RangeSetBuilder, Prec },
         { javascript },
         language,
         { tags },
-        { closeBrackets },
+        { closeBrackets, autocompletion },
       ] = await Promise.all([
         import('codemirror'),
         import('@codemirror/view'),
@@ -77,18 +106,53 @@ export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLa
         provide: (field) => View.decorations.from(field),
       });
       markRef.current = setMarks;
+      /** Methods after a dot, fields inside strings, and names elsewhere. */
+      const complete = (context: import('@codemirror/autocomplete').CompletionContext) => {
+        const source = callbacks.current.hints;
+        if (!source) return null;
+        const node = language.syntaxTree(context.state).resolveInner(context.pos, -1);
+        if (/Comment/.test(node.name)) return null;
+        if (node.name === 'String') {
+          const from = node.from + 1;
+          if (context.pos < from) return null;
+          return {
+            from,
+            options: source.strings().map((label) => ({ label, type: 'text', detail: 'field' })),
+            validFor: /^[^"'`\\]*$/,
+          };
+        }
+        const member = context.matchBefore(/\.[\w$]*/);
+        if (member) {
+          return {
+            from: member.from + 1,
+            options: source.members().map((label) => ({ label, type: 'method' })),
+            validFor: /^[\w$]*$/,
+          };
+        }
+        const word = context.matchBefore(/[\w$]+/);
+        if (!word && !context.explicit) return null;
+        return {
+          from: word?.from ?? context.pos,
+          options: source.names().map((label) => ({ label, type: 'variable' })),
+          validFor: /^[\w$]*$/,
+        };
+      };
+      const editing =
+        mode === 'javascript'
+          ? [closeBrackets(), language.bracketMatching(), language.indentOnInput(), javascript(), autocompletion({ override: [complete], icons: false })]
+          : [];
+      const gutters = lineNumbers ? [gutter(), highlightActiveLineGutter(), highlightActiveLine()] : [];
       const view = new View({
         doc: initialValue.current,
         parent: hostRef.current,
         extensions: [
           minimalSetup,
           markField,
-          closeBrackets(),
-          language.bracketMatching(),
-          language.indentOnInput(),
-          javascript(),
+          ...editing,
+          ...gutters,
           View.lineWrapping,
-          keymap.of([
+          // Ahead of the default keymap, which binds Mod-Enter to a blank line.
+          Prec.highest(keymap.of([
             {
               key: 'Mod-Enter',
               run: () => {
@@ -104,7 +168,7 @@ export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLa
                 return Boolean(callbacks.current.onSave);
               },
             },
-          ]),
+          ])),
           language.syntaxHighlighting(
             language.HighlightStyle.define([
               { tag: tags.keyword, color: 'var(--code-keyword)' },
@@ -125,6 +189,31 @@ export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLa
               backgroundColor: 'color-mix(in srgb, var(--color-delta) 28%, transparent) !important',
             },
             '.cm-matchingBracket': { backgroundColor: 'transparent', outline: '1px solid var(--code-muted)' },
+            '.cm-gutters': {
+              backgroundColor: 'transparent',
+              color: 'var(--code-muted)',
+              border: 'none',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+            },
+            '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px 0 14px', minWidth: '34px', lineHeight: '21.25px' },
+            '.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--code-text)' },
+            '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--code-text) 4%, transparent)' },
+            '.cm-tooltip': {
+              border: '1px solid var(--color-fd-border)',
+              borderRadius: '4px',
+              backgroundColor: 'var(--color-fd-popover)',
+              color: 'var(--color-fd-popover-foreground)',
+              overflow: 'hidden',
+            },
+            '.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '12px', maxHeight: '14em' },
+            '.cm-tooltip-autocomplete > ul > li': { padding: '2px 10px' },
+            '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+              backgroundColor: 'color-mix(in srgb, var(--color-delta) 22%, transparent)',
+              color: 'inherit',
+            },
+            '.cm-completionDetail': { marginLeft: '1em', fontStyle: 'normal', color: 'var(--code-muted)' },
+            '.cm-completionMatchedText': { textDecoration: 'none', fontWeight: '600' },
             '.cm-line.cm-vd-marked': {
               backgroundColor: 'color-mix(in srgb, var(--color-delta) 12%, transparent)',
               boxShadow: 'inset 2px 0 0 var(--color-delta)',
@@ -133,6 +222,11 @@ export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLa
           View.contentAttributes.of({ 'aria-label': ariaLabel, 'aria-multiline': 'true', spellcheck: 'false' }),
           View.updateListener.of((update) => {
             if (update.docChanged && !applying.current) callbacks.current.onChange(update.state.doc.toString());
+            if (update.docChanged || update.selectionSet) {
+              const head = update.state.selection.main.head;
+              const line = update.state.doc.lineAt(head);
+              callbacks.current.onCursor?.(line.number, head - line.from + 1);
+            }
           }),
         ],
       });
@@ -144,6 +238,8 @@ export function CodeEditor({ value, onChange, onRun, onSave, markedLines, ariaLa
       viewRef.current?.destroy();
       viewRef.current = null;
     };
+    // The extension set is fixed for the editor's lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ariaLabel]);
 
   useEffect(() => {

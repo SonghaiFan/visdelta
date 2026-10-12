@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- `VisualizationTransition.stageCount()` is now part of the public type: the
+  number of serial route stages planned for a pair. `play({ duration })` already
+  gives each stage `duration` ms, so a full play lasts `stageCount() × duration`.
+  Runtime behaviour is unchanged.
+- Moved the Playground and Gallery out of the documentation chrome into a
+  full-screen studio with its own app bar. The playground is now an online
+  editor: an examples tree filed by the seven state-change categories, `rows`
+  and `chart.js` file tabs (editable CSV/JSON rows, line numbers, completions
+  from the chart's own methods and the rows' fields), an auto-run switch, a
+  draggable editor/preview divider, share links that run only when the reader
+  presses Run, a status bar, and a real-time keyframe timeline whose clips show
+  each leg's planned route stages.
+
 - Rebuilt the documentation site from scratch with Fumadocs and a Next.js static
   export in `website/`, deployed to the same GitHub Pages URL. It adds a
   restructured information architecture (introduction, concepts, charts,
