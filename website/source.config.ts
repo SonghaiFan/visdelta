@@ -7,7 +7,6 @@ import {
 } from 'fumadocs-typescript';
 import { resolve } from 'node:path';
 import { codeThemes } from './lib/code-themes';
-import { remarkSourceRef } from './lib/remark-source-ref';
 
 // This file is bundled into `.source/`, so resolve from the working directory
 // (`website/`) rather than `import.meta.url`.
@@ -37,13 +36,9 @@ export const docs = defineDocs({
   },
 });
 
-// `next dev` only: lets the inline editor map rendered blocks to their source.
-const editable = process.env.NODE_ENV === 'development';
-
 export default defineConfig({
   mdxOptions: {
     remarkPlugins: [
-      ...(editable ? [remarkSourceRef] : []),
       [
         remarkAutoTypeTable,
         {

@@ -16,8 +16,6 @@ const chromePath = process.env.VISDELTA_CHROME_PATH;
 
 export default defineConfig({
   testDir: './tests',
-  // `*.test.ts` files are Node unit tests (`npm run test:unit`).
-  testMatch: '*.spec.ts',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

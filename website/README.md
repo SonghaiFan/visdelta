@@ -31,7 +31,6 @@ npm run dev        # http://localhost:3000
 | `npm run lint`           | ESLint (Next.js rules)                                                  |
 | `npm run types:check`    | Generate MDX and route types, then `tsc --noEmit`                       |
 | `npm run examples:check` | Verify every live example and playground story against the real `delta()` |
-| `npm run test:unit`      | Node unit tests (`tests/*.test.ts`)                                     |
 | `npm test`               | Playwright tests against the exported site in `out/`                    |
 | `npm run check`          | All of the above, as CI runs it                                         |
 
@@ -104,34 +103,6 @@ Components available in MDX without imports (see `components/mdx.tsx`):
 | `Callout`, `Cards`, `Card`, `Steps`, `Step`, `Tabs`, `Tab`, `Accordions`, `Accordion`, `TypeTable` | Fumadocs UI components |
 
 A code fence tagged `npm` renders as npm/pnpm/yarn/bun tabs.
-
-### Edit text on the page (dev only)
-
-Under `npm run dev`, docs pages have an **Edit text** switch in the bottom-right
-corner. In edit mode, click any paragraph, heading, table, page title or
-description: its Markdown opens in place. **⌘S** (or Save) writes it back to the
-`.mdx` file and Fast Refresh redraws the page; **Esc** cancels. Links don't
-navigate while edit mode is on, and the switch is remembered for the browser
-session.
-
-How it works:
-
-- `lib/remark-source-ref.ts` runs only in development. It stamps each block with
-  `data-vd-src="content/docs/page.mdx#line:column-line:column"`. fumadocs-mdx
-  replaces the frontmatter with blank lines before compiling, so positions match
-  the file on disk.
-- `app/api/dev/source/route.dev.ts` reads and writes those ranges and the
-  `title` and `description` fields. `next.config.mjs` adds the `dev.ts` page
-  extension only in development, so the route never exists in a build. The
-  route accepts same-origin requests carrying its own header, edits files under
-  `content/` only, and refuses a save if the text on disk changed since it was
-  opened.
-- `lib/dev-source.ts` holds the file logic; `npm run test:unit` tests it.
-
-Edit components such as `<LiveExample />` and code blocks in the file. Static
-export applies to builds only (`output` is unset under `next dev`), because it
-rejects the editor's dynamic route even in development. A Playwright test checks
-that the export contains no editor.
 
 ### Live examples
 

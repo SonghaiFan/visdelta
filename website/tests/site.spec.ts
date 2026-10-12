@@ -234,14 +234,6 @@ test.describe('playground', () => {
 });
 
 test.describe('site', () => {
-  test('the dev-only inline editor is not part of the build', async ({ page }) => {
-    await page.goto('docs/concepts/progress/');
-    await expect(page.locator('h1').first()).toBeVisible();
-    await expect(page.locator('[data-vd-src]')).toHaveCount(0);
-    await expect(page.locator('[data-vd-inline-toolbar]')).toHaveCount(0);
-    expect((await page.request.get('api/dev/source/')).status()).toBe(404);
-  });
-
   test('the homepage code edits itself and the chart follows', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('./');

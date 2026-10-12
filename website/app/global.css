@@ -497,18 +497,3 @@ html > body[data-scroll-locked] {
     transform: scale(0);
   }
 }
-
-/* Dev-only inline docs editor (components/dev/inline-editor.tsx). */
-[data-vd-editing] [data-vd-src] {
-  cursor: text;
-  border-radius: 3px;
-  outline: 1px dashed transparent;
-  outline-offset: 4px;
-  transition: outline-color 150ms;
-}
-[data-vd-editing] [data-vd-src]:hover {
-  outline-color: color-mix(in srgb, var(--color-delta) 80%, transparent);
-}
-[data-vd-hidden] {
-  display: none !important;
-}
