@@ -55,7 +55,7 @@ const DEFAULT_STORY = 'sort';
 const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
 /** Timeline panel heights in pixels: one fixed height per view, adjustable by dragging the top edge. */
-const DEFAULT_TIMELINE = { compact: 80, details: 240 };
+const DEFAULT_TIMELINE = { compact: 124, details: 320 };
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
 const STORAGE = {
@@ -120,7 +120,7 @@ function useTimelineRange(appRef: { current: HTMLDivElement | null }) {
       // Keep an editable portion of the workspace above an expanded timeline.
       const available = window.visualViewport?.height ?? window.innerHeight;
       const top = Math.max(0, app.getBoundingClientRect().top + window.scrollY);
-      setTimelineMaxHeight(Math.max(80, Math.floor(available - top - toolbar - status - 160)));
+      setTimelineMaxHeight(Math.max(124, Math.floor(available - top - toolbar - status - 160)));
     };
     update();
     window.addEventListener('resize', update);
@@ -130,7 +130,7 @@ function useTimelineRange(appRef: { current: HTMLDivElement | null }) {
       window.visualViewport?.removeEventListener('resize', update);
     };
   }, [appRef]);
-  return [80, timelineMaxHeight] as const;
+  return [124, timelineMaxHeight] as const;
 }
 
 /**

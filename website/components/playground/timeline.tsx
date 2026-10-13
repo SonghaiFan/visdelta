@@ -268,6 +268,46 @@ export function Timeline({
         onDoubleClick={() => onResetHeight(details)}
       />
       <div className="pg-timeline-body">
+      <div className="pg-row pg-transport">
+        <button
+          type="button"
+          onClick={onPlay}
+          disabled={count < 2}
+          aria-label={playing ? 'Pause' : 'Play keyframes'}
+          title={playing ? 'Pause' : 'Play keyframes'}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border transition-colors hover:bg-fd-accent disabled:opacity-40"
+        >
+          {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5 translate-x-px" />}
+        </button>
+        <div className="w-[7.5rem] shrink-0 font-mono text-xs leading-8 tabular-nums" aria-live="off">
+          <span className="text-fd-foreground">{seconds(now)}</span>
+          <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
+        </div>
+        {guide && <p className="pg-guide">{guide}</p>}
+        <button
+          type="button"
+          onClick={onKeep}
+          disabled={!canKeep}
+          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
+          title={`Keep this state as a keyframe (${mod}S)`}
+        >
+          <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
+          Keep
+        </button>
+        {count > 0 && (
+          <button
+            type="button"
+            aria-expanded={details}
+            aria-controls="pg-details"
+            onClick={() => setDetails(!details)}
+            title={details ? 'Hide details' : 'Show stages, categories and navigation'}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
+          >
+            Details
+            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
       {details && <div className="pg-time-tools" aria-label="Timeline navigation">
         <button type="button" disabled={!total || now <= 0} onClick={() => seekTime(boundaries.findLast(time => time < now - 0.01) ?? 0)}>Previous stage</button>
         <button type="button" disabled={!total || now >= total} onClick={() => seekTime(boundaries.find(time => time > now + 0.01) ?? total)}>Next stage</button>
@@ -286,21 +326,6 @@ export function Timeline({
         {selectedKey && <button type="button" onClick={() => showTime(times[selectedLeg] + legs[selectedLeg] / 2)}>Show transition</button>}
         <label><input type="checkbox" checked={snap} onChange={event => setSnap(event.target.checked)} /> Snap</label>
       </div>}
-      <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2">
-        <button
-          type="button"
-          onClick={onPlay}
-          disabled={count < 2}
-          aria-label={playing ? 'Pause' : 'Play keyframes'}
-          title={playing ? 'Pause' : 'Play keyframes'}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border transition-colors hover:bg-fd-accent disabled:opacity-40"
-        >
-          {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5 translate-x-px" />}
-        </button>
-        <div className="w-[7.5rem] shrink-0 font-mono text-xs leading-8 tabular-nums" aria-live="off">
-          <span className="text-fd-foreground">{seconds(now)}</span>
-          <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
-        </div>
         <div className="pg-time-shell" hidden={count === 0}>
           {lanes && <div className="pg-lane-labels" aria-hidden="true">{visibleCategories.map(category => <span className="pg-category-name" key={category.id}>{category.label}</span>)}</div>}
           <div className="pg-time-viewport" ref={viewportRef} role="region" aria-label="Timeline tracks" tabIndex={0}
@@ -408,32 +433,7 @@ export function Timeline({
         </div>
           </div>
         </div>
-        {guide && <p className="pg-guide">{guide}</p>}
-        <button
-          type="button"
-          onClick={onKeep}
-          disabled={!canKeep}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
-          title={`Keep this state as a keyframe (${mod}S)`}
-        >
-          <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
-          Keep
-        </button>
-        {count > 0 && (
-          <button
-            type="button"
-            aria-expanded={details}
-            aria-controls="pg-details"
-            onClick={() => setDetails(!details)}
-            title={details ? 'Hide details' : 'Show stages, categories and navigation'}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
-          >
-            Details
-            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
-          </button>
-        )}
-      </div>
-      {details && count > 0 && <div id="pg-details">
+      {details && count > 0 && <div id="pg-details" className="pg-stage-card">
         {selectedKey && <div className="pg-stage-selection" aria-label="Selected stage">
           <span className="pg-stage-title">
             <strong>Transition {selectedLeg + 1} · Stage {selectedStage + 1}</strong> {stageLabel(selectedKey, selectedStage)}
