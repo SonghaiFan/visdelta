@@ -27,6 +27,8 @@ import { useMedia, useModifierKey, usePreference } from './preferences';
 import { RowsPanel, type RowsView } from './rows-panel';
 import { SIZE_LIMITS, SizeControls, type SizeMode } from './size-controls';
 import { Timeline } from './timeline';
+import { stageLabels, stageDetails } from './stage-labels';
+import { StageInspector } from './stage-inspector';
 import { useKeyframePreviews } from './keyframe-previews';
 
 /** A curated story, gallery code, or code from a share link (no category). */
@@ -77,6 +79,8 @@ interface Keyframe extends Version {
   changes: StateChange[];
   /** Route stages VisDelta plans for the leg into this keyframe; 0 for the first. */
   stages: number;
+  stageLabels: string[];
+  stageDetails: string[];
 }
 interface Display {
   layer: HTMLElement;
@@ -138,7 +142,7 @@ export function Playground() {
   const shownKey = useRef(-1);
   const reviewRef = useRef(false);
   /** The last live edit and the route stages it was planned with. */
-  const lastMoveRef = useRef<{ from: ChartState; to: ChartState; stages: number } | null>(null);
+  const lastMoveRef = useRef<{ from: ChartState; to: ChartState; stages: number; stageLabels: string[]; stageDetails: string[] } | null>(null);
 
   const [story, setStory] = useState<Opened | null>(null);
   const [code, setCode] = useState('');
@@ -151,6 +155,9 @@ export function Playground() {
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
   const keyframePreviews = useKeyframePreviews(keyframes);
   const [replaying, setReplaying] = useState(false);
+  const [inspectionStage, setInspectionStage] = useState<number | undefined>();
+  const [inspecting, setInspecting] = useState(false);
+  const inspect = useCallback(async () => displayRef.current?.controller.inspect(), []);
   const [value, setValue] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [changes, setChanges] = useState<StateChange[]>([]);
@@ -300,7 +307,7 @@ export function Playground() {
         try {
           const next = await mount((layer) => transition(from.state as never, target.state as never, options(layer)));
           const stages = next.controller.stageCount();
-          lastMoveRef.current = { from: from.state, to: target.state, stages };
+          lastMoveRef.current = { from: from.state, to: target.state, stages, stageLabels: stageLabels(next.controller), stageDetails: stageDetails(next.controller) };
           shownRef.current = target;
           setChanges(difference.stateChanges);
           setChangeStages(stages);
@@ -368,18 +375,18 @@ export function Playground() {
    */
   const measureStages = useCallback(async (from: ChartState, to: ChartState) => {
     const move = lastMoveRef.current;
-    if (move && move.from === from && move.to === to) return move.stages;
+    if (move && move.from === from && move.to === to) return { stages: move.stages, stageLabels: move.stageLabels, stageDetails: move.stageDetails };
     const { transition } = await loadRuntime();
     const host = document.createElement('div');
     host.className = 'pg-measure vd-docs-chart';
     document.body.append(host);
     try {
       const controller = await transition(from as never, to as never, { target: host, height: 240 });
-      const stages = controller.stageCount();
-      controller.destroy();
-      return stages;
+      try {
+        return { stages: controller.stageCount(), stageLabels: stageLabels(controller), stageDetails: stageDetails(controller) };
+      } finally { controller.destroy(); }
     } catch {
-      return 1; // No route: the replay reports the failure when it is built.
+      return { stages: 1, stageLabels: [], stageDetails: [] }; // No route: the replay reports the failure when it is built.
     } finally {
       host.remove();
     }
@@ -405,9 +412,9 @@ export function Playground() {
       }
       difference = result.stateChanges;
     }
-    const stages = last ? await measureStages(last.state, version.state) : 0;
+    const { stages, stageLabels, stageDetails } = last ? await measureStages(last.state, version.state) : { stages: 0, stageLabels: [], stageDetails: [] };
     if (keyframesRef.current !== frames) return; // cleared or kept meanwhile
-    keyframesRef.current = [...frames, { ...version, id: nextKey.current++, changes: difference, stages }];
+    keyframesRef.current = [...frames, { ...version, id: nextKey.current++, changes: difference, stages, stageLabels, stageDetails }];
     setKeyframes(keyframesRef.current);
     setNotice('');
   }, [measureStages]);
@@ -1124,8 +1131,21 @@ export function Playground() {
           ))}
       </section>
 
+      <div className="pg-timeline">
       <Timeline
-        className="pg-timeline"
+        onPreviewStage={(from, to) => void playTo(to, from)}
+        onInspectStage={async position => {
+          await onScrub(position);
+          if (keyframesRef.current !== keyframes) return;
+          const leg = Math.min(keyframes.length - 2, Math.floor(position));
+          setInspectionStage(Math.floor((position - leg) * keyframes[leg + 1].stages));
+          setInspecting(true);
+        }}
+        inspectorControl={keyframes.length > 1 && <button type="button" className="pg-inspect-toggle" aria-expanded={inspecting} onClick={async () => {
+        setInspectionStage(undefined);
+        if (!inspecting) await onScrub(replaying ? value : Math.max(0, keyframes.length - 2));
+        setInspecting(!inspecting);
+      }}>{inspecting ? 'Hide stage inspector' : 'Inspect stages'}</button>}
         keyframes={keyframes}
         previews={keyframePreviews.previews}
         onPreview={keyframePreviews.request}
@@ -1142,6 +1162,18 @@ export function Playground() {
         notice={notice}
         mod={mod}
       />
+
+
+      {inspecting && replaying && keyframes.length > 1 && <StageInspector
+        key={`${keyframes.map(frame => frame.id).join('-')}:${inspectionStage ?? 'all'}`}
+        selectedStage={inspectionStage}
+        inspect={inspect} position={value}
+        leg={Math.min(keyframes.length - 2, Math.floor(value))}
+        offset={keyframes.slice(1, Math.min(keyframes.length - 2, Math.floor(value)) + 1).reduce((sum, frame) => sum + frame.stages * STAGE_DURATION, 0)}
+        stageCount={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages}
+        duration={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages * STAGE_DURATION}
+        onScrub={position => void onScrub(position)} />}
+      </div>
 
       <footer className="pg-status">
         <span className="flex min-w-0 items-center gap-1.5" data-tone={status.tone}>

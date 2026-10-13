@@ -1058,3 +1058,59 @@ html > body[data-scroll-locked] {
   transition: none !important;
   animation: none !important;
 }
+
+.pg-inspect-toggle { font-size: 11px; text-decoration: underline; text-underline-offset: 3px; margin-left: auto; }
+.pg-inspector { border-top: 1px solid var(--color-fd-border); padding: 8px 0; font-size: 11px; }
+.pg-inspector-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.pg-inspector-tools input { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 3px 6px; min-width: 180px; }
+.pg-inspector p { color: var(--color-fd-muted-foreground); margin: 5px 0; }
+.pg-inspector-scroll { max-height: min(32vh, 300px); overflow: auto; }
+.pg-inspector-phase { border: 1px solid var(--color-fd-border); border-radius: 3px; margin: 4px 0; }
+.pg-inspector-phase[data-active] { border-color: var(--color-delta); }
+.pg-inspector-phase summary { padding: 6px; cursor: pointer; }
+.pg-inspector-phase h4, .pg-inspector-seek { margin: 4px 8px; }
+.pg-inspector-seek, .pg-inspector-tools button { text-decoration: underline; text-underline-offset: 3px; }
+.pg-inspector-table { overflow-x: auto; }
+.pg-inspector table { width: 100%; border-collapse: collapse; text-align: left; }
+.pg-inspector th, .pg-inspector td { padding: 4px 8px; border-top: 1px solid var(--color-fd-border); vertical-align: top; }
+.pg-inspector td code { display: block; max-width: 180px; max-height: 64px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-inspector td button { text-align: left; overflow-wrap: anywhere; max-width: 200px; }
+.pg-inspector td button[aria-pressed=true] { color: var(--color-delta); text-decoration: underline; }
+.pg-inspector-notes summary { cursor: pointer; color: var(--color-fd-muted-foreground); }
+.pg-element-highlight { position: fixed; z-index: 90; pointer-events: none; border: 2px solid var(--color-delta); border-radius: 2px; }
+.pg-inspector tr[data-current] { background: color-mix(in srgb, var(--color-delta) 6%, transparent); }
+.pg-inspector-phase-body { max-height: 180px; overflow: auto; }
+.pg-inspector-pages { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; position: sticky; bottom: 0; background: var(--color-fd-background); border-top: 1px solid var(--color-fd-border); }
+.pg-inspector-pages button { text-decoration: underline; }
+.pg-inspector-pages button:disabled { opacity: .4; }
+
+/* Planned waypoints are named directly on the time strip, between authored keys. */
+.pg-stage-block { top: 2px; height: 22px; z-index: 1; display: flex; align-items: center; gap: 5px; padding: 0 12px; overflow: hidden; pointer-events: auto; text-align: left; border: 1px solid var(--color-fd-border); background: var(--color-fd-muted); color: var(--color-fd-muted-foreground); font-family: var(--font-mono); font-size: 10px; }
+.pg-stage-block[data-active] { background: color-mix(in srgb, var(--color-delta) 16%, var(--color-fd-background)); color: var(--color-fd-foreground); border-color: var(--color-delta); }
+.pg-stage-block:focus-visible { outline: 2px solid var(--color-delta); outline-offset: 1px; }
+.pg-stage-number { flex-shrink: 0; font-weight: 600; }
+.pg-stage-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Timeline navigation keeps one time window for every row. */
+.pg-time-tools, .pg-stage-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 11px; padding: 4px 0 8px; }
+.pg-time-tools button, .pg-stage-selection button { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 6px; }
+.pg-time-tools button:disabled { opacity: .4; }
+.pg-time-tools label { display: inline-flex; align-items: center; gap: 4px; }
+.pg-time-tools input[type=number] { width: 64px; border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
+.pg-pan { flex: 1; min-width: 140px; }
+.pg-pan input { width: 100%; accent-color: var(--color-delta); }
+.pg-ruler { pointer-events: auto; touch-action: none; cursor: ew-resize; overflow: hidden; }
+.pg-clips, .pg-category-time { overflow: hidden; }
+.pg-stage-block[aria-pressed=true] { outline: 1px solid var(--color-delta); outline-offset: -2px; color: var(--color-fd-foreground); }
+.pg-stage-selection { border-top: 1px solid var(--color-fd-border); padding-top: 6px; }
+.pg-stage-selection code { overflow-wrap: anywhere; }
+.pg-property-interval { display: block; position: relative; height: 6px; min-width: 100px; background: var(--color-fd-muted); margin-bottom: 4px; }
+.pg-property-interval > span { position: absolute; height: 100%; min-width: 1px; background: var(--color-delta); }
+@media (min-width: 768px) {
+  .pg-inspector { max-height: min(26vh, 240px); overflow: auto; }
+  .pg-inspector-scroll { max-height: none; overflow: visible; }
+}
+
+.pg-stage-exact summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.pg-stage-exact code { display: block; max-width: min(600px, 80vw); padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.pg-stage-name { font-family: var(--font-sans); }

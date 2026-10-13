@@ -350,7 +350,8 @@ test.describe('playground', () => {
     await expect(track.locator('.pg-clip')).toHaveCount(2);
     await details(page);
     await expect(track.locator('.pg-stage-block')).toHaveCount(3);
-    await expect(track.locator('.pg-clip').first()).toContainText('2 stages');
+    await expect(track.locator('.pg-clip').first()).toHaveAttribute('title', /2 planned stages/);
+    await expect(track.locator('.pg-stage-block').nth(1)).toHaveAttribute('aria-label', /stage 2 of 2:/);
     await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
     await expect(keys(page).nth(2)).toHaveAttribute('data-time', '2.7');
     await expect(track).toContainText('2.70s / 2.70s');
@@ -401,7 +402,7 @@ test.describe('playground', () => {
     await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 520 });
     // A canvas larger than its container scrolls instead of being clipped or shrunk.
     const scrolls = () => stage.evaluate((node) => ({ x: node.scrollWidth > node.clientWidth, y: node.scrollHeight > node.clientHeight }));
-    expect(await scrolls()).toEqual({ x: true, y: false });
+    expect(await scrolls()).toEqual({ x: true, y: await stage.evaluate(node => node.clientHeight < 520) });
     await page.getByLabel('Chart height in pixels').fill('1100');
     await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 1100 });
     expect(await scrolls()).toEqual({ x: true, y: true });
@@ -494,7 +495,7 @@ test.describe('playground', () => {
     expect(fits).toBe(true);
   });
 
-  test('a title is figure text above the chart; Fit holds the canvas still, Fixed slides it', async ({ page }) => {
+  test('a title is figure text above the chart; Fit uses the remaining room, Fixed slides it', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#headline');
     // Start, title, subtitle, new title: four kept states.
@@ -503,12 +504,11 @@ test.describe('playground', () => {
     const title = stage.locator('.vd-figure-title:visible').first();
     await expect(title).toContainText('Children under ten');
     await expect(changes(page)).toContainText('appearance.restyle(title)');
-    // The heading is outside the SVG, so the canvas is the same size with or without it.
+    // The heading remains outside the SVG in both sizing modes.
     expect(await stage.locator('svg').first().evaluate((svg) => svg.textContent?.includes('Children under ten'))).toBe(false);
     expect(await stage.locator('figure').first().evaluate((figure) => figure.querySelector('figcaption') !== null && figure.querySelector('svg')!.closest('figcaption') === null)).toBe(true);
 
-    // Fit follows the container, so the canvas is laid out for one room: the heading holds the
-    // room of the tallest text and the canvas does not move at any frame.
+    // Fit keeps the figure in its container and gives the canvas the remaining room.
     const timeline = page.getByLabel('Keyframe timeline');
     const canvas = () => stage.locator('svg:visible').first().evaluate((svg) => {
       const box = svg.getBoundingClientRect();
@@ -519,7 +519,14 @@ test.describe('playground', () => {
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const fitFirst = await canvas();
     await timeline.fill('2.7');
+    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(fitFirst.top);
+    const fitLast = await canvas();
+    expect(fitLast.width).toBe(fitFirst.width);
+    expect(fitLast.height).toBeLessThan(fitFirst.height);
+    expect(fitLast.top + fitLast.height).toBeCloseTo(fitFirst.top + fitFirst.height, 0);
+    await timeline.fill('0');
     await expect.poll(canvas).toEqual(fitFirst);
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
 
     // Fixed leaves the canvas size alone, so the heading's room opens by progress and the
     // first frame is the chart drawn without one.
