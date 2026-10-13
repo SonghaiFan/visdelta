@@ -268,7 +268,10 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
 
 - **Build warnings.** Next.js's CSS optimizer reports two warnings about
   `::highlight(fd-search)` in Fumadocs UI's stylesheet. The selector is valid
-  CSS (the Custom Highlight API); the warning is upstream and harmless.
+  CSS (the Custom Highlight API); the warning is upstream and harmless. During
+  development, `next.config.mjs` filters this specific parser diagnostic with
+  `turbopack.ignoreIssue`, matching its file, title and description. Other
+  diagnostics remain visible; production CSS optimizer warnings may still appear.
 - **Reader code runs in the page.** The playground and gallery evaluate the
   code in the editor with `new Function` in the reader's own tab, as the
   previous site did. There is no sandbox; nothing is sent anywhere. Code that
@@ -302,4 +305,28 @@ Category lanes show each leg's changes under Data, Grain, Encoding, Coordinate,
 Layout, Attention and Appearance. Only categories present in the saved sequence
 appear. A transition can occupy several lanes at once: these blocks describe
 its changes, not independent animation schedules. The stage strip retains the
-actual planned stage timing. Use **Hide categories** to collapse the lanes.
+actual planned stage timing. Use **Details** to show or hide the ruler, stage labels, category lanes, navigation controls and clear action. The timeline is compact by default.
+
+Open **Details**, then use **Inspect stages** to enter the saved timeline and expand its compiled SVG
+phases. Each phase lists the element, recorded attribute/style/text track,
+phase-endpoint values, current value and scheduled interval. Select an element
+row to outline its mounted node, filter by element or property, or use **Show
+phase midpoint** to seek. The timeline and inspector share one scrollable panel. Drag its top edge to resize it from 72 to 360 pixels (112 by default, capped at 45% of the viewport height); arrow keys adjust it, Home/End select the limits, and double-click resets it. The chosen height is remembered. Opening Details or the inspector preserves the panel and chart heights.
+Custom tweens are labelled explicitly: their nested properties are not exposed.
+Immediate renderer writes and node insertion/removal are not property tracks;
+title/subtitle HTML follows whole-transition progress separately. These limits
+are also shown under **Coverage and timing**, rather than guessed from categories.
+
+The timeline's stage strip also shows numbered, named intermediate stages
+without opening the inspector. Labels prefer the planner's exact declaration
+operation. Hover to read the complete action and time range; click or
+press Enter to select the stage without seeking. Authored keyframes keep their own
+numbered diamond markers.
+
+The timeline toolbar provides zoom, pan, Fit all, Fit transition, and exact second entry. Previous/next stage moves to a planned stage boundary. Dragging the ruler scrubs, with optional snapping within eight pixels of a boundary. Selecting a stage is passive and reveals its complete label and timing; Preview stage (or double-click) plays that range. Inspect SVG tracks explicitly seeks into the selected stage and opens its recorded property phases. Attribute interval bars show local phase timing; categories continue to describe whole-transition membership.
+
+Timeline stage captions prefer `stageOperations()` metadata: the declaration slot and its previous/next values. `unset` means the explicit declaration is absent, not a guessed renderer default. Chart-authored or refined stages without a single planner operation retain a clearly prefixed “Chart stage” semantic summary. Category lanes still show the seven semantic categories.
+
+Stage captions describe planner operations in plain language (for example, “Use petal length for horizontal position” and “Remove the grid column setting”). Select a stage and expand **Exact configuration** to see the original slot and before/after values. Labels describe declaration changes, not a promise of visible motion.
+
+Swarm uses `.layout("beeswarm", { x: "petalLength" })`. Unit layout type, columns and x/y channels form one planner operation, so the timeline shows one layout stage whose internal animation still moves horizontally before falling. Category lanes still describe semantic effects of that operation. Swarm keeps `.size(6)` across both endpoints; mark size is independent of layout. Later x/y assignments replace earlier bindings, including layout options.
