@@ -25,7 +25,18 @@ const config = {
   // requested from an origin it does not list. Opened as 127.0.0.1 rather than
   // localhost, no page hydrates and the playground never leaves "Loading".
   allowedDevOrigins: ['127.0.0.1'],
-  turbopack: { root: repositoryRoot },
+  turbopack: {
+    root: repositoryRoot,
+    // Fumadocs uses the valid Custom Highlight API for search results. The
+    // bundled CSS parser does not recognize it yet; keep other issues visible.
+    ignoreIssue: [
+      {
+        path: '**/app/global.css',
+        title: 'Parsing CSS source code failed',
+        description: /'highlight' is not recognized as a valid pseudo-element/,
+      },
+    ],
+  },
   outputFileTracingRoot: repositoryRoot,
 };
 

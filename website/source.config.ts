@@ -1,7 +1,6 @@
 import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 import { metaSchema, pageSchema } from 'fumadocs-core/source/schema';
 import {
-  createFileSystemGeneratorCache,
   createGenerator,
   remarkAutoTypeTable,
 } from 'fumadocs-typescript';
@@ -20,7 +19,9 @@ const repositoryRoot = resolve(process.cwd(), '..');
  */
 const typeGenerator = createGenerator({
   tsconfigPath: resolve(repositoryRoot, 'tsconfig.json'),
-  cache: createFileSystemGeneratorCache('.next/fumadocs-typescript'),
+  // Do not persist type tables under .next: builds can remove that directory
+  // while a dev worker is still generating a table. Keep the generator's
+  // reusable TypeScript project without depending on disposable cache files.
 });
 
 export const docs = defineDocs({
