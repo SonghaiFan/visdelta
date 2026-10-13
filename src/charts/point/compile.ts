@@ -61,8 +61,8 @@ function compilePointAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _cont
       transform: [...(spec.transform || []), { aggregate: { groupby, fields } }],
       encoding: {
         ...baseEncoding,
-        x: { ...x, field: xAs, title: (detailSpec['x'] as ChannelSpec & { title?: string })?.title || aggregateTitle(xAggregate.op, x.title || x.field!) },
-        y: { ...y, field: yAs, title: (detailSpec['y'] as ChannelSpec & { title?: string })?.title || aggregateTitle(yAggregate.op, y.title || y.field!) },
+        x: { ...x, field: xAs, label: (detailSpec['x'] as ChannelSpec & { label?: string })?.label || aggregateTitle(xAggregate.op, x.label || x.field!) },
+        y: { ...y, field: yAs, label: (detailSpec['y'] as ChannelSpec & { label?: string })?.label || aggregateTitle(yAggregate.op, y.label || y.field!) },
         ...(size ? { size: size.channel } : {})
       }
     }, { key: (detailSpec['key'] as string | string[] | undefined) || groupby }), {
@@ -106,9 +106,9 @@ function aggregateVisualChannel(channel: ChannelSpec): ChannelSpec {
   return visual;
 }
 
-function aggregateTitle(op: string, title: string): string {
-  if (!op || op === 'sum' || new RegExp(`^${op}\\s`, 'i').test(title)) return titleize(title);
-  return `${titleize(op)} ${lowerFirst(titleize(title))}`;
+function aggregateTitle(op: string, label: string): string {
+  if (!op || op === 'sum' || new RegExp(`^${op}\\s`, 'i').test(label)) return titleize(label);
+  return `${titleize(op)} ${lowerFirst(titleize(label))}`;
 }
 
 function lowerFirst(value: string): string {

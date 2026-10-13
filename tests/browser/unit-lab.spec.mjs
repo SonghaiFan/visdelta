@@ -249,8 +249,8 @@ test('Unit force accepts simultaneous explicit x and y targets', async ({ page }
     ];
     const source = unit(rows).key('id').layout('grid', { radius: 7 });
     const target = source
-      .x('species', { type: 'nominal', title: 'Species' })
-      .y('score', { type: 'quantitative', title: 'Score' })
+      .x('species', { type: 'nominal', label: 'Species' })
+      .y('score', { type: 'quantitative', label: 'Score' })
       .layout('force', { radius: 7 });
     const change = await transition(source, target, {
       target: '#chart', height: 320
@@ -337,8 +337,8 @@ test('Unit force keeps temporal and quantitative anchor axes aligned and bounded
     ];
     const source = unit(rows).key('id').layout('grid', { radius: 7 });
     const target = source
-      .x('observedAt', { type: 'temporal', title: 'Observed' })
-      .y('score', { type: 'quantitative', title: 'Score' })
+      .x('observedAt', { type: 'temporal', label: 'Observed' })
+      .y('score', { type: 'quantitative', label: 'Score' })
       .layout('force', { radius: 7 });
     const change = await transition(source, target, { target: '#chart', height: 320 });
     change.progress(1);

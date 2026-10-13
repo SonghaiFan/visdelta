@@ -1,4 +1,6 @@
-import type { ViewSpec, DeltaResult, RuntimeOptions } from './types/index.js';
+import type { TransitionInspection } from './runtime/inspection.js';
+export type { TransitionInspection, InspectedStage, InspectedProperty } from './runtime/inspection.js';
+import type { ViewSpec, DeltaResult, RuntimeOptions, DeclarationOperationChange, StateChange } from './types/index.js';
 import { cloneState } from './grammar/view-state.js';
 import { delta, visualizationChartModule, visualizationSpec } from './core.js';
 import type { Visualization } from './core.js';
@@ -14,7 +16,6 @@ import { d3ChartStyle } from './charts/style.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
-import { headingReservations } from './runtime/heading.js';
 import type { CanvasSize } from './runtime/canvas-size.js';
 
 export type { CanvasSize } from './runtime/canvas-size.js';
@@ -82,6 +83,12 @@ export interface VisualizationTransition {
    * play lasts `stageCount() × duration`.
    */
   stageCount(): number;
+  /** Semantic changes for each actual route stage, in authored playback order. */
+  stageChanges(): StateChange[][];
+  /** Exact planner operation per route stage; undefined for direct or chart-refined stages. */
+  stageOperations(): Array<DeclarationOperationChange | undefined>;
+  /** Read compiled SVG property tracks without pausing or seeking playback. */
+  inspect(): Promise<TransitionInspection>;
   /** Stop playback and remove the mounted transition. The controller cannot be used afterwards. */
   destroy(): void;
 }
@@ -140,7 +147,7 @@ export async function transition(
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
   const surface = createTransitionSurface(resolvedFrom, resolvedTo, {
-    ...options, chartStyle, headingReservation: headingReservations.get(options)
+    ...options, chartStyle
   }, chartTypes);
   let value = 0;
   let lastDirection = 1;
@@ -193,7 +200,7 @@ export async function transition(
       // dead beat between an authored state change and its projected motion.
       const started = performance.now();
       const tick = (now: number) => {
-        const fraction = Math.min(1, (now - started) / span);
+        const fraction = Math.max(0, Math.min(1, (now - started) / span));
         show(start + (end - start) * fraction, direction);
         animation = fraction < 1 ? requestAnimationFrame(tick) : null;
       };
@@ -202,6 +209,9 @@ export async function transition(
     },
     pause() { assertAlive(); stop(); return controller; },
     stageCount() { return surface.stageCount(); },
+    stageOperations() { assertAlive(); return cloneState(surface.stageOperations()); },
+    stageChanges() { assertAlive(); return surface.stageStates().map(([from, to]) => delta(from, to).stateChanges); },
+    inspect: surface.inspect,
     resize({ width, height } = {}) {
       assertAlive();
       assertCanvasSize('resize width', width);

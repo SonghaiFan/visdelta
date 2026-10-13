@@ -22,9 +22,9 @@ const samples = {
     category: 'encoding',
     code: `const revenue = bar(rows)
   .x("category")
-  .y("sales", { title: "Revenue" });
+  .y("sales", { label: "Revenue" });
 
-const profit = revenue.y("profit", { title: "Profit" });
+const profit = revenue.y("profit", { label: "Profit" });
 
 return { from: revenue, to: profit };`
   },

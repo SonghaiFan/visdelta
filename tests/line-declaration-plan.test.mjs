@@ -22,7 +22,7 @@ function verify(plan) {
 }
 test('Line summary measure changes form one Grain operation while appearance remains independent', () => {
   const from = base().rollup().toSpec();
-  const to = base().y('profit',{title:'Y'}).rollup({op:'mean',as:'average'}).color('#3366ff').curve('curveBasis').toSpec();
+  const to = base().y('profit',{label:'Y'}).rollup({op:'mean',as:'average'}).color('#3366ff').curve('curveBasis').toSpec();
   const original = [serializeViewSpec(from), serializeViewSpec(to)];
   const plan = planDeclarationTransition(from, to, codec); verify(plan);
   assert.equal(plan.stages.length, 3);
@@ -44,15 +44,15 @@ test('Line raw/summary fallback retains its native zipper route', () => {
 });
 test('Line reducer and truthful output alias update remains one authored rollup operation', () => {
   const from = base().rollup().toSpec();
-  const to = base().y('profit',{title:'Y'}).rollup({op:'mean',as:'average'}).toSpec();
+  const to = base().y('profit',{label:'Y'}).rollup({op:'mean',as:'average'}).toSpec();
   const plan=planDeclarationTransition(from,to,codec);verify(plan);
   assert.equal(plan.stages.length,1);
   assert.equal(plan.stages[0].operation.id,'__visdeltaLineTopology');
 });
 test('Line raw y remap stays an Encoding operation and overridden calls disappear', () => {
   const from=base().breakdown('series').toSpec();
-  const to=base().breakdown('series').y('profit',{title:'Y'}).toSpec();
-  const equivalent=base().breakdown('series').y('x').y('profit',{title:'Y'}).toSpec();
+  const to=base().breakdown('series').y('profit',{label:'Y'}).toSpec();
+  const equivalent=base().breakdown('series').y('x').y('profit',{label:'Y'}).toSpec();
   const plan=planDeclarationTransition(from,to,codec);verify(plan);
   assert.equal(plan.stages.length,1);assert.equal(plan.stages[0].operation.id,'encoding/y');
   assert.deepEqual(planDeclarationTransition(from,equivalent,codec),plan);

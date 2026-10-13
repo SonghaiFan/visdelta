@@ -27,12 +27,15 @@ export interface SortSpec {
 export interface ChannelSpec {
   field?: string;
   type?: ChannelType;
-  title?: string;
+  /** Display name for this channel, independent of the figure title. */
+  label?: string;
+  /** Channel display names use label; title belongs to the figure. */
+  title?: never;
   /** D3 format specifier used by a quantitative axis, for example "~s". */
   format?: string;
   aggregate?: string | boolean;
   timeUnit?: string;
-  value?: string;
+  value?: string | number;
   sort?: SortOrder | SortSpec;
   domain?: unknown[];
   /** Named d3-scale-chromatic scheme, for example "Tableau10" or "Viridis". */
@@ -305,7 +308,7 @@ export type BarOrientation = 'vertical' | 'horizontal';
 
 export interface ChannelSignature {
   field: string | null;
-  title: string | null;
+  label: string | null;
   type: string | null;
   aggregate: string | null;
   domain: unknown[] | null;

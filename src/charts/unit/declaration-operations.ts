@@ -1,20 +1,86 @@
-import type { AxisSpec, DeclarationOperationCodec } from '../../types/index.js';
+import type { AxisSpec, DeclarationOperationCodec, ViewSpec } from '../../types/index.js';
 import { createDeclarationOperationCodec, validateCanonicalAttentionScopes, validateCanonicalDataFields, validateCanonicalEncoding, validateCanonicalTransformPipeline, validateExplicitSourceDatumIdentity, deepEqual } from '../../grammar/declaration-operations.js';
 import { validateCanonicalPositionDomains } from '../../grammar/declaration-domains.js';
 import { serializeViewSpec } from '../../spec-meta.js';
 import { UNIT_LAYOUTS, type UnitViewState } from './authoring.js';
 import { UNIT_DEFAULTS } from './defaults.js';
 
-/** Unit quantity, grouping and layout slots remain independent declarations.
+/** Unit layout type, columns and position bindings form one complete layout slot.
+ * Mark size, quantity and grouping remain independent declarations.
  * Axis metadata mirrors those slots; it is never a second authored operation. */
 export function createUnitDeclarationOperationCodec(): DeclarationOperationCodec<UnitViewState> {
-  return createDeclarationOperationCodec<UnitViewState>({
+  const ordinary = createDeclarationOperationCodec<UnitViewState>({
     allowedRoots: ['mark', 'data', 'encoding', 'transform', 'key', 'datumKey', 'margin', 'unit', 'meta'],
     atomicPaths: [['margin']],
     derivedPaths: [['meta', 'state', 'sceneState', 'axis']],
     normalize: normalizeUnitDeclaration,
     validate: validateUnitDeclaration
   });
+  // A chart-owned shadow groups authored fields without changing their public
+  // serialization or treating their derived axis mirror as another operation.
+  const shadow = createDeclarationOperationCodec<ViewSpec>({
+    allowedRoots: ['mark', 'data', 'encoding', 'transform', 'key', 'datumKey', 'margin', 'meta', 'layout'],
+    atomicPaths: [['margin'], ['layout']],
+    normalize: spec => {
+      if (spec.encoding && !Object.keys(spec.encoding).length) delete spec.encoding;
+      const state = spec.meta?.state;
+      if (state?.sceneState && !Object.keys(state.sceneState).length) delete state.sceneState;
+      if (state?.scopes && !Object.keys(state.scopes).length) delete state.scopes;
+      if (state && !Object.keys(state).length) delete spec.meta!.state;
+      return spec;
+    },
+    derivedPaths: [['meta', 'state', 'sceneState', 'axis']]
+  });
+  const codec: DeclarationOperationCodec<UnitViewState> = {
+    normalize: ordinary.normalize,
+    validate: ordinary.validate,
+    decompose(spec) {
+      const normalized = ordinary.normalize(spec);
+      return normalized.status === 'ok' ? shadow.decompose(toLayoutShadow(normalized.value)) : normalized;
+    },
+    evaluate(template, operations) {
+      const normalized = ordinary.normalize(template);
+      if (normalized.status !== 'ok') return normalized;
+      const evaluated = shadow.evaluate(toLayoutShadow(normalized.value), operations);
+      if (evaluated.status !== 'ok') return evaluated;
+      const value = evaluated.value as UnitViewState & { layout?: Record<string, unknown> };
+      const layout = value.layout;
+      if (!layout || typeof layout !== 'object' || Array.isArray(layout)
+          || Object.keys(layout).some(key => !['type', 'columns', 'x', 'y'].includes(key))) {
+        return { status: 'unsupported', reason: 'Unit requires a complete layout operation' };
+      }
+      delete value.layout;
+      value.meta = { ...value.meta, unit: { ...value.meta?.unit, layout: layout.type as string,
+        ...(layout.columns === undefined ? {} : { columns: layout.columns }) } };
+      value.encoding = { ...value.encoding,
+        ...(layout.x === undefined ? {} : { x: layout.x }),
+        ...(layout.y === undefined ? {} : { y: layout.y }) } as ViewSpec['encoding'];
+      const actual = ordinary.normalize(value);
+      if (actual.status !== 'ok') return actual;
+      const valid = ordinary.validate(actual.value);
+      if (valid.status !== 'ok') return valid;
+      const roundTrip = codec.decompose(actual.value);
+      return roundTrip.status === 'ok' && deepEqual(roundTrip.value, operations) ? actual
+        : { status: 'unsupported', reason: 'Unit layout operations must round-trip exactly' };
+    }
+  };
+  return codec;
+}
+
+function toLayoutShadow(spec: UnitViewState): ViewSpec {
+  const result = serializeViewSpec(spec) as UnitViewState & { layout?: Record<string, unknown> };
+  const unit = { ...result.meta!.unit };
+  const encoding = { ...result.encoding };
+  result.layout = { type: unit.layout,
+    ...(unit.columns === undefined ? {} : { columns: unit.columns }),
+    ...(encoding.x === undefined ? {} : { x: encoding.x }),
+    ...(encoding.y === undefined ? {} : { y: encoding.y }) };
+  delete unit.layout; delete unit.columns;
+  delete encoding.x; delete encoding.y;
+  result.meta = { ...result.meta, unit };
+  if (Object.keys(encoding).length) result.encoding = encoding;
+  else delete result.encoding;
+  return result;
 }
 
 function normalizeUnitDeclaration(spec: UnitViewState): UnitViewState {
@@ -23,6 +89,10 @@ function normalizeUnitDeclaration(spec: UnitViewState): UnitViewState {
   const meta = result.meta ?? {};
   if (meta.state?.scopes && Object.keys(meta.state.scopes).length === 0) delete meta.state.scopes;
   const unit: Record<string, unknown> = { ...UNIT_DEFAULTS, ...(meta.unit ?? {}) };
+  if (unit.radius !== undefined) {
+    if (!result.encoding?.size) result.encoding = { ...result.encoding, size: { value: unit.radius as number } };
+    delete unit.radius;
+  }
   // A derived mirror with authored order or conflicting values is not safely
   // reconstructible. Do not silently erase a legacy instruction or conflict.
   const oldAxis = meta.state?.sceneState?.axis as Record<string, unknown> | undefined;
@@ -51,7 +121,9 @@ function validateUnitDeclaration(spec: UnitViewState): string | void {
   if (spec.mark !== 'unit') return 'declaration is not a Unit';
   const transformError = validateCanonicalTransformPipeline(spec);
   if (transformError) return transformError;
-  const encodingError = validateCanonicalEncoding(spec, ['x', 'y', 'color', 'tooltip']);
+  const size = spec.encoding?.size;
+  if (size && (size.field !== undefined || typeof size.value !== 'number' || !Number.isFinite(size.value) || size.value <= 0 || Object.keys(size).some(key => key !== 'value'))) return 'Unit size requires a positive finite constant';
+  const encodingError = validateCanonicalEncoding(spec, ['x', 'y', 'color', 'size', 'tooltip']);
   if (encodingError) return encodingError;
   const serialized = serializeViewSpec(spec);
   const meta = serialized.meta;

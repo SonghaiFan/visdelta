@@ -8,7 +8,7 @@ const products = [
 ];
 
 export const from = bar(products)
-  .x('product', { title: 'Product line' })
-  .y('revenue', { title: 'Revenue ($M)' });
+  .x('product', { label: 'Product line' })
+  .y('revenue', { label: 'Revenue ($M)' });
 
-export const to = from.y('profit', { title: 'Profit ($M)' });
+export const to = from.y('profit', { label: 'Profit ($M)' });

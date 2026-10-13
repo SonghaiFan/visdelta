@@ -74,7 +74,7 @@ export class BarState extends ChartState<BarViewState> {
   }
 
   override y(field: string | ChannelSpec, options: Partial<ChannelSpec> | string = {}): this {
-    if (typeof options === 'string') options = { title: options };
+    if (typeof options === 'string') options = { label: options };
     const { color, tooltip, ...channelOptions } = options as Partial<ChannelSpec> & {
       color?: unknown;
       tooltip?: unknown;
@@ -118,7 +118,7 @@ export class BarState extends ChartState<BarViewState> {
       by?: string | string[];
       layout?: BarLayout;
       op?: string;
-      title?: string | false;
+      label?: string | false;
       color?: unknown;
       tooltip?: unknown;
       [key: string]: unknown;
@@ -128,9 +128,9 @@ export class BarState extends ChartState<BarViewState> {
     const value = options.value ?? (this.state as BarViewState).encoding?.y?.field ?? 'count';
     const op = options.op ?? 'sum';
     const currentY = (this.state as BarViewState).encoding?.y;
-    const nextTitle = options.title === false
-      ? currentY?.title ?? titleize(value)
-      : options.title ?? aggregateTitle(op, currentY?.title ?? value);
+    const nextTitle = options.label === false
+      ? currentY?.label ?? titleize(value)
+      : options.label ?? aggregateTitle(op, currentY?.label ?? value);
     const { by, category: _cat, value: _val, ...rest } = options;
     const next = aggregateBarState(this, {
       ...rest,
@@ -141,10 +141,10 @@ export class BarState extends ChartState<BarViewState> {
       layout: options.layout ?? 'stacked',
       op
     });
-    return options.title === false
+    return options.label === false
       ? next
       : next.y(value, {
-          title: nextTitle,
+          label: nextTitle,
           format: currentY?.format
         });
   }
@@ -160,7 +160,7 @@ export class BarState extends ChartState<BarViewState> {
           as?: string;
           op?: string;
           color?: unknown;
-          title?: string;
+          label?: string;
           [key: string]: unknown;
         }
       | null = null,
@@ -171,7 +171,7 @@ export class BarState extends ChartState<BarViewState> {
       as?: string;
       op?: string;
       color?: unknown;
-      title?: string;
+      label?: string;
       [key: string]: unknown;
     } = {}
   ): this {
@@ -184,7 +184,7 @@ export class BarState extends ChartState<BarViewState> {
     const fields = (asArray(parent as string | string[] | null).filter(Boolean) as string[]);
     const value = options.value ?? (this.state as BarViewState).encoding?.y?.field ?? 'count';
     const op = options.op ?? 'sum';
-    const { color, title, by: _by, groupby: _groupby, value: _value, ...rest } = options;
+    const { color, label, by: _by, groupby: _groupby, value: _value, ...rest } = options;
 
     // A wide-data segment creates its measure field through a fold. Preserve
     // that preparation when rolling the detail back into category totals.
@@ -224,7 +224,7 @@ export class BarState extends ChartState<BarViewState> {
     }
     const currentY = (this.state as BarViewState).encoding?.y;
     nextState = nextState.y(value, {
-      title: title ?? aggregateTitle(op, currentY?.title ?? value),
+      label: label ?? aggregateTitle(op, currentY?.label ?? value),
       format: currentY?.format
     });
     if (color) nextState = nextState.color(color as string | ChannelSpec);
@@ -270,12 +270,12 @@ export class BarState extends ChartState<BarViewState> {
       key: config.key ?? [category, segment],
       detail: {
         category,
-        categoryTitle: config.categoryTitle ?? state.encoding?.x?.title,
+        categoryTitle: config.categoryTitle ?? state.encoding?.x?.label,
         fields,
         labels,
         segment,
         value,
-        valueTitle: config.valueTitle ?? state.encoding?.y?.title ?? titleize(value),
+        valueTitle: config.valueTitle ?? state.encoding?.y?.label ?? titleize(value),
         layout: config.layout ?? 'stacked',
         color: cloneState(config.color),
         domain: config.domain,
@@ -414,13 +414,13 @@ function normalizeAggregation(
     ...config,
     groupby,
     category,
-    categoryTitle: (config.categoryTitle ?? state.encoding?.x?.title ?? titleize(category ?? '')) as string,
+    categoryTitle: (config.categoryTitle ?? state.encoding?.x?.label ?? titleize(category ?? '')) as string,
     segment,
     value,
     as,
     valueTitle: (config.valueTitle ?? aggregateTitle(
       op,
-      state.encoding?.y?.title ?? titleize(segment ? value : as)
+      state.encoding?.y?.label ?? titleize(segment ? value : as)
     )) as string,
     op
   };

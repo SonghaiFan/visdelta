@@ -46,7 +46,7 @@ export function drawBarAxes(
     position: horizontal ? undefined : baseline,
     edgeTitleInset
   });
-  runtime.drawYAxis(chart, y, horizontal ? enc.y?.title : style.axisTitle(enc.y, 'up'), yTransition, {
+  runtime.drawYAxis(chart, y, horizontal ? enc.y?.label : style.axisTitle(enc.y, 'up'), yTransition, {
     tickCount: yTickCount,
     tickFormat: enc.y?.format,
     position: horizontal ? baseline : undefined,

@@ -29,7 +29,7 @@ export interface RuntimeScale {
 
 export interface RenderChannel extends ChannelSpec {
   field?: string;
-  value?: string;
+  value?: string | number;
   range?: string[];
   scheme?: string;
   scaleType?: string;

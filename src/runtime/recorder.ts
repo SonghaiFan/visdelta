@@ -34,7 +34,7 @@ interface Entry<Datum> {
   index: number;
   group: Element[];
   timing: Timing;
-  factories: Array<{ name: string; create: (entry: Entry<Datum>) => Tween['apply'] | null }>;
+  factories: Array<{ name: string; kind: Tween['kind']; create: (entry: Entry<Datum>) => Tween['apply'] | null }>;
   remove: boolean;
   item: TrackItem;
 }
@@ -259,7 +259,7 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
     return this.record(name, (entry) => {
       const apply = factory.call(entry.node, entry.datum, entry.index, entry.group);
       return apply ? (t) => apply.call(entry.node, t) : null;
-    });
+    }, 'custom');
   }
 
   text(value: Value<Datum, string | number | null>): this {
@@ -321,8 +321,8 @@ export class Recorder<Element_ extends BaseType, Datum> implements Motion<Elemen
     throw new Error(`Recorded transitions cannot run "${type}" handlers: side effects do not seek. Compute the state up front instead.`);
   }
 
-  private record(name: string, create: Entry<Datum>['factories'][number]['create']): this {
-    for (const entry of this.entries) entry.factories.push({ name, create });
+  private record(name: string, create: Entry<Datum>['factories'][number]['create'], kind?: Tween['kind']): this {
+    for (const entry of this.entries) entry.factories.push({ name, create, kind });
     return this;
   }
 }
@@ -347,7 +347,7 @@ function createItem<Datum>(entry: Entry<Datum>): TrackItem {
       const tweens: Tween[] = [];
       for (const factory of entry.factories) {
         const apply = factory.create(entry);
-        if (apply) tweens.push({ name: factory.name, apply });
+        if (apply) tweens.push({ name: factory.name, kind: factory.kind, apply });
       }
       return tweens;
     },

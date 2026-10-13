@@ -31,8 +31,8 @@ use, for example `npx serve`, and open the URL it prints.
         { category: 'Services', revenue: 9, profit: 7 },
       ];
 
-      const revenue = vd.bar(rows).x('category').y('revenue', { title: 'Revenue' });
-      const profit = revenue.y('profit', { title: 'Profit' });
+      const revenue = vd.bar(rows).x('category').y('revenue', { label: 'Revenue' });
+      const profit = revenue.y('profit', { label: 'Profit' });
       const change = await vd.transition(revenue, profit, { target: '#chart' });
 
       document.querySelector('#progress').addEventListener('input', (event) => {

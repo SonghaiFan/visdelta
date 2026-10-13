@@ -12,8 +12,8 @@ const sales = [
 ];
 
 export const from = bar(sales)
-  .x('region', { title: 'Region' })
-  .y('revenue', { title: 'Revenue ($k)' })
+  .x('region', { label: 'Region' })
+  .y('revenue', { label: 'Revenue ($k)' })
   .key(['region', 'channel'])
   .breakdown('channel')
   .color('channel');

@@ -40,9 +40,9 @@ for (const theme of ['d3', 'paper', 'dark', 'editorial']) {
         target.style.width = '240px'; document.body.append(target);
         const base = type === 'unit'
           ? api.unit(rows).value('value').group('region').layout('bar').color('region')
-          : api[type](rows).x('id', { title: 'Category' }).y('value', { title: 'Value' });
+          : api[type](rows).x('id', { label: 'Category' }).y('value', { label: 'Value' });
         const from = ['bar', 'point'].includes(type) ? base.color('region') : base;
-        const to = type === 'unit' ? from : from.y('next', { title: 'Next value' });
+        const to = type === 'unit' ? from : from.y('next', { label: 'Next value' });
         const change = await api.transition(from, to, { target, height: 240, chartStyle: api.chartStylePresets[theme] });
         const inspect = () => {
           const svg = target.querySelector('svg.vd-chart');

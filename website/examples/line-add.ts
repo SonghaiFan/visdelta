@@ -11,8 +11,8 @@ const readings = [
 ];
 
 const all = line(readings)
-  .x('day', { type: 'temporal', title: 'Day' })
-  .y('temperature', { title: 'Temperature (°C)' });
+  .x('day', { type: 'temporal', label: 'Day' })
+  .y('temperature', { label: 'Temperature (°C)' });
 
 // The line extends to the new observation before its point appears.
 export const from = all.where({ field: 'day', lt: '2026-03-07' });

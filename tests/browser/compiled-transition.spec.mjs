@@ -78,7 +78,7 @@ test('a chart-style module changes presentation without entering transition sema
           openYDomain: false,
           edgeTitles: false
       },
-      axisTitle: channel => channel?.title
+      axisTitle: channel => channel?.label
     });
     const target = base.y('other');
     const change = await sl.transition(base, target, { ...options('#cached'), chartStyle: compact });
@@ -115,7 +115,7 @@ test('the Paper preset owns conventional axis titles, a right legend, and its pa
       { id: 'A', region: 'North', income: 42, health: 66 },
       { id: 'B', region: 'South', income: 68, health: 78 }
     ];
-    const from = sl.point(rows).x('income', { title: 'Income' }).y('health', { title: 'Health' }).key('id').color('region');
+    const from = sl.point(rows).x('income', { label: 'Income' }).y('health', { label: 'Health' }).key('id').color('region');
     const change = await sl.transition(from, from, { ...options('#cached'), chartStyle: sl.paperChartStyle });
     change.progress(1);
     const root = change.view.closest('.vd-transition-root');

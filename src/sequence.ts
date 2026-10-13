@@ -1,12 +1,10 @@
 import type { Visualization } from './core.js';
-import { visualizationSpec } from './core.js';
 import { cloneState } from './grammar/view-state.js';
 import { transition } from './transition.js';
-import type { TransitionOptions, VisualizationTransition } from './transition.js';
+import type { TransitionInspection, TransitionOptions, VisualizationTransition } from './transition.js';
 import { resolveTarget } from './runtime/target.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
-import { headingReservations, reserveHeadings } from './runtime/heading.js';
 import type { CanvasSize } from './runtime/canvas-size.js';
 
 /** Options for a timeline of adjacent visualization states. */
@@ -32,6 +30,8 @@ export interface VisualizationSequence {
   play(options?: SequencePlayOptions): VisualizationSequence;
   /** Stop owned playback at the current frame. */
   pause(): VisualizationSequence;
+  /** Inspect the currently mounted leg. Stage positions are local to that leg. */
+  inspect(): Promise<TransitionInspection>;
   /**
    * Recompile the active leg for the container's current size/theme. `width` and
    * `height` change the requested canvas size for every leg, as in
@@ -67,9 +67,6 @@ export async function sequence(states: readonly Visualization[], options: Sequen
   assertCanvasSize('sequence() width', options.width);
   assertCanvasSize('sequence() height', options.height);
   const host = resolveTarget(options.target);
-  // Every leg reserves room for the heading of every state, so the canvas holds
-  // still where one leg hands over to the next.
-  const reservation = reserveHeadings(authoredStates.map(state => visualizationSpec(state)));
   const segments: Segment[] = [];
   /** The canvas size every leg is asked for; legs not on screen pick it up when shown. */
   const requested: { width?: CanvasSize; height?: CanvasSize } = { width: options.width, height: options.height };
@@ -87,7 +84,6 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       let controller: VisualizationTransition | undefined;
       try {
         const legOptions = { ...options, target: mount };
-        headingReservations.set(legOptions, reservation);
         controller = await transition(authoredStates[index], authoredStates[index + 1], legOptions);
         const root = mount.firstElementChild;
         if (!root) throw new Error('sequence() could not prepare a transition surface.');
@@ -188,13 +184,14 @@ export async function sequence(states: readonly Visualization[], options: Sequen
       // advances instead of repeating the already-committed start frame.
       const started = performance.now();
       const tick = (now: number) => {
-        const fraction = Math.min(1, (now - started) / span);
+        const fraction = Math.max(0, Math.min(1, (now - started) / span));
         controller.progress(timelinePosition(startStage + (endStage - startStage) * fraction));
         animation = fraction < 1 ? requestAnimationFrame(tick) : null;
       };
       animation = requestAnimationFrame(tick);
       return controller;
     },
+    inspect: () => segments[activeIndex].controller.inspect(),
     pause() {
       assertAlive();
       stop();

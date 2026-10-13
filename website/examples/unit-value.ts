@@ -10,7 +10,8 @@ const detailed = unit(visits)
   .value('patients', { unitValue: 1 })
   .key('clinic')
   .group('clinic')
-  .layout('bar', { columns: 4, radius: 7 })
+  .size(7)
+  .layout('bar', { columns: 4 })
   .color('clinic');
 
 // Each coarse circle (four patients) splits into the circles it represents.

@@ -159,7 +159,7 @@ export function createFacetPlugin(key: string, mark: string, childPlugin: ChartP
           // Ask the child to budget only its local ticks and legend.
           const localChannels = { ...prepared.encoding };
           for (const channel of ['x', 'y'] as const) {
-            if (localChannels[channel]) localChannels[channel] = { ...localChannels[channel], title: '' };
+            if (localChannels[channel]) localChannels[channel] = { ...localChannels[channel], label: '' };
           }
           const font = runtime.themeValue('--vd-axis-font-size', 10);
           const margin = { top: font * 1.2, right: font * 1.2, bottom: font * 3.2, left: font * 3.2,

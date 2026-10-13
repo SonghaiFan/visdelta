@@ -62,8 +62,8 @@ export function ScrollStory() {
 
     (async () => {
       const [{ bar }, { sequence }] = await Promise.all([import('visdelta/bar'), import('visdelta/transition')]);
-      const a = bar(products).x('product', { title: 'Product' }).y('revenue', { title: 'Revenue ($M)' }).key('product');
-      const b = a.y('profit', { title: 'Profit ($M)' });
+      const a = bar(products).x('product', { label: 'Product' }).y('revenue', { label: 'Revenue ($M)' }).key('product');
+      const b = a.y('profit', { label: 'Profit ($M)' });
       const c = b.sort('profit', 'descending');
       const d = c.highlight({ product: ['Software', 'Cloud'] });
       const story = await sequence([a, b, c, d], { target, height: window.innerWidth < 640 ? 260 : 360 });

@@ -50,9 +50,9 @@ VisDelta's ESM entry and rewrites its version-pinned `d3-*` dependencies.
 
       const revenue = vd.bar(rows)
         .x("category")
-        .y("revenue", { title: "Revenue" });
+        .y("revenue", { label: "Revenue" });
 
-      const profit = revenue.y("profit", { title: "Profit" });
+      const profit = revenue.y("profit", { label: "Profit" });
       const change = await vd.transition(revenue, profit, { target: "#chart" });
 
       progress.addEventListener("input", event => {
@@ -111,7 +111,7 @@ single convenient entry is preferable.
 ```js
 const revenue = bar(rows)
   .x("category")
-  .y("revenue", { title: "Revenue" });
+  .y("revenue", { label: "Revenue" });
 ```
 
 A state describes facts: its data, grain, encodings, layout, attention, and
@@ -120,7 +120,7 @@ appearance. It is not an animation command.
 ### 2. Branch to the next state
 
 ```js
-const profit = revenue.y("profit", { title: "Profit" });
+const profit = revenue.y("profit", { label: "Profit" });
 ```
 
 Chart states are immutable. `profit` reuses the declaration and data from

@@ -3,6 +3,7 @@ import { planDeclarationTransition } from '../grammar/declaration-plan.js';
 import type { DeclarationPlan } from '../grammar/declaration-plan.js';
 import type {
   CanonicalTransitionPair,
+  DeclarationOperationChange,
   ChartTransitionPolicy,
   IntermediateSpec,
   ViewSpec
@@ -26,7 +27,7 @@ export function resolveIntermediateSpecs<S extends ViewSpec>(
 /** Choose once for an authored pair, retaining why a direct fallback was used. */
 export function selectIntermediateRoute<S extends ViewSpec>(
   policy: RoutePolicy<S>, from: S, to: S
-): { waypoints: IntermediateSpec<S>[]; planning: 'authored' | 'planned' | 'direct' | 'unsupported' | 'search-limit'; reason: string } {
+): { operations?: Array<DeclarationOperationChange | undefined>; waypoints: IntermediateSpec<S>[]; planning: 'authored' | 'planned' | 'direct' | 'unsupported' | 'search-limit'; reason: string } {
   if (policy.declarationPlanning && policy.declarationPlanningOrder === 'before-chart') {
     const plan = planDeclarationTransition(from, to, policy.declarationOperations);
     if (plan.status === 'planned') return refineDeclarationPlan(policy, plan);
@@ -46,15 +47,18 @@ export function selectIntermediateRoute<S extends ViewSpec>(
 function refineDeclarationPlan<S extends ViewSpec>(
   policy: RoutePolicy<S>,
   plan: Pick<DeclarationPlan<S>, 'stages' | 'reason'>
-): { waypoints: IntermediateSpec<S>[]; planning: 'planned'; reason: string } {
+): { operations?: Array<DeclarationOperationChange | undefined>; waypoints: IntermediateSpec<S>[]; planning: 'planned'; reason: string } {
   const waypoints: IntermediateSpec<S>[] = [];
+  const operations: Array<DeclarationOperationChange | undefined> = [];
   for (const [index, stage] of plan.stages.entries()) {
     const canonical = canonicalTransitionPair(policy, stage.from, stage.to);
     const local = policy.intermediateSpecs?.(canonical.from, canonical.to) ?? [];
     waypoints.push(...(canonical.reverse ? [...local].reverse().map(({ spec }) => ({ spec })) : local));
+    // Refined chart waypoints are not individual declaration operations.
+    operations.push(...local.map(() => undefined), local.length ? undefined : stage.operation);
     if (index < plan.stages.length - 1) waypoints.push({ spec: stage.to });
   }
-  return { waypoints, planning: 'planned', reason: plan.reason };
+  return { waypoints, operations, planning: 'planned', reason: plan.reason };
 }
 
 /** One authored leg and the canonical pair used to evaluate its frames. */
@@ -63,6 +67,7 @@ export interface TransitionRouteLeg<S extends ViewSpec = ViewSpec> {
   to: S;
   canonical: CanonicalTransitionPair<S>;
   scenes: string[];
+  operation?: DeclarationOperationChange;
 }
 
 /** Internal route representation. No DOM, timers, or builder history. */
@@ -113,5 +118,7 @@ export function selectTransitionRoute<S extends ViewSpec>(
 ): TransitionRoute<S> {
   if (!from) return resolveTransitionRoute(policy, null, to);
   const selected = selectIntermediateRoute(policy, from, to);
-  return resolveTransitionRoute(policy, from, to, selected.waypoints, selected.planning, selected.reason);
+  const route = resolveTransitionRoute(policy, from, to, selected.waypoints, selected.planning, selected.reason);
+  route.legs.forEach((leg, index) => { leg.operation = selected.operations?.[index]; });
+  return route;
 }

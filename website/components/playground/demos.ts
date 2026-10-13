@@ -49,7 +49,7 @@ const POPULATION = './data/us-population-state-age-tidy.csv';
 
 const underTen = `const chart = bar(rows)
   .x("state")
-  .y("population", { title: "Residents under 10", format: "~s" })
+  .y("population", { label: "Residents under 10", format: "~s" })
   .key(["state", "age"])
   .where({ age: "<10" });`;
 
@@ -115,8 +115,8 @@ const chart = bar(cases)
     line: 'One average line unzips into the two stocks it was made from.',
     data: './data/line-lab.csv',
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker")
@@ -131,8 +131,8 @@ const chart = bar(cases)
     line: 'Six cars gather into two averages, sized by how many cars they stand for.',
     data: './data/mtcars.csv',
     code: `const chart = point(rows)
-  .x("wt", { title: "Weight (1000 lb)" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("wt", { label: "Weight (1000 lb)" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name")
   .where({ name: ["Datsun 710", "Fiat 128", "Honda Civic",
     "Duster 360", "Camaro Z28", "Maserati Bora"] })
@@ -156,11 +156,11 @@ const chart = bar(cases)
     line: 'Ask a new question of the same cars: weight becomes horsepower, then colour shows cylinders.',
     data: './data/mtcars.csv',
     code: `const chart = point(rows)
-  .x("wt", { title: "Weight (1000 lb)" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("wt", { label: "Weight (1000 lb)" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name");`,
     edits: [
-      { replace: '.x("wt", { title: "Weight (1000 lb)" })', with: '.x("hp", { title: "Horsepower" })' },
+      { replace: '.x("wt", { label: "Weight (1000 lb)" })', with: '.x("hp", { label: "Horsepower" })' },
       { add: '.color("cyl", { type: "nominal" })' },
     ],
   },
@@ -172,14 +172,14 @@ const chart = bar(cases)
     line: 'Same field, new ruler: a log scale spreads the crowded low end. Then turn the chart on its side.',
     data: './data/mtcars.csv',
     code: `const chart = point(rows)
-  .x("hp", { title: "Horsepower" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("hp", { label: "Horsepower" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name")
   .color("cyl", { type: "nominal" });`,
     edits: [
       {
-        replace: '.x("hp", { title: "Horsepower" })',
-        with: '.x("hp", { title: "Horsepower (log₂)", scale: { type: "log", base: 2 } })',
+        replace: '.x("hp", { label: "Horsepower" })',
+        with: '.x("hp", { label: "Horsepower (log₂)", scale: { type: "log", base: 2 } })',
       },
       { add: '.flip()' },
     ],
@@ -202,8 +202,8 @@ const chart = bar(cases)
     line: 'The same layers lift off a fixed baseline and settle into a stream.',
     data: './data/area-lab.csv',
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");`,
@@ -218,9 +218,10 @@ const chart = bar(cases)
     data: './data/iris.csv',
     code: `const chart = unit(rows)
   .key("flowerId")
-  .layout("grid", { columns: 15, radius: 6 })
+  .size(6)
+  .layout("grid", { columns: 15 })
   .color("species");`,
-    edits: [{ replace: '.layout("grid", { columns: 15, radius: 6 })', with: '.x("petalLength")\n  .layout("beeswarm")' }],
+    edits: [{ replace: '.layout("grid", { columns: 15 })', with: '.layout("beeswarm", { x: "petalLength" })' }],
   },
   {
     id: 'focus',
@@ -230,8 +231,8 @@ const chart = bar(cases)
     line: 'The camera moves to the four-cylinder cars, then lets go and lights them up instead. Every car stays.',
     data: './data/mtcars.csv',
     code: `const chart = point(rows)
-  .x("wt", { title: "Weight (1000 lb)" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("wt", { label: "Weight (1000 lb)" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name")
   .color("cyl", { type: "nominal" });`,
     edits: [{ add: '.focus({ cyl: 4 })' }, { replace: '.focus({ cyl: 4 })', with: '.highlight({ cyl: 4 })' }],
@@ -241,7 +242,7 @@ const chart = bar(cases)
     title: 'Headline',
     category: 'appearance',
     chart: 'bar',
-    line: 'Add a title and a subtitle, then change the title. The text sits above the chart, which does not move.',
+    line: 'Add a title and a subtitle, then change the title. Heading space opens and closes with playback; Fit resizes the canvas to use the remaining room.',
     data: POPULATION,
     code: underTen,
     edits: [
@@ -258,8 +259,8 @@ const chart = bar(cases)
     line: 'The same closing prices, drawn as steps, then with a heavier line.',
     data: './data/line-lab.csv',
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker");`,

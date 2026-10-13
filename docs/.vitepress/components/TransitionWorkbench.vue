@@ -59,13 +59,13 @@ onMounted(async () => {
     ];
 
     const base = bar(rows)
-      .x('category', { title: 'Category' })
-      .y('sales', { title: 'Revenue' })
+      .x('category', { label: 'Category' })
+      .y('sales', { label: 'Revenue' })
       .tooltip(['category', 'sales'])
       .transition({ duration: 720, ease: 'cubicInOut' });
 
     const profitState = base
-      .y('profit', { title: 'Profit' })
+      .y('profit', { label: 'Profit' })
       .tooltip(['category', 'profit']);
 
     await nextTick();

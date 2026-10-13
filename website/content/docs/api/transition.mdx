@@ -60,7 +60,9 @@ and legend take their room from the container, so the canvas fills exactly what
 is left and nothing overflows the container. The legend is a second
 `<svg class="vd-legend-svg">` that exists only while there is a legend, after the
 canvas in the document, so `querySelector('svg')` is still the canvas. A
-transition holds the tallest legend block of the pair, so the canvas never moves.
+transition opens or closes the heading and legend space with playback progress;
+returning to an unheaded state removes the heading rule and its space. In Fit
+mode the canvas uses the remaining height.
 A style with `legendPosition: 'right'` keeps its legend inside the canvas.
 
 `height: 'auto'` reads the room the container gives the chart. A container with
@@ -113,3 +115,31 @@ change.play({ from: change.value });  // resume
 | `This transition has been destroyed.`                | The controller was used after `destroy()` |
 
 See [Troubleshooting](/docs/guides/troubleshooting) for fixes.
+
+## Inspect compiled motion
+
+`await change.inspect()` returns the compiled SVG phases and their recorded
+property tracks, without pausing playback or changing its position. Each phase
+has normalized `start`, `end`, and `properties`; each property identifies its
+DOM `node`, `name`, `kind`, scheduled interval within the phase, and `from` / `to`
+values at the **phase boundaries**. These are not necessarily the endpoints of
+a delayed or chained property interval.
+
+`await sequence.inspect()` reads the active leg. Refresh after resize or theme
+changes. Borrowed nodes must not be mutated; reconstruction, resize and destroy
+invalidate them. Custom tweens are explicitly opaque. Immediate DOM writes,
+insertions/removals, and the independent HTML title/subtitle are outside this
+recorded SVG report. The playground's **Inspect stages** control displays these
+tracks alongside the timeline, including the coverage limits.
+
+When height is `"auto"` (Fit), a constrained container hides the legend first,
+then the subtitle, then the title to preserve the main canvas. The canvas budget
+is half the available width, capped at 200 pixels. These elements return when
+space allows; fixed pixel heights retain the authored heading and legend.
+
+`change.stageChanges()` reports the semantic changes between each actual pair of
+planned intermediate states, in authored playback order. The playground uses
+these to label the stage strip directly. It does not split the full pair's delta
+into guessed phases.
+
+`transition.stageOperations()` returns the exact planner operation for each route stage, in authored playback order. Each entry carries the slot path, action, and previous/next declaration values. Direct and chart-refined stages return `undefined`; semantic categories remain available through `stageChanges()`. These operations do not prove visible motion or alter stage timing.

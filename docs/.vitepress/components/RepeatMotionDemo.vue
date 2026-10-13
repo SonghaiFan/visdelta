@@ -15,7 +15,7 @@ let generation = 0;
 const code = computed(() => `import { bar } from "visdelta/bar";
 import { transition } from "visdelta/transition";
 
-const a = bar(rows).x("label").y("value", { title: "Units" })
+const a = bar(rows).x("label").y("value", { label: "Units" })
   .key(["label", "part"]).breakdown("part")
   .color("part", { domain: ["Core", "Growth", "Services", "Support"],
     range: ["#176078", "#19a4c5", "#2ce5b4", "#00b59c"] });
@@ -33,7 +33,7 @@ async function build() {
     const [{ bar }, { transition }] = await Promise.all([import('../../../dist/bar.js'), import('../../../dist/transition-entry.js')]);
     if (disposed || version !== generation) return;
     motion?.destroy();
-    const a = bar(props.rows).x('label').y('value', { title: 'Units' }).key(['label', 'part']).breakdown('part')
+    const a = bar(props.rows).x('label').y('value', { label: 'Units' }).key(['label', 'part']).breakdown('part')
       .color('part', { domain: ['Core','Growth','Services','Support'], range: ['#176078','#19a4c5','#2ce5b4','#00b59c'] });
     const b = a.repeat('part', { direction: direction.value, scales: scales.value, minWidth: 180 });
     const next = await transition(a, b, { target: host.value, height: 740 });

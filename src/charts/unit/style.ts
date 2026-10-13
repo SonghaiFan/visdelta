@@ -8,11 +8,11 @@ export function unitLayoutChannels(spec: ViewSpec): EncodingSpec {
   const unit = specUnit(spec);
   const { x, y, color } = spec.encoding ?? {};
   if (unit?.layout === 'bar' && unit.group) {
-    return { color, x: { field: String(unit.group), title: String(unit.group), type: 'nominal' } };
+    return { color, x: { field: String(unit.group), label: String(unit.group), type: 'nominal' } };
   }
-  if (unit?.layout === 'beeswarm') return { color, x: x ? { ...x, title: x.title || x.field } : undefined };
+  if (unit?.layout === 'beeswarm') return { color, x: x ? { ...x, label: x.label || x.field } : undefined };
   if (unit?.layout === 'force') return {
-    color, x: x ? { ...x, title: undefined } : undefined, y: y ? { ...y, title: undefined } : undefined
+    color, x: x ? { ...x, label: undefined } : undefined, y: y ? { ...y, label: undefined } : undefined
   };
   return { color };
 }

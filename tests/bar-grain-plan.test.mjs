@@ -15,8 +15,8 @@ const data = [
   { state: 'B', age: 'old', region: 'south', population: 15 }
 ];
 const codec = createBarGrainDeclarationOperationCodec();
-const total = () => bar(data).x('state').y('population', { title: 'Metric' }).rollup({ title: 'Metric' }).toSpec();
-const stacked = () => bar(data).x('state').y('population', { title: 'Metric' }).breakdown('age', { title: 'Metric' }).toSpec();
+const total = () => bar(data).x('state').y('population', { label: 'Metric' }).rollup({ label: 'Metric' }).toSpec();
+const stacked = () => bar(data).x('state').y('population', { label: 'Metric' }).breakdown('age', { label: 'Metric' }).toSpec();
 const aggregate = spec => spec.transform.find(transform => transform.aggregate).aggregate;
 function assertSingleOperationPerStage(plan) {
   for (const stage of plan.stages) {
@@ -35,11 +35,11 @@ test('focused detail merges before changing focus at the coarse grain and revers
   for (const layout of ['stacked', 'grouped']) {
     for (const op of ['sum', 'mean']) {
       for (const focus of [undefined, { field: 'state', equal: 'B' }]) {
-        const fineBuilder = bar(data).x('state').y('population', { title: 'Metric' })
-          .breakdown('age', { op, title: 'Metric', layout }).color('#3366ff')
+        const fineBuilder = bar(data).x('state').y('population', { label: 'Metric' })
+          .breakdown('age', { op, label: 'Metric', layout }).color('#3366ff')
           .focus({ field: 'state', equal: 'A' });
-        let coarseBuilder = bar(data).x('state').y('population', { title: 'Metric' })
-          .rollup({ op, title: 'Metric' });
+        let coarseBuilder = bar(data).x('state').y('population', { label: 'Metric' })
+          .rollup({ op, label: 'Metric' });
         if (focus) coarseBuilder = coarseBuilder.focus(focus);
         const fine = fineBuilder.toSpec();
         const coarse = coarseBuilder.toSpec();
@@ -76,10 +76,10 @@ function sameFocus(from, to) {
 }
 
 test('Bar route focus constraint leaves unrelated pairs and valid detail states available', () => {
-  const fine = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric' }).focus({ field: 'state', equal: 'A' }).toSpec();
-  const otherFocus = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric' }).focus({ field: 'state', equal: 'B' }).toSpec();
+  const fine = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric' }).focus({ field: 'state', equal: 'A' }).toSpec();
+  const otherFocus = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric' }).focus({ field: 'state', equal: 'B' }).toSpec();
   assert.equal(codec.validate(fine).status, 'ok');
   assert.equal(codec.validate(otherFocus).status, 'ok');
   assert.equal(codec.validateStep(fine, otherFocus, { from: fine, to: total() }).status, 'unsupported');
@@ -87,14 +87,14 @@ test('Bar route focus constraint leaves unrelated pairs and valid detail states 
   const sameGrain = planDeclarationTransition(fine, otherFocus, codec);
   assert.equal(sameGrain.status, 'planned');
   assert.equal(sameGrain.stages.length, 1);
-  const otherCategory = bar(data).x('age').y('population', { title: 'Metric' })
-    .rollup({ title: 'Metric' }).toSpec();
+  const otherCategory = bar(data).x('age').y('population', { label: 'Metric' })
+    .rollup({ label: 'Metric' }).toSpec();
   assert.equal(codec.validateStep(fine, otherFocus, { from: fine, to: otherCategory }).status, 'ok');
 });
 
 test('detail-only focus cannot be preserved at coarse grain and keeps the ordinary Bar fallback', () => {
-  const fine = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric' }).focus({ field: 'age', equal: 'young' }).toSpec();
+  const fine = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric' }).focus({ field: 'age', equal: 'young' }).toSpec();
   const coarse = total();
   assert.equal(codec.validate(fine).status, 'ok');
   assert.equal(codec.validate(coarse).status, 'ok');
@@ -130,8 +130,8 @@ test('total to stacked is one complete grouping operation and reverses the same 
 
 test('stacked and grouped detail uses a grouped modifier with a matching offset field', () => {
   const from = stacked();
-  const to = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric' }).layout('grouped').toSpec();
+  const to = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric' }).layout('grouped').toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 1);
@@ -142,10 +142,10 @@ test('stacked and grouped detail uses a grouped modifier with a matching offset 
 });
 
 test('changing grouped detail fields is a grouping operation; grouped offset identity is derived', () => {
-  const from = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).toSpec();
-  const to = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('region', { title: 'Metric', layout: 'grouped' }).toSpec();
+  const from = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).toSpec();
+  const to = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('region', { label: 'Metric', layout: 'grouped' }).toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 1);
@@ -155,9 +155,9 @@ test('changing grouped detail fields is a grouping operation; grouped offset ide
 });
 
 test('horizontal Grain plans keep category and measure axes and use yOffset for grouped layout', () => {
-  const from = bar(data).x('state').y('population', { title: 'Metric' }).rollup({ title: 'Metric' }).flip().toSpec();
-  const to = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).flip().toSpec();
+  const from = bar(data).x('state').y('population', { label: 'Metric' }).rollup({ label: 'Metric' }).flip().toSpec();
+  const to = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).flip().toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 2);
@@ -170,11 +170,11 @@ test('horizontal Grain plans keep category and measure axes and use yOffset for 
   assert.equal(plan.stages.at(-1).to.encoding.xOffset, undefined);
 
   const vertical = total();
-  const reoriented = bar(data).x('state').y('population', { title: 'Metric' }).rollup({ title: 'Metric' }).flip().toSpec();
+  const reoriented = bar(data).x('state').y('population', { label: 'Metric' }).rollup({ label: 'Metric' }).flip().toSpec();
   assert.equal(planDeclarationTransition(vertical, reoriented, codec).status, 'unsupported');
 
-  const horizontalTarget = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric' }).layout('grouped').color('#3366ff').flip().toSpec();
+  const horizontalTarget = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric' }).layout('grouped').color('#3366ff').flip().toSpec();
   const horizontalComposite = planDeclarationTransition(reoriented, horizontalTarget, codec);
   assert.equal(horizontalComposite.status, 'planned');
   assert.deepEqual(horizontalComposite.stages.map(stage => stage.operation.id), [
@@ -185,8 +185,8 @@ test('horizontal Grain plans keep category and measure axes and use yOffset for 
 
 test('reducer and output alias update as one measure operation when presentation is held constant', () => {
   const from = total();
-  const to = bar(data).x('state').y('population', { title: 'Metric' })
-    .rollup({ op: 'mean', title: 'Metric' }).toSpec();
+  const to = bar(data).x('state').y('population', { label: 'Metric' })
+    .rollup({ op: 'mean', label: 'Metric' }).toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 1);
@@ -215,8 +215,8 @@ test('a valid measure alias updates its y binding atomically, while a groupby co
 
 test('combined grain, grouped layout, and constant color changes only produce valid complete states', () => {
   const from = total();
-  const to = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
+  const to = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 3);
@@ -231,10 +231,10 @@ test('combined grain, grouped layout, and constant color changes only produce va
 
 test('equivalent histories produce the same deterministic route', () => {
   const from = total();
-  const targetA = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
-  const targetB = bar(data).x('state').y('population', { title: 'Metric' }).color('#3366ff')
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).toSpec();
+  const targetA = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
+  const targetB = bar(data).x('state').y('population', { label: 'Metric' }).color('#3366ff')
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).toSpec();
   const a = planDeclarationTransition(from, targetA, codec);
   const b = planDeclarationTransition(from, targetB, codec);
   assert.equal(a.status, 'planned');
@@ -263,7 +263,7 @@ test('aggregate anchor keeps its authored transform position; wide and multi-agg
     base.transform[0],
     { sort: { field: 'population', order: 'descending' } }
   ] };
-  const reordered = bar(data).x('state').y('population', { title: 'Metric' }).breakdown('age', { title: 'Metric' }).toSpec();
+  const reordered = bar(data).x('state').y('population', { label: 'Metric' }).breakdown('age', { label: 'Metric' }).toSpec();
   reordered.transform = [ordered.transform[0], reordered.transform[0], ordered.transform[2]];
   const plan = planDeclarationTransition(ordered, reordered, codec);
   assert.equal(plan.status, 'planned');
@@ -301,8 +301,8 @@ test('before-chart planning refines each planned leg exactly once', () => {
     declarationOperations: codec,
     intermediateSpecs: () => { calls += 1; return []; }
   };
-  const target = bar(data).x('state').y('population', { title: 'Metric' })
-    .breakdown('age', { title: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
+  const target = bar(data).x('state').y('population', { label: 'Metric' })
+    .breakdown('age', { label: 'Metric', layout: 'grouped' }).color('#3366ff').toSpec();
   const route = selectIntermediateRoute(policy, total(), target);
   const plan = planDeclarationTransition(total(), target, codec);
   assert.equal(route.planning, 'planned');

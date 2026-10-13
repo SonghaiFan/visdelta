@@ -13,21 +13,6 @@ export function bareLayout<S extends object>(spec: S): S {
   return rest as S;
 }
 
-/**
- * Every heading text a set of states declares. When the canvas height follows
- * its container, a sequence gives each leg the whole set, so every leg holds the
- * same room and the canvas never moves where one leg hands over to the next.
- */
-export interface HeadingReservation { title: string[]; subtitle: string[] }
-
-/** Set by sequence(), read by transition(); not part of the public options. */
-export const headingReservations = new WeakMap<object, HeadingReservation>();
-
-export function reserveHeadings(specs: Headed[]): HeadingReservation {
-  const distinct = (pick: (spec: Headed) => unknown) => [...new Set(specs.map(spec => textOf(pick(spec))).filter(Boolean))];
-  return { title: distinct(spec => spec.title), subtitle: distinct(spec => spec.subtitle) };
-}
-
 const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
 /**
@@ -39,42 +24,29 @@ const clamp = (value: number) => Math.min(1, Math.max(0, value));
  * The heading's room moves with the same `p`. Its height runs between the natural
  * height of the old heading (the first frame is exactly the old state drawn on
  * its own) and that of the new one, so the canvas, whose own layout does not
- * depend on it, only slides. When the canvas height follows its container the
- * canvas must be laid out for one room; the heading then holds the room of the
- * taller text throughout, and `reservation` extends that to a whole sequence.
+ * depend on it in fixed mode, only slides. Fit mode gives the remaining room
+ * to the canvas at the same progress.
  */
-export function createHeading(shell: ShellHeading, from: Headed, to: Headed, reservation?: HeadingReservation) {
+export function createHeading(shell: ShellHeading, from: Headed, to: Headed) {
   const lines = ([
-    [shell.title, textOf(from.title), textOf(to.title), reservation?.title ?? []],
-    [shell.subtitle, textOf(from.subtitle), textOf(to.subtitle), reservation?.subtitle ?? []],
-  ] as Array<[HeadingLine, string, string, string[]]>).map(([line, before, after, reserved]) => {
+    [shell.title, textOf(from.title), textOf(to.title)],
+    [shell.subtitle, textOf(from.subtitle), textOf(to.subtitle)],
+  ] as Array<[HeadingLine, string, string]>).map(([line, before, after]) => {
     line.from.textContent = before;
-    // An unchanged heading is one static text.
     line.to.textContent = before === after ? '' : after;
-    // Texts this pair does not show still count toward the room a held line takes.
-    const sizers = reserved.filter(text => text !== before && text !== after).map(text => {
-      const sizer = document.createElement('span');
-      sizer.textContent = text;
-      sizer.style.display = 'none';
-      sizer.style.visibility = 'hidden';
-      sizer.setAttribute('aria-hidden', 'true');
-      line.element.append(sizer);
-      return sizer;
-    });
-    return { line, before, after, changes: before !== after, sizers };
+    return { line, before, after, changes: before !== after };
   });
 
-  let hold = false;
+  let suppressed = 0;
   let heights: { from: number; to: number } | null = null;
   let current = 0;
 
   function apply(p: number) {
     current = p = clamp(p);
-    for (const { line, before, after, changes, sizers } of lines) {
+    for (const { line, before, after, changes } of lines) {
       // A line takes room only while some text of it can be shown.
-      const present = hold ? Boolean(before || after || sizers.length) : p <= 0 ? Boolean(before) : p >= 1 ? Boolean(after) : Boolean(before || after);
-      line.element.hidden = !present;
-      for (const sizer of sizers) sizer.style.display = hold ? '' : 'none';
+      const present = p <= 0 ? Boolean(before) : p >= 1 ? Boolean(after) : Boolean(before || after);
+      line.element.hidden = !present || (line === shell.subtitle && suppressed >= 1) || suppressed >= 2;
       if (!changes) {
         showSpan(line.from, 1, true);
         continue;
@@ -86,7 +58,7 @@ export function createHeading(shell: ShellHeading, from: Headed, to: Headed, res
     shell.header.hidden = hidden;
     // Between the endpoints the header is as tall as the interpolated room; at an
     // endpoint it is just its own content, exactly as when drawn alone.
-    const interpolate = !hold && heights !== null && p > 0 && p < 1;
+    const interpolate = heights !== null && p > 0 && p < 1;
     shell.header.style.height = interpolate ? `${heights!.from + (heights!.to - heights!.from) * p}px` : '';
     shell.header.style.overflow = interpolate ? 'hidden' : '';
   }
@@ -96,7 +68,7 @@ export function createHeading(shell: ShellHeading, from: Headed, to: Headed, res
     const visible = shown && opacity > 0;
     const visibility = visible ? 'visible' : 'hidden';
     if (element.style.visibility !== visibility) element.style.visibility = visibility;
-    const display = visible || hold ? '' : 'none';
+    const display = visible ? '' : 'none';
     if (element.style.display !== display) element.style.display = display;
     const next = visible && opacity < 1 ? String(opacity) : '';
     if (element.style.opacity !== next) element.style.opacity = next;
@@ -104,16 +76,17 @@ export function createHeading(shell: ShellHeading, from: Headed, to: Headed, res
 
   return {
     progress: apply,
-    /** Hold the room of the taller text instead of interpolating it (canvas height follows its container). */
-    hold(on: boolean) {
-      if (hold === on) return;
-      hold = on;
-      heights = null;
+    room(p = current) {
+      return heights ? heights.from + (heights.to - heights.from) * clamp(p) : 0;
+    },
+    maximumRoom() { return heights ? Math.max(heights.from, heights.to) : 0; },
+    /** Hide secondary text first when a fitted canvas needs the room. */
+    suppress(level: number) {
+      suppressed = level;
       apply(current);
     },
     /** Read the natural height of each endpoint's heading; the container must be laid out. */
     measure() {
-      if (hold) return;
       const natural = (p: number) => {
         apply(p);
         return shell.header.hidden ? 0 : shell.header.getBoundingClientRect().height;

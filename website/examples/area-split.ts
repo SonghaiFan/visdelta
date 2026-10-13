@@ -19,8 +19,8 @@ const listeners = [
 ];
 
 const detailed = area(listeners)
-  .x('month', { type: 'temporal', title: 'Month' })
-  .y('hours', { title: 'Listening hours' })
+  .x('month', { type: 'temporal', label: 'Month' })
+  .y('hours', { label: 'Listening hours' })
   .key(['month', 'genre'])
   .breakdown('genre')
   .color('genre');

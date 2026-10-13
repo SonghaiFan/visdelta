@@ -139,9 +139,9 @@ const grainRows = [
   { id: "b", category: "A", segment: "two", amount: 4 },
   { id: "c", category: "B", segment: "one", amount: 3 }
 ];
-const grainBase = selectedBar(grainRows).datumKey("id").x("category").y("amount", { title: "Metric" });
-const grainFrom = grainBase.rollup({ title: "Metric" }).toSpec();
-const grainTo = grainBase.breakdown("segment", { title: "Metric" }).toSpec();
+const grainBase = selectedBar(grainRows).datumKey("id").x("category").y("amount", { label: "Metric" });
+const grainFrom = grainBase.rollup({ label: "Metric" }).toSpec();
+const grainTo = grainBase.breakdown("segment", { label: "Metric" }).toSpec();
 const grainCodec = selectedBarGrainCodec();
 const grainPlan = api.planDeclarationTransition(grainFrom, grainTo, grainCodec);
 if (grainPlan.status !== "planned" || grainPlan.stages.length !== 1) throw new Error("Packed Bar Grain planner did not produce a one-operation path: " + grainPlan.reason);

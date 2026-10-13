@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { unit } from '../dist/unit.js';
+import { delta } from '../dist/core.js';
 import { createUnitDeclarationOperationCodec } from '../dist/charts/unit/declaration-operations.js';
 import { planDeclarationTransition } from '../dist/grammar/declaration-plan.js';
 import { expandUnits, resolveUnitTransitionPlan } from '../dist/charts/unit/state.js';
@@ -38,7 +39,7 @@ function verify(from, to) {
 test('Unit quantity, units per circle, cap, grouping, layout and appearance are separate operations', () => {
   const plan = verify(base().toSpec(), base().value('amount', { unitValue: 2, maxUnits: 9 }).group('group').layout('bar').color('#3366ff').toSpec());
   assert.deepEqual(plan.stages.map(stage => stage.operation.id).sort(), [
-    'meta/unit/value', 'meta/unit/unitValue', 'meta/unit/maxUnits', 'meta/unit/group', 'meta/unit/layout', 'encoding/color'
+    'meta/unit/value', 'meta/unit/unitValue', 'meta/unit/maxUnits', 'meta/unit/group', 'layout', 'encoding/color'
   ].sort());
   assert.ok(plan.stages.every(stage => stage.to.meta.unit.layout !== 'bar' || stage.to.meta.unit.group === 'group'));
 });
@@ -81,7 +82,7 @@ test('Unit renderer quantity agrees with complete planner states and native moti
   const route = selectTransitionRoute(plugin.createChartType(DEFAULT_CHART_RUNTIME), from, to);
   assert.equal(route.planning, 'planned');
   assert.equal(route.legs.length, plan.stages.length);
-  const layout = plan.stages.find(stage => stage.operation.id === 'meta/unit/layout');
+  const layout = plan.stages.find(stage => stage.operation.id === 'layout');
   assert.equal(resolveUnitTransitionPlan(layout.from, layout.to).match.mode, 'key-first-travel');
 });
 
@@ -138,5 +139,43 @@ test('Unit unverifiable explicit datum identity reports the identity boundary be
     const normalization = codec.normalize(spec);
     assert.equal(normalization.status, 'unsupported');
     assert.match(normalization.reason, /cannot verify explicit datum identity/);
+  }
+});
+
+
+test('Unit complete layout options are one operation with exact reversible endpoints', () => {
+  const from = base().layout('grid', { columns: 15, radius: 6 }).toSpec();
+  const to = base().size(6).layout('beeswarm', { x: 'x' }).toSpec();
+  const plan = verify(from, to);
+  assert.equal(plan.stages.length, 1);
+  assert.equal(plan.stages[0].operation.id, 'layout');
+  assert.deepEqual(plan.stages[0].operation.previous.value.value, { type: 'grid', columns: 15 });
+  assert.equal(plan.stages[0].operation.next.value.value.x.field, 'x');
+  assert.deepEqual(codec.normalize(normalized(to)), codec.normalize(to));
+  assert.deepEqual(resolveUnitTransitionPlan(from, to).steps.map(step => step.part), ['view', 'move-across', 'fall']);
+  const invalid = base().layout('beeswarm', { x: 'missing' }).toSpec();
+  assert.equal(planDeclarationTransition(from, invalid, codec).status, 'unsupported');
+});
+
+test('Unit mark size is independent of the complete layout slot', () => {
+  const from = base().size(6).layout('grid', { columns: 15 }).toSpec();
+  const to = base().size(9).layout('beeswarm', { x: 'x' }).toSpec();
+  const plan = verify(from, to);
+  assert.deepEqual(plan.stages.map(stage => stage.operation.id).sort(), ['encoding/size', 'layout']);
+  const alias = base().radius(6).layout('grid', { columns: 15 }).toSpec();
+  assert.deepEqual(normalized(alias), normalized(from));
+});
+
+
+test('Unit compact and chained declarations have identical differences and reversible routes', () => {
+  const from = base().layout('grid').toSpec();
+  const compact = base().layout('force', { x: { field: 'x', label: 'X' }, y: 'y' });
+  const chained = base().layout('force').x('x', { label: 'X' }).y('y');
+  const overwritten = base().layout('force', { x: { field: 'y', domain: [0, 20] } })
+    .x('x', { label: 'X' }).y('y');
+  for (const state of [chained, overwritten]) {
+    assert.deepEqual(state.toSpec(), compact.toSpec());
+    assert.deepEqual(delta(base(), state).stateChanges, delta(base(), compact).stateChanges);
+    assert.deepEqual(verify(from, state.toSpec()), verify(from, compact.toSpec()));
   }
 });

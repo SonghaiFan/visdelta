@@ -148,3 +148,19 @@ test('a later recording of the same property at the same start overrides the ear
   assert.equal(x(node), 200);
   assert.equal(node.getAttribute('text-anchor'), null);
 });
+
+test('compiled property diagnostics retain kinds and actual delayed intervals', () => {
+  const node = fakeNode({ x: 0 });
+  const sink = [];
+  record(fakeSelection([node]), sink, { time: 0, delay: 100, duration: 300, ease: t => t })
+    .attr('x', 12).style('opacity', 0).text('after').tween('nested', () => () => {});
+  const frame = createProgressController(sink).compile();
+  assert.deepEqual(frame.recordings.flatMap(({ item, start, tweens }) => tweens.map(({ name, kind }) => ({ name, kind: kind ?? (name.startsWith('style.') ? 'style' : name === 'text' ? 'text' : 'attribute'), start: start / frame.span, end: (start + item.duration) / frame.span }))), [
+    { name: 'x', kind: 'attribute', start: 0.25, end: 1 },
+    { name: 'style.opacity', kind: 'style', start: 0.25, end: 1 },
+    { name: 'text', kind: 'text', start: 0.25, end: 1 },
+    { name: 'nested', kind: 'custom', start: 0.25, end: 1 },
+  ]);
+  frame.progress(1);
+  assert.equal(node.getAttribute('x'), '12');
+});

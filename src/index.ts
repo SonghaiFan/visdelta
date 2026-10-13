@@ -43,3 +43,5 @@ export type { VisualizationWarning, ChartWarningInspector } from './types/index.
 
 export { smallMultiples } from './facet.js';
 export type { FacetLayout, FacetedViewState } from './facet.js';
+
+export type { TransitionInspection, InspectedStage, InspectedProperty } from './transition.js';

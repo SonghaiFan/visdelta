@@ -16,8 +16,8 @@ const prices = [
 ];
 
 const detailed = line(prices)
-  .x('date', { type: 'temporal', title: 'Week' })
-  .y('close', { title: 'Close (USD)' })
+  .x('date', { type: 'temporal', label: 'Week' })
+  .y('close', { label: 'Close (USD)' })
   .key(['date', 'ticker'])
   .breakdown('ticker')
   .color('ticker');

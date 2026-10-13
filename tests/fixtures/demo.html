@@ -48,8 +48,8 @@
   const AGE_COLORS = ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f598", "#abdda4", "#66c2a5", "#3288bd"];
   const STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
   const detailed = bar({ url: "/docs/public/data/us-population-state-age-tidy.csv" })
-    .x("state", { title: "State" })
-    .y("population", { title: "Population", format: "~s" })
+    .x("state", { label: "State" })
+    .y("population", { label: "Population", format: "~s" })
     .key(["state", "age"])
     .where({ field: "state", oneOf: STATES })
     .breakdown("age")

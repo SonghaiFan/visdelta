@@ -14,10 +14,10 @@ test('Point summary Grain and appearance stages render complete states and rever
       { id: 'd', region: 'S', cohort: 'two', x: 10, y: 11 }
     ];
     document.body.innerHTML = '<div id="a"></div><div id="b"></div><div id="c"></div>';
-    const base = vd.point(rows).datumKey('id').x('x', { title: 'X' }).y('y', { title: 'Y' });
+    const base = vd.point(rows).datumKey('id').x('x', { label: 'X' }).y('y', { label: 'Y' });
     const rollup = groupby => base.rollup(groupby, {
-      x: { field: 'x', op: 'mean', title: 'X' },
-      y: { field: 'y', op: 'mean', title: 'Y' }
+      x: { field: 'x', op: 'mean', label: 'X' },
+      y: { field: 'y', op: 'mean', label: 'Y' }
     });
     const withMargin = state => ({ chartModule: () => state.chartModule(),
       toSpec: () => ({ ...state.toSpec(), margin: { top: 40, right: 24, bottom: 48, left: 56 } }) });

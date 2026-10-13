@@ -49,8 +49,8 @@
         ];
 
         // Chart states are immutable: `profit` branches from `revenue`.
-        const revenue = vd.bar(rows).x("category").y("revenue", { title: "Revenue" });
-        const profit = revenue.y("profit", { title: "Profit" });
+        const revenue = vd.bar(rows).x("category").y("revenue", { label: "Revenue" });
+        const profit = revenue.y("profit", { label: "Profit" });
 
         try {
           const change = await vd.transition(revenue, profit, { target: "#chart", height: 420 });

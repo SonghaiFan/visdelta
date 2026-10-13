@@ -1,5 +1,5 @@
-import type { ViewSpec } from '../../types/index.js';
-import { ChartState, normalizeDataSource } from '../authoring.js';
+import type { ChannelSpec, ViewSpec } from '../../types/index.js';
+import { ChartState, channelFrom, normalizeDataSource } from '../authoring.js';
 import { compileViewWithCompiler } from '../compile-view.js';
 import { createUnitSpecCompiler } from './compile.js';
 import { chartModule as unitModule } from './module.js';
@@ -15,7 +15,13 @@ export const UNIT_LAYOUTS = ['grid', 'force', 'bar', 'beeswarm'] as const;
 export type UnitLayout = typeof UNIT_LAYOUTS[number];
 
 export interface UnitLayoutOptions {
+  /** Compact position declarations, equivalent to chained x()/y() calls.
+   * Explicit bindings replace the complete channel; omitted bindings preserve it.
+   */
+  x?: string | ChannelSpec;
+  y?: string | ChannelSpec;
   columns?: number;
+  /** Compatibility alias for size(); prefer a separate size() call. */
   radius?: number;
 }
 
@@ -62,11 +68,22 @@ export class UnitState extends ChartState<UnitViewState> {
     return withUnitAxis(this, { columns: value });
   }
 
-  radius(value: number): this {
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new Error('Unit radius must be a positive finite number.');
+  /** Constant mark size in pixels; currently the circle radius. */
+  override size(value: number | string | ChannelSpec, _options: Partial<ChannelSpec> = {}): this {
+    const size = typeof value === 'number' ? value : typeof value === 'object' && !value.field ? value.value : undefined;
+    if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
+      throw new Error('Unit size must be a positive finite constant; field-driven size is unsupported.');
     }
-    return withUnitAxis(this, { radius: value });
+    return this.replaceState('encoding', { ...this.state.encoding, size: { value: size } });
+  }
+
+  /** Compatibility alias for size(). */
+  radius(value: number): this {
+    return this.size(value);
+  }
+
+  override channel(name: string, field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
+    return this.replaceState('encoding', { ...this.state.encoding, [name]: channelFrom(field, options) });
   }
 
   /** Declare categorical membership without silently choosing a layout or color. */
@@ -75,7 +92,9 @@ export class UnitState extends ChartState<UnitViewState> {
     return withUnitAxis(this, { group: field });
   }
 
-  /** Choose how the same keyed units are arranged. */
+  /** Choose how the same keyed units are arranged.
+   * Compact options and chained setters write the same state; last explicit assignment wins.
+   */
   layout(name: UnitLayout, options: UnitLayoutOptions = {}): this {
     if (!UNIT_LAYOUTS.includes(name)) {
       throw new Error(`Unit layout must be one of: ${UNIT_LAYOUTS.join(', ')}.`);
@@ -84,10 +103,13 @@ export class UnitState extends ChartState<UnitViewState> {
     if (options.radius != null && (!Number.isFinite(options.radius) || options.radius <= 0)) {
       throw new Error('Unit radius must be a positive finite number.');
     }
-    return withUnitAxis(this, {
+    let chart: this = this;
+    if (options.radius !== undefined) chart = chart.size(options.radius);
+    if (options.x !== undefined) chart = chart.x(options.x);
+    if (options.y !== undefined) chart = chart.y(options.y);
+    return withUnitAxis(chart, {
       layout: name,
-      ...(options.columns != null ? { columns: options.columns } : {}),
-      ...(options.radius != null ? { radius: options.radius } : {})
+      ...(options.columns != null ? { columns: options.columns } : {})
     });
   }
 }

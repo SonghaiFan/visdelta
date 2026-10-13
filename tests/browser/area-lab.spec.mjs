@@ -50,10 +50,10 @@ for (const sample of scenarios) {
     expect(await snapshot(page)).toEqual(start);
 
     await setEditorCode(editor, sample.code
-      .replace('.x("date")', '.x("date", { title: "Month" })')
-      .replace('title: "Date"', 'title: "Month"'));
+      .replace('.x("date")', '.x("date", { label: "Month" })')
+      .replace('label: "Date"', 'label: "Month"'));
     await ready(page);
-    await expectEditorCode(editor, /title: "Month"/);
+    await expectEditorCode(editor, /label: "Month"/);
     await expect(page.locator('.vd-x-label')).toHaveText('Month →');
     await page.locator('#reset').click();
     await ready(page);

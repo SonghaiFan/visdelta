@@ -500,3 +500,11 @@
 .vd-style-editorial .vd-grid line {
   shape-rendering: auto;
 }
+
+/* Fit mode gives the main canvas priority over the legend, including side legends. */
+.vd-transition-root[data-hide-legend='true'] .vd-legend,
+.vd-transition-root[data-hide-legend='true'] .vd-legend-svg {
+  display: none;
+}
+
+.vd-figure-header { flex-shrink: 0; }

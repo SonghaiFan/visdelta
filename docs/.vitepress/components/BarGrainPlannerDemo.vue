@@ -37,15 +37,15 @@ onMounted(async () => {
       { state: 'Florida', age: '18–64', population: 14.2 },
       { state: 'Florida', age: '65+', population: 5.1 }
     ];
-    const from = bar(rows).x('state', { title: 'State' }).y('population', { title: 'People (millions)' })
-      .rollup({ title: 'People (millions)' });
-    const to = bar(rows).x('state', { title: 'State' }).y('population', { title: 'People (millions)' })
-      .breakdown('age', { title: 'People (millions)' }).layout('grouped').color('#3366ff');
+    const from = bar(rows).x('state', { label: 'State' }).y('population', { label: 'People (millions)' })
+      .rollup({ label: 'People (millions)' });
+    const to = bar(rows).x('state', { label: 'State' }).y('population', { label: 'People (millions)' })
+      .breakdown('age', { label: 'People (millions)' }).layout('grouped').color('#3366ff');
     const plan = planDeclarationTransition(from.toSpec(), to.toSpec(), createBarGrainDeclarationOperationCodec());
     if (plan.status !== 'planned') throw new Error(`Bar Grain route unavailable: ${plan.reason}`);
     stageCount.value = plan.stages.length;
-    fromCode.value = "const from = bar(data).x('state', { title: 'State' })\n  .y('population', { title: 'People (millions)' })\n  .rollup({ title: 'People (millions)' });";
-    toCode.value = "const to = bar(data).x('state', { title: 'State' })\n  .y('population', { title: 'People (millions)' })\n  .breakdown('age', { title: 'People (millions)' })\n  .layout('grouped')\n  .color('#3366ff');";
+    fromCode.value = "const from = bar(data).x('state', { label: 'State' })\n  .y('population', { label: 'People (millions)' })\n  .rollup({ label: 'People (millions)' });";
+    toCode.value = "const to = bar(data).x('state', { label: 'State' })\n  .y('population', { label: 'People (millions)' })\n  .breakdown('age', { label: 'People (millions)' })\n  .layout('grouped')\n  .color('#3366ff');";
     planText.value = JSON.stringify({
       status: plan.status,
       stages: plan.stages.map(stage => ({

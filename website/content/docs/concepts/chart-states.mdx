@@ -79,13 +79,13 @@ base.color('region');
 
 ## Channel options
 
-Channel methods accept options such as `type`, `title`, `format`, `domain`,
+Channel methods accept options such as `type`, `label`, `format`, `domain`,
 `scale`, `sort`, `aggregate`, `timeUnit` and `bin`.
 
 ```ts
 line(rows)
-  .x('date', { type: 'temporal', title: 'Date' })
-  .y('close', { title: 'Close (USD)', format: '$.2f' });
+  .x('date', { type: 'temporal', label: 'Date' })
+  .y('close', { label: 'Close (USD)', format: '$.2f' });
 ```
 
 - **Type.** Core detects `quantitative`, `temporal` and `nominal` from the data

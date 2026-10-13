@@ -23,7 +23,7 @@ export function RepeatDemo() {
     const { bar } = await import('visdelta/bar');
     const a = bar(rows)
       .x('label')
-      .y('value', { title: 'Units' })
+      .y('value', { label: 'Units' })
       .key(['label', 'part'])
       .breakdown('part')
       .color('part', { domain: parts, range: colors });
@@ -32,7 +32,7 @@ export function RepeatDemo() {
   }, [direction, scales]);
 
   const code = useMemo(
-    () => `const a = bar(rows).x("label").y("value", { title: "Units" })
+    () => `const a = bar(rows).x("label").y("value", { label: "Units" })
   .key(["label", "part"]).breakdown("part")
   .color("part", { domain: ${JSON.stringify(parts)},
     range: ${JSON.stringify(colors)} });

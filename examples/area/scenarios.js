@@ -15,8 +15,8 @@ const base = industries
 const stacked = `const DATA_URL = "./data/area-lab.csv";
 
 const detailed = area({ url: DATA_URL })
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");

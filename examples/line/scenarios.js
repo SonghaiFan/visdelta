@@ -14,21 +14,21 @@ const base = stocks
 const timeGrain = `${base}
 
 const weekly = base
-  .x("week", { title: "Week" })
+  .x("week", { label: "Week" })
   .key("week")
   .rollup({ op: "mean" });
 
 const weeklyHigh = base
-  .x("week", { title: "Week" })
-  .y("high", { title: "Weekly high (USD)", format: "$.2f" })
+  .x("week", { label: "Week" })
+  .y("high", { label: "Weekly high (USD)", format: "$.2f" })
   .key("week")
   .rollup({ op: "max" });`;
 
 const series = `const DATA_URL = "./data/line-lab.csv";
 
 const detailed = line({ url: DATA_URL })
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker");

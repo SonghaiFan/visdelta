@@ -10,8 +10,8 @@ const cities = [
 ];
 
 const chart = bar(cities)
-  .x('city', { title: 'City' })
-  .y('visitors', { title: 'Visitors (thousands)' });
+  .x('city', { label: 'City' })
+  .y('visitors', { label: 'Visitors (thousands)' });
 
 export const from = chart.title('Visitors in March');
 export const to = chart.title('Visitors in April').subtitle('Provisional counts, thousands');

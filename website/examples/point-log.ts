@@ -12,12 +12,12 @@ const cars = [
 ];
 
 export const from = point(cars)
-  .x('weight', { title: 'Weight (1000 lb)' })
-  .y('mpg', { title: 'Miles per gallon' })
+  .x('weight', { label: 'Weight (1000 lb)' })
+  .y('mpg', { label: 'Miles per gallon' })
   .key('name');
 
 // Same field, new positional scale: a Coordinate change.
 export const to = from.y('mpg', {
-  title: 'Miles per gallon (log₂)',
+  label: 'Miles per gallon (log₂)',
   scale: { type: 'log', base: 2 },
 });

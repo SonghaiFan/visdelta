@@ -34,8 +34,8 @@ export function TransitionWorkbench() {
 
   const load = useCallback(async () => {
     const { bar } = await import('visdelta/bar');
-    const base = bar(rows).x('category', { title: 'Category' }).y('sales', { title: 'Revenue' }).tooltip(['category', 'sales']);
-    const profit = base.y('profit', { title: 'Profit' }).tooltip(['category', 'profit']);
+    const base = bar(rows).x('category', { label: 'Category' }).y('sales', { label: 'Revenue' }).tooltip(['category', 'sales']);
+    const profit = base.y('profit', { label: 'Profit' }).tooltip(['category', 'profit']);
     return { from: base, to: profit };
   }, []);
 

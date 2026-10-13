@@ -49,6 +49,11 @@ and [where, highlight and focus](/docs/concepts/selection).
 .toSpec()        // → detached view spec
 ```
 
+Unit compact layout bindings and chained setters are equally supported:
+`.layout('beeswarm', { x: 'length' })` and `.layout('beeswarm').x('length')`
+write the same state. The last explicit binding replaces the complete channel;
+omitted layout options preserve it. See [Unit](/docs/charts/unit).
+
 ### Title and subtitle
 
 `.title(text)` and `.subtitle(text)` put a heading above the chart, in the
@@ -66,9 +71,9 @@ In a transition the old text fades out over the first half and the new text
 fades in over the second, driven by the pair's progress, so reverse playback
 shows the same frames backward. The heading's room follows the same progress, so
 the first frame is the old state drawn on its own and the last frame the new one,
-and the canvas only slides in between. With `height: 'auto'` the canvas is laid
-out for one room, so the heading holds the room of the taller text throughout
-(a `sequence()` holds the tallest of all its states). Headings are not part of
+and a fixed-height canvas only slides in between. With `height: 'auto'` the
+canvas uses the remaining container height as the heading opens or closes.
+Sequence endpoints use their own heading space. Headings are not part of
 route planning, so a grain change that also changes the title keeps its
 automatic intermediate states.
 
@@ -78,7 +83,7 @@ See [Bar](/docs/charts/bar).
 
 ```ts
 .flip(options?)
-.breakdown(field?, { layout?, op?, title?, ... })
+.breakdown(field?, { layout?, op?, label?, ... })
 .rollup(groupby?, options?)
 .segment(fieldOrConfig?, config?)
 .layout('simple' | 'grouped' | 'stacked', options?)
@@ -133,9 +138,10 @@ See [Unit](/docs/charts/unit).
 ```ts
 .value(field, { unitValue?, maxUnits? })
 .group(field)
-.layout('grid' | 'force' | 'bar' | 'beeswarm', { columns?, radius? })
+.size(number)
+.layout('grid' | 'force' | 'bar' | 'beeswarm', { x?, y?, columns? })
 .columns(number)
-.radius(number)
+.radius(number) // compatibility alias for size(number)
 ```
 
 ## Pie
@@ -156,3 +162,15 @@ See [Pie](/docs/charts/pie).
 | `D3_CURVE_NAMES`      | `visdelta/line` | Curve names accepted by `line().curve()`      |
 | `D3_AREA_CURVE_NAMES` | `visdelta/area` | Curve names accepted by `area().curve()`      |
 | `UNIT_LAYOUTS`        | `visdelta/unit` | Layout names accepted by `unit().layout()`    |
+
+
+### Channel labels and figure titles
+
+Use `.title(text)` and `.subtitle(text)` for the whole figure. Use `label` in
+channel options for the display name of a field, for example
+`.x("hp", { label: "Horsepower" }).title("Cars")`. Channel `title` has been
+replaced by `label`; update existing channel configurations, including tooltip
+fields and Bar rollup/breakdown measure labels. This does not change figure
+headings or their transition behavior. An omitted label defaults to the field's
+readable name. Compact Unit layout bindings also accept `label` in their channel
+objects and remain equivalent to chained `.x()` / `.y()` declarations.

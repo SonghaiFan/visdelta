@@ -11,8 +11,8 @@ const readings = [
 ];
 
 const base = line(readings)
-  .x('day', { type: 'temporal', title: 'Day' })
-  .y('temperature', { title: 'Temperature (°C)' });
+  .x('day', { type: 'temporal', label: 'Day' })
+  .y('temperature', { label: 'Temperature (°C)' });
 
 export const from = base.curve('curveLinear').strokeWidth(2).pointSize(3);
 export const to = base.curve('curveStep').strokeWidth(4).pointSize(5);

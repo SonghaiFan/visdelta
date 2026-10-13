@@ -41,9 +41,9 @@ test('Bar Grain phase boundaries equal their complete states and scrub identical
       { id: 'c', category: 'B', segment: 'one', value: 5 },
       { id: 'd', category: 'B', segment: 'two', value: 7 }
     ];
-    const detailed = api.bar(rows).datumKey('id').x('category').y('value', { title: 'Value' })
-      .breakdown('segment', { op: 'sum', title: false });
-    const from = detailed.rollup({ op: 'sum', title: 'Value' });
+    const detailed = api.bar(rows).datumKey('id').x('category').y('value', { label: 'Value' })
+      .breakdown('segment', { op: 'sum', label: false });
+    const from = detailed.rollup({ op: 'sum', label: 'Value' });
     const to = detailed.layout('grouped').color('#3366ff');
     const options = target => ({ target, width: 560, height: 320 });
     const plan = api.planDeclarationTransition(from.toSpec(), to.toSpec(),

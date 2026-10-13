@@ -59,8 +59,9 @@ outside the chart's SVG, so it does not count toward the chart's `width` or
 Values merge in order: neutral defaults, the chart module's own defaults, then
 the style's overrides. An authored `spec.margin` is the final override. Margins
 are preferred spacing, not fixed reservations: whitespace adapts to the
-container while axis text keeps its size. A transition uses the largest margins
-any of its states needs, so scrubbing never moves the plot bounds on its own.
+container while axis text keeps its size. A transition shares plot margins
+across its route; space for a top or right legend opens and closes with playback.
+In Fit mode, heading and top-legend space also change the remaining canvas height.
 
 ## CSS tokens
 

@@ -101,10 +101,10 @@ const grainRows = [
   { state: 'A', age: 'young', population: 1 },
   { state: 'A', age: 'old', population: 2 }
 ];
-const grainFrom = selectedBar(grainRows).x('state').y('population', { title: 'Metric' })
-  .rollup({ title: 'Metric' }).toSpec();
-const grainTo = selectedBar(grainRows).x('state').y('population', { title: 'Metric' })
-  .breakdown('age', { title: 'Metric' }).toSpec();
+const grainFrom = selectedBar(grainRows).x('state').y('population', { label: 'Metric' })
+  .rollup({ label: 'Metric' }).toSpec();
+const grainTo = selectedBar(grainRows).x('state').y('population', { label: 'Metric' })
+  .breakdown('age', { label: 'Metric' }).toSpec();
 const publicGrainPlan = planDeclarationTransition(
   grainFrom, grainTo, createBarGrainDeclarationOperationCodec()
 );
@@ -153,10 +153,16 @@ const currentRows = a.rows();
 currentRows[0]?.value;
 const pair = await transition(a, b, { target: '#chart' });
 pair.delta.stateChanges[0]?.category;
+pair.stageChanges()[0]?.[0]?.category;
+pair.stageOperations()[0]?.action;
 pair.progress(0.4).play({ duration: 300 }).pause().resize();
+const inspectedPair = await pair.inspect();
+inspectedPair.stages[0]?.properties[0]?.selector;
+inspectedPair.stages[0]?.properties[0]?.node.getAttribute('x');
 pair.destroy();
 const journey = await sequence([a, b, a], { target: '#chart' });
 journey.progress(1.5).play({ duration: 300 }).pause().resize();
+(await journey.inspect()).stages[0]?.start;
 journey.destroy();
 await selectedSequence([a, b], { target: '#chart' });
 // A chart that stays on screen is a transition held at an endpoint; the
@@ -249,3 +255,11 @@ void fixedSize; void fitSize; void fitContainer;
 const headed = bar([{ city: 'Oslo', visitors: 31 }]).x('city').y('visitors').title('Visitors').subtitle('March').subtitle(null);
 const headingText: string | null | undefined = headed.toSpec().title;
 void headingText;
+
+selectedUnit([{ x: 1, y: 2 }]).layout('beeswarm', { x: 'x', radius: 5 });
+selectedUnit([{ x: 1, y: 2 }]).layout('force', { x: { field: 'x', label: 'X' }, y: 'y' });
+selectedUnit([{ x: 1, y: 2 }]).size(6).layout('beeswarm', { x: 'x' }).x('y');
+
+selectedBar([{ hp: 1, mpg: 2 }]).x('hp', { label: 'Horsepower' }).title('Cars');
+// @ts-expect-error Channel names use label, not the figure title property.
+selectedBar([{ hp: 1 }]).x('hp', { title: 'Horsepower' });

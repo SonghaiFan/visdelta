@@ -10,8 +10,8 @@ const cities = [
 ];
 
 export const from = bar(cities)
-  .x('city', { title: 'City' })
-  .y('visitors', { title: 'Visitors (thousands)' });
+  .x('city', { label: 'City' })
+  .y('visitors', { label: 'Visitors (thousands)' });
 
 // Colour is never inferred: binding a field is an explicit Encoding change.
 export const to = from.color('continent');

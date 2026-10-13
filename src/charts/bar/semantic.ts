@@ -238,7 +238,7 @@ function barGeometryState({
 function channelSignature(channel: ChannelSpec | undefined = {}): ChannelSignature {
   return {
     field: channel.field ?? null,
-    title: channel.title ?? null,
+    label: channel.label ?? null,
     type: channel.type ?? null,
     aggregate: typeof channel.aggregate === 'string' ? channel.aggregate : null,
     domain: (channel.domain as unknown[] | undefined) ?? null,

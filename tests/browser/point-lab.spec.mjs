@@ -43,7 +43,7 @@ for (const sample of pointScenarios) {
     expect(await snapshot(page)).toEqual(start);
 
     await setEditorCode(editor, sample.code
-      .replace('.x("wt")', '.x("wt", { title: "Vehicle weight" })')
+      .replace('.x("wt")', '.x("wt", { label: "Vehicle weight" })')
       .replace('Weight (1,000 lb)', 'Vehicle weight'));
     await expect(page.locator('#status')).toHaveText('Waiting for input');
     await ready(page);
@@ -377,7 +377,7 @@ test('point detail sets the view before summary points spread', async ({ page })
       { id: 'C', region: 'South', x: 70, y: 80 },
       { id: 'D', region: 'South', x: 90, y: 60 }
     ];
-    const detail = point(rows).x('x', { title: 'X' }).y('y', { title: 'Y' })
+    const detail = point(rows).x('x', { label: 'X' }).y('y', { label: 'Y' })
       .key('id').color('region');
     const summary = detail.rollup('region', { key: 'region' });
     const change = await transition(summary, detail, {

@@ -12,9 +12,9 @@ const cars = [
 ];
 
 export const from = point(cars)
-  .x('weight', { title: 'Weight (1000 lb)' })
-  .y('mpg', { title: 'Miles per gallon' })
+  .x('weight', { label: 'Weight (1000 lb)' })
+  .y('mpg', { label: 'Miles per gallon' })
   .key('name');
 
 // Every car keeps its identity while the y mapping changes.
-export const to = from.y('horsepower', { title: 'Horsepower' });
+export const to = from.y('horsepower', { label: 'Horsepower' });

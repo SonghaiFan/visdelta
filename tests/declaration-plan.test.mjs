@@ -90,7 +90,7 @@ test('Bar field-to-constant color is one complete atomic channel update', () => 
 
 test('Bar channel parameter edits are complete and synchronize derived semantic identity', () => {
   const from = base.toSpec();
-  const to = base.y({ field: 'other', type: 'quantitative', title: 'Other', format: '.2f' }).toSpec();
+  const to = base.y({ field: 'other', type: 'quantitative', label: 'Other', format: '.2f' }).toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assert.equal(plan.status, 'planned');
   assert.equal(plan.stages.length, 1);
@@ -229,7 +229,7 @@ test('Unit canonical planning supports independent grouping, quantity, unit valu
     [from, builder.group('group').toSpec(), 'meta/unit/group'],
     [from, valued, 'meta/unit/value'],
     [valued, builder.value('y', { unitValue: 2 }).toSpec(), 'meta/unit/unitValue'],
-    [from, builder.layout('force').toSpec(), 'meta/unit/layout']
+    [from, builder.layout('force').toSpec(), 'layout']
   ]) {
     assert.equal(peerCodec.validate(target).status, 'ok');
     const forward = planDeclarationTransition(source, target, peerCodec);
@@ -246,7 +246,8 @@ test('Unit canonical planning supports independent grouping, quantity, unit valu
     const right = new Map(peerCodec.decompose(forward.stages[0].to).value.map(operation => [operation.id, JSON.stringify(operation)]));
     assert.equal([...new Set([...left.keys(), ...right.keys()])].filter(key => left.get(key) !== right.get(key)).length, 1);
   }
-  const sized = unit(rows).layout('grid').size('x').toSpec();
+  assert.throws(() => unit(rows).size('x'), /field-driven size is unsupported/);
+  const sized = { ...from, encoding: { ...from.encoding, size: { field: 'x' } } };
   assert.equal(peerCodec.validate(sized).status, 'unsupported');
   const invalidLayout = { ...from, meta: { ...from.meta, unit: { layout: 'bogus' }, state: { sceneState: { axis: { layout: 'bogus' } } } } };
   assert.equal(peerCodec.validate(invalidLayout).status, 'unsupported');
@@ -567,4 +568,26 @@ test('route rendering consumes prepared leg states without re-preparing waypoint
   }, route);
   assert.deepEqual(phases.map(phase => phase.spec.value), [50, 110]);
   assert.ok(phases.every(phase => phase.routePrepared));
+});
+
+
+test('Unit route retains the exact Swarm declaration operation for each stage', () => {
+  const a = unit(rows).key('id').layout('grid', { columns: 15, radius: 6 }).color('group').toSpec();
+  const b = unit(rows).key('id').size(6).x('x').layout('beeswarm').color('group').toSpec();
+  const policy = unitPlugin.createChartType(DEFAULT_CHART_RUNTIME);
+  const route = selectTransitionRoute(policy, a, b);
+  assert.equal(route.legs.length, 1);
+  const operation = route.legs[0].operation;
+  assert.equal(operation.id, 'layout');
+  assert.equal(operation.action, 'update');
+  assert.equal(operation.previous.value.value.type, 'grid');
+  assert.equal(operation.previous.value.value.columns, 15);
+  assert.equal(operation.previous.value.value.radius, undefined);
+  assert.equal(operation.next.value.value.type, 'beeswarm');
+  assert.equal(operation.next.value.value.x.field, 'x');
+  assert.equal(operation.next.value.value.columns, undefined);
+  const reverse = selectTransitionRoute(policy, b, a);
+  assert.equal(reverse.legs.length, 1);
+  assert.deepEqual(reverse.legs[0].operation.previous, operation.next);
+  assert.deepEqual(reverse.legs[0].operation.next, operation.previous);
 });

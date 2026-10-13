@@ -33,8 +33,8 @@ test('reference demonstrates the complete three-stage Bar Grain route at desktop
   await expect(demo.locator('.bar-grain-demo-heading strong')).toHaveText('Total → grouped detail + color');
   const inspector = demo.locator('.bar-grain-demo-inspector');
   await expect(inspector.locator('summary')).toContainText('3 complete stages');
-  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".rollup({ title: 'People (millions)' })");
-  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".breakdown('age', { title: 'People (millions)' })");
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".rollup({ label: 'People (millions)' })");
+  await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".breakdown('age', { label: 'People (millions)' })");
   await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".layout('grouped')");
   await expect(inspector.locator('.bar-grain-demo-authoring')).toContainText(".color('#3366ff')");
   await expect(inspector).toContainText('__visdeltaBarGrain/grouping');

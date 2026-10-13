@@ -27,7 +27,7 @@ export const idioms = [
     id: 'vertical-bars', mark: 'bar', title: 'Vertical bar chart', note: 'one bar = one state · height = residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
-  .y("population", { title: "Residents under 10" })
+  .y("population", { label: "Residents under 10" })
   .key(["state", "age"])
   .where({ age: "<10" })
   .where({ field: "state", oneOf: ${FEATURE_STATES} });`
@@ -36,7 +36,7 @@ export const idioms = [
     id: 'horizontal-bars', mark: 'bar', title: 'Horizontal bar chart', note: 'one bar = one state · length = residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
-  .y("population", { title: "Residents under 10" })
+  .y("population", { label: "Residents under 10" })
   .key(["state", "age"])
   .where({ age: "<10" })
   .where({ field: "state", oneOf: ${FEATURE_STATES} })
@@ -46,7 +46,7 @@ export const idioms = [
     id: 'ranked-bars', mark: 'bar', title: 'Ranked bar chart', note: 'one bar = one state or territory · sorted by residents under 10', data: POPULATION,
     code: `const chart = bar(rows)
   .x("state")
-  .y("population", { title: "Residents under 10" })
+  .y("population", { label: "Residents under 10" })
   .key(["state", "age"])
   .where({ age: "<10" })
   .sort("population", "descending")
@@ -55,8 +55,8 @@ export const idioms = [
   {
     id: 'ranked-horizontal-bars', mark: 'bar', title: 'Ranked horizontal bars', note: 'one bar = one car · sorted by horsepower', data: CARS,
     code: `const chart = bar(rows)
-  .x("name", { title: "Car" })
-  .y("hp", { title: "Horsepower" })
+  .x("name", { label: "Car" })
+  .y("hp", { label: "Horsepower" })
   .key("name")
   .sort("hp", "descending")
   .flip();`
@@ -126,8 +126,8 @@ const chart = bar(bands)
   {
     id: 'aggregated-bars', mark: 'bar', title: 'Aggregated bars', note: 'one bar = one age band · height = sum across all states', data: POPULATION,
     code: `const chart = bar(rows)
-  .x("age", { title: "Age band" })
-  .y("population", { title: "Total residents", format: "~s" })
+  .x("age", { label: "Age band" })
+  .y("population", { label: "Total residents", format: "~s" })
   .rollup("age");`
   },
   {
@@ -155,16 +155,16 @@ const chart = bar(bands)
   {
     id: 'line', mark: 'line', title: 'Line chart', note: 'one vertex = one trading day · AAPL close', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key("date")
   .where({ ticker: "AAPL" });`
   },
   {
     id: 'multi-series-line', mark: 'line', title: 'Multi-series line chart', note: 'one line = one ticker · daily close', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker");`
@@ -172,8 +172,8 @@ const chart = bar(bands)
   {
     id: 'many-series-line', mark: 'line', title: 'Many series', note: 'manufacturing in focus · other industries provide context', data: UNEMPLOYMENT,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)" })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)" })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("#64748b")
@@ -182,8 +182,8 @@ const chart = bar(bands)
   {
     id: 'long-line', mark: 'line', title: 'Daily time series', note: 'one line = one ticker · a year of daily closes', data: STOCK_YEAR,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.0f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.0f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker")
@@ -192,8 +192,8 @@ const chart = bar(bands)
   {
     id: 'line-with-points', mark: 'line', title: 'Line with points', note: 'one dot = one trading day · GOOG close', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key("date")
   .where({ ticker: "GOOG" })
   .pointSize(4);`
@@ -201,8 +201,8 @@ const chart = bar(bands)
   {
     id: 'step-line', mark: 'line', title: 'Step line', note: 'each step holds the close until the next trading day', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key("date")
   .where({ ticker: "AAPL" })
   .curve("curveStep")
@@ -211,8 +211,8 @@ const chart = bar(bands)
   {
     id: 'smooth-line', mark: 'line', title: 'Smoothed line', note: 'monotone curve through each daily close · never overshoots', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker")
@@ -221,8 +221,8 @@ const chart = bar(bands)
   {
     id: 'weekly-mean-line', mark: 'line', title: 'Aggregated line', note: 'one dot = one week · mean of its daily closes', data: STOCKS,
     code: `const chart = line(rows)
-  .x("week", { title: "Week" })
-  .y("close", { title: "Mean close (USD)", format: "$.2f" })
+  .x("week", { label: "Week" })
+  .y("close", { label: "Mean close (USD)", format: "$.2f" })
   .where({ ticker: "AAPL" })
   .rollup({ op: "mean" })
   .pointSize(4);`
@@ -230,16 +230,16 @@ const chart = bar(bands)
   {
     id: 'log-line', mark: 'line', title: 'Log-scale line', note: 'equal vertical steps = doubling trading volume', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("volume", { title: "Volume", scale: { type: "log", base: 2 } })
+  .x("date", { label: "Date" })
+  .y("volume", { label: "Volume", scale: { type: "log", base: 2 } })
   .key("date")
   .where({ ticker: "AAPL" });`
   },
   {
     id: 'highlighted-line', mark: 'line', title: 'Highlighted series', note: 'AAPL in focus · GOOG kept faint for comparison', data: STOCKS,
     code: `const chart = line(rows)
-  .x("date", { title: "Date" })
-  .y("close", { title: "Close (USD)", format: "$.2f" })
+  .x("date", { label: "Date" })
+  .y("close", { label: "Close (USD)", format: "$.2f" })
   .key(["date", "ticker"])
   .breakdown("ticker")
   .color("ticker")
@@ -250,16 +250,16 @@ const chart = bar(bands)
   {
     id: 'area', mark: 'area', title: 'Area chart', note: 'filled from zero · monthly unemployed in manufacturing', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key("date")
   .where({ industry: "Manufacturing" });`
   },
   {
     id: 'baseline-area', mark: 'area', title: 'Area with a baseline', note: 'filled from 1,000 · the band shows the excess', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key("date")
   .where({ industry: "Manufacturing" })
   .baseline(1000);`
@@ -267,8 +267,8 @@ const chart = bar(bands)
   {
     id: 'step-area', mark: 'area', title: 'Stepped area', note: 'each month holds its value until the next', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key("date")
   .where({ industry: "Construction" })
   .curve("curveStep");`
@@ -276,8 +276,8 @@ const chart = bar(bands)
   {
     id: 'stacked-area', mark: 'area', title: 'Stacked area chart', note: 'one layer = one industry · top edge = their total', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");`
@@ -285,8 +285,8 @@ const chart = bar(bands)
   {
     id: 'many-layer-area', mark: 'area', title: 'Stacked area over time', note: 'three selected industries · top edge = their combined total', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "~s" })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");`
@@ -294,8 +294,8 @@ const chart = bar(bands)
   {
     id: 'normalized-area', mark: 'area', title: 'Normalized stacked area', note: 'shares within three selected industries · each month sums to 100%', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Share of unemployed" })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Share of unemployed" })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry")
@@ -304,8 +304,8 @@ const chart = bar(bands)
   {
     id: 'streamgraph', mark: 'area', title: 'Streamgraph', note: 'three selected industries · thickness = unemployed · moving baseline', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "~s" })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "~s" })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry")
@@ -314,8 +314,8 @@ const chart = bar(bands)
   {
     id: 'smooth-stream', mark: 'area', title: 'Smoothed streamgraph', note: 'silhouette offset · monotone interpolation between monthly observations', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry")
@@ -325,8 +325,8 @@ const chart = bar(bands)
   {
     id: 'highlighted-range', mark: 'area', title: 'Highlighted range', note: 'Sep 2008 – Jun 2009 in ink · the rest as context', data: INDUSTRIES,
     code: `const chart = area(rows)
-  .x("date", { title: "Date" })
-  .y("unemployed", { title: "Unemployed (thousands)", format: "," })
+  .x("date", { label: "Date" })
+  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
   .key("date")
   .where({ industry: "Manufacturing" })
   .highlight({ field: "date", gte: new Date("2008-09-01"), lt: new Date("2009-07-01") });`
@@ -336,23 +336,23 @@ const chart = bar(bands)
   {
     id: 'scatterplot', mark: 'point', title: 'Scatterplot', note: 'one dot = one car · weight against fuel economy', data: CARS,
     code: `const chart = point(rows)
-  .x("wt", { title: "Weight (1000 lb)" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("wt", { label: "Weight (1000 lb)" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name");`
   },
   {
     id: 'categorical-scatterplot', mark: 'point', title: 'Categorical scatterplot', note: 'one dot = one flower · hue = species', data: IRIS,
     code: `const chart = point(rows)
-  .x("petalLength", { title: "Petal length" })
-  .y("petalWidth", { title: "Petal width" })
+  .x("petalLength", { label: "Petal length" })
+  .y("petalWidth", { label: "Petal width" })
   .key("flowerId")
   .color("species");`
   },
   {
     id: 'bubble-chart', mark: 'point', title: 'Bubble chart', note: 'one dot = one car · area = horsepower · hue = cylinders', data: CARS,
     code: `const chart = point(rows)
-  .x("wt", { title: "Weight (1000 lb)" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("wt", { label: "Weight (1000 lb)" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name")
   .size("hp", { range: [4, 18] })
   .color("cyl", { type: "nominal" });`
@@ -360,7 +360,7 @@ const chart = bar(bands)
   {
     id: 'dot-plot', mark: 'point', title: 'Dot plot', note: 'one dot = one state · position = residents under 10', data: POPULATION,
     code: `const chart = point(rows)
-  .x("population", { title: "Residents under 10", format: "~s" })
+  .x("population", { label: "Residents under 10", format: "~s" })
   .y("state")
   .key(["state", "age"])
   .where({ age: "<10" })
@@ -370,7 +370,7 @@ const chart = bar(bands)
     id: 'lollipop', mark: 'point', title: 'Lollipop chart', note: 'one stem = one state · from zero to residents under 10', data: POPULATION,
     code: `const chart = point(rows)
   .x("state")
-  .y("population", { title: "Residents under 10", format: "~s" })
+  .y("population", { label: "Residents under 10", format: "~s" })
   .key(["state", "age"])
   .where({ age: "<10" })
   .where({ field: "state", oneOf: ${FEATURE_STATES} })
@@ -379,7 +379,7 @@ const chart = bar(bands)
   {
     id: 'dumbbell', mark: 'point', title: 'Dumbbell chart', note: 'one rule = one state · youngest band against oldest', data: POPULATION,
     code: `const chart = point(rows)
-  .x("population", { title: "Residents", format: "~s" })
+  .x("population", { label: "Residents", format: "~s" })
   .y("state")
   .key(["state", "age"])
   .where({ field: "age", oneOf: ["<10", "≥80"] })
@@ -390,7 +390,7 @@ const chart = bar(bands)
   {
     id: 'strip-plot', mark: 'point', title: 'Strip plot', note: 'one dot = one flower · sepal length by species', data: IRIS,
     code: `const chart = point(rows)
-  .x("sepalLength", { title: "Sepal length" })
+  .x("sepalLength", { label: "Sepal length" })
   .y("species")
   .key("flowerId")
   .color("species")
@@ -399,8 +399,8 @@ const chart = bar(bands)
   {
     id: 'aggregated-points', mark: 'point', title: 'Aggregated points', note: 'one dot = one cylinder count · area = number of cars', data: CARS,
     code: `const chart = point(rows)
-  .x("wt", { title: "Mean weight" })
-  .y("mpg", { title: "Mean mpg" })
+  .x("wt", { label: "Mean weight" })
+  .y("mpg", { label: "Mean mpg" })
   .key("name")
   .color("cyl", { type: "nominal" })
   .rollup("cyl", {
@@ -413,8 +413,8 @@ const chart = bar(bands)
   {
     id: 'highlighted-points', mark: 'point', title: 'Highlighted points', note: 'four-cylinder cars in ink · the rest as context', data: CARS,
     code: `const chart = point(rows)
-  .x("hp", { title: "Horsepower" })
-  .y("mpg", { title: "Miles per gallon" })
+  .x("hp", { label: "Horsepower" })
+  .y("mpg", { label: "Miles per gallon" })
   .key("name")
   .highlight({ cyl: 4 }, { opacity: 0.12 });`
   },
@@ -440,7 +440,7 @@ const chart = bar(bands)
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
-  .x("petalLength", { title: "Petal length" })
+  .x("petalLength", { label: "Petal length" })
   .layout("beeswarm");`
   },
   {

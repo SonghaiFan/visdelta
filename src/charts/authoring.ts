@@ -134,7 +134,7 @@ export class ChartState<S extends ViewSpec = ViewSpec> extends ViewState<S> {
       encoding: {
         tooltip: cloneState(
           list.map((item) =>
-            typeof item === 'string' ? { field: item, title: titleize(item) } : item
+            typeof item === 'string' ? { field: item, label: titleize(item) } : item
           )
         )
       }
@@ -245,12 +245,12 @@ export function channelFrom(
     const channel = { ...field, ...options };
     return {
       ...channel,
-      ...(channel.field && !channel.title ? { title: titleize(channel.field) } : {})
+      ...(channel.field && !channel.label ? { label: titleize(channel.field) } : {})
     };
   }
   return {
     field: field as string,
-    title: titleize(field as string),
+    label: titleize(field as string),
     ...options
   };
 }

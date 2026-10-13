@@ -16,9 +16,9 @@ const rows = [
   { id: 'd', region: 'S', cohort: 'two', x: 10, y: 11 }
 ];
 const codec = createPointDeclarationOperationCodec();
-const base = () => point(rows).datumKey('id').x('x', { title: 'X' }).y('y', { title: 'Y' });
+const base = () => point(rows).datumKey('id').x('x', { label: 'X' }).y('y', { label: 'Y' });
 const summary = (groups = 'region', op = 'mean', size = false) => base().rollup(groups, {
-  x: { field: 'x', op, title: 'X' }, y: { field: 'y', op, title: 'Y' }, size
+  x: { field: 'x', op, label: 'X' }, y: { field: 'y', op, label: 'Y' }, size
 }).toSpec();
 const agg = spec => spec.transform.find(item => item.aggregate).aggregate;
 
@@ -87,10 +87,10 @@ test('Point aggregate size presentation remains a separate encoding operation', 
 test('Point canonical grouping, measures, appearance and attention ignore overwritten rollup calls', () => {
   const from = summary();
   const target = base().rollup(['region', 'cohort'], {
-    x: { field: 'x', op: 'sum', title: 'X' }, y: { field: 'y', op: 'sum', title: 'Y' }
+    x: { field: 'x', op: 'sum', label: 'X' }, y: { field: 'y', op: 'sum', label: 'Y' }
   }).color('#3366ff').pointSize(7).focus({ region: 'N' });
   const overwritten = base().rollup('cohort').rollup(['region', 'cohort'], {
-    x: { field: 'x', op: 'sum', title: 'X' }, y: { field: 'y', op: 'sum', title: 'Y' }
+    x: { field: 'x', op: 'sum', label: 'X' }, y: { field: 'y', op: 'sum', label: 'Y' }
   }).color('#ff0000').color('#3366ff').radius(4).pointSize(7).focus({ region: 'N' });
   const to = target.toSpec();
   const plan = planDeclarationTransition(from, to, codec);

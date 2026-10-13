@@ -21,8 +21,8 @@ const products = [
 ];
 
 const a = bar(products)
-  .x('product', { title: 'Product line' })
-  .y('revenue', { title: 'Revenue ($M)' });
+  .x('product', { label: 'Product line' })
+  .y('revenue', { label: 'Revenue ($M)' });
 ```
 
 This is a description, not a drawing. Nothing renders yet.
@@ -33,7 +33,7 @@ This is a description, not a drawing. Nothing renders yet.
 ### Describe the change
 
 ```ts
-const b = a.y('profit', { title: 'Profit ($M)' });
+const b = a.y('profit', { label: 'Profit ($M)' });
 ```
 
 `a` is untouched. `b` is a new state that differs in one line.

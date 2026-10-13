@@ -50,9 +50,9 @@ function editedScenario(sample) {
   if (options && /\btitle\s*:/.test(options)) {
     options = options.replace(/(\btitle\s*:\s*)["'][^"']*["']/, `$1"${label}"`);
   } else if (options) {
-    options = options.replace(/}\s*$/, `, title: "${label}" }`);
+    options = options.replace(/}\s*$/, `, label: "${label}" }`);
   } else {
-    options = `{ title: "${label}" }`;
+    options = `{ label: "${label}" }`;
   }
   return {
     code: sample.code.replace(xCall[0], `.x("${field}", ${options})`),
@@ -348,7 +348,7 @@ test('manual run, drafts, switching and playback controls', async ({ page }) => 
   await ready(page);
   await page.locator('#auto-run').uncheck();
   const edited = scenarios[0].code
-    .replace('.x("state")', '.x("state", { title: "Region" })')
+    .replace('.x("state")', '.x("state", { label: "Region" })')
     .replaceAll('"State"', '"Region"');
   await setEditorCode(page.locator('#editor'), edited);
   await expect(page.locator('#status')).toHaveText('Edited · press Run');
@@ -380,7 +380,7 @@ test('late async evaluation cannot overwrite a newer edit', async ({ page }) => 
   await ready(page);
   await page.locator('#auto-run').uncheck();
   await setEditorCode(page.locator('#editor'), `await new Promise(resolve => { window.releaseLabRun = resolve; });\n${scenarios[0].code
-    .replace('.x("state")', '.x("state", { title: "Stale region" })')
+    .replace('.x("state")', '.x("state", { label: "Stale region" })')
     .replaceAll('"State"', '"Stale region"')}`);
   await page.locator('#run').click();
   await expect(page.locator('#status')).toHaveText('Compiling');

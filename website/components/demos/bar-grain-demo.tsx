@@ -16,12 +16,12 @@ const rows = [
   { state: 'Florida', age: '65+', population: 5.1 },
 ];
 
-const fromCode = `const from = bar(rows).x('state', { title: 'State' })
-  .y('population', { title: 'People (millions)' })
-  .rollup({ title: 'People (millions)' });`;
-const toCode = `const to = bar(rows).x('state', { title: 'State' })
-  .y('population', { title: 'People (millions)' })
-  .breakdown('age', { title: 'People (millions)' })
+const fromCode = `const from = bar(rows).x('state', { label: 'State' })
+  .y('population', { label: 'People (millions)' })
+  .rollup({ label: 'People (millions)' });`;
+const toCode = `const to = bar(rows).x('state', { label: 'State' })
+  .y('population', { label: 'People (millions)' })
+  .breakdown('age', { label: 'People (millions)' })
   .layout('grouped')
   .color('#3366ff');`;
 
@@ -34,11 +34,11 @@ export function BarGrainDemo() {
       import('visdelta/bar'),
       import('visdelta/core'),
     ]);
-    const from = bar(rows).x('state', { title: 'State' }).y('population', { title: 'People (millions)' }).rollup({ title: 'People (millions)' });
+    const from = bar(rows).x('state', { label: 'State' }).y('population', { label: 'People (millions)' }).rollup({ label: 'People (millions)' });
     const to = bar(rows)
-      .x('state', { title: 'State' })
-      .y('population', { title: 'People (millions)' })
-      .breakdown('age', { title: 'People (millions)' })
+      .x('state', { label: 'State' })
+      .y('population', { label: 'People (millions)' })
+      .breakdown('age', { label: 'People (millions)' })
       .layout('grouped')
       .color('#3366ff');
     const result = planDeclarationTransition(from.toSpec(), to.toSpec(), createBarGrainDeclarationOperationCodec());

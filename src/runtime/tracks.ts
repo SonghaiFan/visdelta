@@ -14,6 +14,7 @@ export type Ease = (t: number) => number;
 export interface Tween {
   /** Property identity. Later steps on the same node+name take over the track. */
   name: string;
+  kind?: 'attribute' | 'style' | 'text' | 'custom';
   apply: (this: Element, eased: number) => void;
 }
 
@@ -36,7 +37,18 @@ export interface TrackItem {
   cancel(): void;
 }
 
+export interface RecordedProperty {
+  node: Element;
+  name: string;
+  kind: 'attribute' | 'style' | 'text' | 'custom';
+  /** Fractions of this compiled phase's clock. */
+  start: number;
+  end: number;
+}
+
 export interface FrameEvaluator {
+  readonly recordings?: readonly Scheduled[];
+  readonly span?: number;
   progress(value: number, direction?: number): void;
 }
 
@@ -168,6 +180,7 @@ function compilePropertyTracks(scheduled: Scheduled[], span: number): FrameEvalu
   }
   sample(0);
   return {
+    recordings: scheduled, span,
     progress(value, direction = 1) {
       sample(clamp(value, 0, 1) * span, direction);
     }

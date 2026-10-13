@@ -25,11 +25,11 @@ test('Area stream layout is independent of style and connection',()=>{
  const p=verify(from,to,3);assert.deepEqual(new Set(p.stages.map(s=>s.operation.id)),new Set(['__visdeltaAreaLayout','encoding/color','connect']));
 });
 test('Area summary measure source, reducer, and output alias are one Grain operation',()=>{
- const from=base().rollup().toSpec();const to=base().y('profit',{title:'Y'}).rollup({op:'mean',as:'average'}).color('#3366ff').toSpec();
+ const from=base().rollup().toSpec();const to=base().y('profit',{label:'Y'}).rollup({op:'mean',as:'average'}).color('#3366ff').toSpec();
  assert.equal(to.encoding.y.type,'quantitative');const p=verify(from,to,2);assert.deepEqual(new Set(p.stages.map(s=>s.operation.id)),new Set(['__visdeltaAreaTopology','encoding/color']));
 });
 test('Area raw y binding is Encoding and overridden calls disappear',()=>{
- const from=base().breakdown('series').toSpec();const to=base().breakdown('series').y('profit',{title:'Y'}).toSpec();const equivalent=base().breakdown('series').y('x').y('profit',{title:'Y'}).toSpec();
+ const from=base().breakdown('series').toSpec();const to=base().breakdown('series').y('profit',{label:'Y'}).toSpec();const equivalent=base().breakdown('series').y('x').y('profit',{label:'Y'}).toSpec();
  const p=verify(from,to,1);assert.equal(p.stages[0].operation.id,'encoding/y');assert.deepEqual(planDeclarationTransition(from,equivalent,codec),p);
 });
 test('Area single unused series provenance and explicit stacked defaults normalize identically',()=>{

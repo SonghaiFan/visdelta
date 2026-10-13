@@ -54,10 +54,10 @@ export function createPlotLayout(context: RenderContext, themeValue: ThemeValue,
     const tickLabel = y?.type === 'quantitative' ? format(y.format || '~g') : String;
     const tickWidth = y?.field ? rows.reduce((max, row) => Math.max(max, measureTick(tickLabel(row[y.field!] as number))), 0) : 0;
     const floors = {
-      left: y ? Math.max(font * 2, tickWidth + padding) + (!plot.edgeTitles && y.title ? title * 2 : 0) : padding,
+      left: y ? Math.max(font * 2, tickWidth + padding) + (!plot.edgeTitles && y.label ? title * 2 : 0) : padding,
       right: padding,
-      top: plot.edgeTitles && y?.title ? title * 2 + padding : padding,
-      bottom: x ? font * 2 + (x.title ? title + padding : padding) : padding
+      top: plot.edgeTitles && y?.label ? title * 2 + padding : padding,
+      bottom: x ? font * 2 + (x.label ? title + padding : padding) : padding
     };
     for (const side of ['left', 'right', 'top', 'bottom'] as const) {
       const length = side === 'left' || side === 'right' ? width : height;

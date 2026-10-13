@@ -19,10 +19,56 @@ import { unit } from 'visdelta/unit';
 | `.group(field)`                                   | Declare categorical membership, without choosing colour |
 | `.layout('grid' \| 'force' \| 'bar' \| 'beeswarm', options?)` | Arrange the same units                   |
 | `.columns(number)`                                | Set grid or unit-bar columns                         |
-| `.radius(number)`                                 | Set the requested unit radius                        |
+| `.size(number)`                                   | Set constant mark size (requested circle radius in pixels) |
+| `.radius(number)`                                 | Compatibility alias for `.size(number)`               |
 | `.x(field, options?)`, `.y(field, options?)`      | Declare force targets; x also positions a beeswarm   |
 
 The available layout names are exported as `UNIT_LAYOUTS`.
+
+```js
+unit(rows)
+  .key("flowerId")
+  .size(6)
+  .layout("beeswarm", { x: "petalLength" })
+  .color("species");
+```
+
+Layout options accept `x` and `y` as field names or full channel configurations,
+and `columns`. Layout type, columns and x/y bindings form one complete planner
+operation. The existing horizontal-move-then-fall animation remains inside it,
+with the usual per-mark stagger. Size is an independent Appearance channel.
+
+Compact layout options and chained `.x()` / `.y()` calls are equally supported
+forms of the same declaration, not compatibility syntax:
+
+```js
+unit(rows).layout("beeswarm", { x: "petalLength" });
+unit(rows).layout("beeswarm").x("petalLength");
+```
+
+Both write one position binding. The last explicit assignment wins, including
+across the two forms, and replaces the complete channel and its options:
+
+```js
+unit(rows)
+  .key("flowerId")
+  .size(6)
+  .layout("beeswarm", { x: "petalLength" })
+  .x("petalWidth") // replaces the earlier x binding and its options
+  .color("species");
+```
+
+Reversing those x assignments makes `petalLength` win. Omitted layout options
+retain earlier settings: `.x("petalWidth").layout("beeswarm")` keeps
+`petalWidth`. Equivalent final states produce the same difference and transition
+route; normal overwrites do not issue warnings. `.radius(6)` and layout `{ radius: 6 }` remain aliases
+for `.size(6)` and obey the same last-assignment rule.
+
+Currently Unit renders circles: size is their requested radius in pixels,
+which layout fitting can reduce when space is limited. Field-driven size,
+rectangle marks and glyph marks are not yet supported.
+Data, quantity, grouping, size, color and attention remain independent operations.
+One operation can still produce several semantic categories in `delta()`.
 
 ## Layouts
 

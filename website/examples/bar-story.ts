@@ -8,9 +8,9 @@ const products = [
 ];
 
 const revenue = bar(products)
-  .x('product', { title: 'Product line' })
-  .y('revenue', { title: 'Revenue ($M)' });
-const profit = revenue.y('profit', { title: 'Profit ($M)' });
+  .x('product', { label: 'Product line' })
+  .y('revenue', { label: 'Revenue ($M)' });
+const profit = revenue.y('profit', { label: 'Profit ($M)' });
 const ranked = profit.sort('profit', 'descending');
 const emphasised = ranked.highlight({ product: 'Software' });
 

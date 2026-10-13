@@ -101,10 +101,10 @@ for (const sample of scenarios) {
     expect(await snapshot(page)).toEqual(start);
 
     await setEditorCode(editor, sample.code
-      .replace('.x("date")', '.x("date", { title: "Trading month" })')
-      .replace('title: "Date"', 'title: "Trading month"'));
+      .replace('.x("date")', '.x("date", { label: "Trading month" })')
+      .replace('label: "Date"', 'label: "Trading month"'));
     await ready(page);
-    await expectEditorCode(editor, /title: "Trading month"/);
+    await expectEditorCode(editor, /label: "Trading month"/);
     await expect(page.locator('.vd-x-label')).toHaveText('Trading month →');
     await page.locator('#reset').click();
     await ready(page);

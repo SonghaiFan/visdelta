@@ -10,7 +10,7 @@ const cities = [
 ];
 
 export const from = bar(cities)
-  .x('city', { title: 'City' })
-  .y('visitors', { title: 'Visitors (thousands)' });
+  .x('city', { label: 'City' })
+  .y('visitors', { label: 'Visitors (thousands)' });
 
 export const to = from.flip();

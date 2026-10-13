@@ -63,10 +63,10 @@ const demos = [
     note: 'length and category',
     states(api) {
       const from = api.bar(barRows)
-        .x('category', { title: 'Category' })
-        .y('value', { title: 'Value' })
+        .x('category', { label: 'Category' })
+        .y('value', { label: 'Value' })
         .color('region');
-      return [from, from.y('next', { title: 'Next value' })];
+      return [from, from.y('next', { label: 'Next value' })];
     }
   },
   {
@@ -75,11 +75,11 @@ const demos = [
     note: 'position and color',
     states(api) {
       const from = api.point(pointRows)
-        .x('income', { title: 'Income' })
-        .y('health', { title: 'Health' })
+        .x('income', { label: 'Income' })
+        .y('health', { label: 'Health' })
         .key('place')
         .color('region');
-      return [from, from.y('access', { title: 'Access' })];
+      return [from, from.y('access', { label: 'Access' })];
     }
   },
   {
@@ -88,9 +88,9 @@ const demos = [
     note: 'sequence and change',
     states(api) {
       const from = api.line(seriesRows)
-        .x('period', { title: 'Period' })
-        .y('sales', { title: 'Sales' });
-      return [from, from.y('next', { title: 'Forecast' })];
+        .x('period', { label: 'Period' })
+        .y('sales', { label: 'Sales' });
+      return [from, from.y('next', { label: 'Forecast' })];
     }
   },
   {
@@ -99,9 +99,9 @@ const demos = [
     note: 'magnitude over sequence',
     states(api) {
       const from = api.area(seriesRows)
-        .x('period', { title: 'Period' })
-        .y('sales', { title: 'Sales' });
-      return [from, from.y('next', { title: 'Forecast' })];
+        .x('period', { label: 'Period' })
+        .y('sales', { label: 'Sales' });
+      return [from, from.y('next', { label: 'Forecast' })];
     }
   },
   {

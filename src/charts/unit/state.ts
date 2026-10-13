@@ -196,7 +196,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
   const unit = unitMeta(spec);
   const layout = unit.layout || UNIT_DEFAULTS.layout;
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
-  const requestedRadius = positiveNumber(unit.radius, 12);
+  const requestedRadius = positiveNumber(spec.encoding?.size?.value ?? unit.radius, 12);
   const xChannel = spec.encoding?.x || null;
   const yChannel = spec.encoding?.y || null;
   const groupKey = unit.group || null;
@@ -217,7 +217,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
     const yByKey = new Map(placed.circles.map((circle) => [circle.data.__unitKey, circle.y] as const));
     return {
       name: 'beeswarm', axes: true, r: radius,
-      axis: { scale: x, channel: { ...xChannel, title: xChannel.title || xKey } },
+      axis: { scale: x, channel: { ...xChannel, label: xChannel.label || xKey } },
       x: (d) => position(x, d.__row[xKey]),
       y: (d) => chart.innerHeight - radius - (yByKey.get(d.__unitKey) ?? 0)
     };
@@ -241,7 +241,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
     };
     return {
       name: 'bar', axes: true, r: radius, groupField: groupKey,
-      axis: { scale: groupScale, channel: { field: groupKey, title: groupKey, type: 'nominal' } },
+      axis: { scale: groupScale, channel: { field: groupKey, label: groupKey, type: 'nominal' } },
       x: (d) => groupStart(d.__row[groupKey]) + (stackByGroup(d) % groupColumns) * cell,
       y: (d) => chart.innerHeight - radius - Math.floor(stackByGroup(d) / groupColumns) * cell
     };
@@ -623,7 +623,7 @@ function forceAxis(scale: RuntimeScale | null, channel: ChannelSpec | null): Uni
   if (!scale || !channel?.field) return null;
   return {
     scale,
-    channel: { ...channel, title: channel.title || channel.field }
+    channel: { ...channel, label: channel.label || channel.field }
   };
 }
 
@@ -702,7 +702,7 @@ function unitPositionSignature(spec: ViewSpec): string {
   return stableStringify({
     layout: unit.layout || UNIT_DEFAULTS.layout,
     columns: unit.columns ?? null,
-    radius: unit.radius ?? null,
+    size: spec.encoding?.size ?? unit.radius ?? null,
     group: unit.group ?? null,
     value: unit.value ?? null,
     unitValue: unitValueForSpec(spec),

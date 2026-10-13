@@ -1,3 +1,4 @@
+import type { TransitionInspection, InspectionFrame } from './inspection.js';
 // A standalone, seekable surface for one canonical chart pair. It mounts its
 // own root under the host, compiles the pair into per-phase frame evaluators,
 // and answers progress(value, direction) from DOM snapshots plus those
@@ -16,14 +17,12 @@ import { hideTooltip } from './tooltip.js';
 import { clearSceneTransitionProgress } from '../transition-progress.js';
 import type { SceneHostElement } from './scene.js';
 import type { FrameEvaluator } from './tracks.js';
-import type { ChartType, MarginSpec, RuntimeOptions, DataRow } from '../types/index.js';
+import type { DeclarationOperationChange, ChartType, MarginSpec, RuntimeOptions, DataRow } from '../types/index.js';
 import type { ChartTypeRegistry } from '../charts/index.js';
-import { select } from 'd3-selection';
 import { viewRows, domainTransforms } from './data.js';
 import { applyTransforms } from '../data/transforms.js';
 import type { CanvasSize } from './canvas-size.js';
 import { bareLayout, createHeading } from './heading.js';
-import type { HeadingReservation } from './heading.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
   /** Canvas width: pixels, or "auto" (default) to follow the container. */
@@ -32,14 +31,15 @@ export interface TransitionSurfaceOptions extends RuntimeOptions {
   height?: CanvasSize;
   /** Force the reconstruction bridge even for chart types that allow cached frames. */
   reconstruct?: boolean;
-  /** Heading texts of the whole sequence this pair belongs to, so every leg reserves the same room. */
-  headingReservation?: HeadingReservation;
 }
 
 export interface TransitionSurface {
   readonly view: Element;
   /** Number of serial route stages chosen for this authored pair. */
   stageCount(): number;
+  stageOperations(): Array<DeclarationOperationChange | undefined>;
+  stageStates(): Array<[ViewLayoutSpec, ViewLayoutSpec]>;
+  inspect(): Promise<TransitionInspection>;
   commitMount(): void;
   rollbackMount(): void;
   progress(value: number, direction?: number): void;
@@ -95,7 +95,7 @@ export function createTransitionSurface(
   root.dataset.chartStyle = styleKey;
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
-  const heading = createHeading(shell.heading, authored.from, authored.to, options.headingReservation);
+  const heading = createHeading(shell.heading, authored.from, authored.to);
   // A top legend sits in a block above the canvas, outside the SVG, so `width` and
   // `height` are the canvas alone. A side legend stays in the right margin.
   const legendOutside = options.chartStyle?.legendPosition !== 'right';
@@ -109,13 +109,13 @@ export function createTransitionSurface(
   // contract. Unspecified/custom renderers use the reconstruction bridge.
   const cacheFrames = chartType.transitionEvaluation === 'cached' && options.reconstruct !== true;
   let cached: FrameEvaluator | null = null;
+  let inspectionFrames: InspectionFrame[] = [];
   const runtimeScene = () => node.__visDeltaScene as ViewRuntimeScene | undefined;
   const disposeScene = () => {
     const scene = runtimeScene();
     if (scene) {
       clearSceneTransitionProgress(scene, { finish: false });
     }
-    select(node).selectAll('*');
     node.replaceChildren();
     delete node.__visDeltaScene;
   };
@@ -151,13 +151,19 @@ export function createTransitionSurface(
     figure.display = fill ? 'flex' : '';
     figure.flexDirection = fill ? 'column' : '';
     node.style.flex = fill ? '1 1 0' : '';
-    // A canvas that fills its container is laid out for one room, so the heading holds it.
-    heading.hold(fill);
+    heading.suppress(0);
   }
   applyCanvasStyles();
 
+  let legendRooms: number[] = [];
+  let fittedHeight = 0;
+  let layoutWidth = 720;
+
+  let resetFrames = true;
+
   function compileFrames(): FrameEvaluator {
-    disposeScene();
+    if (resetFrames) disposeScene();
+    resetFrames = false;
     prepareSeekSourceState(node, config, {}, shell.tooltip,
       { effectiveViewSpec: route.from, sceneTransition: { scene: [] } }, true);
     const startFrame = captureDomFrame(node);
@@ -187,6 +193,7 @@ export function createTransitionSurface(
       }
       return frame;
     });
+    inspectionFrames = frames;
     // Save the clean endpoint (no zero-opacity exit marks/ticks), while keeping
     // detached nodes alive in the phase snapshots for later reverse seeks.
     const finalFrame = frames[frames.length - 1];
@@ -219,6 +226,32 @@ export function createTransitionSurface(
   return {
     view: node,
     stageCount() { return Math.max(1, routeStages); },
+    stageOperations() {
+      const operations = route.legs.map(leg => leg.operation);
+      return canonical.reverse ? operations.reverse().map(operation => operation && ({
+        ...operation,
+        action: operation.action === 'insert' ? 'delete' : operation.action === 'delete' ? 'insert' : 'update',
+        previous: operation.next, next: operation.previous,
+        fromIndex: operation.toIndex, toIndex: operation.fromIndex
+      } as DeclarationOperationChange)) : operations;
+    },
+    stageStates() {
+      const pairs: Array<[ViewLayoutSpec, ViewLayoutSpec]> = route.legs.map(leg => [leg.from ?? leg.to, leg.to]);
+      return canonical.reverse ? pairs.reverse().map(([from, to]) => [to, from]) : pairs;
+    },
+    async inspect() {
+      const { inspectFrames } = await import('./inspection.js');
+      if (!root.parentNode) throw new Error('This transition has been destroyed.');
+      const restore = captureDomFrame(node);
+      try {
+        // Reconstruction renderers rebuild on every subsequent progress call.
+        // Restore the exact DOM here instead of rendering a second replacement frame.
+        if (!cacheFrames) compileFrames();
+        return inspectFrames(inspectionFrames, canonical.reverse);
+      } finally {
+        restore.restore();
+      }
+    },
     commitMount() { previousChildren = []; },
     rollbackMount() {
       if (root.parentNode === host) host.replaceChildren(...previousChildren);
@@ -229,13 +262,28 @@ export function createTransitionSurface(
       heading.progress(value);
       if (layoutDirty) {
         // The heading's own room is read before the canvas is laid out for what is left.
+        heading.suppress(0);
         heading.measure();
-        const width = node.clientWidth || 720;
-        // The legend block is as tall as the tallest legend of the pair, so the
-        // canvas under it holds still. Its wrapping depends on the side margins,
-        // which depend on the width alone, so it is known before the height.
+        const width = layoutWidth = node.clientWidth || 720;
+        // Use the maximum legend room only to decide which chrome fits. The
+        // displayed room follows the active route leg below.
         const sizing = { width, height: from.height ?? to.height ?? 500 };
         config.legendHeight = legendOutside ? legendBlockHeight(chartType, layoutStates, sizing) : 0;
+        // Decide once per layout, never per animation frame. Restore all chrome
+        // before measuring so growing the container restores it automatically.
+        delete root.dataset.hideLegend;
+        if (requestedHeight === 'auto' && shell.figure.clientHeight > 0) {
+          // A readable canvas scales with the available width, capped at 200px.
+          // Below that budget, decoration gives way in priority order.
+          const minimumCanvas = Math.min(200, width / 2);
+          const available = () => Math.round(shell.figure.clientHeight - heading.maximumRoom() - (config.legendHeight ?? 0));
+          if (available() < minimumCanvas) {
+            config.legendHeight = 0;
+            root.dataset.hideLegend = 'true';
+          }
+          if (available() < minimumCanvas) { heading.suppress(1); heading.measure(); }
+          if (available() < minimumCanvas) { heading.suppress(2); heading.measure(); }
+        }
         // "auto" reads the room the container gives the view, less the legend block.
         // A container with no height of its own gives none, and the chart keeps its own height.
         const room = requestedHeight === 'auto' ? node.clientHeight - config.legendHeight : 0;
@@ -247,9 +295,42 @@ export function createTransitionSurface(
             width, height: baseHeight, rows: applyTransforms(viewRows(spec.data, {}) as DataRow[], spec.transform ?? [])
           }, { ...spec.margin, ...config.margin }) ?? baseHeight));
         config.margin = invariantTransitionMargin(chartType, layoutStates, width, config.height, legendOutside);
+        // Measure each complete route state, including the empty legend. The
+        // active leg interpolates these rooms instead of reserving their maximum.
+        legendRooms = layoutStates.map(spec => legendOutside && !root.dataset.hideLegend
+          ? legendBlockHeight(chartType, [spec], sizing) : 0);
+        fittedHeight = requestedHeight === 'auto' ? shell.figure.clientHeight : 0;
+        heading.measure();
         layoutDirty = false;
       }
-      value = canonicalProgress(value);
+      const routeProgress = canonicalProgress(value);
+      const legPosition = routeProgress * Math.max(1, legendRooms.length - 1);
+      const legIndex = Math.min(Math.floor(legPosition), Math.max(0, legendRooms.length - 2));
+      const fraction = legPosition - legIndex;
+      const legendHeight = (legendRooms[legIndex] ?? 0) * (1 - fraction)
+        + (legendRooms[legIndex + 1] ?? legendRooms[legIndex] ?? 0) * fraction;
+      const height = fittedHeight > 0
+        ? Math.max(1, fittedHeight - heading.room(value) - legendHeight)
+        : config.height;
+      let margin = config.margin;
+      if (!legendOutside) {
+        const before = invariantTransitionMargin(chartType, [layoutStates[legIndex]], layoutWidth, height!, false);
+        const after = invariantTransitionMargin(chartType, [layoutStates[Math.min(legIndex + 1, layoutStates.length - 1)]], layoutWidth, height!, false);
+        margin = { ...config.margin };
+        for (const side of ['top', 'right'] as const) {
+          margin[side] = Number(before[side]) * (1 - fraction) + Number(after[side]) * fraction;
+        }
+      }
+      if (config.height !== height || config.legendHeight !== legendHeight
+        || margin?.top !== config.margin?.top || margin?.right !== config.margin?.right) {
+        config.height = height;
+        config.legendHeight = legendHeight;
+        config.margin = legendOutside
+          ? invariantTransitionMargin(chartType, layoutStates, layoutWidth, height!, true) : margin;
+        cached = null;
+        inspectionFrames = [];
+      }
+      value = routeProgress;
       const canonicalDirection = (direction || 1) * (canonical.reverse ? -1 : 1);
       if (cacheFrames) {
         cached ??= compileFrames();
@@ -278,11 +359,12 @@ export function createTransitionSurface(
       if (width != null) requestedWidth = width;
       if (height != null) requestedHeight = height;
       applyCanvasStyles();
-      cached = null;
+      cached = null; inspectionFrames = [];
+      resetFrames = true;
       layoutDirty = true;
     },
     follows() { return { width: typeof requestedWidth !== 'number', height: requestedHeight === 'auto' }; },
-    destroy() { cached = null; disposeScene(); root.remove(); }
+    destroy() { cached = null; inspectionFrames = []; disposeScene(); root.remove(); }
   };
 }
 

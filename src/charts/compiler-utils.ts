@@ -114,19 +114,19 @@ export function resolveAxisOrder(axisSpec: AnyRecord = {}, orientation: string):
 
 export function channelFromField(
   fieldOrChannel: string | ChannelSpec,
-  title: string | null,
+  label: string | null,
   fallbackType: string
 ): ChannelSpec {
   if (fieldOrChannel && typeof fieldOrChannel === 'object') {
-    const channel = { ...fieldOrChannel } as ChannelSpec & { type?: string; title?: string };
+    const channel = { ...fieldOrChannel } as ChannelSpec & { type?: string; label?: string };
     if (!channel.type) channel.type = fallbackType as ChannelSpec['type'];
-    if (channel.field && !channel.title) channel.title = titleize(channel.field);
+    if (channel.field && !channel.label) channel.label = titleize(channel.field);
     return channel;
   }
   return {
     field: fieldOrChannel as string,
     type: fallbackType as ChannelSpec['type'],
-    title: title || titleize(fieldOrChannel as string)
+    label: label || titleize(fieldOrChannel as string)
   };
 }
 
@@ -136,10 +136,10 @@ export function mergeXYChannel(
   fallbackType: string
 ): ChannelSpec {
   if (typeof override === 'string') return channelFromField(override, null, fallbackType);
-  const channel = { ...base, ...override } as ChannelSpec & { type?: string; title?: string; scale?: AnyRecord };
+  const channel = { ...base, ...override } as ChannelSpec & { type?: string; label?: string; scale?: AnyRecord };
   if (!channel.type) channel.type = fallbackType as ChannelSpec['type'];
-  if (channel.field && (!channel.title || (override as ChannelSpec).field)) {
-    channel.title = (override as ChannelSpec & { title?: string }).title || titleize(channel.field);
+  if (channel.field && (!channel.label || (override as ChannelSpec).field)) {
+    channel.label = (override as ChannelSpec & { label?: string }).label || titleize(channel.field);
   }
   if ((override as ChannelSpec & { scale?: AnyRecord }).scale || (base as ChannelSpec & { scale?: AnyRecord }).scale) {
     channel.scale = {

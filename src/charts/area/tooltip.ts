@@ -209,7 +209,7 @@ function tooltipLines(
     { text: formatTooltipValue(value(xField), x), header: true },
     ...(seriesValue != null ? [{ text: String(seriesValue), header: true }] : []),
     ...details.map((item) => ({
-      text: `${item.title || titleize(item.field || '')}: ${formatTooltipValue(
+      text: `${item.label || titleize(item.field || '')}: ${formatTooltipValue(
         item.field === yField && value(yField) == null
           ? Math.abs(band.cell.center.y1 - band.cell.center.y0)
           : value(item.field || ''),

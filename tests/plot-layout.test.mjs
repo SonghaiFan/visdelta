@@ -5,7 +5,7 @@ import { resolveChartPresentation, d3ChartStyle, paperChartStyle, darkChartStyle
 import { barPresentation } from '../dist/charts/bar/style.js';
 
 const rows = [{ x: 'A', y: 10, group: 'North' }, { x: 'B', y: 30, group: 'South' }];
-const channels = { x: { field: 'x', title: 'Category' }, y: { field: 'y', title: 'Value', type: 'quantitative' } };
+const channels = { x: { field: 'x', label: 'Category' }, y: { field: 'y', label: 'Value', type: 'quantitative' } };
 const local = { plot: { margin: { top: 56, right: 20, bottom: 40, left: 56 }, edgeTitles: true } };
 
 test('the default D3 bar presentation keeps categorical x ticks without their domain line', () => {
@@ -31,7 +31,7 @@ for (const theme of [d3ChartStyle, paperChartStyle, darkChartStyle, editorialCha
       assert.ok(layout(800, 240, withLegend).right > wide.right);
       assert.equal(layout(240, 240, withLegend).right, small.right);
     }
-    const long = layout(800, 240, { ...channels, y: { field: 'x', title: 'Place' } }, [{ x: 'A long category name' }]);
+    const long = layout(800, 240, { ...channels, y: { field: 'x', label: 'Place' } }, [{ x: 'A long category name' }]);
     assert.ok(long.left > wide.left);
     assert.equal(JSON.stringify(plot), before);
   });

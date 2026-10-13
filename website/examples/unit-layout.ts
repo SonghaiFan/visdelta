@@ -9,7 +9,8 @@ const flowers = Array.from({ length: 45 }, (_, index) => ({
 export const from = unit(flowers)
   .key('id')
   .color('species')
-  .layout('grid', { columns: 9, radius: 7 });
+  .size(7)
+  .layout('grid', { columns: 9 });
 
 // The same keyed units regroup into one stack per species.
 export const to = from.group('species').layout('bar', { columns: 5 });

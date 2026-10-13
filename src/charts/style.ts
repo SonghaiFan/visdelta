@@ -95,7 +95,7 @@ export const paperChartStyle = defineChartStyle({
   legendPosition: 'right',
   legendInset: { top: 4, left: 16 },
   plot: PAPER_CARTESIAN,
-  axisTitle: channel => channel?.title
+  axisTitle: channel => channel?.label
 });
 
 /** Compact high-contrast spacing paired with the scoped `.vd-style-dark` CSS preset. */
@@ -153,7 +153,7 @@ export function directionalAxisTitle(
   channel: ChannelSpec | undefined,
   direction: 'right' | 'up'
 ): string | undefined {
-  const title = channel?.title;
+  const title = channel?.label;
   if (!title) return undefined;
   return direction === 'right' ? `${title} →` : `↑ ${title}`;
 }

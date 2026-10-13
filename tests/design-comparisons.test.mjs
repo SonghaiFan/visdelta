@@ -12,8 +12,8 @@ test('every guide comparison has unique identity, a source and runnable immutabl
     assert.ok(item.story?.headline && item.story?.description, item.id);
     for (const side of [item.before, item.after]) {
       for (const declaration of side.charts ?? []) {
-        assert.doesNotMatch(declaration.code, /title: "Units"/, `${item.id}: unit title resolved from the story`);
-        assert.doesNotMatch(declaration.code, /\.x\("year", \{ title: "Year" \}\)/, `${item.id}: year axis declares ordinal or integer format`);
+        assert.doesNotMatch(declaration.code, /label: "Units"/, `${item.id}: unit title resolved from the story`);
+        assert.doesNotMatch(declaration.code, /\.x\("year", \{ label: "Year" \}\)/, `${item.id}: year axis declares ordinal or integer format`);
       }
     }
   }

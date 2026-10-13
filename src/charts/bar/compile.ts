@@ -63,8 +63,8 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
   const currentOrientation = barOrientationFromEncoding(encoding);
   const catCh = categoryChannel(encoding);
   const measCh = measureChannel(encoding);
-  const category = channelFromField(catCh as ChannelSpec, (catCh as ChannelSpec)?.title || null, 'nominal');
-  const measure = channelFromField(measCh as ChannelSpec, (measCh as ChannelSpec)?.title || null, 'quantitative');
+  const category = channelFromField(catCh as ChannelSpec, (catCh as ChannelSpec)?.label || null, 'nominal');
+  const measure = channelFromField(measCh as ChannelSpec, (measCh as ChannelSpec)?.label || null, 'quantitative');
   const orientation: BarOrientation = flipsOrientation ? oppositeOrientation(currentOrientation) : currentOrientation;
 
   if (orientation === 'horizontal') {
@@ -143,9 +143,9 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
   );
   const newEncoding: Encoding = {
     ...cloneEncoding(spec.encoding) as Encoding,
-    x: channelFromField(categoryField, (detailSpec['categoryTitle'] as string) || (encoding['x'] as ChannelSpec)?.title || null, 'nominal'),
+    x: channelFromField(categoryField, (detailSpec['categoryTitle'] as string) || (encoding['x'] as ChannelSpec)?.label || null, 'nominal'),
     y: {
-      ...channelFromField(valueField, (detailSpec['valueTitle'] as string) || (encoding['y'] as ChannelSpec)?.title || null, 'quantitative'),
+      ...channelFromField(valueField, (detailSpec['valueTitle'] as string) || (encoding['y'] as ChannelSpec)?.label || null, 'quantitative'),
       ...((encoding['y'] as ChannelSpec)?.format
         ? { format: (encoding['y'] as ChannelSpec).format }
         : {})

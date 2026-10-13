@@ -92,7 +92,7 @@ test('chart style modules inherit the default grammar without entering chart spe
     legendInset: { top: 6 },
     legendPosition: 'right',
     plot: { grid: 'horizontal', margin: { left: 32 } },
-    axisTitle: channel => channel?.title
+    axisTitle: channel => channel?.label
   });
   const spec = bar([{ id: 'A', value: 2 }]).x('id').y('value').toSpec();
 
@@ -126,7 +126,7 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(paperChartStyle.plot.openYDomain, false);
   assert.equal(paperChartStyle.legendPosition, 'right');
   assert.equal(paperChartStyle.plot.margin.right, 20); // legend space is allocated from content
-  assert.equal(paperChartStyle.axisTitle({ title: 'Income' }, 'right'), 'Income');
+  assert.equal(paperChartStyle.axisTitle({ label: 'Income' }, 'right'), 'Income');
   assert.equal(darkChartStyle.key, 'dark');
   assert.equal(darkChartStyle.plot.grid, 'horizontal');
   assert.equal(chartStylePresets.editorial, editorialChartStyle);
@@ -176,8 +176,8 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
     { state: 'CA', age: '≥80', population: 1 }
   ];
   const detailed = bar(rows)
-    .x('state', { title: 'Region' })
-    .y('population', { title: 'Residents', format: '~s' })
+    .x('state', { label: 'Region' })
+    .y('population', { label: 'Residents', format: '~s' })
     .key(['state', 'age'])
     .breakdown('age')
     .color('age', { domain: ['<10', '≥80'], range: ['#d53e4f', '#3288bd'] });
@@ -185,8 +185,8 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
   const detailSpec = detailed.toSpec();
   const total = detailed.rollup().toSpec();
   assert.equal(detailSpec.encoding.y.format, '~s');
-  assert.equal(detailSpec.encoding.x.title, 'Region');
-  assert.equal(detailSpec.encoding.y.title, 'Sum of Residents');
+  assert.equal(detailSpec.encoding.x.label, 'Region');
+  assert.equal(detailSpec.encoding.y.label, 'Sum of Residents');
   assert.deepEqual(total.transform, [{
     aggregate: {
       groupby: ['state'],
@@ -195,7 +195,7 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
   }]);
   assert.equal(total.encoding.color, undefined);
   assert.equal(total.encoding.y.field, 'population');
-  assert.equal(total.encoding.y.title, 'Sum of Residents');
+  assert.equal(total.encoding.y.label, 'Sum of Residents');
 });
 
 test('bar aggregate axes describe the default operation', () => {
@@ -203,13 +203,13 @@ test('bar aggregate axes describe the default operation', () => {
     { quarter: 'Q1', region: 'North', revenue: 12 },
     { quarter: 'Q1', region: 'South', revenue: 8 }
   ];
-  const base = bar(rows).x('quarter').y('revenue', { title: 'Revenue' });
+  const base = bar(rows).x('quarter').y('revenue', { label: 'Revenue' });
 
-  assert.equal(base.rollup().toSpec().encoding.y.title, 'Sum of Revenue');
-  assert.equal(base.rollup({ op: 'count' }).toSpec().encoding.y.title, 'Count of Revenue');
-  assert.equal(base.rollup({ title: 'Quarter total' }).toSpec().encoding.y.title, 'Quarter total');
+  assert.equal(base.rollup().toSpec().encoding.y.label, 'Sum of Revenue');
+  assert.equal(base.rollup({ op: 'count' }).toSpec().encoding.y.label, 'Count of Revenue');
+  assert.equal(base.rollup({ label: 'Quarter total' }).toSpec().encoding.y.label, 'Quarter total');
   assert.equal(
-    base.breakdown('region').rollup().toSpec().encoding.y.title,
+    base.breakdown('region').rollup().toSpec().encoding.y.label,
     'Sum of Revenue'
   );
 });
@@ -251,7 +251,7 @@ test('where changes rows while focus keeps rows and changes the view', () => {
 
   const filteredBar = charts[0].where({ type: 'Hot days' }).toSpec();
   assert.equal(filteredBar.meta.object.key, 'id');
-  assert.equal(filteredBar.encoding.y.title, 'Y');
+  assert.equal(filteredBar.encoding.y.label, 'Y');
 });
 
 test('selectors compose from the previous immutable state and reset to the declaration baseline', () => {
@@ -320,7 +320,7 @@ test('unit separates group meaning from layout and preserves count identity', ()
   assert.equal(groupedSpec.encoding?.color, undefined);
   assert.equal(barSpec.meta.state.sceneState.axis.layout, 'bar');
   assert.equal(barSpec.meta.unit.columns, 2);
-  assert.equal(barSpec.meta.unit.radius, 5);
+  assert.equal(barSpec.encoding.size.value, 5);
   assert.equal(base.x('id').layout('beeswarm').toSpec().meta.unit.layout, 'beeswarm');
   assert.equal(base.layout('force').toSpec().meta.unit.layout, 'force');
   assert.equal(typeof bars.rollup, 'undefined');
@@ -803,7 +803,7 @@ test('a JSON-safe chart state survives JSON round-tripping with identical meanin
   const revived = JSON.parse(JSON.stringify(spec));
   assert.deepEqual(revived, spec, 'the serialized spec is the spec');
   // Plain JSON specs are accepted wherever a state is, with the same delta and the same rows.
-  const other = state.y('sales', { title: 'Sales' });
+  const other = state.y('sales', { label: 'Sales' });
   const revivedDelta = delta(revived, other.toSpec());
   const authoredDelta = delta(state, other);
   assert.deepEqual(revivedDelta.changed, authoredDelta.changed);
@@ -821,4 +821,67 @@ test('toSpec() serializes Date objects to ISO strings, so every chart state is J
   assert.deepEqual(JSON.parse(JSON.stringify(spec)), spec);
   assert.equal(detectDataTypes(spec.data).date, 'temporal');
   assert.equal(new Date(spec.data[0].date).getTime(), rows[0].date.getTime());
+});
+
+
+test('Unit compact and chained position declarations are equivalent and immutable', () => {
+  const rows = [{ id: 'a', x: 2, y: 4 }];
+  const base = unit(rows).key('id');
+  const target = base.layout('beeswarm', { x: 'x', radius: 5 });
+  assert.deepEqual(target.toSpec(), base.x('x').layout('beeswarm', { radius: 5 }).toSpec());
+  assert.deepEqual(base.layout('force', { x: { field: 'x', label: 'Position' }, y: 'y' }).toSpec(), base.x('x', { label: 'Position' }).y('y').layout('force').toSpec());
+  assert.equal(base.toSpec().encoding?.x, undefined);
+});
+
+test('Unit size is a constant mark channel and positional assignments are last-write-wins', () => {
+  const rows = [{ id: 'a', length: 3, width: 2 }];
+  const base = unit(rows).key('id').size(6);
+  assert.deepEqual(base.toSpec().encoding.size, { value: 6 });
+  assert.deepEqual(base.radius(9).toSpec(), base.size(9).toSpec());
+  assert.deepEqual(base.layout('grid', { radius: 9 }).toSpec(), base.size(9).layout('grid').toSpec());
+  assert.equal(base.layout('grid', { radius: 9 }).size(4).toSpec().encoding.size.value, 4);
+  assert.equal(base.size(4).layout('grid', { radius: 9 }).toSpec().encoding.size.value, 9);
+  const first = base.layout('beeswarm', { x: { field: 'length', domain: [0, 10], label: 'Old' } });
+  assert.deepEqual(first.x('width').toSpec(), base.layout('beeswarm', { x: 'width' }).toSpec());
+  assert.deepEqual(base.x('width').layout('beeswarm', { x: 'length' }).toSpec(), base.layout('beeswarm', { x: 'length' }).toSpec());
+  assert.deepEqual(base.layout('force', { y: { field: 'length', domain: [0, 10] } }).y('width').toSpec(), base.layout('force', { y: 'width' }).toSpec());
+  assert.equal(first.toSpec().encoding.x.field, 'length');
+  assert.equal(base.toSpec().encoding.size.value, 6);
+  for (const invalid of [0, -1, NaN, Infinity, 'length']) assert.throws(() => base.size(invalid), /Unit size/);
+  assert.deepEqual(delta(base, base.size(9)).stateChanges, [{ category: 'appearance', action: 'reshape', property: 'size' }]);
+});
+
+
+test('Unit omitted compact bindings preserve channels and title scopes remain independent', () => {
+  const base = unit([{ id: 'a', x: 2, y: 4 }]).key('id')
+    .x('x', { label: 'Position', domain: [0, 10] }).y('y')
+    .title('Figure').subtitle('Source');
+  const before = base.toSpec();
+  const compact = base.layout('force', { columns: 3 });
+  const chained = base.layout('force').columns(3);
+  assert.deepEqual(compact.toSpec(), chained.toSpec());
+  assert.deepEqual(compact.toSpec().encoding, before.encoding);
+  assert.equal(compact.toSpec().title, 'Figure');
+  assert.equal(compact.toSpec().encoding.x.label, 'Position');
+  assert.equal(compact.title('New figure').toSpec().encoding.x.label, 'Position');
+  assert.equal(compact.x('y').toSpec().title, 'Figure');
+  assert.deepEqual(base.toSpec(), before);
+});
+
+
+test('channel labels survive compilation independently of figure titles', () => {
+  const rows = [{ id: 'a', x: 1, y: 2 }];
+  for (const make of [bar, point, line, area, unit]) {
+    const chart = make(rows).x('x', { label: 'Horizontal' })
+      .y('y', { label: 'Vertical' }).title('Figure').subtitle('Source');
+    const spec = chart.toSpec();
+    assert.equal(spec.title, 'Figure');
+    assert.equal(spec.subtitle, 'Source');
+    assert.equal(spec.encoding.x.label, 'Horizontal');
+    assert.equal(spec.encoding.y.label, 'Vertical');
+    assert.equal('title' in spec.encoding.x, false);
+    assert.equal('title' in spec.encoding.y, false);
+    assert.equal(chart.title('Other').toSpec().encoding.x.label, 'Horizontal');
+    assert.equal(chart.x('x', { label: 'Other axis' }).toSpec().title, 'Figure');
+  }
 });

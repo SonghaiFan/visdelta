@@ -52,14 +52,14 @@ const stacked = matrix.flatMap((values, i) => values.map((value, j) => ({ label:
 const dense = Array.from({ length: 16 }, (_, i) => ({ year: 2008 + i, label: String(2008 + i), part: parts[0], value: 65 + i * 2 + Math.sin(i) * 12 })).flatMap(row => parts.map((part, j) => ({ ...row, part, value: row.value / (j + 1) })));
 const irregular = stacked.map(row => ({ ...row, year: [2020, 2021, 2025, 2030][row.year - 2020], label: String([2020, 2021, 2025, 2030][row.year - 2020]) }));
 const colors = `.color("part", { domain: ${JSON.stringify(parts)}, range: ${JSON.stringify(palette)} })`;
-const bars = (extra = '', x = 'label') => `const chart = bar(rows)\n  .x("${x}", { type: "ordinal" })\n  .y("value", { title: "Units" })\n  .key(["${x}", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
-const connected = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { title: "Year" })\n  .y("value", { title: "Units" })\n  .key(["year", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
-const plain = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("label", { type: "ordinal" })\n  .y("value", { title: "Units" })\n  .key("label")${extra};`;
-const single = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { title: "Year" })\n  .y("value", { title: "Units" })\n  .key("year")${extra};`;
+const bars = (extra = '', x = 'label') => `const chart = bar(rows)\n  .x("${x}", { type: "ordinal" })\n  .y("value", { label: "Units" })\n  .key(["${x}", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
+const connected = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { label: "Year" })\n  .y("value", { label: "Units" })\n  .key(["year", "part"])\n  .breakdown("part")\n  ${colors}${extra};`;
+const plain = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("label", { type: "ordinal" })\n  .y("value", { label: "Units" })\n  .key("label")${extra};`;
+const single = (mark, extra = '') => `const chart = ${mark}(rows)\n  .x("year", { label: "Year" })\n  .y("value", { label: "Units" })\n  .key("year")${extra};`;
 const view = (mark, code, caption, options = {}) => ({ charts: [{ mark, code }], caption, ...options });
 const small = () => ({ caption: 'One chart; one panel per component; shared scales.', height: 480, charts: [{ mark: 'bar',
   code: `const chart = bar(rows)
-  .x("label").y("value", { title: "Units" }).key("label")
+  .x("label").y("value", { label: "Units" }).key("label")
   ${colors}
   .repeat("part", { direction: "y", scales: "shared", minWidth: 180 });`
 }] });
@@ -71,10 +71,10 @@ const continuousYears = new Set();
 function narrate(side, told, continuous) {
   if (!side?.charts) return side;
   return { ...side, charts: side.charts.map(chart => ({ ...chart, code: chart.code
-    .replaceAll('title: "Units"', `title: "${told.y}"`)
+    .replaceAll('label: "Units"', `label: "${told.y}"`)
     // A later .y() replaces the channel options, so a domain-only override keeps the unit title.
-    .replace(/\.y\("value", \{ domain: (\[[^\]]*\]) \}\)/g, `.y("value", { title: "${told.y}", domain: $1 })`)
-    .replaceAll('.x("year", { title: "Year" })', continuous ? '.x("year", { title: "Year", format: "d" })' : '.x("year", { title: "Year", type: "ordinal" })') })) };
+    .replace(/\.y\("value", \{ domain: (\[[^\]]*\]) \}\)/g, `.y("value", { label: "${told.y}", domain: $1 })`)
+    .replaceAll('.x("year", { label: "Year" })', continuous ? '.x("year", { label: "Year", format: "d" })' : '.x("year", { label: "Year", type: "ordinal" })') })) };
 }
 const entry = (id, guide, title, why, rows, before, after, override = {}) => {
   const usesYear = [before, after].some(side => side?.charts?.some(chart => chart.code.includes('.x("year"')));
@@ -145,7 +145,7 @@ export const designComparisons = [
   entry('bar-trend', 'baseline', 'Follow an ordered trend', 'Use position when changes matter.', narrow,
     view('bar', plain('bar', '\n  .y("value", { domain: [95, 100] })'), 'Bars with clipped magnitudes'), view('line', single('line', '\n  .y("value", { domain: [95, 100] })\n  .pointSize(4)'), 'Ordered annual values')),
   entry('bar-change', 'baseline', 'Show change explicitly', 'Label the newly derived measure.', narrow,
-    view('bar', plain('bar', '\n  .y("value", { domain: [95, 100] })'), 'Absolute values, clipped'), view('bar', 'const changes = rows.slice(1).map((row, i) => ({ ...row, change: row.value - rows[i].value }));\nconst domain = [Math.min(0, ...changes.map(row => row.change)), Math.max(0, ...changes.map(row => row.change))];\nconst chart = bar(changes).x("label").y("change", { title: "Annual change (units)", domain }).key("label");', 'Year-to-year differences')),
+    view('bar', plain('bar', '\n  .y("value", { domain: [95, 100] })'), 'Absolute values, clipped'), view('bar', 'const changes = rows.slice(1).map((row, i) => ({ ...row, change: row.value - rows[i].value }));\nconst domain = [Math.min(0, ...changes.map(row => row.change)), Math.max(0, ...changes.map(row => row.change))];\nconst chart = bar(changes).x("label").y("change", { label: "Annual change (units)", domain }).key("label");', 'Year-to-year differences')),
   entry('stack-components', 'stack', 'Compare every component', 'Give each component a shared baseline.', stacked,
     view('bar', bars(), 'Middle segments float'), small()),
   entry('stack-trends', 'stack', 'Read component trends', 'Use lines when totals are secondary.', stacked,
@@ -155,7 +155,7 @@ export const designComparisons = [
   entry('stack-crossover', 'stack', 'Find a crossover', 'Compare two traces directly.', stacked,
     view('bar', bars('', 'year'), 'Floating components'), view('line', connected('line', '\n  .where({ field: "part", oneOf: ["Growth", "Support"] })\n  .pointSize(4)'), 'Only the two relevant components')),
   entry('stack-one-total', 'stack', 'Compare parts of one total', 'Separate bars support direct comparison.', singlePart,
-    view('bar', bars(), 'One stacked total'), view('bar', 'const chart = bar(rows).x("part").y("value", { title: "Units" }).key("part").flip();', 'One bar per component')),
+    view('bar', bars(), 'One stacked total'), view('bar', 'const chart = bar(rows).x("part").y("value", { label: "Units" }).key("part").flip();', 'One bar per component')),
   entry('stack-one-share', 'stack', 'Communicate one share', 'A stated percentage can suffice.', singlePart,
     view('bar', bars(), 'More chart than message'), { caption: 'Core accounts for 60% of this total.', text: '60%', detail: '90 of 150 units belong to Core.' }),
   entry('stack-many-totals', 'stack', 'Allow room for many totals', 'Rows give categories vertical space.', manyTotals,
@@ -165,7 +165,7 @@ export const designComparisons = [
   entry('stack-important', 'stack', 'Anchor the focus component', 'The bottom supports comparisons.', stacked,
     view('bar', bars().replace(JSON.stringify(parts), JSON.stringify(['Growth', 'Services', 'Core', 'Support'])), 'Core in the middle'), view('bar', bars().replace(colors, focusedColors), 'Core at zero, highlighted')),
   entry('stack-shares', 'stack', 'Compare relative composition', 'Normalize deliberately when shares matter.', stacked,
-    view('bar', bars(), 'Absolute totals differ'), view('bar', 'const percentages = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.label === row.label).reduce((sum, r) => sum + r.value, 0) }));\n' + bars().replace('bar(rows)', 'bar(percentages)').replace('title: "Units"', 'title: "Share (%)"'), 'Every total is 100%')),
+    view('bar', bars(), 'Absolute totals differ'), view('bar', 'const percentages = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.label === row.label).reduce((sum, r) => sum + r.value, 0) }));\n' + bars().replace('bar(rows)', 'bar(percentages)').replace('label: "Units"', 'label: "Share (%)"'), 'Every total is 100%')),
   entry('stack-total-duplicate', 'stack', 'Stack only components', 'Adding totals double-counts the quantity.', stacked,
     view('bar', 'const withTotals = rows.concat([...new Set(rows.map(row => row.label))].map(label => ({ label, part: "Total", value: rows.filter(row => row.label === label).reduce((sum, row) => sum + row.value, 0) })));\n' + bars().replace('bar(rows)', 'bar(withTotals)').replace(colors, '.color("part")'), 'Total added as another component'), view('bar', bars(), 'Only mutually exclusive parts')),
   entry('stack-tiny', 'stack', 'Simplify minor components', 'Author an aggregation without losing quantity.', tiny,
@@ -185,11 +185,11 @@ export const designComparisons = [
   entry('line-observations', 'line', 'Reveal irregular observations', 'Symbols distinguish measured dates from interpolation.', irregular,
     view('line', connected('line'), 'No observation symbols'), view('line', connected('line', '\n  .pointSize(4)'), 'Symbols at measured years')),
   entry('line-labels', 'line', 'Check identification on mobile', 'A compact key can remain legible.', stacked,
-    view('line', connected('line').replace(colors, '.color("part", { title: "Core / Growth / Services / Support component classifications" })'), 'Long key heading'), view('line', connected('line'), 'Short, stable component names', { detail: 'VisDelta does not currently provide direct endpoint labels. This uses its supported legend.' })),
+    view('line', connected('line').replace(colors, '.color("part", { label: "Core / Growth / Services / Support component classifications" })'), 'Long key heading'), view('line', connected('line'), 'Short, stable component names', { detail: 'VisDelta does not currently provide direct endpoint labels. This uses its supported legend.' })),
   entry('line-near-zero', 'line', 'Show nearby zero', 'Include the nearby reference when helpful.', nearZero,
     view('line', single('line', '\n  .y("value", { domain: [1, 4] })'), 'Tight range'), view('line', single('line', '\n  .y("value", { domain: [0, 4] })'), 'Zero is visible')),
   entry('line-near-full', 'line', 'Show nearby 100%', 'Retain the full-scale reference for shares.', narrow,
-    view('line', single('line', '\n  .y("value", { domain: [96, 99], title: "Share (%)" })'), 'Missing upper reference'), view('line', single('line', '\n  .y("value", { domain: [95, 100], title: "Share (%)" })'), '100% is visible')),
+    view('line', single('line', '\n  .y("value", { domain: [96, 99], label: "Share (%)" })'), 'Missing upper reference'), view('line', single('line', '\n  .y("value", { domain: [95, 100], label: "Share (%)" })'), '100% is visible')),
   entry('line-interpolation', 'line', 'Keep interpolation honest', 'Inspect the curve between observations.', jagged,
     view('line', single('line', '\n  .curve("curveNatural")\n  .pointSize(4)'), 'Natural smoothing'), view('line', single('line', '\n  .curve("curveMonotoneX")\n  .pointSize(4)'), 'Monotone interpolation')),
   entry('area-categories', 'area', 'Avoid filling unrelated categories', 'A category comparison needs independent marks.', ordinal,
@@ -197,8 +197,8 @@ export const designComparisons = [
   entry('area-total-secondary', 'area', 'Prioritize individual trends', 'Lines suit a secondary combined total.', stacked,
     view('area', connected('area'), 'Floating layer positions'), view('line', connected('line'), 'Independent trajectories')),
   entry('area-shares', 'area', 'Show shares that add up to 100%', 'Stacked shares make the whole explicit.', stacked,
-    view('line', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('line').replace('line(rows)', 'line(shares)').replace('title: "Units"', 'title: "Share of revenue (%)"'), 'Separate share lines'),
-    view('area', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('area').replace('area(rows)', 'area(shares)').replace('title: "Units"', 'title: "Share of revenue (%)"'), 'Every year fills to 100%'),
+    view('line', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('line').replace('line(rows)', 'line(shares)').replace('label: "Units"', 'label: "Share of revenue (%)"'), 'Separate share lines'),
+    view('area', 'const shares = rows.map(row => ({ ...row, value: 100 * row.value / rows.filter(r => r.year === row.year).reduce((sum, r) => sum + r.value, 0) }));\n' + connected('area').replace('area(rows)', 'area(shares)').replace('label: "Units"', 'label: "Share of revenue (%)"'), 'Every year fills to 100%'),
     { headline: 'Core’s share fell from 60% to 50%', description: 'Share of revenue by business line, 2020–2023' }),
   entry('area-small-differences', 'area', 'Reveal small changes', 'A focused line scale can help.', narrow,
     view('area', single('area', '\n  .y("value", { domain: [0, 100] })'), 'Small changes within large fill'), view('line', single('line', '\n  .y("value", { domain: [95, 100] })'), 'Focused positions')),
@@ -211,7 +211,7 @@ export const designComparisons = [
   entry('area-anchor', 'area', 'Put the focus at the baseline', 'Explicit order can anchor the relevant layer.', stacked,
     view('area', 'const order = ["Growth", "Services", "Core", "Support"];\nconst ordered = rows.slice().sort((a, b) => order.indexOf(a.part) - order.indexOf(b.part));\n' + connected('area', '\n  .layout("stream", { offset: "none", order: "none" })').replace('area(rows)', 'area(ordered)'), 'Core inside the stack'), view('area', connected('area').replace(colors, focusedColors), 'Core at the baseline')),
   entry('area-identify', 'area', 'Keep layer identification concise', 'Use stable names and a compact key.', stacked,
-    view('area', connected('area').replace(colors, '.color("part", { title: "Long component classification used for the layered composition" })'), 'Long key heading'), view('area', connected('area', '\n  .labels("inside")'), 'Direct layer names', { detail: 'Names appear inside layers when they fit; the compact key also identifies thin layers.' })),
+    view('area', connected('area').replace(colors, '.color("part", { label: "Long component classification used for the layered composition" })'), 'Long key heading'), view('area', connected('area', '\n  .labels("inside")'), 'Direct layer names', { detail: 'Names appear inside layers when they fit; the compact key also identifies thin layers.' })),
   entry('area-explanation', 'area', 'Explain a period of interest', 'An explicit window guides attention.', dense,
     view('area', connected('area'), 'No context'), view('area', connected('area', '\n  .highlight({ field: "year", gte: 2015, lte: 2019 }, { opacity: 0.2 })'), 'Highlighted interval', { detail: 'Illustrative event window: 2015–2019.' })),
   entry('area-tiny', 'area', 'Aggregate minor layers explicitly', 'Preserve totals while simplifying the key.', tiny,
@@ -219,11 +219,11 @@ export const designComparisons = [
   entry('area-irregular-exception', 'area', 'Keep uneven intervals visible', 'Few observations can still require continuous spacing.', irregular,
     view('bar', bars(), 'Uniform category spacing'), view('area', connected('area'), 'Actual spacing between years')),
   entry('dot-sorted', 'dot', 'Rank the values', 'Sorting turns a dot plot into a ranking.', satisfaction,
-    view('point', 'const chart = point(rows).x("value", { title: "Units", domain: [50, 80] }).y("label").key("label");', 'Unsorted areas'), view('point', 'const chart = point(rows).x("value", { title: "Units", domain: [50, 80] }).y("label").key("label").sort("value", "ascending");', 'Sorted; the highest score on top')),
+    view('point', 'const chart = point(rows).x("value", { label: "Units", domain: [50, 80] }).y("label").key("label");', 'Unsorted areas'), view('point', 'const chart = point(rows).x("value", { label: "Units", domain: [50, 80] }).y("label").key("label").sort("value", "ascending");', 'Sorted; the highest score on top')),
   entry('dot-range', 'dot', 'Show a spread, not two magnitudes', 'A range plot draws the distance between two values.', temperatures,
-    view('bar', 'const chart = bar(rows).x("label").y("value", { title: "Units" }).key(["label", "bound"]).breakdown("bound").color("bound").layout("grouped");', 'Paired bars from zero'), view('point', 'const chart = point(rows).x("value", { title: "Units" }).y("label").key(["label", "bound"]).color("bound").connector({ by: "label" });', 'One range per area')),
+    view('bar', 'const chart = bar(rows).x("label").y("value", { label: "Units" }).key(["label", "bound"]).breakdown("bound").color("bound").layout("grouped");', 'Paired bars from zero'), view('point', 'const chart = point(rows).x("value", { label: "Units" }).y("label").key(["label", "bound"]).color("bound").connector({ by: "label" });', 'One range per area')),
   entry('dot-pairs', 'dot', 'Emphasize the paired gap', 'A connector makes the distance explicit.', pairs,
-    view('point', 'const chart = point(rows).x("value", { title: "Units" }).y("label").key(["label", "part"]).color("part");', 'Two unconnected dots'), view('point', 'const chart = point(rows).x("value").y("label").key(["label", "part"]).color("part").connector({ by: "label" });', 'A range per category')),
+    view('point', 'const chart = point(rows).x("value", { label: "Units" }).y("label").key(["label", "part"]).color("part");', 'Two unconnected dots'), view('point', 'const chart = point(rows).x("value").y("label").key(["label", "part"]).color("part").connector({ by: "label" });', 'A range per category')),
 ];
 const pieCode = (extra = '') => `const chart = pie(rows)
   .value("value")
@@ -243,12 +243,12 @@ story(namedPie, 'Essential operations is the largest share', 'Revenue by busines
 designComparisons.push(
   entry('pie-exclusive', 'pie', 'Use bars when answers overlap', 'A pie needs parts of one whole; multiple answers exceed 100%.', survey,
     view('pie', 'const chart = pie(rows)\n  .value("value")\n  .key("part")\n  .label("part")\n  .color("part");', 'Slices imply exclusive answers'),
-    view('bar', 'const chart = bar(rows).x("part").y("value", { title: "Units", domain: [0, 100] }).key("part").sort("value", "ascending").flip();', 'Each factor against 100%')),
+    view('bar', 'const chart = bar(rows).x("part").y("value", { label: "Units", domain: [0, 100] }).key("part").sort("value", "ascending").flip();', 'Each factor against 100%')),
   entry('pie-familiar', 'pie', 'Recognize a familiar proportion', 'Rounded fractions can be recognizable in a pie.', renewals,
     view('pie', pieCode().replace(colors, '.color("part")'), 'A valid familiar proportion', { label: 'Also suitable' }),
     { caption: 'A simpler single-message alternative.', text: '25%', detail: 'One quarter of the total.', label: 'Simpler alternative' }),
   entry('pie-precise', 'pie', 'Compare similar shares', 'Position supports precise comparisons.', pieRows,
-    view('pie', pieCode(), 'Similar angles are hard to distinguish'), view('bar', 'const chart = bar(rows).x("part").y("value", { title: "Share (%)" }).key("part").flip();', 'Compare on a common baseline')),
+    view('pie', pieCode(), 'Similar angles are hard to distinguish'), view('bar', 'const chart = bar(rows).x("part").y("value", { label: "Share (%)" }).key("part").flip();', 'Compare on a common baseline')),
   entry('pie-many', 'pie', 'Handle many components', 'An aligned stack makes a compact alternative.', manyPie,
     view('pie', pieCode().replace(colors, '.color("part")'), 'Ten slices compete for attention'), view('bar', bars('\n  .flip()').replace(colors, '.color("part")'), 'A horizontal total with its components')),
   entry('pie-one-share', 'pie', 'Communicate a single share', 'Text can carry the message directly.', coreShare,

@@ -167,7 +167,7 @@ function tooltipLines(
     ? tooltip
     : [
         ...(seriesField && value(seriesField) != null
-          ? [{ field: seriesField, title: titleize(seriesField) }]
+          ? [{ field: seriesField, label: titleize(seriesField) }]
           : []),
         y
       ];
@@ -175,7 +175,7 @@ function tooltipLines(
   return [
     { text: formatTooltipValue(value(xField), x), header: true },
     ...details.map((item) => ({
-      text: `${item.title || titleize(item.field || '')}: ${formatTooltipValue(value(item.field || ''), tooltipChannel(item, x, y))}`,
+      text: `${item.label || titleize(item.field || '')}: ${formatTooltipValue(value(item.field || ''), tooltipChannel(item, x, y))}`,
       header: false
     }))
   ];

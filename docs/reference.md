@@ -62,7 +62,7 @@ categories to discrete colors. Sequential and diverging names such as `Blues`,
 quantitative field they use D3's continuous interpolator. An explicit `range`
 takes precedence over `scheme`.
 
-Channel options can include `type`, `title`, `format`, `domain`, `scale`,
+Channel options can include `type`, `label`, `format`, `domain`, `scale`,
 `sort`, `aggregate`, `timeUnit`, and `bin`. Core fills a missing type from data;
 an authored type always wins.
 
@@ -113,9 +113,9 @@ fades in over the second, driven by the authored progress of the pair, so
 reverse playback shows the same frames backward. The heading's room follows the
 same progress: the first frame is the old state drawn on its own and the last
 frame the new one, with the room opening or closing in between, so the canvas
-only slides. With `height: "auto"` the canvas is laid out for one room, so the
-heading holds the room of the taller text throughout, and a `sequence()` holds
-the tallest heading of all its states for every leg. Headings are not part of
+only slides at a fixed height. With `height: "auto"` the canvas uses the
+remaining container height as the heading opens or closes. Sequence endpoints
+use their own heading space, including zero space for an absent heading. Headings are not part of
 route planning: a pair that differs in grain and in title keeps its automatic
 intermediate states. A figure with no heading takes no room for one. Themes
 style `.vd-figure-title` and `.vd-figure-subtitle`; the padding and rule under
@@ -424,7 +424,7 @@ point(rows)
 ```ts
 .value(field, { unitValue?, maxUnits? })
 .group(field)
-.layout("grid" | "force" | "bar" | "beeswarm", { columns?, radius? })
+.layout("grid" | "force" | "bar" | "beeswarm", { x?, y?, columns?, radius? })
 .columns(number)
 .radius(number)
 ```
@@ -515,7 +515,7 @@ subsets; the operation shape follows each chart's semantics.
 | Point | Ordinary channels and presentation; summary-to-summary grouping and a complete x/y measure bundle with optional aggregate size. Derived position bindings, mark keys and detail metadata follow those Grain slots. | Raw-to-summary pairs, multiple aggregates, unavailable fields, mismatched keys/aliases, and runtime detail-view stages. |
 | Line | Raw y remapping is an Encoding operation. Summary source field, reducer and output alias form one Grain operation with its derived y binding. Curve, connection, appearance and attention remain separate. | Raw-to-summary pairs keep the native zipper when eligible. Pairs crossing ordinary and explicit-detail declarations retain the native route. Custom mark keys and implicit color-derived series remain supported in ordinary declarations; explicit topology/summary declarations require derived keys and declared series. Complex pipelines and runtime zipper stages are outside that subset. |
 | Area | Raw y remapping and summary measure semantics follow the same distinction. Stacked-to-stream layout and its offset/order form a separate layout modifier; curve, connection, baseline and appearance remain separate. Ignored series provenance in a single summary is normalized away. | Raw-to-summary pairs retain the native topology fallback. Ordinary raw declarations preserve represented custom mark keys; explicit topology and summary declarations require their derived mark keys. Complex pipelines and runtime stages remain outside that subset. |
-| Unit | Quantity field, quantity per circle, circle cap, group, layout, columns and radius are separate slots; x/y, color, tooltip, attention, keys and margins are also supported. Axis metadata is a derived mirror. | Aggregate transforms, unresolved data, legacy unit x/y metadata, axis-order instructions, conflicting mirrors and invalid layout dependencies. |
+| Unit | Quantity field, quantity per circle, circle cap and group are separate slots. Layout type, columns and complete x/y bindings form one Layout slot; constant size, color, tooltip, attention, keys and margins remain independent. Axis metadata is a derived mirror. | Aggregate transforms, unresolved data, legacy unit x/y metadata, axis-order instructions, conflicting mirrors and invalid layout dependencies. |
 
 Point summaries require resolved inline records, one aggregate at its original
 pipeline position, and complete quantitative x/y measures. Line and Area
@@ -595,10 +595,10 @@ grouping state:
 import { bar, createBarGrainDeclarationOperationCodec } from 'visdelta/bar';
 import { planDeclarationTransition } from 'visdelta';
 
-const from = bar(data).x('state').y('population', { title: 'Metric' })
-  .rollup({ title: 'Metric' }).toSpec();
-const to = bar(data).x('state').y('population', { title: 'Metric' })
-  .breakdown('age', { title: 'Metric' }).toSpec();
+const from = bar(data).x('state').y('population', { label: 'Metric' })
+  .rollup({ label: 'Metric' }).toSpec();
+const to = bar(data).x('state').y('population', { label: 'Metric' })
+  .breakdown('age', { label: 'Metric' }).toSpec();
 const plan = planDeclarationTransition(
   from, to, createBarGrainDeclarationOperationCodec()
 );
@@ -673,8 +673,8 @@ canvas: they sit above it in the figure and never count toward `width` or
 fills the rest. The legend is a second `<svg class="vd-legend-svg">` that exists
 only while there is a legend to show; it comes after the canvas in the document
 and above it on screen, so `querySelector("svg")` is still the canvas. A
-transition holds the tallest legend block of the pair, so the canvas never
-moves; a legend that appears or disappears only fades. A style that sets
+transition interpolates the legend room between its route states, so a legend
+that appears or disappears also opens or closes its space. A style that sets
 `legendPosition: "right"` keeps its legend inside the canvas, in its right
 margin. A chart that repeats panels draws its legends inside the panels.
 
@@ -961,3 +961,48 @@ x/y bindings and declared domains. Shared and independent numeric scales are
 supported. Other chart modules currently support facet-to-facet transitions through
 their composite module; their flat-to-repeat bridge remains unsupported. Nested facets
 and declaration-operation planning for composite states are unsupported.
+
+### Compiled transition inspection
+
+`await change.inspect()` returns `{ stages, notes }` for the rendered pair.
+Each stage is a compiled seek phase with normalized authored `start` / `end`
+positions and `properties`. A property records its borrowed DOM `node`, `name`,
+`kind`, scheduled `start` / `end` fractions within the phase, and `from` / `to`
+values at phase boundaries. The values describe phase endpoints, not necessarily
+the endpoints of an individual delayed or chained property interval.
+
+Inspection restores the displayed frame and does not pause playback. Re-read
+it after resize or theme changes; node references must not be mutated and expire
+on reconstruction, resize or destruction. `await sequence.inspect()` inspects
+the currently mounted leg. Compiled phases may subdivide route stages; category
+membership is not an animation schedule. Custom tweens have null values because
+the recorder cannot infer their nested writes. Immediate writes, topology changes
+and the independent HTML heading are outside this property-track report.
+
+When height is `"auto"` (Fit), a constrained container hides the legend first,
+then the subtitle, then the title to preserve the main canvas. The canvas budget
+is half the available width, capped at 200 pixels. These elements return when
+space allows; fixed pixel heights retain the authored heading and legend.
+
+`change.stageChanges()` returns one `StateChange[]` per planned route stage, in
+authored playback order, by comparing that stage's actual intermediate states.
+It is distinct from `change.delta`, which describes the complete pair. Reversed
+routes reverse the stage order and compare each pair in the authored direction.
+
+`transition.stageOperations()` returns the exact planner operation for each route stage, in authored playback order. Each entry carries the slot path, action, and previous/next declaration values. Direct and chart-refined stages return `undefined`; semantic categories remain available through `stageChanges()`. These operations do not prove visible motion or alter stage timing.
+
+Unit layout options accept `x` and `y` as field names or complete channel specifications. For example, `.layout("beeswarm", { x: "petalLength" })` is equivalent to `.x("petalLength").layout("beeswarm")`. Compact options and chained setters are equally supported forms that immediately write the same canonical binding. The last explicit assignment replaces the complete channel and its options; omitted options retain previously authored settings on the same builder. Normal overwrites require no warning. Equivalent final states produce the same difference and route regardless of declaration form. Layout configuration changes form one planner stage and retain the existing internal horizontal-move-then-fall motion and per-mark stagger. Semantic categories still describe the consequences of the operation and are not separate animation schedules.
+
+Unit `.size(6)` declares `encoding.size: { value: 6 }` independently of layout. For the current circle renderer this is a requested radius in pixels; layout fitting can reduce it to fit the available space. `.radius(6)` and legacy layout `{ radius: 6 }` are aliases. Field-driven Unit size, rectangles and glyphs are currently unsupported. The last size, x or y assignment wins, including assignments in layout options; replacing a channel also replaces its earlier domain/label options.
+
+
+### Channel labels and figure titles
+
+Use `.title(text)` and `.subtitle(text)` for the whole figure. Use `label` in
+channel options for the display name of a field, for example
+`.x("hp", { label: "Horsepower" }).title("Cars")`. Channel `title` has been
+replaced by `label`; update existing channel configurations, including tooltip
+fields and Bar rollup/breakdown measure labels. This does not change figure
+headings or their transition behavior. An omitted label defaults to the field's
+readable name. Compact Unit layout bindings also accept `label` in their channel
+objects and remain equivalent to chained `.x()` / `.y()` declarations.

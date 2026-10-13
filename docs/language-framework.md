@@ -149,9 +149,12 @@ chart supplies its own validated operation subset:
 - Line and Area keep raw y remapping as Encoding. For supported summaries,
   source measure, reducer, output alias and derived y binding form one Grain
   operation. Area's stream layout remains an independent layout modifier.
-- Unit represents quantity, `unitValue`, cap, grouping and layout parameters in
-  separate slots; its axis metadata mirrors the declarations. Grouping changes
-  arrangement, while `unitValue` changes Grain.
+- Unit keeps quantity, `unitValue`, cap and grouping independent. Layout type,
+  columns and complete x/y bindings form one chart-owned Layout
+  operation; its axis metadata mirrors the declarations. Changing layout
+  parameters together does not create preparation or cleanup time slots.
+  Constant mark size is an independent Appearance channel; legacy radius setters
+  alias that channel. Grouping changes arrangement, while `unitValue` changes Grain.
 
 The subsets do not promise a route between every pair. Point, Line and Area
 raw/summary pairs retain their chart-owned structural transition or direct
@@ -476,8 +479,20 @@ built into Core.
 ### Keep the language small
 
 Use plain English and one word for one concept. Public names, exported types,
-examples, tests, and documentation change together. Do not keep aliases in this
-greenfield release.
+examples, tests, and documentation change together. Compact options and chained
+setters may express the same authored property as equally supported forms. They
+must immediately write the same canonical state, not parallel declarations or
+setter history. For Unit, `.layout("beeswarm", { x: "length" })` is equivalent to
+`.layout("beeswarm").x("length")`. The last explicit assignment to a channel
+replaces the complete channel, including its options; omitted layout options
+preserve earlier assignments. Thus a later `.x("width")` replaces that binding,
+while a later `.layout("force")` preserves it. This ordinary overwrite requires
+no warning. Equivalent final states must produce the same difference and route,
+regardless of declaration form. This does not require separate planner stages:
+Unit still plans layout and position bindings as one complete operation.
+
+Names in different scopes, such as figure `.title()` and channel `{ label }`,
+remain distinct properties; they must not overwrite or normalize into each other.
 
 The detailed signatures live in the [API reference](/reference). Working
 behavior lives in the unified Playground.
@@ -511,7 +526,7 @@ encoding, a grain or a mark key. Blank text and `null` declare no heading, so a
 state with a blank title is the same state as one without.
 
 A heading is figure text above the canvas, outside the SVG, so it never changes
-the canvas's `width` or `height` (see [the reference](/reference#canvas-size)).
+the canvas's fixed `width` or `height` (see [the reference](/reference#canvas-size)).
 It belongs to the figure, not to the route: planning, the generated waypoints and
 the frame caches see each endpoint without its heading, so a heading change does
 not remove an intermediate route and no operation codec carries it. The heading
@@ -520,12 +535,11 @@ out over the first half and the new text fades in over the second, so no frame
 shows both and reverse playback shows the same frames backward. The heading's
 room follows the same progress: its height runs between the natural height of the
 old heading and that of the new one, so the first frame is the old state drawn on
-its own, the last frame is the new state drawn on its own, and the canvas, whose
-layout does not depend on the heading, only slides. A `sequence()` hands over
-between legs at a state both draw identically. When the canvas height follows its
-container (`height: "auto"`) the canvas is laid out for one room, so the heading
-holds the room of the taller text throughout, and a `sequence()` holds the tallest
-heading of all its states for every leg.
+its own and the last frame is the new state drawn on its own. A fixed-height
+canvas only slides; a fitted canvas (`height: "auto"`) uses the remaining
+container height at each progress value. A `sequence()` hands over between legs
+at the shared state's own heading height. An absent heading takes no space and
+shows no separator, including after reverse playback.
 
 ### Legend placement
 
@@ -534,9 +548,8 @@ canvas, outside the chart's SVG, so it never counts toward the canvas's `width`
 or `height`. This changes where the legend lives, not what it means: it remains
 advisory presentation derived from the declared color binding, still emits no
 state change of its own, and is still measured with the same wrapping that draws
-it. Like margins, its block is one height for a whole pair, the tallest among the
-route states, so the canvas never moves and a legend that appears or disappears
-only fades by progress. Each chart type reports the height it will draw through
+it. Its room interpolates between complete route states with progress, so an
+appearing or disappearing legend opens or closes its space as it fades. Each chart type reports the height it will draw through
 `legendHeight`; a state that draws no top-level legend, such as repeated panels,
 reports 0. A style with `legendPosition: "right"` keeps its legend inside the
 canvas, in its right margin.
@@ -591,3 +604,11 @@ An explicit `resize({ height })` sets the canvas height without changing progres
 Resize invalidates geometry caches; marks, ticks and grids use the new dimensions
 together. The [API reference](./reference.md#native-small-multiples) records
 the implemented controls and unsupported combinations.
+
+### Render diagnostics
+
+Compiled property inspection belongs to the frame/control layer. Its SVG node
+references, phase-boundary values and scheduled intervals describe a particular
+render at particular dimensions. They do not classify semantic changes, define
+new actions, or equate category membership with phase order. Opaque custom
+motion and unrecorded DOM writes must be identified as coverage limits.

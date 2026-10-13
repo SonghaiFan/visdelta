@@ -46,7 +46,8 @@ test('a heading sits above the canvas and never changes its size', async ({ page
     const plain = await sl.transition(base, base, { target: plainHost, width: 500, height: 300 });
     plain.progress(1);
     const headedHost = mountHost('width:500px');
-    const headed = base.title('Cases by place').subtitle('2020 to 2021');
+    const headed = base.where({ year: 2020 }).x('location', { label: 'Place' }).y('cases', { label: 'Cases counted' })
+      .title('Cases by place').subtitle('2020 to 2021');
     const change = await sl.transition(headed, headed, { target: headedHost, width: 500, height: 300 });
     change.progress(1);
     const svg = headedHost.querySelector('svg');
@@ -57,6 +58,7 @@ test('a heading sits above the canvas and never changes its size', async ({ page
       headerBottom: Math.round(headedHost.querySelector('.vd-figure-header').getBoundingClientRect().bottom),
       canvasTop: box(svg).top,
       insideSvg: svg.textContent.includes('Cases by place'),
+      axisLabels: [svg.querySelector('.vd-x-label').textContent, svg.querySelector('.vd-y-label').textContent],
       lines: lines(headedHost),
       tag: headedHost.querySelector('.vd-figure-header').tagName
     };
@@ -68,6 +70,8 @@ test('a heading sits above the canvas and never changes its size', async ({ page
   expect(result.plainCanvas).toMatchObject({ width: 500, height: 300 });
   expect(result.headerBottom).toBeLessThanOrEqual(result.canvasTop);
   expect(result.insideSvg).toBe(false);
+  expect(result.axisLabels[0]).toContain('Place');
+  expect(result.axisLabels[1]).toContain('Cases counted');
   expect(result.tag).toBe('FIGCAPTION');
   expect(result.lines).toEqual([[{ text: 'Cases by place', visible: true, opacity: 1 }], [{ text: '2020 to 2021', visible: true, opacity: 1 }]]);
 });
@@ -173,7 +177,7 @@ test('a heading change does not disturb the planned route', async ({ page }) => 
   expect(result.state).toEqual([]);
 });
 
-test('auto height takes the heading\'s room from the container and holds it', async ({ page }) => {
+test('auto height interpolates heading room and restores the unheaded endpoint', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const host = mountHost('width:500px;height:400px');
     const headed = base.title('Cases').subtitle('by place');
@@ -184,7 +188,7 @@ test('auto height takes the heading\'s room from the container and holds it', as
     const bare = mountHost('width:500px;height:400px');
     const plain = await sl.transition(base, base, { target: bare, width: 'auto', height: 'auto' });
     plain.progress(1);
-    // A heading that appears: the canvas is laid out for one room, so the room is held.
+    // An arriving heading takes progressively more room from the canvas.
     const arriving = mountHost('width:500px;height:400px');
     const move = await sl.transition(base, headed, { target: arriving, width: 'auto', height: 'auto' });
     const held = [0, 0.5, 1].map(p => { move.progress(p); return { canvas: size(arriving.querySelector('svg')), header: box(arriving.querySelector('.vd-figure-header')).height, figure: box(arriving.querySelector('figure')).height }; });
@@ -194,11 +198,11 @@ test('auto height takes the heading\'s room from the container and holds it', as
   expect(result.header).toBeGreaterThan(20);
   expect(result.canvas).toMatchObject({ width: 500, height: 400 - result.header });
   expect(result.bare).toMatchObject({ width: 500, height: 400 });
-  for (const frame of result.held) {
-    expect(frame.header).toBe(result.header);
-    expect(frame.canvas).toEqual(result.canvas);
+  result.held.forEach((frame, index) => {
+    expect(Math.abs(frame.header - result.header * index / 2)).toBeLessThanOrEqual(1);
+    expect(frame.canvas.height).toBe(400 - frame.header);
     expect(frame.figure).toBe(400);
-  }
+  });
 });
 
 test('a sequence shows each state\'s own heading, and the canvas is continuous at every handoff', async ({ page }) => {
@@ -232,14 +236,69 @@ test('a sequence shows each state\'s own heading, and the canvas is continuous a
   expect(result.alone[2]).toBeGreaterThan(result.alone[0]);
 });
 
-test('with auto height a sequence holds the canvas still through every leg', async ({ page }) => {
+test('with auto height sequence endpoints match independently rendered states', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const states = [base.title('One'), base.title('Two').subtitle('with a note'), base.title('Three, a much longer heading that wraps in a narrow figure').subtitle('last')];
     const host = mountHost('width:300px;height:420px');
     const journey = await sl.sequence(states, { target: host, width: 'auto', height: 'auto' });
     const boxes = [0, 0.5, 1, 1.5, 2].map(position => { journey.progress(position); return { ...size(host.querySelector('svg')), top: within(host, host.querySelector('svg')) }; });
+    const alone = [];
+    for (const state of states) {
+      const single = mountHost('width:300px;height:420px');
+      const controller = await sl.transition(state, state, { target: single, width: 'auto', height: 'auto' });
+      alone.push({ ...size(single.querySelector('svg')), top: within(single, single.querySelector('svg')) });
+      controller.destroy();
+    }
     journey.destroy();
-    return boxes;
+    return { boxes, alone };
   });
-  expect(new Set(result.map(canvas => JSON.stringify(canvas))).size).toBe(1);
+  expect([result.boxes[0], result.boxes[2], result.boxes[4]]).toEqual(result.alone);
+  expect(result.boxes[1].top).toBeGreaterThan(result.boxes[0].top);
+  expect(result.boxes[1].top).toBeLessThan(result.boxes[2].top);
+});
+
+for (const width of [600, 320]) test(`fit yields legend, subtitle, then title and restores them at ${width}px`, async ({ page }) => {
+  const result = await page.evaluate(async (width) => {
+    const host = mountHost(`width:${width}px;height:500px`);
+    const budget = Math.min(200, width / 2);
+    const state = base.color('location').title('Cases').subtitle('by place');
+    const change = await sl.transition(state, state, { target: host, width: 'auto', height: 'auto' });
+    const read = () => ({
+      title: !host.querySelector('.vd-figure-title').hidden,
+      subtitle: !host.querySelector('.vd-figure-subtitle').hidden,
+      legend: getComputedStyle(host.querySelector('.vd-legend')).display !== 'none',
+      height: box(host.querySelector('svg')).height,
+    });
+    const full = read();
+    const header = box(host.querySelector('.vd-figure-header')).height;
+    const subtitle = box(host.querySelector('.vd-figure-subtitle')).height + 4;
+    const frames = [];
+    for (const height of [budget + header, budget + header - subtitle, budget - 10, 500]) {
+      host.style.height = `${height}px`;
+      change.resize();
+      change.progress(0);
+      const start = read();
+      change.progress(0.5);
+      const middle = read();
+      change.progress(1);
+      frames.push({ start, middle, end: read() });
+    }
+    change.resize({ height: 100 });
+    const fixed = read();
+    change.destroy();
+    return { full, frames, fixed };
+  }, width);
+  expect(result.full).toMatchObject({ title: true, subtitle: true, legend: true });
+  const expected = [
+    { title: true, subtitle: true, legend: false },
+    { title: true, subtitle: false, legend: false },
+    { title: false, subtitle: false, legend: false, height: Math.min(200, width / 2) - 10 },
+    { title: true, subtitle: true, legend: true },
+  ];
+  result.frames.forEach((frame, index) => {
+    expect(frame.start).toMatchObject(expected[index]);
+    expect(frame.middle).toEqual(frame.start);
+    expect(frame.end).toEqual(frame.start);
+  });
+  expect(result.fixed).toMatchObject({ title: true, subtitle: true, legend: true, height: 100 });
 });

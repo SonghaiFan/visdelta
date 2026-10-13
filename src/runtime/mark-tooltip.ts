@@ -32,9 +32,9 @@ function tooltipHtml(row: RenderDatum, spec: ViewSpec, markKey: string | null): 
     ? tooltipSpec
     : Object.keys(source || {})
         .filter((field) => !field.startsWith('__') && (source[field] == null || typeof source[field] !== 'object'))
-        .map((field) => ({ field, title: titleize(field) }));
+        .map((field) => ({ field, label: titleize(field) }));
   const content = items
-    .map((item) => `<strong>${escapeHtml(item.title || titleize(item.field))}</strong>: ${escapeHtml(source[item.field])}`)
+    .map((item) => `<strong>${escapeHtml(item.label || titleize(item.field))}</strong>: ${escapeHtml(source[item.field])}`)
     .join('<br>');
   return [content, tooltipIdentityHtml(row, spec, markKey)]
     .filter(Boolean).join('<br>');
