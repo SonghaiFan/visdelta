@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { categories } from '@/examples/registry';
 import type { KeyframePreview } from './keyframe-previews';
-import { Pause, Play } from 'lucide-react';
+import { ChevronDown, Pause, Play } from 'lucide-react';
 import type { StateChange } from 'visdelta/core';
 import { formatChange } from '@/components/live/transition-player';
 
@@ -96,7 +96,7 @@ export function Timeline({
   mod = '⌘',
   className,
 }: TimelineProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [details, setDetails] = useState(false);
   const [hover, setHover] = useState<{ id: number; left: number; top: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerInside = useRef(false);
@@ -129,15 +129,9 @@ export function Timeline({
   const current = replaying && Math.abs(value - Math.round(value)) < 0.002 ? Math.round(value) : -1;
   const step = STEPS.find((candidate) => total / candidate <= 10) ?? STEPS.at(-1)!;
   const ticks = total ? Array.from({ length: Math.floor(total / step + 1e-6) + 1 }, (_, index) => index * step) : [0];
-  const hint =
-    notice ||
-    (count === 0
-      ? `Keep the chart on screen as a keyframe with ${mod}S.`
-      : count === 1
-        ? 'Edit the code, then keep another keyframe to make a timeline.'
-        : replaying
-          ? `Replaying ${count} keyframes. Edit the code to go live again.`
-          : `Live. Play or scrub to replay ${count} keyframes.`);
+  /** Only say something when there is a next step; a working timeline stays quiet. */
+  const hint = notice || (count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '');
+  const lanes = details && visibleCategories.length > 0;
 
   return (
     <section aria-label="Keyframes" className={className}>
@@ -152,21 +146,18 @@ export function Timeline({
         >
           {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5 translate-x-px" />}
         </button>
-        <div className="w-[8.5rem] shrink-0 font-mono text-xs tabular-nums" aria-live="off">
+        <div className="w-[7.5rem] shrink-0 font-mono text-xs tabular-nums" aria-live="off">
           <span className="text-fd-foreground">{seconds(now)}</span>
           <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
-          <span className="block text-[0.65rem] text-fd-muted-foreground">
-            {count} {count === 1 ? 'key' : 'keys'} · {stages} {stages === 1 ? 'stage' : 'stages'}
-          </span>
         </div>
-        <div className="pg-track" data-expanded={expanded && visibleCategories.length > 0 || undefined} data-dense={count > 12 || undefined}>
-          <div className="pg-ruler" aria-hidden="true">
+        <div className="pg-track" data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} hidden={count === 0}>
+          {details && <div className="pg-ruler" aria-hidden="true">
             {ticks.map((tick) => (
               <span key={tick} className="pg-tick" style={{ left: x(tick) }}>
                 {tick % 1000 === 0 ? `${tick / 1000}s` : ''}
               </span>
             ))}
-          </div>
+          </div>}
           <div className="pg-clips">
             {keyframes.slice(1).map((key, index) => (
               <span
@@ -179,11 +170,11 @@ export function Timeline({
               >
                 <span className="pg-clip-label">
                   {describeLeg(key)}
-                  {key.stages > 1 && <span className="pg-clip-stages">{key.stages} stages</span>}
+                  {details && key.stages > 1 && <span className="pg-clip-stages">{key.stages} stages</span>}
                 </span>
               </span>
             ))}
-            {keyframes.slice(1).flatMap((key, index) =>
+            {details && keyframes.slice(1).flatMap((key, index) =>
               Array.from({ length: Math.max(1, key.stages) }, (_, stage) => {
                 const local = replaying ? (value - index) * Math.max(1, key.stages) : -1;
                 return (
@@ -232,7 +223,7 @@ export function Timeline({
               </button>
             ))}
           </div>
-          {expanded && visibleCategories.length > 0 && <div className="pg-category-scroll">
+          {lanes && <div className="pg-category-scroll">
             {visibleCategories.map(category => <div className="pg-category-row" key={category.id} data-category={category.id}>
               <span className="pg-category-name">{category.label}</span>
               <div className="pg-category-time">
@@ -253,16 +244,30 @@ export function Timeline({
           type="button"
           onClick={onKeep}
           disabled={!canKeep}
-          className="ml-auto inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 sm:ml-0"
+          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ${count === 0 ? 'ml-auto' : 'ml-auto sm:ml-0'}`}
           title={`Keep this state as a keyframe (${mod}S)`}
         >
           <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
           Keep
         </button>
+        {count > 0 && (
+          <button
+            type="button"
+            aria-expanded={details}
+            aria-controls="pg-details"
+            onClick={() => setDetails(!details)}
+            title={details ? 'Hide details' : 'Show ruler, stages, categories and clear'}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
+          >
+            Details
+            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
-      {visibleCategories.length > 0 && <div className="pg-category-help">
-        <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Hide categories' : 'Show categories'}</button>
-        {expanded && <span>Lanes show changes in each transition; stage markers show planned timing.</span>}
+      {details && count > 0 && <div id="pg-details" className="pg-category-help">
+        <span>{count} {count === 1 ? 'key' : 'keys'} · {stages} {stages === 1 ? 'stage' : 'stages'}</span>
+        {lanes && <span>Lanes group changes by category; the strip under the clips shows planned stages.</span>}
+        <button type="button" onClick={onClear}>Clear keys</button>
       </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
         <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>
@@ -273,14 +278,7 @@ export function Timeline({
           : <div className="pg-preview-placeholder">{previews[hover.id]?.error ? 'Preview unavailable' : 'Loading preview…'}</div>}
         <p>{previewIndex ? describeLeg(keyframes[previewIndex]) : 'Initial state'}</p>
       </div>, document.body)}
-      <p className="mt-0.5 flex items-baseline gap-3 pl-11 text-xs text-fd-muted-foreground" aria-live="polite">
-        <span>{hint}</span>
-        {count > 0 && (
-          <button type="button" onClick={onClear} className="ml-auto underline-offset-4 hover:text-fd-foreground hover:underline">
-            clear
-          </button>
-        )}
-      </p>
+      <p className="pg-hint" aria-live="polite">{hint}</p>
     </section>
   );
 }

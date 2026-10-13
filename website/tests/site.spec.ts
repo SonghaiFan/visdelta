@@ -141,6 +141,7 @@ test.describe('playground', () => {
   const chart = (page: Page) => page.getByLabel('Chart', { exact: true });
   const keys = (page: Page) => page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key');
   const changes = (page: Page) => page.getByRole('status', { name: 'State changes' });
+  const details = async (page: Page) => { const toggle = page.getByRole('button', { name: 'Details' }); if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click(); };
   const examples = (page: Page) => page.getByRole('navigation', { name: 'Examples' });
   /** Bars drawn on screen (prepared legs of a sequence stay hidden). */
   const visibleBars = (page: Page) =>
@@ -151,6 +152,7 @@ test.describe('playground', () => {
   test('keyframe previews are passive, cached, keyboard accessible and cleaned up', async ({ page }) => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    await details(page);
     await page.getByLabel('Keyframe timeline').fill('0');
     const code = await page.locator('.cm-content').textContent();
     const time = await page.getByLabel('Keyframe timeline').inputValue();
@@ -183,7 +185,7 @@ test.describe('playground', () => {
     await page.keyboard.press('Tab');
     await keys(page).first().focus();
     await expect(tooltip).toContainText('Initial state');
-    await page.getByRole('button', { name: 'clear', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear keys', exact: true }).click();
     await expect(tooltip).toHaveCount(0);
     await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
   });
@@ -191,7 +193,12 @@ test.describe('playground', () => {
   test('category lanes share leg geometry without claiming stage timing', async ({ page }) => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
-    await expect(page.getByText('Lanes show changes in each transition; stage markers show planned timing.')).toBeVisible();
+    // Compact by default: no lanes, ruler or stage strip until Details opens.
+    await expect(page.locator('.pg-category-row')).toHaveCount(0);
+    await expect(page.locator('.pg-stage-block')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
+    await details(page);
+    await expect(page.getByText('Lanes group changes by category; the strip under the clips shows planned stages.')).toBeVisible();
     const rows = page.locator('.pg-category-row');
     expect(await rows.count()).toBeGreaterThan(0);
     await expect.poll(() => page.locator('.pg-category-block').evaluateAll(blocks => {
@@ -205,9 +212,9 @@ test.describe('playground', () => {
     await page.getByLabel('Keyframe timeline').fill('1.25');
     await expect(rows).toHaveCount(count);
     await expect(page.locator('.pg-category-block[data-active]').first()).toBeVisible();
-    await page.getByRole('button', { name: 'Hide categories' }).click();
+    await page.getByRole('button', { name: 'Details' }).click();
     await expect(rows).toHaveCount(0);
-    await page.getByRole('button', { name: 'Show categories' }).click();
+    await page.getByRole('button', { name: 'Details' }).click();
     await expect(rows).toHaveCount(count);
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.getByLabel('Keyframe timeline')).toBeVisible();
@@ -315,7 +322,7 @@ test.describe('playground', () => {
     const timeline = page.getByLabel('Keyframe timeline');
     await timeline.fill('0');
     await expect(editor).not.toContainText('population: { gte');
-    await expect(page.getByText(/Replaying 3 keyframes/)).toBeVisible();
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     // The track is in real time: keyframe 2 sits where its leg ends.
     await timeline.fill((await keys(page).nth(1).getAttribute('data-time'))!);
     await expect(editor).toContainText('gte: 1000000');
@@ -341,6 +348,7 @@ test.describe('playground', () => {
     const track = page.getByRole('region', { name: 'Keyframes' });
     // Split is planned in two route stages, the grouped layout in one: 3 × 0.9s.
     await expect(track.locator('.pg-clip')).toHaveCount(2);
+    await details(page);
     await expect(track.locator('.pg-stage-block')).toHaveCount(3);
     await expect(track.locator('.pg-clip').first()).toContainText('2 stages');
     await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
@@ -507,7 +515,7 @@ test.describe('playground', () => {
       return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top) };
     });
     await timeline.fill('0');
-    await expect(page.getByText(/Replaying 4 keyframes/)).toBeVisible();
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const fitFirst = await canvas();
     await timeline.fill('2.7');

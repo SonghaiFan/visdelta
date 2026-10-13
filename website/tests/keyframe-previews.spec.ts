@@ -78,10 +78,11 @@ test('clearing while a preview starts discards its result and host', async ({ pa
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('playground/#split');
   await expect(page.locator('.pg-key')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Details' }).click();
   await page.evaluate(() => {
     const observer = new MutationObserver(records => {
       if (records.some(record => [...record.addedNodes].some(node => node instanceof Element && node.matches('.pg-snapshot-render')))) {
-        const clear = [...document.querySelectorAll('button')].find(button => button.textContent === 'clear');
+        const clear = [...document.querySelectorAll('button')].find(button => button.textContent === 'Clear keys');
         clear?.click();
         observer.disconnect();
       }
@@ -112,6 +113,7 @@ test('one saved sequence retains all seven category lanes and overlapping change
     await page.getByRole('button', { name: 'Keep', exact: true }).click();
     await expect(page.locator('.pg-key')).toHaveCount(index + 2);
   }
+  await page.getByRole('button', { name: 'Details' }).click();
   await expect(page.locator('.pg-category-name')).toHaveText(['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']);
   const firstTime = await page.locator('.pg-key').nth(1).getAttribute('data-time');
   await page.getByLabel('Keyframe timeline').fill(String(Number(firstTime) / 2));
