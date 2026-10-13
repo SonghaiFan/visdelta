@@ -34,7 +34,6 @@ interface TimelineProps {
   onSeek: (index: number) => void;
   onPlay: () => void;
   onKeep: () => void;
-  onClear: () => void;
   canKeep: boolean;
   notice?: string;
   /** Shortcut prefix shown in hints, such as ⌘ or Ctrl+. */
@@ -111,7 +110,6 @@ export function Timeline({
   onSeek,
   onPlay,
   onKeep,
-  onClear,
   canKeep,
   notice,
   mod = '⌘',
@@ -445,9 +443,7 @@ export function Timeline({
         </>}
         <span className="pg-stage-actions">
           {selectedKey && <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : selectedLeg + (selectedStage + 0.5) / selectedStages)}>{inspecting ? 'Hide inspector' : 'Inspect'}</button>}
-          <button type="button" className="pg-clear" title="Remove every kept keyframe" onClick={onClear}>Clear keys</button>
         </span>
-        {selectedKey?.stageDetails?.[selectedStage] && <details className="pg-stage-exact"><summary>Exact configuration</summary><code>{selectedKey.stageDetails[selectedStage]}</code></details>}
       </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
         <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>

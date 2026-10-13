@@ -74,27 +74,6 @@ test('a preview failure does not block selection or playback', async ({ page }) 
   await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
 });
 
-test('clearing while a preview starts discards its result and host', async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('playground/#split');
-  await expect(page.locator('.pg-key')).toHaveCount(3);
-  await page.getByRole('button', { name: 'Details' }).click();
-  await page.evaluate(() => {
-    const observer = new MutationObserver(records => {
-      if (records.some(record => [...record.addedNodes].some(node => node instanceof Element && node.matches('.pg-snapshot-render')))) {
-        const clear = [...document.querySelectorAll('button')].find(button => button.textContent === 'Clear keys');
-        clear?.click();
-        observer.disconnect();
-      }
-    });
-    observer.observe(document.body, { childList: true });
-  });
-  await page.locator('.pg-key').first().hover();
-  await expect(page.locator('.pg-key')).toHaveCount(0);
-  await expect(page.getByRole('tooltip')).toHaveCount(0);
-  await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
-});
-
 test('one saved sequence retains all seven category lanes and overlapping changes', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const base = 'bar([{group:"A",part:"x",v:2,w:6},{group:"A",part:"y",v:4,w:5},{group:"B",part:"x",v:3,w:2},{group:"B",part:"y",v:5,w:3}]).x("group").y("v").key(["group","part"]).breakdown("part").color("part")';

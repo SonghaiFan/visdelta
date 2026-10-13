@@ -180,7 +180,24 @@ export function Playground() {
   const [tab, setTab] = useState<'code' | 'rows'>('code');
   const [rowsView, setRowsView] = useState<RowsView>('table');
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
-  const keyframePreviews = useKeyframePreviews(keyframes);
+  const { previews, request, requestAll } = useKeyframePreviews(keyframes);
+  const snapshotTrackRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const track = snapshotTrackRef.current;
+    if (!track) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      requestAll(keyframes.map(frame => frame.id));
+      return;
+    }
+    const observer = new IntersectionObserver(entries => {
+      requestAll(entries
+        .filter(entry => entry.isIntersecting)
+        .map(entry => Number((entry.target as HTMLElement).dataset.frameId)));
+      entries.filter(entry => entry.isIntersecting).forEach(entry => observer.unobserve(entry.target));
+    }, { root: track, rootMargin: '0px 80px' });
+    track.querySelectorAll('[data-frame-id]').forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [keyframes, requestAll]);
   const [replaying, setReplaying] = useState(false);
   const [inspectionStage, setInspectionStage] = useState<number | undefined>();
   const [inspecting, setInspecting] = useState(false);
@@ -235,6 +252,7 @@ export function Playground() {
   };
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
+  const selectedKeyframe = Math.max(0, Math.min(keyframes.length - 1, Math.round(replaying ? value : livePosition ?? value)));
   /** Floating needs room beside the editor, so narrow screens stay docked. */
   const floating = placementPreference === 'float' && wide;
   const floatingWindow = useFloatingWindow(appRef, floatRef, '.pg-toolbar');
@@ -519,13 +537,6 @@ export function Playground() {
     if (editTimer.current !== null) window.clearTimeout(editTimer.current);
     void run(codeRef.current);
   }, [run]);
-
-  const clearKeyframes = useCallback(() => {
-    goLive();
-    keyframesRef.current = [];
-    setKeyframes([]);
-    setNotice('');
-  }, [goLive]);
 
   /** Code, Δ and the live hand-off follow the replay playhead. */
   const follow = useCallback(
@@ -1079,6 +1090,28 @@ export function Playground() {
         </div>
       </div>
 
+      {keyframes.length > 0 && <nav className="pg-snapshot-gallery" aria-label="Saved chart snapshots">
+        <div ref={snapshotTrackRef} className="pg-snapshot-track">
+          {keyframes.map((frame, index) => <button
+            key={frame.id}
+            data-frame-id={frame.id}
+            type="button"
+            className="pg-snapshot-card"
+            aria-pressed={selectedKeyframe === index}
+            title={`Show keyframe ${index + 1}`}
+            onClick={() => void playTo(index)}
+          >
+            <span className="pg-snapshot-image">
+              {previews[frame.id]?.image
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={previews[frame.id].image} alt="" />
+                : <span>{previews[frame.id]?.error ? 'Preview unavailable' : 'Rendering preview…'}</span>}
+            </span>
+            <span className="pg-snapshot-caption"><span>{String(index + 1).padStart(2, '0')}</span>{index === 0 ? 'Start' : `Keyframe ${index + 1}`}</span>
+          </button>)}
+        </div>
+      </nav>}
+
       <aside id="pg-explorer" className="pg-explorer">
         <Explorer stories={playgroundDemos} activeId={story?.id} activeCategory={story?.category} onOpen={select} />
       </aside>
@@ -1233,8 +1266,8 @@ export function Playground() {
           setInspecting(true);
         }}
         keyframes={keyframes}
-        previews={keyframePreviews.previews}
-        onPreview={keyframePreviews.request}
+        previews={previews}
+        onPreview={request}
         value={replaying ? value : livePosition ?? value}
         stageDuration={STAGE_DURATION}
         replaying={replaying || livePosition !== null}
@@ -1243,7 +1276,6 @@ export function Playground() {
         onSeek={(index) => void playTo(index)}
         onPlay={onPlay}
         onKeep={() => void keep()}
-        onClear={clearKeyframes}
         canKeep={!busy && !error && !review}
         notice={notice}
         mod={mod}
@@ -1267,7 +1299,7 @@ export function Playground() {
         offset={keyframes.slice(1, Math.min(keyframes.length - 2, Math.floor(value)) + 1).reduce((sum, frame) => sum + frame.stages * stageDurationFor(frame.changes), 0)}
         stageCount={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages}
         duration={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages * stageDurationFor(keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].changes)}
-        onScrub={position => void onScrub(position)} />}
+        configuration={inspectionStage === undefined ? undefined : keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stageDetails?.[inspectionStage]} />}
       </Timeline>
 
       <footer className="pg-status">

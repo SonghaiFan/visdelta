@@ -405,6 +405,60 @@ html > body[data-scroll-locked] {
   padding: 0 0.5rem;
   border-bottom: 1px solid var(--color-fd-border);
 }
+.pg-snapshot-gallery {
+  grid-area: snapshots;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-fd-border);
+}
+.pg-snapshot-track {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.pg-snapshot-card {
+  display: grid;
+  flex: 0 0 112px;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--color-fd-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-fd-muted-foreground);
+  text-align: left;
+  transition: border-color 150ms, color 150ms, background-color 150ms;
+}
+.pg-snapshot-card:hover,
+.pg-snapshot-card[aria-pressed='true'] {
+  border-color: var(--color-delta);
+  color: var(--color-fd-foreground);
+  background: color-mix(in srgb, var(--color-delta) 7%, var(--color-fd-background));
+}
+.pg-snapshot-card:focus-visible { outline: 2px solid var(--color-fd-ring); outline-offset: 2px; }
+.pg-snapshot-image {
+  display: grid;
+  height: 58px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: var(--color-fd-background);
+}
+.pg-snapshot-image img { width: 100%; height: 100%; object-fit: contain; }
+.pg-snapshot-image > span { padding: 0 0.25rem; font-size: 9px; text-align: center; }
+.pg-snapshot-caption {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-snapshot-caption > span { color: var(--color-fd-muted-foreground); }
 .pg-tool {
   display: inline-flex;
   align-items: center;
@@ -725,9 +779,10 @@ html > body[data-scroll-locked] {
     flex: none;
     height: calc(100dvh - 2.75rem);
     grid-template-columns: var(--pg-side) minmax(0, var(--pg-left, 42fr)) 7px minmax(0, var(--pg-right, 58fr));
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
       'tool tool tool tool'
+      'side snapshots snapshots snapshots'
       'side edit split view'
       'side time time time'
       'status status status status';
@@ -748,6 +803,7 @@ html > body[data-scroll-locked] {
     grid-template-columns: var(--pg-side) minmax(0, 1fr);
     grid-template-areas:
       'tool tool'
+      'side snapshots'
       'side edit'
       'side time'
       'status status';
@@ -759,7 +815,7 @@ html > body[data-scroll-locked] {
     position: absolute;
     z-index: 30;
     grid-area: auto;
-    top: calc(var(--pg-bar) + 0.75rem);
+    top: calc(var(--pg-bar) + 6rem);
     right: 1rem;
     width: min(34rem, 60%);
     height: min(28rem, 62%);
@@ -1153,48 +1209,50 @@ html > body[data-scroll-locked] {
 .pg-stage-title strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pg-stage-title > span { font-family: var(--font-mono); color: var(--color-fd-muted-foreground); opacity: .7; }
 .pg-stage-actions { display: inline-flex; gap: 12px; margin-left: auto; }
-.pg-stage-selection button, .pg-stage-exact summary { color: var(--color-fd-muted-foreground); cursor: pointer; }
-.pg-stage-selection button:hover, .pg-stage-exact summary:hover { color: var(--color-fd-foreground); text-decoration: underline; text-underline-offset: 3px; }
+.pg-stage-selection button { color: var(--color-fd-muted-foreground); cursor: pointer; }
+.pg-stage-selection button:hover { color: var(--color-fd-foreground); text-decoration: underline; text-underline-offset: 3px; }
 .pg-stage-selection button:focus-visible { outline: 1px solid var(--color-delta); outline-offset: 2px; }
 .pg-stage-actions button[aria-expanded=true] { color: var(--color-delta); }
-.pg-stage-exact { flex-basis: 100%; }
-.pg-stage-exact code { display: block; max-width: min(600px, 80vw); padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 
 /* Inspector: a waterfall of the tracks. Rows that actually move come first. */
 .pg-inspector { margin-top: 8px; border-top: 1px solid var(--color-fd-border); padding-top: 8px; font-size: 11px; }
-.pg-inspector p { margin: 6px 0; color: var(--color-fd-muted-foreground); }
-.pg-inspector-tabs { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 6px; }
+.pg-inspector p { margin: 3px 0; color: var(--color-fd-muted-foreground); font-size: 10px; }
+.pg-inspector-tabs { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 3px; }
 .pg-inspector-tabs button { padding: 2px 0; color: var(--color-fd-muted-foreground); border-bottom: 1px solid transparent; }
 .pg-inspector-tabs button span { opacity: .6; font-variant-numeric: tabular-nums; }
 .pg-inspector-tabs button:hover { color: var(--color-fd-foreground); }
 .pg-inspector-tabs button[aria-selected=true] { color: var(--color-fd-foreground); border-bottom-color: var(--color-fd-foreground); }
 .pg-inspector-tabs button[data-active]:not([aria-selected=true]) { color: var(--color-delta); }
 .pg-inspector-tabs button:focus-visible { outline: 1px solid var(--color-delta); outline-offset: 2px; }
-.pg-property-interval { display: block; position: relative; height: 6px; min-width: 100px; background: var(--color-fd-muted); margin-bottom: 4px; }
+.pg-property-interval { display: block; position: relative; height: 3px; min-width: 54px; background: var(--color-fd-muted); margin: 0 0 2px; }
 .pg-property-interval > span { position: absolute; height: 100%; min-width: 1px; background: var(--color-delta); }
-.pg-inspector-notes { margin-top: 6px; }
-.pg-inspector-notes summary { cursor: pointer; color: var(--color-fd-muted-foreground); }
+.pg-inspector-time { display: block; white-space: nowrap; font-size: 9px; color: var(--color-fd-muted-foreground); }
+.pg-inspector-configuration { margin: 3px 0; }
+.pg-inspector-configuration summary { color: var(--color-fd-muted-foreground); cursor: pointer; }
+.pg-inspector-configuration code { display: block; max-height: 3.5em; overflow: auto; padding: 3px 0; font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .pg-element-highlight { position: fixed; z-index: 90; pointer-events: none; border: 2px solid var(--color-delta); border-radius: 2px; }
 @media (max-width: 639.98px) { .pg-inspector-table { overflow-x: auto; } }
 /* In Details the stage bars name each stage; the clip's own label would show through them. */
 .pg-track[data-details] .pg-clip-label { display: none; }
 
 /* Keep the phase tables, with the category tabs narrowing each table. */
-.pg-inspector-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.pg-inspector-tools input { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 3px 6px; min-width: 180px; }
+.pg-inspector-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 10px; }
+.pg-inspector-tools input { border: 1px solid var(--color-fd-border); border-radius: 2px; padding: 1px 4px; min-width: 160px; font-size: 10px; }
 .pg-inspector-scroll { overflow: visible; }
-.pg-inspector-phase { border: 1px solid var(--color-fd-border); border-radius: 3px; margin: 4px 0; }
+.pg-inspector-phase { border: 1px solid var(--color-fd-border); border-radius: 2px; margin: 2px 0; }
 .pg-inspector-phase[data-active] { border-color: var(--color-delta); }
-.pg-inspector-phase summary { padding: 6px; cursor: pointer; }
-.pg-inspector-phase h4, .pg-inspector-seek { margin: 4px 8px; }
-.pg-inspector-seek, .pg-inspector-tools button { text-decoration: underline; text-underline-offset: 3px; }
+.pg-inspector-phase summary { padding: 3px 5px; cursor: pointer; font-size: 10px; line-height: 1.3; }
+.pg-inspector-phase h4 { margin: 2px 4px; }
+.pg-inspector-tools button { text-decoration: underline; text-underline-offset: 2px; }
 .pg-inspector-table { overflow-x: auto; }
-.pg-inspector table { width: 100%; border-collapse: collapse; text-align: left; }
-.pg-inspector th, .pg-inspector td { padding: 4px 8px; border-top: 1px solid var(--color-fd-border); vertical-align: top; }
-.pg-inspector td code { display: block; max-width: 180px; max-height: 64px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-.pg-inspector td button { text-align: left; overflow-wrap: anywhere; max-width: 200px; }
+.pg-inspector table { width: 100%; border-collapse: collapse; text-align: left; font-size: 10px; line-height: 1.2; }
+.pg-inspector th, .pg-inspector td { padding: 2px 4px; border-top: 1px solid var(--color-fd-border); vertical-align: middle; }
+.pg-inspector th { color: var(--color-fd-muted-foreground); font-weight: 500; white-space: nowrap; }
+.pg-inspector td code { display: block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.pg-inspector td button { max-width: 180px; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; font: 10px var(--font-mono); }
+.pg-inspector td:nth-child(2) { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pg-inspector td button[aria-pressed=true] { color: var(--color-delta); text-decoration: underline; }
-.pg-inspector-phase-body { max-height: 180px; overflow: auto; }
+.pg-inspector-phase-body { max-height: 150px; overflow: auto; }
 .pg-inspector-pages { display: flex; justify-content: space-between; gap: 8px; padding: 6px 8px; position: sticky; bottom: 0; background: var(--color-fd-background); border-top: 1px solid var(--color-fd-border); }
 .pg-inspector-pages button { text-decoration: underline; }
 .pg-inspector-pages button:disabled { opacity: .4; }

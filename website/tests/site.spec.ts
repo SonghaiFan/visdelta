@@ -185,8 +185,6 @@ test.describe('playground', () => {
     await page.keyboard.press('Tab');
     await keys(page).first().focus();
     await expect(tooltip).toContainText('Initial state');
-    await page.getByRole('button', { name: 'Clear keys', exact: true }).click();
-    await expect(tooltip).toHaveCount(0);
     await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
   });
 

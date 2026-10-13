@@ -51,8 +51,6 @@ test('multi-stage inspection exposes stage numbers and exact element paths', asy
   await expect(element).toHaveAttribute('title', /nth-of-type/);
   await expect(phases.first().getByRole('tablist', { name: /Element groups/ })).toBeVisible();
   await page.screenshot({ path: '/tmp/visdelta-stage-inspector-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: 'Clear keys', exact: true }).click();
-  await expect(inspector).toHaveCount(0);
 });
 
 test('the timeline itself labels intermediate stages and selects them with the keyboard', async ({ page }) => {

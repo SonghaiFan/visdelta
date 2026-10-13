@@ -21,7 +21,7 @@ const read = (track: InspectedProperty) => !track.node.isConnected ? 'Not mounte
   : track.kind === 'style' ? getComputedStyle(track.node).getPropertyValue(track.name.slice(6))
   : track.node.getAttribute(track.name);
 
-export function StageInspector({ inspect, position, leg, offset, duration, stageCount, selectedStage, onScrub }: {
+export function StageInspector({ inspect, position, leg, offset, duration, stageCount, selectedStage, configuration }: {
   inspect: () => Promise<TransitionInspection | undefined>;
   position: number;
   leg: number;
@@ -29,7 +29,7 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
   duration: number;
   stageCount: number;
   selectedStage?: number;
-  onScrub: (position: number) => void;
+  configuration?: string;
 }) {
   const [result, setResult] = useState<TransitionInspection>();
   const [error, setError] = useState('');
@@ -66,6 +66,7 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
     </div>
     {error ? <p role="status">{error}</p> : !result ? <p role="status">Reading compiled stages…</p> : <>
       <p>Recorded SVG phases. Values show phase endpoints; equal values can still have motion between them.</p>
+      {configuration && <details className="pg-inspector-configuration"><summary>Configuration</summary><code>{configuration}</code></details>}
       <div className="pg-inspector-scroll">
         {result.stages.map((stage, index) => {
           const stageNumber = Math.floor(stage.start * stageCount + 1e-9);
@@ -85,7 +86,6 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
           }} className="pg-inspector-phase" data-active={active || undefined}>
             <summary>Stage {Math.floor(stage.start * stageCount + 1e-9) + 1} · phase {index + 1} · {seconds(offset + stage.start * duration)}–{seconds(offset + stage.end * duration)} · {stage.properties.length} tracks {active && `· current ${Math.round(Math.max(0, Math.min(1, (position - leg - stage.start) / (stage.end - stage.start))) * 100)}%`}</summary>
             {expanded && <div className="pg-inspector-phase-body">
-            <button type="button" className="pg-inspector-seek" onClick={() => onScrub(leg + (stage.start + stage.end) / 2)}>Show phase midpoint</button>
             <div className="pg-inspector-tabs" role="tablist" aria-label={`Element groups for phase ${index + 1}`}>
               {GROUPS.map((name, groupIndex) => grouped[groupIndex].length ? <button key={name} type="button" role="tab"
                 aria-selected={group === name} onClick={() => { setGroups(previous => ({ ...previous, [index]: name })); setPages(previous => ({ ...previous, [index]: 0 })); }}>
@@ -93,16 +93,15 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
               </button> : null)}
             </div>
             {rows.length ? <section><h4 className="sr-only">{group}</h4><div className="pg-inspector-table"><table>
-                <thead><tr><th>Element</th><th>Property</th><th>Phase start</th><th>Phase end</th><th>Current</th><th>Scheduled interval</th></tr></thead>
+                <thead><tr><th>Element</th><th>Property</th><th>From → to</th><th>Now</th><th>Time</th></tr></thead>
                 <tbody>{visible.map((track, row) => {
                   const moving = track.kind === 'custom' || track.from !== track.to;
                   return <tr key={row} data-still={!moving || undefined} data-current={active && (position - leg - stage.start) / (stage.end - stage.start) >= track.start && (position - leg - stage.start) / (stage.end - stage.start) <= track.end || undefined}>
                   <td><button type="button" aria-pressed={selected === track} title={track.selector} onClick={() => setSelected(selected === track ? undefined : track)}>{labelOf(track.node)}</button></td>
-                  <td>{track.kind} · {track.name}</td>
-                  <td><code>{track.kind === 'custom' ? 'Not exposed' : track.from ?? 'absent'}</code></td>
-                  <td><code>{track.kind === 'custom' ? 'Not exposed' : track.to ?? 'absent'}</code></td>
+                  <td title={track.kind}>{track.name.replace(/^style\./, '')}</td>
+                  <td><code>{track.kind === 'custom' ? 'Not exposed' : track.from ?? 'absent'}{moving && track.kind !== 'custom' && <> → {track.to ?? 'absent'}</>}</code></td>
                   <td><code>{read(track) ?? 'absent'}</code></td>
-                  <td><span className="pg-property-interval" aria-hidden="true"><span style={{ left: `${track.start * 100}%`, width: `${(track.end - track.start) * 100}%` }} /></span>{seconds(offset + (stage.start + track.start * (stage.end - stage.start)) * duration)}–{seconds(offset + (stage.start + track.end * (stage.end - stage.start)) * duration)}</td>
+                  <td><span className="pg-property-interval" aria-hidden="true"><span style={{ left: `${track.start * 100}%`, width: `${(track.end - track.start) * 100}%` }} /></span><span className="pg-inspector-time">{seconds(offset + (stage.start + track.start * (stage.end - stage.start)) * duration)}–{seconds(offset + (stage.start + track.end * (stage.end - stage.start)) * duration)}</span></td>
                 </tr>;
                 })}</tbody>
               </table></div></section> : <p>No matching recorded property tracks.</p>}
@@ -115,7 +114,6 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
           </details>;
         })}
       </div>
-      <details className="pg-inspector-notes"><summary>Coverage and timing</summary>{result.notes.map(note => <p key={note}>{note}</p>)}</details>
     </>}
     {box && box.width > 0 && createPortal(<div className="pg-element-highlight" aria-hidden="true" style={{ left: box.left - 2, top: box.top - 2, width: box.width + 4, height: box.height + 4 }} />, document.body)}
   </div>;
