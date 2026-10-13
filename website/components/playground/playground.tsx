@@ -56,7 +56,6 @@ const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
 /** Timeline panel heights in pixels: one fixed height per view, adjustable by dragging the top edge. */
 const DEFAULT_TIMELINE = { compact: 80, details: 240 };
-const TIMELINE_RANGE = [80, 360] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
 const STORAGE = {
@@ -110,6 +109,30 @@ async function compare(a: ChartState, b: ChartState): Promise<DeltaResult> {
 }
 const unchanged = (result: DeltaResult) => !result.stateChanges.length && !result.edits.length && !result.deltas.length;
 
+function useTimelineRange(appRef: { current: HTMLDivElement | null }) {
+  const [timelineMaxHeight, setTimelineMaxHeight] = useState(360);
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    const update = () => {
+      const toolbar = app.querySelector('.pg-toolbar')?.getBoundingClientRect().height ?? 40;
+      const status = app.querySelector('.pg-status')?.getBoundingClientRect().height ?? 24;
+      // Keep an editable portion of the workspace above an expanded timeline.
+      const available = window.visualViewport?.height ?? window.innerHeight;
+      const top = Math.max(0, app.getBoundingClientRect().top + window.scrollY);
+      setTimelineMaxHeight(Math.max(80, Math.floor(available - top - toolbar - status - 160)));
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('resize', update);
+    };
+  }, [appRef]);
+  return [80, timelineMaxHeight] as const;
+}
+
 /**
  * An online editor for VisDelta. Every valid edit is a transition from the
  * chart on screen to the new code. Keep any moment as a keyframe; kept
@@ -117,6 +140,7 @@ const unchanged = (result: DeltaResult) => !result.stateChanges.length && !resul
  */
 export function Playground() {
   const appRef = useRef<HTMLDivElement>(null);
+  const timelineRange = useTimelineRange(appRef);
   const editorPaneRef = useRef<HTMLElement>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -206,8 +230,8 @@ export function Playground() {
   }, [autoRun]);
   const split = dragSplit ?? clamp(Number(splitPreference) || DEFAULT_SPLIT, SPLIT_RANGE);
   const timelineHeights = {
-    compact: dragTimeline && !dragTimeline.details ? dragTimeline.height : clamp(Number(compactPreference) || DEFAULT_TIMELINE.compact, TIMELINE_RANGE),
-    details: dragTimeline?.details ? dragTimeline.height : clamp(Number(detailsPreference) || DEFAULT_TIMELINE.details, TIMELINE_RANGE),
+    compact: clamp(dragTimeline && !dragTimeline.details ? dragTimeline.height : Number(compactPreference) || DEFAULT_TIMELINE.compact, timelineRange),
+    details: clamp(dragTimeline?.details ? dragTimeline.height : Number(detailsPreference) || DEFAULT_TIMELINE.details, timelineRange),
   };
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
@@ -1227,7 +1251,7 @@ export function Playground() {
         notice={notice}
         mod={mod}
         heights={timelineHeights}
-        heightRange={TIMELINE_RANGE}
+        heightRange={timelineRange}
         onHeight={(height, commit, details) => {
           if (commit) {
             (details ? setDetailsPreference : setCompactPreference)(String(height));

@@ -539,6 +539,9 @@ html > body[data-scroll-locked] {
 .pg-panel .cm-editor {
   height: 100%;
 }
+.pg-panel .cm-scroller {
+  overflow: auto;
+}
 .pg-problem {
   flex-shrink: 0;
   max-height: 6rem;
@@ -589,7 +592,6 @@ html > body[data-scroll-locked] {
   flex-direction: column;
   /* Fixed, so opening Details never moves the chart; the reader drags the top edge. */
   height: var(--pg-time-h, 56px);
-  max-height: 45dvh;
   border-top: 1px solid var(--color-fd-border);
 }
 .pg-timeline-body {
@@ -809,11 +811,12 @@ html > body[data-scroll-locked] {
   }
   .pg-panel {
     flex: none;
+    height: clamp(12rem, 28dvh, 18rem);
+    overflow: hidden;
   }
   .pg-panel .cm-editor {
-    height: auto;
-    min-height: 9rem;
-    max-height: 26rem;
+    height: 100%;
+    min-height: 0;
   }
   #pg-panel-rows {
     height: 24rem;
@@ -1151,6 +1154,7 @@ html > body[data-scroll-locked] {
 .pg-time-tools, .pg-stage-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 11px; padding: 4px 0 8px; }
 .pg-time-tools button, .pg-stage-selection button { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 6px; }
 .pg-time-tools button:disabled { opacity: .4; }
+.pg-time-tools .pg-time-scale:disabled { opacity: 1; }
 .pg-time-tools label { display: inline-flex; align-items: center; gap: 4px; }
 .pg-time-tools input[type=number] { width: 64px; border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
 .pg-ruler { pointer-events: auto; touch-action: none; cursor: ew-resize; overflow: hidden; }

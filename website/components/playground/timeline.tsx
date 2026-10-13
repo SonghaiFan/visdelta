@@ -279,7 +279,7 @@ export function Timeline({
             if (Number.isFinite(time) && Math.abs(time - now) > 5) seekTime(time);
           }} /> s</label>
         <button type="button" aria-label="Zoom out timeline" disabled={zoom === 0.25} onClick={() => setView(zoom / 2, (start + end) / 2)}>−</button>
-        <button type="button" disabled={zoom === 1} aria-label="Reset timeline scale to 160 pixels per second" title="Reset to 160 pixels per second" onClick={() => setView(1, (start + end) / 2)}>{pixelsPerSecond}px / s</button>
+        <button type="button" className="pg-time-scale" disabled={zoom === 1} aria-label="Reset timeline scale to 160 pixels per second" title="Reset to 160 pixels per second" onClick={() => setView(1, (start + end) / 2)}>{pixelsPerSecond}px / s</button>
         <button type="button" aria-label="Zoom in timeline" disabled={!total || zoom === 8} onClick={() => setView(zoom * 2, (start + end) / 2)}>+</button>
         <button type="button" disabled={!total} onClick={() => showTime(now)}>Show playhead</button>
         {selectedKey && <button type="button" onClick={() => showTime(times[selectedLeg] + legs[selectedLeg] / 2)}>Show transition</button>}
