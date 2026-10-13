@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { categories } from '@/examples/registry';
 import type { KeyframePreview } from './keyframe-previews';
@@ -37,6 +37,14 @@ interface TimelineProps {
   /** Shortcut prefix shown in hints, such as ⌘ or Ctrl+. */
   mod?: string;
   className?: string;
+  /** Panel height in pixels; fixed, so toggling details never moves the chart. */
+  height: number;
+  /** Smallest and largest panel height, in pixels. */
+  heightRange: readonly [number, number];
+  /** The reader resizes the panel; `commit` is false while the drag is live. */
+  onHeight: (height: number, commit: boolean) => void;
+  /** Back to the default height. */
+  onResetHeight: () => void;
 }
 
 const seconds = (ms: number, digits = 2) => `${(ms / 1000).toFixed(digits)}s`;
@@ -95,6 +103,10 @@ export function Timeline({
   notice,
   mod = '⌘',
   className,
+  height,
+  heightRange,
+  onHeight,
+  onResetHeight,
 }: TimelineProps) {
   const [details, setDetails] = useState(false);
   const [hover, setHover] = useState<{ id: number; left: number; top: number } | null>(null);
@@ -131,10 +143,54 @@ export function Timeline({
   const ticks = total ? Array.from({ length: Math.floor(total / step + 1e-6) + 1 }, (_, index) => index * step) : [0];
   /** Only say something when there is a next step; a working timeline stays quiet. */
   const hint = notice || (count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '');
+  const clampHeight = (value: number) => Math.min(heightRange[1], Math.max(heightRange[0], Math.round(value)));
+  /** Drag the top edge: moving up makes the panel taller. */
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    const startY = event.clientY;
+    const startHeight = height;
+    let current = startHeight;
+    const move = (moveEvent: globalThis.PointerEvent) => {
+      current = clampHeight(startHeight + startY - moveEvent.clientY);
+      onHeight(current, false);
+    };
+    const end = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', end);
+      handle.removeEventListener('pointercancel', end);
+      onHeight(current, true);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  };
+  const nudgeHeight = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const next = { ArrowUp: height + 16, ArrowDown: height - 16, Home: heightRange[0], End: heightRange[1] }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    onHeight(clampHeight(next), true);
+  };
   const lanes = details && visibleCategories.length > 0;
 
   return (
-    <section aria-label="Keyframes" className={className}>
+    <section aria-label="Keyframes" className={className} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize timeline"
+        aria-valuemin={heightRange[0]}
+        aria-valuemax={heightRange[1]}
+        aria-valuenow={height}
+        tabIndex={0}
+        className="pg-timeline-grip"
+        title="Drag to resize · double-click to reset"
+        onPointerDown={startResize}
+        onKeyDown={nudgeHeight}
+        onDoubleClick={onResetHeight}
+      />
+      <div className="pg-timeline-body">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <button
           type="button"
@@ -279,6 +335,7 @@ export function Timeline({
         <p>{previewIndex ? describeLeg(keyframes[previewIndex]) : 'Initial state'}</p>
       </div>, document.body)}
       <p className="pg-hint" aria-live="polite">{hint}</p>
+      </div>
     </section>
   );
 }

@@ -55,10 +55,14 @@ const DEFAULT_STORY = 'sort';
 /** Editor share of the editor + preview width. */
 const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
+/** Timeline panel height in pixels: fixed, and adjustable by dragging its top edge. */
+const DEFAULT_TIMELINE = 112;
+const TIMELINE_RANGE = [72, 360] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
 const STORAGE = {
   split: 'visdelta.playground.split',
+  timeline: 'visdelta.playground.timeline-height',
   autoRun: 'visdelta.playground.autorun',
   sizeMode: 'visdelta.playground.size-mode',
   fixedWidth: 'visdelta.playground.fixed-width',
@@ -162,6 +166,9 @@ export function Playground() {
   const [review, setReview] = useState(false);
   const [autoRunPreference, setAutoRunPreference] = usePreference(STORAGE.autoRun, 'true');
   const [splitPreference, setSplitPreference] = usePreference(STORAGE.split, String(DEFAULT_SPLIT));
+  const [timelinePreference, setTimelinePreference] = usePreference(STORAGE.timeline, String(DEFAULT_TIMELINE));
+  /** The timeline height while its edge is being dragged. */
+  const [dragTimeline, setDragTimeline] = useState<number | null>(null);
   /** The divider while it is being dragged. */
   const [dragSplit, setDragSplit] = useState<number | null>(null);
   /** null follows the layout: open on wide screens, closed on narrow ones. */
@@ -189,6 +196,7 @@ export function Playground() {
     autoRunRef.current = autoRun;
   }, [autoRun]);
   const split = dragSplit ?? clamp(Number(splitPreference) || DEFAULT_SPLIT, SPLIT_RANGE);
+  const timelineHeight = dragTimeline ?? clamp(Number(timelinePreference) || DEFAULT_TIMELINE, TIMELINE_RANGE);
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
   /** Floating needs room beside the editor, so narrow screens stay docked. */
@@ -934,6 +942,7 @@ export function Playground() {
       data-explorer={explorerChoice === null ? 'auto' : explorerOpen ? 'open' : 'closed'}
       data-placement={floating ? 'float' : 'dock'}
       data-dragging={dragging || undefined}
+      data-resizing-timeline={dragTimeline !== null || undefined}
       style={{ '--pg-left': `${split * 100}fr`, '--pg-right': `${(1 - split) * 100}fr` } as CSSProperties}
     >
       <div role="toolbar" aria-label="Playground" className="pg-toolbar">
@@ -1141,6 +1150,15 @@ export function Playground() {
         canKeep={!busy && !error && !review}
         notice={notice}
         mod={mod}
+        height={timelineHeight}
+        heightRange={TIMELINE_RANGE}
+        onHeight={(height, commit) => {
+          if (commit) {
+            setTimelinePreference(String(height));
+            setDragTimeline(null);
+          } else setDragTimeline(height);
+        }}
+        onResetHeight={() => setTimelinePreference(String(DEFAULT_TIMELINE))}
       />
 
       <footer className="pg-status">

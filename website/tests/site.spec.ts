@@ -190,6 +190,40 @@ test.describe('playground', () => {
     await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
   });
 
+  test('the timeline panel has a fixed height that the reader can resize', async ({ page }) => {
+    await page.goto('playground/#split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    const panel = page.getByRole('region', { name: 'Keyframes' });
+    const grip = page.getByRole('separator', { name: 'Resize timeline' });
+    const height = async () => (await panel.boundingBox())!.height;
+    const chartHeight = async () => (await page.locator('.pg-stage').boundingBox())!.height;
+    expect(await height()).toBeCloseTo(112, 0);
+    // Opening Details neither grows the panel nor moves the chart.
+    const chartBefore = await chartHeight();
+    await page.getByRole('button', { name: 'Details' }).click();
+    expect(await height()).toBeCloseTo(112, 0);
+    expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
+    // Dragging the top edge up makes it taller; the size is remembered.
+    const box = (await grip.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 80, { steps: 5 });
+    await page.mouse.up();
+    expect(await height()).toBeCloseTo(192, 0);
+    await expect(grip).toHaveAttribute('aria-valuenow', '192');
+    await page.reload();
+    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
+    expect(await height()).toBeCloseTo(192, 0);
+    // The keyboard and a double-click work too, within limits.
+    await grip.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(grip).toHaveAttribute('aria-valuenow', '176');
+    await page.keyboard.press('Home');
+    await expect(grip).toHaveAttribute('aria-valuenow', '72');
+    await grip.dblclick();
+    await expect(grip).toHaveAttribute('aria-valuenow', '112');
+  });
+
   test('category lanes share leg geometry without claiming stage timing', async ({ page }) => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
