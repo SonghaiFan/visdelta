@@ -307,7 +307,7 @@ appear. A transition can occupy several lanes at once: these blocks describe
 its changes, not independent animation schedules. The stage strip retains the
 actual planned stage timing. The ruler is always visible, with a default scale of **160 pixels per second**. Short stories leave unused room; long stories scroll horizontally. Use **Details** to show stage labels, category lanes, navigation controls and the clear action. A story reserves each leg before playing it, and its playhead follows the chart controller at the same 0.9 seconds per stage used for replay. Clip widths remain fixed during playback; new clips fade in. Pausing or scrubbing takes control from the story. Code changes only when an authored keyframe is reached.
 
-Open **Details**, then use **Inspect stages** to enter the saved timeline and expand its compiled SVG
+Open **Details**, then use **Inspect** to enter the saved timeline and expand its compiled SVG
 phases. Each phase lists the element, recorded attribute/style/text track,
 phase-endpoint values, current value and scheduled interval. Select an element
 row to outline its mounted node, filter by element or property, or use **Show
@@ -323,7 +323,7 @@ operation. Hover to read the complete action and time range; click or
 press Enter to select the stage without seeking. Authored keyframes keep their own
 numbered diamond markers.
 
-The timeline toolbar provides explicit scale changes (40–1280 pixels per second), Show playhead, Show transition, and exact second entry. Navigation scrolls the shared time canvas without changing its scale or playhead. Native horizontal scrolling replaces the separate Pan slider; playback follows an offscreen playhead automatically. Previous/next stage moves to a planned stage boundary. Dragging the ruler scrubs, with optional snapping within eight pixels of a boundary. Selecting a stage is passive and reveals its complete label and timing; Preview stage (or double-click) plays that range. Inspect SVG tracks explicitly seeks into the selected stage and opens its recorded property phases. Category labels stay fixed beside the scrollable time rows. Attribute interval bars show local phase timing; categories continue to describe whole-transition membership.
+The timeline toolbar provides explicit scale changes (40–1280 pixels per second), Show playhead, Show transition, and exact second entry. Navigation scrolls the shared time canvas without changing its scale or playhead. Native horizontal scrolling replaces the separate Pan slider; playback follows an offscreen playhead automatically. Previous/next stage moves to a planned stage boundary. Dragging the ruler scrubs, with optional snapping within eight pixels of a boundary. Selecting a stage is passive and reveals its complete label and timing; Preview (or double-click) plays that range. Inspect explicitly seeks into the selected stage and opens its recorded property phases. Category labels stay fixed beside the scrollable time rows. Attribute interval bars show local phase timing; categories continue to describe whole-transition membership.
 
 Timeline stage captions prefer `stageOperations()` metadata: the declaration slot and its previous/next values. `unset` means the explicit declaration is absent, not a guessed renderer default. Chart-authored or refined stages without a single planner operation retain a clearly prefixed “Chart stage” semantic summary. Category lanes still show the seven semantic categories.
 

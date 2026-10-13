@@ -1168,3 +1168,16 @@ html > body[data-scroll-locked] {
 .pg-stage-exact summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .pg-stage-exact code { display: block; max-width: min(600px, 80vw); padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .pg-stage-name { font-family: var(--font-sans); }
+
+/* One stage line: what is selected, and the few things to do with it. */
+.pg-stage-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11px; padding: 6px 0 4px; border-top: 1px solid var(--color-fd-border); }
+.pg-stage-selection button, .pg-stage-exact summary { border-radius: 3px; padding: 2px 6px; color: var(--color-fd-muted-foreground); }
+.pg-stage-selection button:hover { background: var(--color-fd-accent); color: var(--color-fd-foreground); }
+.pg-stage-selection button:focus-visible { outline: 2px solid var(--color-delta); outline-offset: 1px; }
+.pg-stage-title { display: flex; flex: 1; min-width: 12rem; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.pg-stage-title strong { font-family: var(--font-mono); }
+.pg-stage-title > span { color: var(--color-fd-muted-foreground); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pg-stage-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.pg-stage-actions button[aria-expanded=true] { color: var(--color-delta); }
+.pg-clear { text-decoration: underline; text-underline-offset: 3px; }
+.pg-stage-exact { flex-basis: 100%; }

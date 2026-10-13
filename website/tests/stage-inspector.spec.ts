@@ -4,10 +4,10 @@ test('inspect saved stages, seek and highlight exact element tracks', async ({ p
   await page.goto('playground/#split');
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect stages', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   const inspector = page.getByLabel('Stage inspector');
   await expect(inspector.locator('.pg-inspector-phase').first()).toBeVisible();
-  await inspector.locator('.pg-inspector-phase summary').first().click();
+  if (await inspector.locator('.pg-inspector-phase').first().getAttribute('open') === null) await inspector.locator('.pg-inspector-phase summary').first().click();
   await expect(inspector.getByRole('columnheader', { name: 'Property', exact: true }).first()).toBeVisible();
   await inspector.getByRole('button', { name: 'Show phase midpoint' }).first().click();
   await expect(inspector.locator('.pg-inspector-phase[data-active]')).toHaveCount(1);
@@ -19,7 +19,7 @@ test('inspect saved stages, seek and highlight exact element tracks', async ({ p
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(inspector).toBeVisible();
   await expect(page.getByLabel('Keyframe timeline')).toBeVisible();
-  await page.getByRole('button', { name: 'Hide stage inspector', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide inspector', exact: true }).click();
   await expect(inspector).toHaveCount(0);
   await expect(page.locator('.pg-element-highlight')).toHaveCount(0);
 });
@@ -29,11 +29,12 @@ test('multi-stage inspection exposes stage numbers and exact element paths', asy
   await page.goto('playground/#swarm');
   await expect.poll(() => page.locator('.pg-key').count(), { timeout: 25000 }).toBeGreaterThan(1);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect stages', exact: true }).click();
+  await page.locator('.pg-stage-block').first().click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   const inspector = page.getByLabel('Stage inspector');
   await expect(inspector.locator('.pg-inspector-phase')).toHaveCount(2);
   await expect(inspector.locator('summary').first()).toContainText('Stage 1');
-  await inspector.locator('.pg-inspector-phase summary').first().click();
+  if (await inspector.locator('.pg-inspector-phase').first().getAttribute('open') === null) await inspector.locator('.pg-inspector-phase summary').first().click();
   const element = inspector.locator('td button').first();
   await expect(element).toHaveAttribute('title', /nth-of-type/);
   expect(await inspector.locator('tbody tr').count()).toBeLessThanOrEqual(50);
@@ -62,7 +63,7 @@ test('the timeline itself labels intermediate stages and selects them with the k
   await enter.focus();
   await page.keyboard.press('Enter');
   await expect(enter).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Inspect SVG tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   await expect(enter).toHaveAttribute('data-active', 'true');
   await expect(page.locator('.pg-key')).toHaveCount(3);
   await page.screenshot({ path: '/tmp/visdelta-labelled-stages.png', fullPage: true });
@@ -117,7 +118,7 @@ test('timeline selection is passive, zoom and scrolling align rows, and boundari
   await time.fill('1.35');
   await time.press('Enter');
   await expect(time).toHaveValue('1.35');
-  await page.getByRole('button', { name: 'Inspect SVG tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   await expect(page.locator('.pg-inspector-phase[open]').first()).toBeVisible();
   await expect(page.locator('.pg-property-interval').first()).toBeVisible();
   await page.getByRole('button', { name: 'Zoom out timeline', exact: true }).click();

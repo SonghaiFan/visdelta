@@ -207,14 +207,14 @@ test.describe('playground', () => {
     await expect(grip).toHaveAttribute('aria-valuenow', '240');
     // The stage inspector opens inside the fixed panel and scrolls there; the chart does not move.
     const chartBefore = await chartHeight();
-    await page.getByRole('button', { name: 'Inspect stages', exact: true }).click();
+    await page.getByRole('button', { name: 'Inspect', exact: true }).click();
     const inspector = page.getByLabel('Stage inspector');
     await expect(inspector).toBeVisible();
     expect(await height()).toBeCloseTo(240, 0);
     expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
     expect(await inspector.evaluate(node => Boolean(node.closest('.pg-timeline-body')))).toBe(true);
     expect(await panel.locator('.pg-timeline-body').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
-    await page.getByRole('button', { name: 'Hide stage inspector', exact: true }).click();
+    await page.getByRole('button', { name: 'Hide inspector', exact: true }).click();
     // Dragging the top edge up makes it taller; each view's size is remembered.
     const box = (await grip.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

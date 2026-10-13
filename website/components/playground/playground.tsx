@@ -1223,18 +1223,15 @@ export function Playground() {
       <Timeline
         className="pg-timeline"
         onPreviewStage={(from, to) => void playTo(to, from)}
-        onInspectStage={async position => {
+        inspecting={inspecting}
+        onInspect={async position => {
+          if (position === null) { setInspecting(false); return; }
           await onScrub(position);
           if (keyframesRef.current !== keyframes) return;
           const leg = Math.min(keyframes.length - 2, Math.floor(position));
           setInspectionStage(Math.floor((position - leg) * keyframes[leg + 1].stages));
           setInspecting(true);
         }}
-        inspectorControl={keyframes.length > 1 && <button type="button" className="pg-inspect-toggle" aria-expanded={inspecting} onClick={async () => {
-        setInspectionStage(undefined);
-        if (!inspecting) await onScrub(replaying ? value : Math.max(0, keyframes.length - 2));
-        setInspecting(!inspecting);
-      }}>{inspecting ? 'Hide stage inspector' : 'Inspect stages'}</button>}
         keyframes={keyframes}
         previews={keyframePreviews.previews}
         onPreview={keyframePreviews.request}
