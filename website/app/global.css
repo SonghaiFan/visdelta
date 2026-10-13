@@ -1069,9 +1069,6 @@ html > body[data-scroll-locked] {
 .pg-category-block[data-active] { border-color: var(--color-delta); background: color-mix(in srgb, var(--color-delta) 12%, var(--color-fd-background)); }
 .pg-category-head { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-delta); pointer-events: none; }
 .pg-track[data-details] > .pg-head { bottom: auto; height: 40px; }
-.pg-category-help { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 10px; color: var(--color-fd-muted-foreground); padding: 4px 0 0; animation: pg-details-in 200ms var(--ease-out-quint); }
-.pg-category-help button { margin-left: auto; text-decoration: underline; text-underline-offset: 3px; }
-.pg-category-help button:hover { color: var(--color-fd-foreground); }
 .pg-track[data-single] { flex: 0 0 16px; }
 .pg-guide { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: 12px; line-height: 32px; color: var(--color-fd-muted-foreground); text-overflow: ellipsis; white-space: nowrap; }
 /* Warnings float over the chart edge, so the panel never needs a line for them. */
@@ -1099,7 +1096,6 @@ html > body[data-scroll-locked] {
   animation: none !important;
 }
 
-.pg-inspect-toggle { font-size: 11px; text-decoration: underline; text-underline-offset: 3px; margin-left: auto; }
 .pg-inspector { border-top: 1px solid var(--color-fd-border); padding: 8px 0; font-size: 11px; }
 .pg-inspector-tools { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .pg-inspector-tools input { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 3px 6px; min-width: 180px; }
@@ -1131,22 +1127,33 @@ html > body[data-scroll-locked] {
 .pg-stage-number { flex-shrink: 0; font-weight: 600; }
 .pg-stage-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Timeline navigation keeps one time window for every row. */
-.pg-time-tools, .pg-stage-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 11px; padding: 4px 0 8px; }
-.pg-time-tools button, .pg-stage-selection button { border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 6px; }
+/* Timeline navigation keeps one time window for every row. Quiet text controls; the stage line below is the only bordered group. */
+.pg-time-tools, .pg-stage-selection { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11px; padding: 4px 0 8px; }
+.pg-time-tools button, .pg-stage-selection button, .pg-stage-exact summary { border-radius: 3px; padding: 2px 6px; color: var(--color-fd-muted-foreground); }
+.pg-time-tools button:hover:not(:disabled), .pg-stage-selection button:hover { background: var(--color-fd-accent); color: var(--color-fd-foreground); }
 .pg-time-tools button:disabled { opacity: .4; }
+.pg-time-tools button:focus-visible, .pg-stage-selection button:focus-visible { outline: 2px solid var(--color-delta); outline-offset: 1px; }
 .pg-time-tools label { display: inline-flex; align-items: center; gap: 4px; }
 .pg-time-tools input[type=number] { width: 64px; border: 1px solid var(--color-fd-border); border-radius: 3px; padding: 2px 4px; font-variant-numeric: tabular-nums; }
+.pg-zoom { display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
+.pg-zoom button:nth-child(2) { min-width: 3.2em; font-family: var(--font-mono); }
+.pg-clear { margin-left: auto; text-decoration: underline; text-underline-offset: 3px; }
+.pg-stage-title { display: flex; flex: 1; min-width: 12rem; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.pg-stage-title strong { font-family: var(--font-mono); }
+.pg-stage-title > span { color: var(--color-fd-muted-foreground); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.pg-stage-actions { display: inline-flex; gap: 4px; margin-left: auto; }
+.pg-stage-actions button[aria-expanded=true] { color: var(--color-delta); }
 .pg-pan { flex: 1; min-width: 140px; }
 .pg-pan input { width: 100%; accent-color: var(--color-delta); }
 .pg-ruler { pointer-events: auto; touch-action: none; cursor: ew-resize; overflow: hidden; }
 .pg-clips, .pg-category-time { overflow: hidden; }
 .pg-stage-block[aria-pressed=true] { outline: 1px solid var(--color-delta); outline-offset: -2px; color: var(--color-fd-foreground); }
 .pg-stage-selection { border-top: 1px solid var(--color-fd-border); padding-top: 6px; }
+.pg-stage-exact { order: 3; flex-basis: 100%; }
 .pg-stage-selection code { overflow-wrap: anywhere; }
 .pg-property-interval { display: block; position: relative; height: 6px; min-width: 100px; background: var(--color-fd-muted); margin-bottom: 4px; }
 .pg-property-interval > span { position: absolute; height: 100%; min-width: 1px; background: var(--color-delta); }
 
-.pg-stage-exact summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.pg-stage-exact summary { display: inline-block; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .pg-stage-exact code { display: block; max-width: min(600px, 80vw); padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .pg-stage-name { font-family: var(--font-sans); }
