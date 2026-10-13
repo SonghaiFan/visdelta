@@ -146,11 +146,16 @@ test('keyframe previews retain the heading and outside legend above the canvas',
       visibleItems: [...legend.querySelectorAll<SVGElement>('.vd-legend-item')].every(item => Number(item.style.opacity) === 1),
       correctSwatches: [...legend.querySelectorAll<SVGElement>('rect')].every(item => item.style.fill === item.getAttribute('fill')),
       legendAbove: Number(legend.getAttribute('y')) + Number(legend.getAttribute('height')) <= Number(canvas.getAttribute('y')) + 1,
-      height: svg.documentElement.getAttribute('height'),
+      // Width and height size the canvas; the heading and legend are added above it.
+      canvasHeight: canvas.getAttribute('height'),
+      figureHeight: Number(svg.documentElement.getAttribute('height')),
+      chromeAbove: Number(canvas.getAttribute('y')),
       loaded: image.complete && image.naturalWidth > 0,
     };
   });
-  expect(details).toMatchObject({ title: 'Regional totals', subtitle: 'Saved heading and legend', legendAbove: true, visibleItems: true, correctSwatches: true, loaded: true, height: '300' });
+  expect(details).toMatchObject({ title: 'Regional totals', subtitle: 'Saved heading and legend', legendAbove: true, visibleItems: true, correctSwatches: true, loaded: true, canvasHeight: '300' });
+  expect(details.figureHeight).toBeCloseTo(300 + details.chromeAbove, 0);
+  expect(details.chromeAbove).toBeGreaterThan(0);
   expect(details.labels).toContain('North');
   expect(details.labels).toContain('South');
 });

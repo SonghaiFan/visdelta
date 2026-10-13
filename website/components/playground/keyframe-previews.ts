@@ -57,7 +57,7 @@ export function useKeyframePreviews(frames: { id: number; state: ChartState }[])
         let result: KeyframePreview;
         try {
           const { transition } = await loadRuntime();
-          controller = await transition(frame.state as never, frame.state as never, { target: host, width: 480, height: 'auto' });
+          controller = await transition(frame.state as never, frame.state as never, { target: host, width: 480, height: 300 });
           controller.progress(1);
           const image = svgSnapshot(host);
           result = image ? { image } : { error: true };

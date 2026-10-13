@@ -566,7 +566,7 @@ test.describe('playground', () => {
     const timeline = page.getByLabel('Keyframe timeline');
     const canvas = () => stage.locator('svg:visible').first().evaluate((svg) => {
       const box = svg.getBoundingClientRect();
-      return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top) };
+      return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom) };
     });
     await timeline.fill('0');
     await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
@@ -577,7 +577,8 @@ test.describe('playground', () => {
     const fitLast = await canvas();
     expect(fitLast.width).toBe(fitFirst.width);
     expect(fitLast.height).toBeLessThan(fitFirst.height);
-    expect(fitLast.top + fitLast.height).toBeCloseTo(fitFirst.top + fitFirst.height, 0);
+    // Compare the edge itself: summing separately rounded top and height can drift by a pixel.
+    expect(fitLast.bottom).toBe(fitFirst.bottom);
     await timeline.fill('0');
     await expect.poll(canvas).toEqual(fitFirst);
     await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
