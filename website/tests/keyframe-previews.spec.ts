@@ -119,7 +119,7 @@ test('one saved sequence retains all seven category lanes and overlapping change
   await page.getByLabel('Keyframe timeline').fill(String(Number(firstTime) / 2));
   expect(await page.locator('.pg-category-block[data-active]').count()).toBeGreaterThan(1);
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.locator('.pg-category-scroll')).toHaveCSS('max-height', '120px');
+  await expect(page.locator('.pg-category-scroll')).toHaveCSS('max-height', 'none');
   await page.locator('[data-category="appearance"]').scrollIntoViewIfNeeded();
   await expect(page.locator('[data-category="appearance"]')).toBeVisible();
 });

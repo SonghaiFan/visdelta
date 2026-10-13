@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { categories } from '@/examples/registry';
 import type { KeyframePreview } from './keyframe-previews';
@@ -39,9 +39,18 @@ interface TimelineProps {
   /** Shortcut prefix shown in hints, such as ⌘ or Ctrl+. */
   mod?: string;
   className?: string;
+  children?: ReactNode;
   inspectorControl?: ReactNode;
   onInspectStage?: (position: number) => void;
   onPreviewStage?: (from: number, to: number) => void;
+  /** Panel height in pixels; fixed, so toggling details never moves the chart. */
+  height: number;
+  /** Smallest and largest panel height, in pixels. */
+  heightRange: readonly [number, number];
+  /** The reader resizes the panel; `commit` is false while the drag is live. */
+  onHeight: (height: number, commit: boolean) => void;
+  /** Back to the default height. */
+  onResetHeight: () => void;
 }
 
 const seconds = (ms: number, digits = 2) => `${(ms / 1000).toFixed(digits)}s`;
@@ -103,10 +112,16 @@ export function Timeline({
   notice,
   mod = '⌘',
   className,
+  children,
   inspectorControl,
   onInspectStage,
   onPreviewStage,
+  height,
+  heightRange,
+  onHeight,
+  onResetHeight,
 }: TimelineProps) {
+  const resize = useRef<{ pointerId: number; startY: number; startHeight: number; current: number } | null>(null);
   const [details, setDetails] = useState(false);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -164,10 +179,56 @@ export function Timeline({
   const ticks = total ? Array.from({ length: Math.ceil(span / step) + 1 }, (_, index) => (Math.floor(start / step) + index) * step) : [0];
   /** Only say something when there is a next step; a working timeline stays quiet. */
   const hint = notice || (count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '');
+  const clampHeight = (value: number) => Math.min(heightRange[1], Math.max(heightRange[0], Math.round(value)));
+  /** Drag the top edge: moving up makes the panel taller. */
+  const startResize = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || resize.current) return;
+    event.preventDefault();
+    const startHeight = event.currentTarget.parentElement!.getBoundingClientRect().height;
+    resize.current = { pointerId: event.pointerId, startY: event.clientY, startHeight, current: startHeight };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveResize = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = resize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.current = clampHeight(drag.startHeight + drag.startY - event.clientY);
+    onHeight(drag.current, false);
+  };
+  const endResize = (event: PointerEvent<HTMLDivElement>) => {
+    const drag = resize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    resize.current = null;
+    onHeight(drag.current, true);
+  };
+  const nudgeHeight = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const next = { ArrowUp: height + 16, ArrowDown: height - 16, Home: heightRange[0], End: heightRange[1] }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    onHeight(clampHeight(next), true);
+  };
   const lanes = details && visibleCategories.length > 0;
 
   return (
-    <section aria-label="Keyframes" className={className}>
+    <section aria-label="Keyframes" className={className} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize timeline"
+        aria-valuemin={heightRange[0]}
+        aria-valuemax={heightRange[1]}
+        aria-valuenow={height}
+        tabIndex={0}
+        className="pg-timeline-grip"
+        title="Drag to resize · double-click to reset"
+        onPointerDown={startResize}
+        onPointerMove={moveResize}
+        onPointerUp={endResize}
+        onPointerCancel={endResize}
+        onLostPointerCapture={endResize}
+        onKeyDown={nudgeHeight}
+        onDoubleClick={onResetHeight}
+      />
+      <div className="pg-timeline-body">
       {details && <div className="pg-time-tools" aria-label="Timeline navigation">
         <button type="button" disabled={!total || now <= 0} onClick={() => seekTime(boundaries.findLast(time => time < now - 0.01) ?? 0)}>Previous stage</button>
         <button type="button" disabled={!total || now >= total} onClick={() => seekTime(boundaries.find(time => time > now + 0.01) ?? total)}>Next stage</button>
@@ -352,6 +413,8 @@ export function Timeline({
         <p>{previewIndex ? describeLeg(keyframes[previewIndex]) : 'Initial state'}</p>
       </div>, document.body)}
       <p className="pg-hint" aria-live="polite">{hint}</p>
+      {children}
+      </div>
     </section>
   );
 }

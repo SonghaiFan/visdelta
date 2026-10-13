@@ -311,7 +311,7 @@ Open **Details**, then use **Inspect stages** to enter the saved timeline and ex
 phases. Each phase lists the element, recorded attribute/style/text track,
 phase-endpoint values, current value and scheduled interval. Select an element
 row to outline its mounted node, filter by element or property, or use **Show
-phase midpoint** to seek. The inspector scrolls independently of the scrubber.
+phase midpoint** to seek. The timeline and inspector share one scrollable panel. Drag its top edge to resize it from 72 to 360 pixels (112 by default, capped at 45% of the viewport height); arrow keys adjust it, Home/End select the limits, and double-click resets it. The chosen height is remembered. Opening Details or the inspector preserves the panel and chart heights.
 Custom tweens are labelled explicitly: their nested properties are not exposed.
 Immediate renderer writes and node insertion/removal are not property tracks;
 title/subtitle HTML follows whole-transition progress separately. These limits
