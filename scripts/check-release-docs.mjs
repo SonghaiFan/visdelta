@@ -37,7 +37,7 @@ for (const file of files) {
   // Check relative documentation/example links. Anchors and external links have
   // separate semantics; do not pretend an existence check validates those.
   for (const [, target] of source.matchAll(/\]\(([^\s)]+)\)/g)) {
-    // Root-relative routes belong to the VitePress site and its build-time
+    // Root-relative routes belong to the published site and its build-time
     // dead-link validator. This checker owns repository-relative files.
     if (/^(?:https?:|#|\/|mailto:|codex:)/.test(target)) continue;
     const path = decodeURIComponent(target.split('#')[0]);
@@ -54,9 +54,6 @@ console.log(`Release docs: ${pkg.version}, ${urls} CDN references match packaged
 async function walk(dir) {
   const files = [];
   for (const entry of await readdir(join(root, dir), { withFileTypes: true })) {
-    // VitePress source and generated bundles are checked by `vitepress build`.
-    // Do not re-parse compiled, HTML-escaped code examples as authored docs.
-    if (entry.isDirectory() && entry.name === '.vitepress') continue;
     const path = join(dir, entry.name);
     if (entry.isDirectory()) files.push(...await walk(path));
     else if (/\.(md|mdx|html|js|ts|txt)$/.test(path)) files.push(path);

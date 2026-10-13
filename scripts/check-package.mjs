@@ -154,7 +154,7 @@ if (!packageJson.devDependencies?.esbuild) {
   throw new Error("package.json must pin esbuild as a devDependency for the global build.");
 }
 assertEqual(packageJson.scripts["pack:check"], "node scripts/check-pack-consumer.mjs", "pack:check");
-assertEqual(packageJson.scripts["release:check"], "npm test && npm run test:browser && npm run pack:check", "release:check");
+assertEqual(packageJson.scripts["release:check"], "npm test && npm run pack:check", "release:check");
 assertEqual(packageJson.scripts.prepublishOnly, "npm run release:check", "prepublishOnly");
 if (!changelog.includes(`## ${packageJson.version} - `)) {
   throw new Error(`CHANGELOG.md must include an entry for ${packageJson.version}.`);

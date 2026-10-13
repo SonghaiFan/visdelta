@@ -14,10 +14,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run release:check
-      # The published ESM package supports Node 18 consumers; browser test
-      # tooling requires Node 20+, so test consumption separately after build.
+      # The published ESM package supports Node 18 consumers, so test
+      # consumption separately after build.
       - uses: actions/setup-node@v4
         with:
           node-version: 18

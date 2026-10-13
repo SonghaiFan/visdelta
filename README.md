@@ -125,7 +125,6 @@ npm ci
 npm run check
 npm run build
 npm run docs:check
-npm run test:browser
 ```
 
 The documentation site lives in [`website/`](website/README.md), a separate

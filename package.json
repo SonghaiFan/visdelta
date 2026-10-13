@@ -104,19 +104,15 @@
     "bundle:check": "node scripts/check-bundle-size.mjs",
     "check": "node scripts/check.mjs",
     "examples:check": "node scripts/check-examples.mjs",
-    "docs:check": "node scripts/check-release-docs.mjs && vitepress build docs",
-    "docs:dev": "npm run build && vitepress dev docs --host 127.0.0.1",
-    "docs:build": "npm run build && vitepress build docs",
-    "docs:preview": "vitepress preview docs --host 127.0.0.1",
+    "docs:check": "node scripts/check-release-docs.mjs",
     "demo:gif": "node scripts/render-demo-gif.mjs",
     "clean:check": "node scripts/check-clean-install.mjs",
     "manifest:check": "node scripts/check-chart-manifest.mjs",
     "pack:check": "node scripts/check-pack-consumer.mjs",
     "package:check": "node scripts/check-package.mjs",
-    "release:check": "npm test && npm run test:browser && npm run pack:check",
+    "release:check": "npm test && npm run pack:check",
     "smoke": "node scripts/smoke.mjs",
     "test": "npm run check && npm run manifest:check && npm run build && npm run bundle:check && npm run examples:check && npm run docs:check && npm run package:check && npm run smoke && node --test tests/*.test.mjs",
-    "test:browser": "playwright test",
     "prepack": "npm test",
     "prepublishOnly": "npm run release:check"
   },
@@ -148,9 +144,6 @@
     "esm"
   ],
   "devDependencies": {
-    "@codemirror/lang-javascript": "^6.2.5",
-    "@codemirror/language": "^6.12.4",
-    "@lezer/highlight": "^1.2.3",
     "@playwright/test": "^1.63.0",
     "@types/d3": "^7.4.3",
     "@types/d3-array": "^3.2.2",
@@ -163,10 +156,8 @@
     "@types/d3-interpolate": "^3.0.4",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-timer": "^3.0.2",
-    "codemirror": "^6.0.2",
     "d3": "^7.0.0",
     "esbuild": "0.28.2",
-    "typescript": "^5.9.3",
-    "vitepress": "2.0.0-alpha.20"
+    "typescript": "^5.9.3"
   }
 }

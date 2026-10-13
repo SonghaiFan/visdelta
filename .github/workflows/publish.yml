@@ -39,7 +39,6 @@ jobs:
           '
 
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
       - run: npm run release:check
 
       # release:check already builds and validates the package. OIDC trusted

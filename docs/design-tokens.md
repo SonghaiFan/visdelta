@@ -1,7 +1,7 @@
 # Site design tokens
 
 The documentation site, Playground and Gallery share one token set,
-[`docs/.vitepress/theme/tokens.css`](https://github.com/SonghaiFan/visdelta/blob/main/docs/.vitepress/theme/tokens.css).
+[`website/app/global.css`](../website/app/global.css).
 The values were extracted from what the site's components already had in
 common: canvas and surface tones, a single divider line, the monospace label,
 eight-pixel panels and one accent.
