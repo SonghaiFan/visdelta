@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as 
 import { createPortal } from 'react-dom';
 import { categories } from '@/examples/registry';
 import type { KeyframePreview } from './keyframe-previews';
-import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { ChevronDown, Pause, Play } from 'lucide-react';
 import type { StateChange } from 'visdelta/core';
 import { formatChange } from '@/components/live/transition-player';
 
@@ -60,8 +60,8 @@ const describeLeg = (key: TimelineKey) => (key.changes.length ? key.changes.map(
 const describe = (key: TimelineKey, index: number, at: number) =>
   `Keyframe ${index + 1}${key.changes.length ? `: ${key.changes.map(formatChange).join(', ')}` : ''}`.concat(index ? ` (${seconds(at)})` : '');
 
-/** Shared time geometry for overview, stage strip, category lanes and scrubbing. */
-export function timelineGeometry(keyframes: TimelineKey[], stageDuration: number, zoom = 1, pan = 0) {
+/** Shared time geometry for the stage strip, category lanes and scrubbing. */
+export function timelineGeometry(keyframes: TimelineKey[], stageDuration: number) {
   const count = keyframes.length;
   const legs = keyframes.slice(1).map((key) => Math.max(1, key.stages) * stageDuration);
   /** When each keyframe is reached. */
@@ -78,17 +78,11 @@ export function timelineGeometry(keyframes: TimelineKey[], stageDuration: number
     const index = Math.max(0, Math.min(count - 2, times.findLastIndex((start) => start <= time)));
     return index + Math.min(1, Math.max(0, (time - times[index]) / legs[index]));
   };
-  const span = total / zoom;
-  const start = Math.min(pan, Math.max(0, total - span));
-  const end = start + span;
-  const x = (time: number) => `calc(var(--pg-pad) + (100% - 2 * var(--pg-pad)) * ${span ? (time - start) / span : 0})`;
-  const width = (duration: number) => `calc((100% - 2 * var(--pg-pad)) * ${span ? duration / span : 0})`;
+  const x = (time: number) => `calc(var(--pg-pad) + (100% - 2 * var(--pg-pad)) * ${total ? time / total : 0})`;
+  const width = (duration: number) => `calc((100% - 2 * var(--pg-pad)) * ${total ? duration / total : 0})`;
 
-  return { legs, times, total, timeOf, positionOf, span, start, end, x, width };
+  return { legs, times, total, timeOf, positionOf, x, width };
 }
-
-/** Ruler steps, in milliseconds, from fine to coarse. */
-const STEPS = [10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10_000];
 
 /**
  * Kept keyframes on a real-time track, like an editing timeline. Each leg
@@ -125,9 +119,6 @@ export function Timeline({
 }: TimelineProps) {
   const resize = useRef<{ pointerId: number; startY: number; startHeight: number; current: number } | null>(null);
   const [details, setDetails] = useState(false);
-  const [timeDraft, setTimeDraft] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState(0);
   const [selection, setSelection] = useState<{ id: number; stage: number } | null>(null);
   const [hover, setHover] = useState<{ id: number; left: number; top: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,7 +145,7 @@ export function Timeline({
   const visibleCategories = categories.filter(category => keyframes.some(key => key.changes.some(change => change.category === category.id)));
   const previewIndex = hover ? keyframes.findIndex(key => key.id === hover.id) : -1;
   const count = keyframes.length;
-  const { legs, times, total, timeOf, positionOf, span, start, end, x, width } = timelineGeometry(keyframes, stageDuration, zoom, pan);
+  const { legs, times, total, timeOf, positionOf, x, width } = timelineGeometry(keyframes, stageDuration);
   /** The reader's pick; otherwise the stage under the playhead, or the last one when idle. */
   const picked = selection ? keyframes.findIndex(key => key.id === selection.id) - 1 : -1;
   const followed = Math.min(count - 2, Math.floor(replaying ? value : count - 2));
@@ -164,24 +155,11 @@ export function Timeline({
   const selectedStage = picked >= 0 ? Math.min(selection!.stage, selectedStages - 1) : Math.min(selectedStages - 1, Math.max(0, Math.floor((replaying ? value - selectedLeg : 1) * selectedStages - 1e-9)));
   const selectedStart = selectedKey ? times[selectedLeg] + selectedStage * stageDuration : 0;
   const stageLabel = (key: TimelineKey, stage: number) => key.stageLabels?.[stage] === '' ? 'No additional semantic change' : key.stageLabels?.[stage] ?? 'Stage details unavailable';
-  const boundaries = [0, ...keyframes.slice(1).flatMap((key, leg) => Array.from({ length: Math.max(1, key.stages) }, (_, stage) => times[leg] + (stage + 1) * stageDuration))];
   const stagePosition = (leg: number, stage: number, fraction: number, stages: number) => leg + (stage + fraction) / stages;
   const seekTime = (time: number) => { if (!Number.isFinite(time)) return; close(); onScrub(positionOf(Math.max(0, Math.min(total, time)))); };
-  const setView = (nextZoom: number, center: number) => {
-    const next = Math.max(1, Math.min(32, nextZoom));
-    setZoom(next); setPan(Math.max(0, Math.min(total - total / next, center - total / next / 2)));
-  };
-  const scrubRuler = (event: PointerEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const time = start + Math.max(0, Math.min(1, (event.clientX - rect.left - 7) / Math.max(1, rect.width - 14))) * span;
-    const nearest = boundaries.reduce((best, point) => Math.abs(point - time) < Math.abs(best - time) ? point : best, 0);
-    seekTime(!event.altKey && span > 0 && Math.abs(nearest - time) / span * rect.width < 8 ? nearest : time);
-  };
 
   const now = replaying ? timeOf(value) : total;
   const current = replaying && Math.abs(value - Math.round(value)) < 0.002 ? Math.round(value) : -1;
-  const step = STEPS.find((candidate) => span / candidate <= 10) ?? STEPS.at(-1)!;
-  const ticks = total ? Array.from({ length: Math.ceil(span / step) + 1 }, (_, index) => (Math.floor(start / step) + index) * step) : [0];
   /** Guidance takes the track's place until there is something to scrub; a working timeline stays quiet. */
   const guide = count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '';
   const height = details ? heights.details : heights.compact;
@@ -235,25 +213,6 @@ export function Timeline({
         onDoubleClick={() => onResetHeight(details)}
       />
       <div className="pg-timeline-body">
-      {details && <div className="pg-time-tools" aria-label="Timeline navigation">
-        <button type="button" aria-label="Previous stage" title="Previous stage" disabled={!total || now <= 0} onClick={() => seekTime(boundaries.findLast(time => time < now - 0.01) ?? 0)}><ChevronLeft aria-hidden="true" className="size-3.5" /></button>
-        <button type="button" aria-label="Next stage" title="Next stage" disabled={!total || now >= total} onClick={() => seekTime(boundaries.find(time => time > now + 0.01) ?? total)}><ChevronRight aria-hidden="true" className="size-3.5" /></button>
-        <label>Time <input aria-label="Playhead time in seconds" type="number" min="0" max={total / 1000} step="0.01"
-          value={timeDraft ?? (now / 1000).toFixed(2)} onChange={event => setTimeDraft(event.target.value)}
-          onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-          onBlur={event => {
-            const time = event.currentTarget.valueAsNumber * 1000;
-            setTimeDraft(null);
-            if (Number.isFinite(time) && Math.abs(time - now) > 5) seekTime(time);
-          }} /> s</label>
-        <span className="pg-zoom" role="group" aria-label="Zoom">
-          <button type="button" aria-label="Zoom out timeline" disabled={zoom === 1} onClick={() => setView(zoom / 2, start + span / 2)}>−</button>
-          <button type="button" aria-label="Fit all" title="Fit whole timeline" disabled={zoom === 1} onClick={() => setView(1, total / 2)}>{zoom.toFixed(1)}×</button>
-          <button type="button" aria-label="Zoom in timeline" disabled={!total || zoom === 32} onClick={() => setView(zoom * 2, now >= start && now <= end ? now : start + span / 2)}>+</button>
-        </span>
-        {zoom > 1 && <label className="pg-pan">Pan <input aria-label="Pan timeline" type="range" min="0" max={Math.max(0, total - span)} step="1" value={start} onChange={event => setPan(event.currentTarget.valueAsNumber)} /></label>}
-        <button type="button" className="pg-clear" title="Remove every kept keyframe" onClick={onClear}>Clear keys</button>
-      </div>}
       <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2">
         <button
           type="button"
@@ -270,18 +229,6 @@ export function Timeline({
           <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
         </div>
         <div className="pg-track" data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} data-single={count === 1 || undefined} hidden={count === 0}>
-          {details && <div className="pg-ruler" onPointerDown={event => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            scrubRuler(event);
-          }} onPointerMove={event => {
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) scrubRuler(event);
-          }}>
-            {ticks.map((tick) => (
-              <span key={tick} className="pg-tick" style={{ left: x(tick) }}>
-                {`${tick / 1000}s`}
-              </span>
-            ))}
-          </div>}
           <div className="pg-clips">
             {keyframes.slice(1).map((key, index) => (
               <span
@@ -313,8 +260,8 @@ export function Timeline({
                     aria-pressed={selection?.id === key.id && selectedStage === stage}
                     title={description}
                     onClick={() => {
-                      close();
                       setSelection({ id: key.id, stage });
+                      seekTime(times[index] + stage * stageDuration);
                       if (inspecting) onInspect?.(stagePosition(index, stage, 0.5, Math.max(1, key.stages)));
                     }}
                     onDoubleClick={() => onPreviewStage?.(stagePosition(index, stage, 0, Math.max(1, key.stages)), stagePosition(index, stage, 1, Math.max(1, key.stages)))}
@@ -326,10 +273,10 @@ export function Timeline({
             {count >= 2 && (
               <input
                 type="range"
-                min={start / 1000}
-                max={end / 1000}
+                min={0}
+                max={total / 1000}
                 step={0.01}
-                value={Math.max(start, Math.min(end, now)) / 1000}
+                value={Math.min(total, now) / 1000}
                 aria-label="Keyframe timeline"
                 aria-valuetext={`${seconds(now)} of ${seconds(total)}`}
                 onChange={(event) => { close(); onScrub(positionOf(event.currentTarget.valueAsNumber * 1000)); }}
@@ -368,11 +315,11 @@ export function Timeline({
                   const label = changes.map(formatChange).join(' · ');
                   return <span key={key.id} className="pg-category-block" data-active={active || undefined} title={`${category.label}: ${label}${active ? ' — current transition' : ''}`} style={{ left: x(times[index]), width: width(legs[index]) }}>{label}</span>;
                 })}
-                {replaying && now >= start && now <= end && <span className="pg-category-head" aria-hidden="true" style={{ left: x(now) }} />}
+                {replaying && <span className="pg-category-head" aria-hidden="true" style={{ left: x(now) }} />}
               </div>
             </div>)}
           </div>}
-          {replaying && now >= start && now <= end && <span className="pg-head" aria-hidden="true" style={{ left: x(now) }} />}
+          {replaying && <span className="pg-head" aria-hidden="true" style={{ left: x(now) }} />}
         </div>
         {guide && <p className="pg-guide">{guide}</p>}
         <button
@@ -404,12 +351,12 @@ export function Timeline({
           <strong>{selectedLeg + 1}.{selectedStage + 1}</strong> {stageLabel(selectedKey, selectedStage)}
           <span>{seconds(selectedStart)}–{seconds(selectedStart + stageDuration)}</span>
         </span>
-        {selectedKey.stageDetails?.[selectedStage] && <details className="pg-stage-exact"><summary>Exact configuration</summary><code>{selectedKey.stageDetails[selectedStage]}</code></details>}
         <span className="pg-stage-actions">
-          <button type="button" onClick={() => seekTime(selectedStart)}>Go to start</button>
           <button type="button" onClick={() => onPreviewStage?.(stagePosition(selectedLeg, selectedStage, 0, selectedStages), stagePosition(selectedLeg, selectedStage, 1, selectedStages))}>Preview</button>
-          <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : stagePosition(selectedLeg, selectedStage, 0.5, selectedStages))}>{inspecting ? 'Hide inspector' : 'Inspect tracks'}</button>
+          <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : stagePosition(selectedLeg, selectedStage, 0.5, selectedStages))}>{inspecting ? 'Hide inspector' : 'Inspect'}</button>
+          <button type="button" className="pg-clear" title="Remove every kept keyframe" onClick={onClear}>Clear keys</button>
         </span>
+        {selectedKey.stageDetails?.[selectedStage] && <details className="pg-stage-exact"><summary>Exact configuration</summary><code>{selectedKey.stageDetails[selectedStage]}</code></details>}
       </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
         <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>

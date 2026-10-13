@@ -203,14 +203,14 @@ test.describe('playground', () => {
     expect(Math.max(...centres) - Math.min(...centres)).toBeLessThan(1.5);
     // Details opens to its own remembered height, then stays fixed.
     await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(240, 0);
-    await expect(grip).toHaveAttribute('aria-valuenow', '240');
+    expect(await height()).toBeCloseTo(200, 0);
+    await expect(grip).toHaveAttribute('aria-valuenow', '200');
     // The stage inspector opens inside the fixed panel and scrolls there; the chart does not move.
     const chartBefore = await chartHeight();
-    await page.getByRole('button', { name: 'Inspect tracks', exact: true }).click();
+    await page.getByRole('button', { name: 'Inspect', exact: true }).click();
     const inspector = page.getByLabel('Stage inspector');
     await expect(inspector).toBeVisible();
-    expect(await height()).toBeCloseTo(240, 0);
+    expect(await height()).toBeCloseTo(200, 0);
     expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
     expect(await inspector.evaluate(node => Boolean(node.closest('.pg-timeline-body')))).toBe(true);
     expect(await panel.locator('.pg-timeline-body').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
@@ -221,26 +221,26 @@ test.describe('playground', () => {
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 40, { steps: 5 });
     await page.mouse.up();
-    expect(await height()).toBeCloseTo(280, 0);
+    expect(await height()).toBeCloseTo(240, 0);
     await page.getByRole('button', { name: 'Details' }).click();
     expect(await height()).toBeCloseTo(56, 0);
     await page.reload();
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(280, 0);
+    expect(await height()).toBeCloseTo(240, 0);
     // The keyboard and a double-click work too, within limits.
     await grip.focus();
     await page.keyboard.press('ArrowDown');
-    await expect(grip).toHaveAttribute('aria-valuenow', '264');
+    await expect(grip).toHaveAttribute('aria-valuenow', '224');
     await page.keyboard.press('Home');
     await expect(grip).toHaveAttribute('aria-valuenow', '56');
     await grip.dblclick();
-    await expect(grip).toHaveAttribute('aria-valuenow', '240');
+    await expect(grip).toHaveAttribute('aria-valuenow', '200');
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect.poll(height).toBeCloseTo(240, 0);
+    await expect.poll(height).toBeCloseTo(200, 0);
     await grip.focus();
     await page.keyboard.press('ArrowUp');
-    await expect.poll(height).toBeCloseTo(256, 0);
+    await expect.poll(height).toBeCloseTo(216, 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 

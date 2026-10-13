@@ -4,7 +4,7 @@ test('inspect saved stages, seek and highlight exact element tracks', async ({ p
   await page.goto('playground/#split');
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   const inspector = page.getByLabel('Stage inspector');
   await expect(inspector.locator('.pg-inspector-phase').first()).toBeVisible();
   // The selected stage opens with the inspector.
@@ -30,7 +30,7 @@ test('multi-stage inspection exposes stage numbers and exact element paths', asy
   await page.goto('playground/#swarm');
   await expect.poll(() => page.locator('.pg-key').count(), { timeout: 25000 }).toBeGreaterThan(1);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await page.getByRole('button', { name: 'Inspect tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   const inspector = page.getByLabel('Stage inspector');
   await expect(inspector.locator('.pg-inspector-phase')).toHaveCount(1);
   await expect(inspector.locator('summary').first()).toContainText('Stage 1');
@@ -64,7 +64,7 @@ test('the timeline itself labels intermediate stages and selects them with the k
   await enter.focus();
   await page.keyboard.press('Enter');
   await expect(enter).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Inspect tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   await expect(enter).toHaveAttribute('data-active', 'true');
   await expect(page.locator('.pg-key')).toHaveCount(3);
   await page.screenshot({ path: '/tmp/visdelta-labelled-stages.png', fullPage: true });
@@ -89,48 +89,31 @@ test('regroup shows all six intermediate stage captions without opening the insp
 });
 
 
-test('timeline selection is passive, zoom and pan align rows, and boundaries seek exactly', async ({ page }) => {
+test('selecting a stage seeks to it, aligns with its category lane, and inspects it', async ({ page }) => {
   await page.goto('playground/#focus');
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  const time = page.getByLabel('Playhead time in seconds');
-  const before = await time.inputValue();
+  // The minimal panel has no ruler, zoom, time field or stepper: one stage line.
+  await expect(page.locator('.pg-ruler, .pg-time-tools')).toHaveCount(0);
+  const readout = page.locator('.pg-row').getByText(/^\d\.\d\ds$/).first();
   await page.locator('.pg-stage-block').nth(1).click();
-  await expect(time).toHaveValue(before);
+  await expect(readout).toHaveText('0.90s');
   await expect(page.getByLabel('Selected stage')).toContainText('focus');
-  await page.getByRole('button', { name: 'Zoom in timeline', exact: true }).click();
-  await expect(page.getByLabel('Pan timeline')).toBeVisible();
   const aligned = await page.locator('.pg-stage-block').nth(1).boundingBox();
   const category = await page.locator('.pg-category-block').filter({ hasText: 'attention.exit(focus)' }).boundingBox();
   expect(aligned!.x).toBeCloseTo(category!.x, 0);
   expect(aligned!.width * 2).toBeCloseTo(category!.width, 0);
-  await page.getByLabel('Pan timeline').fill('0');
-  await expect(time).toHaveValue(before);
-  await page.getByRole('button', { name: 'Go to start', exact: true }).click();
-  await expect(time).toHaveValue('0.90');
-  await page.getByRole('button', { name: 'Next stage', exact: true }).click();
-  await expect(time).toHaveValue('1.80');
-  await page.getByRole('button', { name: 'Previous stage', exact: true }).click();
-  await expect(time).toHaveValue('0.90');
-  await time.fill('1.35');
-  await time.press('Enter');
-  await expect(time).toHaveValue('1.35');
-  await page.getByRole('button', { name: 'Inspect tracks', exact: true }).click();
+  await page.getByRole('button', { name: 'Inspect', exact: true }).click();
   await expect(page.locator('.pg-inspector-phase[open]').first()).toBeVisible();
   await expect(page.locator('.pg-property-interval').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Fit all', exact: true }).click();
-  await expect(page.getByLabel('Pan timeline')).toHaveCount(0);
-  const ruler = await page.locator('.pg-ruler').boundingBox();
-  await page.mouse.click(ruler!.x + 7 + (ruler!.width - 14) / 3 + 2, ruler!.y + 5);
-  await expect(time).toHaveValue('0.90');
+  await page.locator('.pg-stage-block').nth(2).click();
+  await expect(page.getByLabel('Selected stage')).toContainText('2.2');
   await page.locator('.pg-stage-block').nth(1).dblclick();
-  await expect(time).toHaveValue('1.80', { timeout: 5000 });
-  await page.screenshot({ path: '/tmp/visdelta-timeline-navigation-desktop.png', fullPage: true });
+  await expect(readout).toHaveText('1.80s', { timeout: 5000 });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(350);
   await expect(page.getByLabel('Selected stage')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: '/tmp/visdelta-timeline-navigation-mobile.png', fullPage: true });
 });
 
 
@@ -140,8 +123,7 @@ test('Swarm uses one complete layout stage with readable configuration', async (
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   await expect(page.locator('.pg-stage-name')).toHaveCount(1);
   await expect(page.locator('.pg-stage-name')).toHaveText('Change layout from grid to beeswarm');
-  await expect(page.getByLabel('Playhead time in seconds')).toHaveValue('0.90');
-  await expect(page.locator('.cm-content')).toContainText('.layout("beeswarm", { x: "petalLength" })');
+    await expect(page.locator('.cm-content')).toContainText('.layout("beeswarm", { x: "petalLength" })');
   await expect(page.locator('.cm-content')).toContainText('.size(6)');
   await page.locator('.pg-stage-block').click();
   await page.getByText('Exact configuration', { exact: true }).click();

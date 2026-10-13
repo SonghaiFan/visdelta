@@ -58,7 +58,7 @@ const DEFAULT_STORY = 'sort';
 const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
 /** Timeline panel heights in pixels: one fixed height per view, adjustable by dragging the top edge. */
-const DEFAULT_TIMELINE = { compact: 56, details: 240 };
+const DEFAULT_TIMELINE = { compact: 56, details: 200 };
 const TIMELINE_RANGE = [56, 360] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
