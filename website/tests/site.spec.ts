@@ -408,7 +408,8 @@ test.describe('playground', () => {
     await expect(track.locator('.pg-stage-block').nth(1)).toHaveAttribute('aria-label', /stage 2 of 2:/);
     await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
     await expect(keys(page).nth(2)).toHaveAttribute('data-time', '2.7');
-    await expect(track).toContainText('2.70s / 2.70s');
+    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('2.70');
+    await expect(track).toContainText('s / 2.70s');
     // Measure the settled track, not the scale-in entrance transform.
     await track.locator('.pg-clip').evaluateAll(clips => Promise.all(clips.flatMap(clip => clip.getAnimations().map(animation => animation.finished))));
     const clipWidths = await track.locator('.pg-clip').evaluateAll((clips) => clips.map((clip) => clip.getBoundingClientRect().width));
@@ -416,7 +417,8 @@ test.describe('playground', () => {
 
     // Scrubbing to 1.25s sits in the first leg's second stage.
     await page.getByLabel('Keyframe timeline').fill('1.25');
-    await expect(track).toContainText('1.25s / 2.70s');
+    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('1.25');
+    await expect(track).toContainText('s / 2.70s');
     await expect(track.locator('.pg-clip').first()).toHaveAttribute('data-active', 'true');
     await expect(track.locator('.pg-stage-block[data-active]')).toHaveCount(1);
     expect(await track.locator('.pg-stage-block').evaluateAll((blocks) => blocks.findIndex((block) => block.hasAttribute('data-active')))).toBe(1);
@@ -428,7 +430,8 @@ test.describe('playground', () => {
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play keyframes' })).toBeVisible({ timeout: 10_000 });
     expect(Date.now() - started).toBeGreaterThan(2_300);
-    await expect(track).toContainText('2.70s / 2.70s');
+    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('2.70');
+    await expect(track).toContainText('s / 2.70s');
     expect(errors).toEqual([]);
   });
 
