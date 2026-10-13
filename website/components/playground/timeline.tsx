@@ -44,7 +44,6 @@ interface TimelineProps {
   children?: ReactNode;
   inspecting?: boolean;
   onInspect?: (position: number | null) => void;
-  onPreviewStage?: (from: number, to: number) => void;
   /** Smallest and largest panel height, in pixels. */
   heightRange: readonly [number, number];
   /** The reader resizes the panel; `commit` is false while the drag is live. */
@@ -118,13 +117,11 @@ export function Timeline({
   children,
   inspecting = false,
   onInspect,
-  onPreviewStage,
   heightRange,
   onHeight,
   onResetHeight,
 }: TimelineProps) {
   const resize = useRef<{ pointerId: number; startY: number; startHeight: number; current: number } | null>(null);
-  const [details, setDetails] = useState(false);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -166,8 +163,6 @@ export function Timeline({
   const selectedKey = selectedLeg >= 0 ? keyframes[selectedLeg + 1] : undefined;
   const selectedStages = Math.max(1, selectedKey?.stages ?? 1);
   const selectedStage = picked >= 0 ? Math.min(selection!.stage, selectedStages - 1) : Math.min(selectedStages - 1, Math.max(0, Math.floor((replaying ? value - selectedLeg : 1) * selectedStages - 1e-9)));
-  const selectedDuration = durations[selectedLeg] ?? stageDuration;
-  const selectedStart = selectedKey ? times[selectedLeg] + selectedStage * selectedDuration : 0;
   const stageLabel = (key: TimelineKey, stage: number) => key.stageLabels?.[stage] === '' ? 'No additional semantic change' : key.stageLabels?.[stage] ?? 'Stage details unavailable';
   const boundaries = [0, ...keyframes.slice(1).flatMap((key, leg) => Array.from({ length: Math.max(1, key.stages) }, (_, stage) => times[leg] + (stage + 1) * durations[leg]))];
   const seekTime = (time: number) => { if (!Number.isFinite(time)) return; close(); onScrub(positionOf(Math.max(0, Math.min(total, time)))); };
@@ -225,8 +220,8 @@ export function Timeline({
     else if (head > node.scrollLeft + node.clientWidth - TRACK_PAD) node.scrollLeft = head - node.clientWidth + TRACK_PAD;
   }, [now, playing, pixelsPerSecond, replaying]);
   /** Guidance takes the track's place until there is something to scrub; a working timeline stays quiet. */
-  const guide = count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '';
-  const height = details ? heights.details : heights.compact;
+  const guide = count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit this keyframe, or use + above to add the next one.` : '';
+  const height = inspecting ? heights.details : heights.compact;
   const clampHeight = (value: number) => Math.min(heightRange[1], Math.max(heightRange[0], Math.round(value)));
   /** Drag the top edge: moving up makes the panel taller. */
   const startResize = (event: PointerEvent<HTMLDivElement>) => {
@@ -240,24 +235,24 @@ export function Timeline({
     const drag = resize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     drag.current = clampHeight(drag.startHeight + drag.startY - event.clientY);
-    onHeight(drag.current, false, details);
+    onHeight(drag.current, false, inspecting);
   };
   const endResize = (event: PointerEvent<HTMLDivElement>) => {
     const drag = resize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     resize.current = null;
-    onHeight(drag.current, true, details);
+    onHeight(drag.current, true, inspecting);
   };
   const nudgeHeight = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const next = { ArrowUp: height + 16, ArrowDown: height - 16, Home: heightRange[0], End: heightRange[1] }[event.key];
     if (next === undefined) return;
     event.preventDefault();
-    onHeight(clampHeight(next), true, details);
+    onHeight(clampHeight(next), true, inspecting);
   };
-  const lanes = details && visibleCategories.length > 0;
+  const lanes = visibleCategories.length > 0;
 
   return (
-    <section aria-label="Keyframes" className={className} data-details={details || undefined} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
+    <section aria-label="Keyframes" className={className} data-details={inspecting || undefined} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
       <div
         role="separator"
         aria-orientation="horizontal"
@@ -274,7 +269,7 @@ export function Timeline({
         onPointerCancel={endResize}
         onLostPointerCapture={endResize}
         onKeyDown={nudgeHeight}
-        onDoubleClick={() => onResetHeight(details)}
+        onDoubleClick={() => onResetHeight(inspecting)}
       />
       <div className="pg-timeline-body">
       <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2">
@@ -305,7 +300,7 @@ export function Timeline({
           <div className="pg-time-viewport" ref={viewportRef} role="region" aria-label="Timeline tracks" tabIndex={0}
             onKeyDown={trackKey}
             onScroll={event => setViewport({ width: event.currentTarget.clientWidth, left: event.currentTarget.scrollLeft })}>
-        <div className="pg-track" style={{ width: `${trackWidth}px` }} data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} data-single={count === 1 || undefined}>
+        <div className="pg-track" style={{ width: `${trackWidth}px` }} data-details={inspecting || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} data-single={count === 1 || undefined}>
           <div className="pg-ruler" onPointerDown={event => {
             event.currentTarget.setPointerCapture(event.pointerId);
             scrubRuler(event);
@@ -330,11 +325,11 @@ export function Timeline({
               >
                 <span className="pg-clip-label">
                   {describeLeg(key)}
-                  {details && key.stages > 1 && <span className="pg-clip-stages">{key.stages} stages</span>}
+                  {inspecting && key.stages > 1 && <span className="pg-clip-stages">{key.stages} stages</span>}
                 </span>
               </span>
             ))}
-            {details && keyframes.slice(1).flatMap((key, index) =>
+            {inspecting && keyframes.slice(1).flatMap((key, index) =>
               Array.from({ length: Math.max(1, key.stages) }, (_, stage) => {
                 const local = replaying ? (value - index) * Math.max(1, key.stages) : -1;
                 const label = stageLabel(key, stage);
@@ -349,7 +344,6 @@ export function Timeline({
                     aria-pressed={selection?.id === key.id && selectedStage === stage}
                     title={description}
                     onClick={() => { close(); setSelection({ id: key.id, stage }); if (inspecting) onInspect?.(index + (stage + 0.5) / Math.max(1, key.stages)); }}
-                    onDoubleClick={() => onPreviewStage?.(index + stage / Math.max(1, key.stages), index + (stage + 1) / Math.max(1, key.stages))}
                     style={{ left: x(times[index] + stage * durations[index]), width: width(durations[index]) }}
                   ><span className="pg-stage-number">{stage + 1}</span><span className="pg-stage-name">{label}</span></button>
                 );
@@ -414,37 +408,25 @@ export function Timeline({
           onClick={onKeep}
           disabled={!canKeep}
           className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
-          title={`Keep this state as a keyframe (${mod}S)`}
+          title={`Save at the playhead: update a keyframe or insert between keyframes (${mod}S)`}
         >
           <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
           Keep
         </button>
-        {count > 0 && (
+        {count > 1 && (
           <button
             type="button"
-            aria-expanded={details}
-            aria-controls="pg-details"
-            onClick={() => setDetails(!details)}
-            title={details ? 'Hide details' : 'Show stages, categories and navigation'}
+            aria-expanded={inspecting}
+            aria-controls="pg-inspector"
+            onClick={() => onInspect?.(inspecting ? null : selectedLeg + (selectedStage + 0.5) / selectedStages)}
+            title={inspecting ? 'Close the stage inspector' : 'Open the stage inspector'}
             className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
           >
             Details
-            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
+            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${inspecting ? 'rotate-180' : ''}`} />
           </button>
         )}
       </div>
-      {details && count > 0 && <div id="pg-details" className="pg-stage-selection" aria-label="Selected stage">
-        {selectedKey && <>
-          <button type="button" className="pg-stage-range" aria-label="Go to start" title="Go to the start of this stage" onClick={() => seekTime(selectedStart)}>{seconds(selectedStart)}–{seconds(selectedStart + selectedDuration)}</button>
-          <span className="pg-stage-title">
-            <strong>{stageLabel(selectedKey, selectedStage).replace(/^Chart stage: /, '')}</strong>
-            <span>{selectedLeg + 1}·{selectedStage + 1}</span>
-          </span>
-        </>}
-        <span className="pg-stage-actions">
-          {selectedKey && <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : selectedLeg + (selectedStage + 0.5) / selectedStages)}>{inspecting ? 'Hide inspector' : 'Inspect'}</button>}
-        </span>
-      </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
         <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>
         {previews[hover.id]?.image

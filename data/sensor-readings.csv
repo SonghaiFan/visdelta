@@ -1,0 +1,11 @@
+date,sensor,reading,valid
+2025-01-01,North intake,12,true
+2025-01-02,North intake,13,true
+2025-01-03,North intake,12,true
+2025-01-04,North intake,94,false
+2025-01-05,North intake,13,true
+2025-01-06,North intake,14,true
+2025-01-07,North intake,14,true
+2025-01-08,North intake,13,true
+2025-01-09,North intake,15,true
+2025-01-10,North intake,14,true

@@ -1,9 +1,9 @@
 'use client';
 
-import { Link2, PanelLeft, Play, RotateCcw } from 'lucide-react';
+import { Link2, PanelLeft, Play, Plus, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DeltaResult, StateChange } from 'visdelta/core';
-import type { CanvasSize, VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
+import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
 import { CodeEditor, type CodeHints } from '@/components/interactive/code-editor';
 import { loadIdioms, type LabChart } from '@/components/interactive/corpus';
 import {
@@ -86,7 +86,7 @@ interface Keyframe extends Version {
 interface Display {
   layer: HTMLElement;
   controller: Controller;
-  size: { width: CanvasSize; height: CanvasSize };
+  size: { width: number; height: number };
   kind: 'live' | 'replay';
 }
 
@@ -146,7 +146,7 @@ export function Playground() {
   const stageRef = useRef<HTMLDivElement>(null);
   const floatRef = useRef<HTMLElement>(null);
   /** What every chart is asked for: fit its layer, or a fixed canvas. */
-  const sizeRef = useRef<{ width: CanvasSize; height: CanvasSize }>({ width: 'auto', height: 'auto' });
+  const sizeRef = useRef<{ width: number; height: number }>({ ...FIXED_DEFAULT });
   const factoriesRef = useRef<Awaited<ReturnType<typeof loadFactories>> | null>(null);
   const membersRef = useRef(new Map<ChartName, string[]>());
   const displayRef = useRef<Display | null>(null);
@@ -155,6 +155,8 @@ export function Playground() {
   /** The last version of the code that ran. */
   const latestRef = useRef<Version | null>(null);
   const keyframesRef = useRef<Keyframe[]>([]);
+  /** Editing keeps its authored timeline position even after returning to live mode. */
+  const editPosition = useRef(0);
   const replayOf = useRef<Keyframe[] | null>(null);
   const datasetRef = useRef<Dataset>(inlineData);
   const codeRef = useRef('');
@@ -255,7 +257,12 @@ export function Playground() {
   const selectedKeyframe = Math.max(0, Math.min(keyframes.length - 1, Math.round(replaying ? value : livePosition ?? value)));
   /** Floating needs room beside the editor, so narrow screens stay docked. */
   const floating = placementPreference === 'float' && wide;
-  const floatingWindow = useFloatingWindow(appRef, floatRef, '.pg-toolbar');
+  const updateCanvasSize = useCallback(({ width, height }: { width?: number; height?: number }) => {
+    const bound = (value: number) => Math.round(Math.min(SIZE_LIMITS.max, Math.max(SIZE_LIMITS.min, value)));
+    if (width != null) setFixedWidthPreference(String(bound(width)));
+    if (height != null) setFixedHeightPreference(String(bound(height)));
+  }, [setFixedWidthPreference, setFixedHeightPreference]);
+  const floatingWindow = useFloatingWindow(appRef, floatRef, '.pg-toolbar', updateCanvasSize, sizeMode === 'fixed');
   const { contain: containFloat, reset: resetFloat } = floatingWindow;
 
   const writeCode = useCallback((text: string) => {
@@ -274,6 +281,25 @@ export function Playground() {
     flashTimer.current = window.setTimeout(() => setFlash(''), 3200);
   }, []);
 
+  /** Fit is a display transform; every controller sees the same authored canvas. */
+  const fitLayer = useCallback((layer: HTMLElement) => {
+    const stage = stageRef.current;
+    const width = layer.offsetWidth;
+    const height = layer.offsetHeight;
+    if (!stage || !width || !height || !stage.clientWidth || !stage.clientHeight) return;
+    const scale = Math.min(stage.clientWidth / width, stage.clientHeight / height);
+    layer.style.setProperty('--pg-fit-scale', String(scale));
+    layer.style.setProperty('--pg-fit-x', `${(stage.clientWidth - width * scale) / 2}px`);
+    layer.style.setProperty('--pg-fit-y', `${(stage.clientHeight - height * scale) / 2}px`);
+    const preview = previewPaneRef.current;
+    const svg = layer.querySelector('svg.vd-chart');
+    if (preview?.dataset.floating === 'true' && preview.dataset.canvasMode === 'fixed' && svg) {
+      const chrome = svg.getBoundingClientRect().top - layer.getBoundingClientRect().top;
+      layer.style.setProperty('--pg-canvas-top', `${chrome}px`);
+      preview.style.setProperty('--pg-float-chrome', `${chrome}px`);
+    } else preview?.style.setProperty('--pg-float-chrome', '0px');
+  }, []);
+
   /** The size every new chart is built with. */
   const canvas = useCallback(() => ({ ...sizeRef.current }), []);
 
@@ -285,12 +311,14 @@ export function Playground() {
     layer.dataset.state = 'hidden';
     stageRef.current!.append(layer);
     try {
-      return { layer, controller: await build(layer), size };
+      const controller = await build(layer);
+      fitLayer(layer);
+      return { layer, controller, size };
     } catch (cause) {
       layer.remove();
       throw cause;
     }
-  }, [canvas]);
+  }, [canvas, fitLayer]);
 
   /** Show a mounted layer at one exact frame in place of the current one. */
   const show = useCallback((next: Omit<Display, 'kind'>, kind: Display['kind'], at: number, fade = false) => {
@@ -303,6 +331,7 @@ export function Playground() {
       next.size = size;
     }
     next.controller.progress(at);
+    fitLayer(next.layer);
     const previous = displayRef.current;
     displayRef.current = { ...next, kind };
     if (fade) requestAnimationFrame(() => (next.layer.dataset.state = 'shown'));
@@ -318,7 +347,7 @@ export function Playground() {
     } else {
       retire();
     }
-  }, [canvas]);
+  }, [canvas, fitLayer]);
 
   /** Remove the chart on screen, as for code that has not run yet. */
   const clearStage = useCallback(() => {
@@ -381,7 +410,10 @@ export function Playground() {
           const tracked = index > 0 && frames[index].code === target.code && frames[index - 1].code === from.code;
           const storyToken = storyRun.current;
           const track = (progress: number) => {
-            if (tracked && keyframesRef.current === frames && storyRun.current === storyToken) setLivePosition(index - 1 + progress);
+            if (tracked && keyframesRef.current === frames && storyRun.current === storyToken) {
+              editPosition.current = index - 1 + progress;
+              setLivePosition(editPosition.current);
+            }
           };
           track(0);
           if (prefersReducedMotion()) {
@@ -469,32 +501,73 @@ export function Playground() {
     }
   }, []);
 
-  /** Keep a version as the next keyframe. */
-  const keep = useCallback(async (version: Version | null = latestRef.current) => {
-    if (!version) return;
+  /** Update an authored endpoint, or insert a state in the selected leg. Stories append. */
+  const keep = useCallback(async (version: Version | null = latestRef.current, mode: 'position' | 'append' | 'story' = 'position') => {
+    const append = mode !== 'position';
+    const story = mode === 'story';
     const frames = keyframesRef.current;
-    const last = frames.at(-1);
+    const position = editPosition.current;
+    if (!story && codeRef.current !== version?.code) {
+      if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+      const request = ++evalRun.current;
+      try {
+        const source = codeRef.current;
+        version = { state: await evaluate(source), code: source };
+        if (request !== evalRun.current || keyframesRef.current !== frames || editPosition.current !== position) return;
+        setError(null);
+        setLatest(version);
+        goLive();
+        await present(version);
+      } catch (cause) {
+        if (request === evalRun.current) setError(errorMessage(cause));
+        return;
+      }
+    }
+    if (!version) return;
     version = { ...version, state: (await freezeState(version.state)).state };
     if (keyframesRef.current !== frames) return;
-    let difference: StateChange[] = [];
-    if (last) {
-      if (last.state.toSpec().mark !== version.state.toSpec().mark) {
-        setNotice('Keyframes share one chart type. Clear them to start another.');
-        return;
-      }
-      const result = await compare(last.state, version.state);
-      if (unchanged(result)) {
-        setNotice(`This is already keyframe ${frames.length}.`);
-        return;
-      }
-      difference = result.stateChanges;
+    if (frames.length && frames[0].state.toSpec().mark !== version.state.toSpec().mark) {
+      setNotice('Keyframes share one chart type. Open another example to start another chart type.');
+      return;
     }
-    const { stages, stageLabels, stageDetails } = last ? await measureStages(last.state, version.state) : { stages: 0, stageLabels: [], stageDetails: [] };
-    if (keyframesRef.current !== frames) return; // cleared or kept meanwhile
-    keyframesRef.current = [...frames, { ...version, id: nextKey.current++, changes: difference, stages, stageLabels, stageDetails }];
-    setKeyframes(keyframesRef.current);
-    setNotice('');
-  }, [measureStages]);
+    const at = Math.max(0, Math.min(frames.length - 1, position));
+    const update = !append && frames.length > 0 && Math.abs(at - Math.round(at)) < 1e-6;
+    const index = append || !frames.length ? frames.length : update ? Math.round(at) : Math.floor(at) + 1;
+    const previous = frames[index - 1];
+    if (update && frames[index].code === version.code && unchanged(await compare(frames[index].state, version.state))) {
+      setNotice(`This is already keyframe ${index + 1}.`);
+      return;
+    }
+    if (!update && previous && unchanged(await compare(previous.state, version.state))) {
+      setNotice(`This is already keyframe ${index}.`);
+      return;
+    }
+    const saved: Keyframe = { ...version, id: update ? frames[index].id : nextKey.current++, changes: [], stages: 0, stageLabels: [], stageDetails: [] };
+    const next = [...frames];
+    next.splice(index, update ? 1 : 0, saved);
+    // Both incoming edges change when a frame is inserted or replaced.
+    for (const edge of [index, index + 1]) {
+      if (edge >= next.length) continue;
+      if (edge === 0) continue;
+      const result = await compare(next[edge - 1].state, next[edge].state);
+      next[edge] = { ...next[edge], changes: result.stateChanges, ...await measureStages(next[edge - 1].state, next[edge].state) };
+    }
+    if (keyframesRef.current !== frames || (!story && (editPosition.current !== position || codeRef.current !== version.code))) return;
+    keyframesRef.current = next;
+    setKeyframes(next);
+    editPosition.current = index;
+    setValue(index);
+    if (!story) {
+      goLive();
+      setLivePosition(index);
+      shownRef.current = next[index];
+      setLatest(next[index]);
+      setChanges(next[index].changes);
+      setChangeStages(next[index].stages);
+      setInspecting(false);
+    }
+    setNotice(story ? '' : update ? `Updated keyframe ${index + 1}.` : `Inserted keyframe ${index + 1}.`);
+  }, [evaluate, goLive, measureStages, present, setLatest]);
 
   /** Run code; if it is a valid state, the chart moves to it. */
   const run = useCallback(
@@ -507,11 +580,13 @@ export function Playground() {
         const version = { state, code: source };
         setLatest(version);
         goLive();
+        setLivePosition(editPosition.current);
+        setInspecting(false);
         const first = reviewRef.current;
         reviewRef.current = false;
         setReview(false);
         await present(version);
-        if (first && request === evalRun.current) await keep(version);
+        if (first && request === evalRun.current) await keep(version, 'story');
       } catch (cause) {
         if (request === evalRun.current) setError(errorMessage(cause));
       }
@@ -522,6 +597,10 @@ export function Playground() {
   const onEdit = useCallback(
     (text: string) => {
       storyRun.current += 1; // the reader takes over from a story
+      replayRun.current += 1;
+      displayRef.current?.controller.pause();
+      setPlaying(false);
+      setLivePlaying(false);
       setWriting(false);
       setNotice('');
       writeCode(text);
@@ -542,6 +621,7 @@ export function Playground() {
   const follow = useCallback(
     (position: number) => {
       const frames = keyframesRef.current;
+      editPosition.current = position;
       setValue(position);
       const reached = Math.min(frames.length - 1, Math.max(0, Math.floor(position + 1e-9)));
       const leg = Math.min(frames.length - 1, Math.max(1, Math.ceil(position - 1e-6)));
@@ -595,6 +675,7 @@ export function Playground() {
       const token = ++replayRun.current;
       // Commit the controlled input immediately, before preparing the sequence.
       // Otherwise its following native change event can restore the old playhead.
+      editPosition.current = position;
       setValue(position);
       setLivePosition(position);
       storyRun.current += 1;
@@ -724,6 +805,7 @@ export function Playground() {
       reviewRef.current = Boolean(next.review);
       setReview(Boolean(next.review));
       keyframesRef.current = [];
+      editPosition.current = 0;
       setKeyframes([]);
       const frames = storyFrames(next);
       writeCode(frames[0]);
@@ -741,7 +823,7 @@ export function Playground() {
             const version = { state: await evaluate(frame), code: frame };
             if (token !== storyRun.current) return;
             setLatest(version);
-            await keep(version);
+            await keep(version, 'story');
           }
           writeCode(frames.at(-1)!);
           await present(latestRef.current!);
@@ -751,7 +833,7 @@ export function Playground() {
         if (token !== storyRun.current) return;
         setLatest(first);
         await present(first);
-        await keep(first);
+        await keep(first, 'story');
         setBusy(false);
         for (const frame of frames.slice(1)) {
           await sleep(STEP_PAUSE);
@@ -764,7 +846,7 @@ export function Playground() {
           setLatest(version);
           // Reserve the complete leg before its clock starts; only the playhead
           // changes during the transition, not the timeline's duration.
-          await keep(version);
+          await keep(version, 'story');
           if (token !== storyRun.current) return;
           await present(version);
         }
@@ -841,18 +923,44 @@ export function Playground() {
     };
   }, [open]);
 
-  // A change of size mode, size or place reaches the chart on screen; charts built
-  // later read the same request. With "auto" the library follows the container itself.
+  // Only an explicit canvas-size edit reaches the renderer. Fit/Fixed toggles
+  // and container changes update the display transform, preserving motion caches.
   useEffect(() => {
-    const request = sizeMode === 'fixed' ? { width: fixedWidth, height: fixedHeight } : { width: 'auto' as const, height: 'auto' as const };
+    const request = { width: fixedWidth, height: fixedHeight };
     sizeRef.current = request;
     const display = displayRef.current;
-    if (display) {
+    if (display && (display.size.width !== request.width || display.size.height !== request.height)) {
       display.controller.resize(request);
       display.size = request;
     }
-    if (sizeMode === 'fit') stageRef.current?.scrollTo(0, 0);
-  }, [sizeMode, fixedWidth, fixedHeight]);
+  }, [fixedWidth, fixedHeight]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observed = new Set<HTMLElement>();
+    const update = () => {
+      const layers = [...stage.children].filter((node): node is HTMLElement => node instanceof HTMLElement && node.classList.contains('pg-layer'));
+      for (const layer of layers) {
+        if (!observed.has(layer)) { observed.add(layer); sizes.observe(layer); }
+        fitLayer(layer);
+      }
+      for (const layer of observed) if (!layers.includes(layer)) { sizes.unobserve(layer); observed.delete(layer); }
+    };
+    const sizes = new ResizeObserver(update);
+    sizes.observe(stage);
+    const mounts = new MutationObserver(update);
+    mounts.observe(stage, { childList: true });
+    update();
+    return () => { mounts.disconnect(); sizes.disconnect(); };
+  }, [fitLayer]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    for (const layer of stage.children) if (layer instanceof HTMLElement) fitLayer(layer);
+    if (sizeMode === 'fit') stage.scrollTo(0, 0);
+  }, [fitLayer, sizeMode, floating]);
 
   // A floating window stays inside the workspace when the workspace shrinks.
   useEffect(() => {
@@ -1098,7 +1206,7 @@ export function Playground() {
             type="button"
             className="pg-snapshot-card"
             aria-pressed={selectedKeyframe === index}
-            title={`Show keyframe ${index + 1}`}
+            title={`Play to keyframe ${index + 1}`}
             onClick={() => void playTo(index)}
           >
             <span className="pg-snapshot-image">
@@ -1109,6 +1217,11 @@ export function Playground() {
             </span>
             <span className="pg-snapshot-caption"><span>{String(index + 1).padStart(2, '0')}</span>{index === 0 ? 'Start' : `Keyframe ${index + 1}`}</span>
           </button>)}
+          <button type="button" className="pg-snapshot-add" aria-label="Add keyframe at end"
+            title="Add the edited chart after the last keyframe" disabled={busy || Boolean(error) || review}
+            onClick={() => void keep(undefined, 'append')}>
+            <Plus aria-hidden="true" className="size-4" />
+          </button>
         </div>
       </nav>}
 
@@ -1191,12 +1304,14 @@ export function Playground() {
           floatRef.current = element;
         }}
         aria-label="Preview"
+        data-floating={floating || undefined}
+        data-canvas-mode={sizeMode}
+        data-resizing={floatingWindow.resizing || undefined}
         className="pg-preview"
-        style={
-          floating && floatingWindow.rect
-            ? { left: floatingWindow.rect.x, top: floatingWindow.rect.y, width: floatingWindow.rect.w, height: floatingWindow.rect.h, right: 'auto' }
-            : undefined
-        }
+        style={floating ? {
+          ...(floatingWindow.rect ? { left: floatingWindow.rect.x, top: floatingWindow.rect.y, right: 'auto' } : {}),
+          ...(sizeMode === 'fixed' ? { width: fixedWidth, height: fixedHeight } : floatingWindow.rect ? { width: floatingWindow.rect.w, height: floatingWindow.rect.h } : {}),
+        } : undefined}
       >
         <div
           className="pg-viewbar"
@@ -1209,10 +1324,7 @@ export function Playground() {
             width={fixedWidth}
             height={fixedHeight}
             onMode={setSizeModePreference}
-            onSize={({ width, height }) => {
-              if (width != null) setFixedWidthPreference(String(width));
-              if (height != null) setFixedHeightPreference(String(height));
-            }}
+            onSize={updateCanvasSize}
             floating={floating}
             canFloat={wide}
             onFloat={() => {
@@ -1222,7 +1334,7 @@ export function Playground() {
           />
         </div>
         {!floating && <p className="min-h-6 shrink-0 px-4 pt-1 text-sm text-fd-muted-foreground">{story?.line}</p>}
-        <div className="relative min-h-0 flex-1 px-4">
+        <div className="pg-canvas-host relative min-h-0 flex-1 px-4">
           <div ref={stageRef} className="pg-stage vd-docs-chart" data-size={sizeMode} aria-label="Chart" aria-busy={busy} />
           {review && (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
@@ -1241,21 +1353,28 @@ export function Playground() {
         <p
           role="status"
           aria-label="State changes"
+          title={floating ? changes.map(formatChange).join(' · ') : undefined}
           className="flex min-h-7 shrink-0 flex-wrap items-baseline gap-x-2.5 gap-y-1 px-4 py-1 font-mono text-xs text-fd-muted-foreground"
         >
           <span className="font-sans font-semibold text-[var(--color-delta)]">Δ</span>
-          {changes.length ? changes.map((change, index) => <span key={index} className="text-fd-foreground/80">{formatChange(change)}</span>) : <span>edit the code; the chart follows</span>}
-          {changes.length > 0 && changeStages > 1 && <span className="ml-auto font-sans">planned in {changeStages} stages</span>}
+          {floating ? <>
+            <span>{changes.length} changes</span>
+            {changeStages > 1 && <span className="pg-change-stages ml-auto">{changeStages} stages</span>}
+            <span className="sr-only">{changes.map(formatChange).join(' · ')}</span>
+          </> : <>
+            {changes.length ? changes.map((change, index) => <span key={index} className="text-fd-foreground/80">{formatChange(change)}</span>) : <span>edit the code; the chart follows</span>}
+            {changes.length > 0 && changeStages > 1 && <span className="ml-auto font-sans">planned in {changeStages} stages</span>}
+          </>}
         </p>
+        {floating && floatingWindow.resizing && <output className="pg-resize-readout" aria-live="off">{fixedWidth} × {fixedHeight} px</output>}
         {floating &&
           EDGES.map((edge) => (
-            <span key={edge} aria-hidden="true" className="pg-resize" data-edge={edge} onPointerDown={floatingWindow.startResize(edge)} />
+            <span key={edge} aria-hidden="true" className="pg-resize" data-edge={edge} data-active={floatingWindow.resizeEdge === edge || undefined} title="Drag to resize canvas" onPointerDown={floatingWindow.startResize(edge)} />
           ))}
       </section>
 
       <Timeline
         className="pg-timeline"
-        onPreviewStage={(from, to) => void playTo(to, from)}
         inspecting={inspecting}
         onInspect={async position => {
           if (position === null) { setInspecting(false); return; }
@@ -1273,7 +1392,7 @@ export function Playground() {
         replaying={replaying || livePosition !== null}
         playing={playing || livePlaying}
         onScrub={(position) => void onScrub(position)}
-        onSeek={(index) => void playTo(index)}
+        onSeek={(index) => void onScrub(index)}
         onPlay={onPlay}
         onKeep={() => void keep()}
         canKeep={!busy && !error && !review}

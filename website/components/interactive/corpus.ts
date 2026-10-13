@@ -1,11 +1,4 @@
-/**
- * Typed access to example corpora kept beside the previous VitePress site. The
- * library's tests check the design comparisons, so the site imports both in
- * place instead of keeping copies:
- *
- * - docs/.vitepress/components/galleryIdioms.js       gallery idioms
- * - docs/.vitepress/components/designComparisons.js  "Not ideal → Better" pairs
- */
+/** Typed access to the interactive examples authored with the Fumadocs site. */
 
 export type LabChart = 'bar' | 'line' | 'area' | 'point' | 'unit';
 
@@ -29,5 +22,5 @@ export async function loadIdioms(): Promise<{
   idiomGroups: IdiomGroup[];
   datasetName: (url: string) => string;
 }> {
-  return (await import('@repo/docs/.vitepress/components/galleryIdioms.js')) as never;
+  return (await import('./gallery-idioms.js')) as never;
 }

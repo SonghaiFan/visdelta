@@ -24,9 +24,6 @@
       ],
       "collections/*": [
         "./.source/*"
-      ],
-      "@repo/*": [
-        "../*"
       ]
     },
     "plugins": [

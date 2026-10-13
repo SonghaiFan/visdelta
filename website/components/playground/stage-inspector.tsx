@@ -58,7 +58,7 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
   }, []);
   // Reading the box never modifies the rendered node or its animation styles.
   const box = selected?.node.isConnected ? selected.node.getBoundingClientRect() : null;
-  return <div className="pg-inspector" ref={root} aria-label="Stage inspector">
+  return <div className="pg-inspector" id="pg-inspector" ref={root} aria-label="Stage inspector">
     <div className="pg-inspector-tools">
       <strong>Transition {leg + 1} → {leg + 2}</strong>
       <input aria-label="Filter element tracks" placeholder="Filter element or attribute…" value={filter} onChange={event => { setFilter(event.target.value); setPages({}); }} />

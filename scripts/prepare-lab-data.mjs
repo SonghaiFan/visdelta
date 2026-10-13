@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { csvParse, csvFormat, autoType } from 'd3-dsv';
 import { utcMonday } from 'd3';
 
-const directory = new URL('../docs/public/data/', import.meta.url);
+const directory = new URL('../data/', import.meta.url);
 export async function preparedLabData() {
   const stocks = csvParse(await readFile(new URL('stock.csv', directory), 'utf8'), autoType);
   const lineRows = ['AAPL', 'GOOG'].flatMap(ticker =>

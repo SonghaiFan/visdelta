@@ -10,7 +10,13 @@ export type KeyframePreview = { image?: string; error?: boolean };
 export function useKeyframePreviews(frames: { id: number; state: ChartState }[]) {
   const [previews, setPreviews] = useState<Record<number, KeyframePreview>>({});
   const current = useRef(frames);
-  useLayoutEffect(() => { current.current = frames; }, [frames]);
+  useLayoutEffect(() => {
+    for (const frame of frames) {
+      const previous = current.current.find(item => item.id === frame.id);
+      if (previous && previous.state !== frame.state) cache.current.delete(frame.id);
+    }
+    current.current = frames;
+  }, [frames]);
   const cache = useRef(new Map<number, KeyframePreview>());
   const pending = useRef<number | null>(null);
   const queued = useRef<number[]>([]);
@@ -44,7 +50,7 @@ export function useKeyframePreviews(frames: { id: number; state: ChartState }[])
           result = image ? { image } : { error: true };
         } catch { result = { error: true }; }
         finally { controller?.destroy(); host.remove(); }
-        if (alive.current && token === generation.current && current.current.some(item => item.id === next)) {
+        if (alive.current && token === generation.current && current.current.some(item => item.id === next && item.state === frame.state)) {
           cache.current.set(next, result);
           setPreviews(Object.fromEntries(cache.current));
         }

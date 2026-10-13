@@ -9,7 +9,7 @@ import { transitionScenario } from '../examples/scenario.js';
 const evaluate = (code, name, rows) => new Function('bar', 'rows', `${code}\nreturn ${name};`)(bar, rows);
 
 test('Add real rows cells independently produce the six- and eight-state extracts', async () => {
-  const rows = csvParse(await readFile(new URL('../docs/public/data/us-population-state-age-tidy.csv', import.meta.url), 'utf8'), autoType);
+  const rows = csvParse(await readFile(new URL('../data/us-population-state-age-tidy.csv', import.meta.url), 'utf8'), autoType);
   const sample = scenarios.find(sample => sample.id === 'data');
   const from = evaluate(sample.code, 'from', rows).rows();
   const to = evaluate(sample.toCode, 'to', rows).rows();

@@ -28,9 +28,9 @@ if (!process.env.VISDELTA_ALLOW_STALE_DIST && statSync(dist).mtimeMs < newest(so
 }
 
 // The playground and gallery load the repository's bundled demo datasets.
-// They stay in docs/public/data (shared with library tests); copy them into
-// the site's public folder so the export serves them under <base>/data/.
-const dataSource = fileURLToPath(new URL('../../docs/public/data/', import.meta.url));
+// They stay in root data/ (shared with library checks); copy them into the
+// site's public folder so the export serves them under <base>/data/.
+const dataSource = fileURLToPath(new URL('../../data/', import.meta.url));
 const dataTarget = fileURLToPath(new URL('../public/data/', import.meta.url));
 mkdirSync(dataTarget, { recursive: true });
 cpSync(dataSource, dataTarget, { recursive: true, filter: (path) => !path.endsWith('README.md') });

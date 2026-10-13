@@ -1,6 +1,6 @@
 'use client';
 
-import { PictureInPicture2, PanelRight } from 'lucide-react';
+import { PictureInPicture2, PanelRight, Maximize2, Square, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export type SizeMode = 'fit' | 'fixed';
@@ -21,13 +21,13 @@ interface SizeControlsProps {
 }
 
 const MODES: { id: SizeMode; label: string; hint: string }[] = [
-  { id: 'fit', label: 'Fit', hint: 'The chart fills its container and follows it when it changes' },
+  { id: 'fit', label: 'Fit', hint: 'Scale the fixed canvas proportionally to the available space' },
   { id: 'fixed', label: 'Fixed', hint: 'The chart keeps this width and height; a smaller container scrolls' },
 ];
 
 /**
- * How big the chart is: fit its container (`width` and `height` "auto") or keep
- * a fixed width and height in pixels. Also where the preview lives: docked
+ * How the fixed canvas is displayed: scale it into its container, or show it
+ * at its original size with scrolling. Also where the preview lives: docked
  * beside the editor, or floating over it.
  */
 export function SizeControls({ mode, width, height, onMode, onSize, floating, canFloat, onFloat }: SizeControlsProps) {
@@ -52,7 +52,7 @@ export function SizeControls({ mode, width, height, onMode, onSize, floating, ca
   );
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+    <div className="pg-size-controls flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
       <div role="group" aria-label="Chart size" className="flex overflow-hidden rounded-sm border">
         {MODES.map((option) => (
           <button
@@ -66,11 +66,16 @@ export function SizeControls({ mode, width, height, onMode, onSize, floating, ca
               mode === option.id ? 'bg-fd-foreground text-fd-background' : 'text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground',
             )}
           >
-            {option.label}
+            <span className="pg-size-mode-label">{option.label}</span>
+            {option.id === 'fit' ? <Maximize2 aria-hidden="true" className="pg-size-mode-icon size-3" /> : <Square aria-hidden="true" className="pg-size-mode-icon size-3" />}
           </button>
         ))}
       </div>
-      {mode === 'fixed' && (
+      {floating && <details className="pg-size-menu">
+        <summary aria-label="Canvas dimensions" title="Edit canvas width and height"><SlidersHorizontal aria-hidden="true" className="size-3" /><span className="pg-size-readout">{width} × {height}</span></summary>
+        <div className="pg-size-popover">{field('Chart width in pixels', width, 'width')}{field('Chart height in pixels', height, 'height')}</div>
+      </details>}
+      {mode === 'fixed' && !floating && (
         <>
           {field('Chart width in pixels', width, 'width')}
           {field('Chart height in pixels', height, 'height')}
@@ -85,7 +90,7 @@ export function SizeControls({ mode, width, height, onMode, onSize, floating, ca
           className="pg-tool ml-auto"
         >
           {floating ? <PanelRight aria-hidden="true" className="size-3.5" /> : <PictureInPicture2 aria-hidden="true" className="size-3.5" />}
-          {floating ? 'Dock' : 'Float'}
+          <span className={floating ? 'sr-only' : undefined}>{floating ? 'Dock' : 'Float'}</span>
         </button>
       )}
     </div>

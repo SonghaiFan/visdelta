@@ -89,10 +89,9 @@ test('one saved sequence retains all seven category lanes and overlapping change
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.insertText(`const chart = ${expression};`);
     await page.getByRole('button', { name: 'Run', exact: true }).click();
-    await page.getByRole('button', { name: 'Keep', exact: true }).click();
+    await page.getByRole('button', { name: 'Add keyframe at end', exact: true }).click();
     await expect(page.locator('.pg-key')).toHaveCount(index + 2);
   }
-  await page.getByRole('button', { name: 'Details' }).click();
   await expect(page.locator('.pg-category-name')).toHaveText(['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']);
   const firstTime = await page.locator('.pg-key').nth(1).getAttribute('data-time');
   await page.getByLabel('Keyframe timeline').fill(String(Number(firstTime) / 2));

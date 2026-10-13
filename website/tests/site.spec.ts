@@ -316,15 +316,16 @@ test.describe('playground', () => {
     const errors = trackErrors(page);
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    await keys(page).last().click();
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
     // The new state is live but not kept until the reader keeps it.
     await expect(keys(page)).toHaveCount(3);
     await page.keyboard.press('ControlOrMeta+s');
-    await expect(keys(page)).toHaveCount(4);
+    await expect(keys(page)).toHaveCount(3);
     await page.keyboard.press('ControlOrMeta+s');
-    await expect(page.getByText('This is already keyframe 4.')).toBeVisible();
+    await expect(page.getByText('This is already keyframe 3.')).toBeVisible();
 
     await typeInto(page, editor, 'const chart = line(rows).nope();');
     await expect(page.getByRole('alert').filter({ hasText: 'is not a function' })).toBeVisible();
@@ -336,6 +337,7 @@ test.describe('playground', () => {
   test('completions offer the chart\'s own methods and the rows\' fields', async ({ page }) => {
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    await keys(page).last().click();
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).cur');
     const list = page.locator('.cm-tooltip-autocomplete');
@@ -629,6 +631,7 @@ test.describe('playground', () => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
+    await keys(page).last().click();
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });

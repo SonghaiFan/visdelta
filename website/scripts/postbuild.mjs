@@ -1,8 +1,7 @@
-// Runs after `next build`. Adds compatibility files to the static export:
-// redirects from the previous VitePress URLs, and assets that external pages
-// link to. Next.js has no redirect support in static exports, so each legacy
-// URL becomes a tiny HTML page with a canonical link and an immediate redirect.
-import { access, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+// Runs after `next build`. Adds compatibility redirects from the previous
+// documentation URLs. Next.js has no redirect support in static exports, so
+// each legacy URL becomes a tiny HTML page with a canonical link and redirect.
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -77,13 +76,6 @@ for (const [legacy, target] of Object.entries(legacyRedirects)) {
   }
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, redirectPage(target));
-}
-
-// The README and external posts link to the previous site's demo GIF.
-const legacyAssets = ['demo.gif'];
-for (const asset of legacyAssets) {
-  const from = fileURLToPath(new URL(`../../docs/public/${asset}`, import.meta.url));
-  if (await exists(from)) await copyFile(from, join(out, asset));
 }
 
 // Record the base path this export was built for, so `npm start` and the

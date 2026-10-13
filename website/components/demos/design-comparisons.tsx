@@ -136,7 +136,7 @@ export function DesignComparisons() {
       }
     });
     resizer.observe(document.documentElement);
-    import('@repo/docs/.vitepress/components/designComparisons.js').then((module) => {
+    import('@/components/interactive/design-comparisons.js').then((module) => {
       if (!disposed.current) setCorpus(module as unknown as Corpus);
     });
     return () => {

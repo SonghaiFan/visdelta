@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/public/visdelta-logo.svg" width="160" alt="VisDelta logo">
+  <img src="website/public/visdelta-logo.svg" width="160" alt="VisDelta logo">
 </p>
 
 # VisDelta
@@ -11,7 +11,7 @@ control play or seek the transition.
 > This project is evolving quickly and will remain free and open source forever. If you’ve downloaded it or are using it, please **Star** the repository and [**Follow @SonghaiFan**](https://github.com/SonghaiFan) to keep up with my projects. Your Star is my biggest source of support and motivation to keep building.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SonghaiFan/visdelta/main/docs/public/demo.gif" width="760" alt="A bar chart scrubbed from a rollup to an age breakdown to a grouped layout and back, driven by progress(t)">
+  <img src="https://raw.githubusercontent.com/SonghaiFan/visdelta/main/website/public/demo.gif" width="760" alt="A bar chart scrubbed from a rollup to an age breakdown to a grouped layout and back, driven by progress(t)">
 </p>
 
 Every frame above is `change.progress(t)` — the same frames play forward,

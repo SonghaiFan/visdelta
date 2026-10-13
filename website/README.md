@@ -155,22 +155,26 @@ code, then the chart.
   motion never jumps. A broken edit shows its error and keeps the last chart.
   With **Auto-run** off, edits wait for **Run** (⌘/Ctrl+Enter) and land as one
   transition; the switch is remembered per viewer.
-- **Keyframes.** **Keep** (⌘S) saves the current state as a keyframe. Kept
-  keyframes replay as one real `sequence()` on a real-time track: each leg is a
+- **Keyframes.** **Keep** (⌘S) updates the keyframe at the playhead, or inserts a new frame
+  between neighboring keyframes when the playhead is between them. Code edits
+  retain that position. The **+** beside the snapshots explicitly adds a frame
+  at the end. Kept keyframes replay as one real `sequence()` on a real-time track: each leg is a
   clip as long as it plays, and a lane below shows the route stages VisDelta
   planned for it (`stageCount()`; `play()` gives each stage the same duration).
-  Play, scrub, or click a keyframe to travel to it. The code and the Δ line
+  Timeline keyframe clicks seek and pause. Snapshot clicks play to that frame.
+  The code and the Δ line
   follow the playhead, and the next edit moves on from the keyframe on screen.
-- **Chart size.** The preview's **Fit / Fixed** switch sets the `width` and
-  `height` every chart is built with (the canvas alone: a title, a subtitle and a
-  top legend sit above it and take their room from the preview under Fit; a fixed
-  size is added to theirs): `"auto"` follows the preview (the library
-  re-fits when it changes, including during a keyframe replay), **Fixed** keeps
-  a width and height in pixels and the preview scrolls when it is smaller. The
-  choice is remembered per viewer. **Float** turns the preview into a window
-  over the editor that is dragged by its title bar and resized from its edges;
-  a chart set to Fit follows the window. Floating needs the wide layout, so
-  phones stay docked. The window is mouse and touch only; Dock returns it.
+- **Chart size.** **Fit** and **Fixed** use the same fixed canvas width and
+  height (640 × 400 by default). **Fit** scales the complete figure uniformly
+  into the preview; changing its container does not recalculate chart geometry
+  or simulation. **Fixed** displays the canvas at its original pixel size.
+  The choice and dimensions are remembered per viewer. **Float** makes the
+  preview a window over the editor. In Fixed mode, its dimensions equal the
+  canvas W/H and its controls sit outside that area. Dragging a floating edge
+  edits W/H through the same controls; moving or docking the window preserves
+  them. The bottom-right grip marks the resize corner; dragging shows the live
+  pixel dimensions. Floating W/H inputs open from the dimensions control in its
+  compact toolbar. Floating needs the wide layout, so phones stay docked.
 - **Share** puts the code, and the rows when they were edited or uploaded, in
   a compressed `#share=` hash and copies the link. Code from a link is shown
   but does not run until the reader presses Run. Rows too large for a URL are
@@ -284,20 +288,18 @@ To deploy elsewhere, build with the target's base path and `SITE_URL`, and serve
   loads only when search is opened.
 - **Legacy anchors.** Redirects preserve pages, not every in-page anchor of the
   old site.
-- **Legacy VitePress site.** The previous site in `docs/` is still built by the
-  root `npm test` (`docs:check`) and is no longer deployed. This site still
-  reads from it: datasets in `docs/public/data/` (copied to `public/data/` by
-  `scripts/prepare.mjs`), `demo.gif`, and the gallery and design-comparison
-  corpora in `docs/.vitepress/components/`. Move those into the site before
-  removing `docs/`.
-  The semantic constitution (`docs/language-framework.md`) and the regression
-  log remain the authoritative engineering records referenced by `AGENTS.md`.
+- **Source data and engineering records.** Shared CSV inputs live in the
+  repository-root `data/` directory. `scripts/prepare.mjs` copies them into
+  `public/data/` for the static site. The semantic constitution and transition
+  regression log remain in root `docs/` as authoritative engineering records
+  referenced by `AGENTS.md`; the reader-facing documentation lives here in
+  Fumadocs.
 
 ### Keyframe previews and category lanes
 
 Hover a numbered timeline marker, or focus it with the keyboard, to see a still
 preview of its saved state. Hovering leaves playback and code unchanged; click
-to travel to the keyframe, and press Escape to dismiss the preview. Touch taps
+to seek to the keyframe without playing, and press Escape to dismiss the preview. Touch taps
 continue to select keyframes directly. Previews fit the full figure into a
 480 × 300 frame, including its title, subtitle and top legend.
 
@@ -305,9 +307,9 @@ Category lanes show each leg's changes under Data, Grain, Encoding, Coordinate,
 Layout, Attention and Appearance. Only categories present in the saved sequence
 appear. A transition can occupy several lanes at once: these blocks describe
 its changes, not independent animation schedules. The stage strip retains the
-actual planned stage timing. The ruler is always visible, with a default scale of **160 pixels per second**. Short stories leave unused room; long stories scroll horizontally. Use **Details** to show stage labels, category lanes, navigation controls and the clear action. A story reserves each leg before playing it, and its playhead follows the chart controller at the same 0.9 seconds per stage used for replay. Clip widths remain fixed during playback; new clips fade in. Pausing or scrubbing takes control from the story. Code changes only when an authored keyframe is reached.
+actual planned stage timing. The ruler is always visible, with a default scale of **160 pixels per second**. Short stories leave unused room; long stories scroll horizontally. Category lanes are visible in the default view. **Details** opens the stage inspector directly. A story reserves each leg before playing it, and its playhead follows the chart controller at the same 0.9 seconds per stage used for replay. Clip widths remain fixed during playback; new clips fade in. Pausing or scrubbing takes control from the story. Code changes only when an authored keyframe is reached.
 
-Open **Details**, then use **Inspect** to enter the saved timeline and expand its compiled SVG
+Open **Details** to inspect the saved timeline and expand its compiled SVG
 phases. Each phase lists the element, recorded attribute/style/text track,
 phase-endpoint values, current value and scheduled interval. Select an element
 row to outline its mounted node, filter by element or property, or use **Show
@@ -317,13 +319,18 @@ Immediate renderer writes and node insertion/removal are not property tracks;
 title/subtitle HTML follows whole-transition progress separately. These limits
 are also shown under **Coverage and timing**, rather than guessed from categories.
 
-The timeline's stage strip also shows numbered, named intermediate stages
-without opening the inspector. Labels prefer the planner's exact declaration
+While the inspector is open, the timeline's stage strip shows numbered, named intermediate stages. Labels prefer the planner's exact declaration
 operation. Hover to read the complete action and time range; click or
-press Enter to select the stage without seeking. Authored keyframes keep their own
+press Enter to seek to that stage's midpoint and inspect it. Authored keyframes keep their own
 numbered diamond markers.
 
-The timeline toolbar provides explicit scale changes (40–1280 pixels per second), Show playhead, Show transition, and exact second entry. Navigation scrolls the shared time canvas without changing its scale or playhead. Native horizontal scrolling replaces the separate Pan slider; playback follows an offscreen playhead automatically. Previous/next stage moves to a planned stage boundary. Dragging the ruler scrubs, with optional snapping within eight pixels of a boundary. Selecting a stage is passive and reveals its complete label and timing; Preview (or double-click) plays that range. Inspect explicitly seeks into the selected stage and opens its recorded property phases. Category labels stay fixed beside the scrollable time rows. Attribute interval bars show local phase timing; categories continue to describe whole-transition membership.
+The editable time readout and ruler seek without playing. Focus the track and
+use +/−/0 to change its scale; Shift+←/→ seeks to adjacent stage boundaries.
+Dragging the ruler snaps within eight pixels of a boundary unless Alt is held.
+Category labels stay fixed beside the scrollable time rows. Clicking a stage
+opens its recorded phases at the midpoint. Snapshot clicks and the Play button
+control playback. Attribute interval bars show local phase timing; categories
+describe whole-transition membership.
 
 Timeline stage captions prefer `stageOperations()` metadata: the declaration slot and its previous/next values. `unset` means the explicit declaration is absent, not a guessed renderer default. Chart-authored or refined stages without a single planner operation retain a clearly prefixed “Chart stage” semantic summary. Category lanes still show the seven semantic categories.
 

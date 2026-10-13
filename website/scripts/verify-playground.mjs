@@ -27,7 +27,7 @@ for (const demo of playgroundDemos) {
   try {
     if (demo.edits.length < 1 || demo.edits.length > 4) throw new Error(`expected 1–4 purposeful edits, got ${demo.edits.length}`);
     const rows = demo.data
-      ? csvParse(await readFile(new URL(`../../docs/public/${demo.data.slice(2)}`, import.meta.url), 'utf8'), autoType)
+      ? csvParse(await readFile(new URL(`../../data/${demo.data.slice(7)}`, import.meta.url), 'utf8'), autoType)
       : [];
     const states = [];
     for (const [index, code] of storyFrames(demo).entries()) {
@@ -90,7 +90,7 @@ for (const key of legacyKeys) if (!coverageDocument.includes(`| \`${key}\` |`)) 
 
 // Facts used by the simulated stories must come from their checked-in source
 // rows, not from temporary values introduced by the authoring code.
-const readCsv = async (name) => csvParse(await readFile(new URL(`../../docs/public/data/${name}`, import.meta.url), 'utf8'), autoType);
+const readCsv = async (name) => csvParse(await readFile(new URL(`../../data/${name}`, import.meta.url), 'utf8'), autoType);
 const monthly = await readCsv('service-demand-monthly.csv');
 const expectedMonthlyTotals = [250, 260, 279, 301, 318, 332];
 const actualMonthlyTotals = Array.from(

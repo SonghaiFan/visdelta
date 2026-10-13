@@ -47,7 +47,7 @@
   const AGE_BANDS = ["<10", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "≥80"];
   const AGE_COLORS = ["#d53e4f", "#f46d43", "#fdae61", "#fee08b", "#ffffbf", "#e6f598", "#abdda4", "#66c2a5", "#3288bd"];
   const STATES = ["CA", "TX", "FL", "NY", "PA", "IL"];
-  const detailed = bar({ url: "/docs/public/data/us-population-state-age-tidy.csv" })
+  const detailed = bar({ url: "/data/us-population-state-age-tidy.csv" })
     .x("state", { label: "State" })
     .y("population", { label: "Population", format: "~s" })
     .key(["state", "age"])

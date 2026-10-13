@@ -6,7 +6,7 @@ import { preparedLabData, formatLabData } from '../scripts/prepare-lab-data.mjs'
 import { scenarios as lineScenarios } from '../examples/line/scenarios.js';
 import { scenarios as areaScenarios } from '../examples/area/scenarios.js';
 
-const root = new URL('../docs/public/data/', import.meta.url);
+const root = new URL('../data/', import.meta.url);
 const read = async name => csvParse(await readFile(new URL(name, root), 'utf8'), autoType);
 
 test('prepared demo CSVs reproduce their sources without drift', async () => {
