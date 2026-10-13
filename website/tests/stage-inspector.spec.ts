@@ -31,7 +31,7 @@ test('multi-stage inspection exposes stage numbers and exact element paths', asy
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   await page.getByRole('button', { name: 'Inspect stages', exact: true }).click();
   const inspector = page.getByLabel('Stage inspector');
-  await expect(inspector.locator('.pg-inspector-phase')).toHaveCount(1);
+  await expect(inspector.locator('.pg-inspector-phase')).toHaveCount(2);
   await expect(inspector.locator('summary').first()).toContainText('Stage 1');
   await inspector.locator('.pg-inspector-phase summary').first().click();
   const element = inspector.locator('td button').first();
@@ -87,22 +87,26 @@ test('regroup shows all six intermediate stage captions without opening the insp
 });
 
 
-test('timeline selection is passive, zoom and pan align rows, and boundaries seek exactly', async ({ page }) => {
+test('timeline selection is passive, zoom and scrolling align rows, and boundaries seek exactly', async ({ page }) => {
   await page.goto('playground/#focus');
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await expect(page.getByLabel('Chart code')).toContainText('.highlight({ cyl: 4 })');
   const time = page.getByLabel('Playhead time in seconds');
+  await expect(time).toHaveValue('2.70');
   const before = await time.inputValue();
   await page.locator('.pg-stage-block').nth(1).click();
   await expect(time).toHaveValue(before);
   await expect(page.getByLabel('Selected stage')).toContainText('focus');
-  await page.getByRole('button', { name: 'Fit transition', exact: true }).click();
-  await expect(page.getByLabel('Pan timeline')).toBeVisible();
+  await page.getByRole('button', { name: 'Zoom in timeline', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom in timeline', exact: true }).click();
+  await page.getByRole('button', { name: 'Show transition', exact: true }).click();
+  await expect(time).toHaveValue(before);
   const aligned = await page.locator('.pg-stage-block').nth(1).boundingBox();
   const category = await page.locator('.pg-category-block').filter({ hasText: 'attention.exit(focus)' }).boundingBox();
   expect(aligned!.x).toBeCloseTo(category!.x, 0);
   expect(aligned!.width * 2).toBeCloseTo(category!.width, 0);
-  await page.getByLabel('Pan timeline').fill('0');
+  await page.getByRole('region', { name: 'Timeline tracks', exact: true }).evaluate(node => { node.scrollLeft = 0; });
   await expect(time).toHaveValue(before);
   await page.getByRole('button', { name: 'Go to start', exact: true }).click();
   await expect(time).toHaveValue('0.90');
@@ -116,10 +120,11 @@ test('timeline selection is passive, zoom and pan align rows, and boundaries see
   await page.getByRole('button', { name: 'Inspect SVG tracks', exact: true }).click();
   await expect(page.locator('.pg-inspector-phase[open]').first()).toBeVisible();
   await expect(page.locator('.pg-property-interval').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Fit all', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom out timeline', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom out timeline', exact: true }).click();
   await expect(page.getByLabel('Pan timeline')).toHaveCount(0);
   const ruler = await page.locator('.pg-ruler').boundingBox();
-  await page.mouse.click(ruler!.x + 7 + (ruler!.width - 14) / 3 + 2, ruler!.y + 5);
+  await page.mouse.click(ruler!.x + 7 + 160 * 0.9 + 2, ruler!.y + 5);
   await expect(time).toHaveValue('0.90');
   await page.locator('.pg-stage-block').nth(1).dblclick();
   await expect(time).toHaveValue('1.80', { timeout: 5000 });
@@ -132,18 +137,18 @@ test('timeline selection is passive, zoom and pan align rows, and boundaries see
 });
 
 
-test('Swarm uses one complete layout stage with readable configuration', async ({ page }) => {
+test('Swarm moves from grouped counts to measured unit layouts with readable configuration', async ({ page }) => {
   await page.goto('playground/#swarm');
-  await expect(page.locator('.pg-key')).toHaveCount(2, { timeout: 25000 });
+  await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await expect(page.locator('.pg-stage-name')).toHaveCount(1);
-  await expect(page.locator('.pg-stage-name')).toHaveText('Change layout from grid to beeswarm');
-  await expect(page.getByLabel('Playhead time in seconds')).toHaveValue('0.90');
-  await expect(page.locator('.cm-content')).toContainText('.layout("beeswarm", { x: "petalLength" })');
+  await expect(page.locator('.pg-stage-name')).toHaveCount(4);
+  await expect(page.locator('.pg-stage-name').filter({ hasText: 'beeswarm' })).toHaveCount(1);
+  await expect(page.getByLabel('Chart code')).toContainText('Expand the grouped counts back to individuals');
+  await expect(page.locator('.cm-content')).toContainText('.x("petalLength").layout("beeswarm")');
   await expect(page.locator('.cm-content')).toContainText('.size(6)');
-  await page.locator('.pg-stage-block').click();
+  await page.locator('.pg-stage-block').nth(2).click();
   await page.getByText('Exact configuration', { exact: true }).click();
   await expect(page.getByLabel('Selected stage')).toContainText('petalLength');
-  await expect(page.getByLabel('Selected stage')).toContainText('"columns":15');
+  await expect(page.getByLabel('Selected stage')).toContainText('beeswarm');
   await page.screenshot({ path: '/tmp/visdelta-unit-layout-bundle.png', fullPage: true });
 });

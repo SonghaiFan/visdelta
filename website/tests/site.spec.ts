@@ -197,8 +197,8 @@ test.describe('playground', () => {
     const grip = page.getByRole('separator', { name: 'Resize timeline' });
     const height = async () => (await panel.boundingBox())!.height;
     const chartHeight = async () => (await page.locator('.pg-stage').boundingBox())!.height;
-    // Compact is exactly one row; its controls sit on one centre line.
-    expect(await height()).toBeCloseTo(56, 0);
+    // Compact includes the time ruler; its controls sit on one centre line.
+    expect(await height()).toBeCloseTo(80, 0);
     const centres = await panel.locator('button:visible').evaluateAll(nodes => nodes.filter(node => !node.classList.contains('pg-key')).map(node => { const rect = node.getBoundingClientRect(); return rect.top + rect.height / 2; }));
     expect(Math.max(...centres) - Math.min(...centres)).toBeLessThan(1.5);
     // Details opens to its own remembered height, then stays fixed.
@@ -223,7 +223,7 @@ test.describe('playground', () => {
     await page.mouse.up();
     expect(await height()).toBeCloseTo(280, 0);
     await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(56, 0);
+    expect(await height()).toBeCloseTo(80, 0);
     await page.reload();
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     await page.getByRole('button', { name: 'Details' }).click();
@@ -233,7 +233,7 @@ test.describe('playground', () => {
     await page.keyboard.press('ArrowDown');
     await expect(grip).toHaveAttribute('aria-valuenow', '264');
     await page.keyboard.press('Home');
-    await expect(grip).toHaveAttribute('aria-valuenow', '56');
+    await expect(grip).toHaveAttribute('aria-valuenow', '80');
     await grip.dblclick();
     await expect(grip).toHaveAttribute('aria-valuenow', '240');
     await page.setViewportSize({ width: 390, height: 844 });
@@ -290,25 +290,25 @@ test.describe('playground', () => {
     for (const label of ['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']) {
       await expect(tree.getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-expanded', 'true');
     }
-    await expect(tree.getByRole('button', { name: 'Sort', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(tree.getByRole('button', { name: /Which states have the largest under-ten populations/ })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('tab', { name: 'chart.js' })).toHaveAttribute('aria-selected', 'true');
     await expect(chart(page).locator('svg').first()).toBeVisible();
     // The editor, the preview and the timeline fill the window; the page does not scroll.
     expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(1);
-    // Start, sort descending, sort ascending: three kept states, each leg labelled.
+    // Add an interpretive title, then rank states by the stated measure.
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
-    await expect(page.getByLabel('Chart code')).toContainText('.sort("population", "ascending")');
+    await expect(page.getByLabel('Chart code')).toContainText('.sort("population", "descending")');
     await expect(changes(page)).toContainText('layout.reorder');
-    await expect(page.getByRole('button', { name: 'Keyframe 2: layout.reorder' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Keyframe 3: layout.reorder' })).toBeVisible();
     await expect(page.locator('.pg-clip')).toHaveCount(2);
     await expect(page.locator('footer.pg-status')).toContainText('Live');
 
     // Folders collapse; a story opens from the tree and its hash.
     await tree.getByRole('button', { name: 'Data', exact: true }).click();
     await expect(tree.getByRole('button', { name: 'Filter', exact: true })).toHaveCount(0);
-    await tree.getByRole('button', { name: 'Zip', exact: true }).click();
-    await expect(page).toHaveURL(/#zip$/);
-    await expect(page.getByRole('toolbar', { name: 'Playground' })).toContainText('Grain/Zip');
+    await tree.getByRole('button', { name: /Which services contribute/ }).click();
+    await expect(page).toHaveURL(/#service-line-split$/);
+    await expect(page.getByRole('toolbar', { name: 'Playground' })).toContainText('Grain/Which services contribute');
     await expect(chart(page).locator('svg path.vd-line').first()).toBeVisible();
     await expect(changes(page)).toContainText('grain.split', { timeout: 15_000 });
     expect(errors).toEqual([]);
@@ -316,17 +316,17 @@ test.describe('playground', () => {
 
   test('a reader edit animates from the chart on screen; a broken edit keeps it', async ({ page }) => {
     const errors = trackErrors(page);
-    await page.goto('playground/#zip');
-    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    await page.goto('playground/#service-line-split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     const editor = page.getByLabel('Chart code');
-    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
     // The new state is live but not kept until the reader keeps it.
-    await expect(keys(page)).toHaveCount(2);
-    await page.keyboard.press('ControlOrMeta+s');
     await expect(keys(page)).toHaveCount(3);
     await page.keyboard.press('ControlOrMeta+s');
-    await expect(page.getByText('This is already keyframe 3.')).toBeVisible();
+    await expect(keys(page)).toHaveCount(4);
+    await page.keyboard.press('ControlOrMeta+s');
+    await expect(page.getByText('This is already keyframe 4.')).toBeVisible();
 
     await typeInto(page, editor, 'const chart = line(rows).nope();');
     await expect(page.getByRole('alert').filter({ hasText: 'is not a function' })).toBeVisible();
@@ -336,8 +336,8 @@ test.describe('playground', () => {
   });
 
   test('completions offer the chart\'s own methods and the rows\' fields', async ({ page }) => {
-    await page.goto('playground/#zip');
-    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    await page.goto('playground/#service-line-split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).cur');
     const list = page.locator('.cm-tooltip-autocomplete');
@@ -345,16 +345,16 @@ test.describe('playground', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.type('ve("');
     await page.keyboard.press('Control+Space');
-    await expect(list.getByRole('option', { name: /ticker/ })).toBeVisible();
+    await expect(list.getByRole('option', { name: /service/ })).toBeVisible();
   });
 
   test('with auto-run off, edits wait for Run and land as one transition', async ({ page }) => {
     const errors = trackErrors(page);
-    await page.goto('playground/#zip');
-    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    await page.goto('playground/#service-line-split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     await page.getByRole('switch', { name: 'Auto-run' }).uncheck({ force: true });
     const editor = page.getByLabel('Chart code');
-    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await page.waitForTimeout(800);
     await expect(changes(page)).not.toContainText('appearance.reshape');
     await expect(page.locator('footer.pg-status')).toContainText('to run');
@@ -552,14 +552,14 @@ test.describe('playground', () => {
   test('a title is figure text above the chart; Fit uses the remaining room, Fixed slides it', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#headline');
-    // Start, title, subtitle, new title: four kept states.
-    await expect(keys(page)).toHaveCount(4, { timeout: 30_000 });
+    // Start, then add a title and subtitle: three kept states.
+    await expect(keys(page)).toHaveCount(3, { timeout: 30_000 });
     const stage = chart(page);
     const title = stage.locator('.vd-figure-title:visible').first();
-    await expect(title).toContainText('Children under ten');
-    await expect(changes(page)).toContainText('appearance.restyle(title)');
+    await expect(title).toContainText('Residents under 10');
+    await expect(changes(page)).toContainText('appearance.restyle(subtitle)');
     // The heading remains outside the SVG in both sizing modes.
-    expect(await stage.locator('svg').first().evaluate((svg) => svg.textContent?.includes('Children under ten'))).toBe(false);
+    expect(await stage.locator('svg').first().evaluate((svg) => svg.querySelector('.vd-figure-title') !== null)).toBe(false);
     expect(await stage.locator('figure').first().evaluate((figure) => figure.querySelector('figcaption') !== null && figure.querySelector('svg')!.closest('figcaption') === null)).toBe(true);
 
     // Fit keeps the figure in its container and gives the canvas the remaining room.
@@ -572,7 +572,7 @@ test.describe('playground', () => {
     await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const fitFirst = await canvas();
-    await timeline.fill('2.7');
+    await timeline.fill((await timeline.getAttribute('max'))!);
     await expect.poll(async () => (await canvas()).top).toBeGreaterThan(fitFirst.top);
     const fitLast = await canvas();
     expect(fitLast.width).toBe(fitFirst.width);
@@ -590,7 +590,7 @@ test.describe('playground', () => {
     await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const first = await canvas();
-    await timeline.fill('2.7');
+    await timeline.fill((await timeline.getAttribute('max'))!);
     await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(1);
     await expect.poll(async () => (await canvas()).top).toBeGreaterThan(first.top + 20);
     const last = await canvas();
@@ -626,12 +626,12 @@ test.describe('playground', () => {
   test('a share link carries the code and opens it only when the reader runs it', async ({ page, context }) => {
     const errors = trackErrors(page);
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.goto('playground/#zip');
-    await expect(keys(page)).toHaveCount(2, { timeout: 20_000 });
+    await page.goto('playground/#service-line-split');
+    await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     const editor = page.getByLabel('Chart code');
-    await typeInto(page, editor, 'const chart = line(rows).x("date").y("close").key(["date", "ticker"]).breakdown("ticker").color("ticker").curve("curveStepAfter");');
+    await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
-    await page.getByRole('button', { name: 'Share' }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
     await expect(page.locator('footer.pg-status')).toContainText(/Link (copied|is in the address bar)/);
     await expect(page).toHaveURL(/#share=[\w-]+$/);
     const link = page.url();
@@ -677,7 +677,7 @@ test.describe('playground', () => {
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
     await page.getByRole('button', { name: 'Show examples' }).click();
-    await examples(page).getByRole('button', { name: 'Remap', exact: true }).click();
+    await examples(page).getByRole('button', { name: /Is engine power related to fuel economy/ }).click();
     await expect(page).toHaveURL(/#remap$/);
     await expect(examples(page)).toBeHidden();
   });

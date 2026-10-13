@@ -66,6 +66,8 @@ export function matchLinePathFrames(
 
   const observation = pairObservationChanges(from.points, to.points);
   if (observation) {
+    const boundary = matchBoundaryObservations(from, to, renderPoints);
+    if (boundary) return boundary;
     const strategy = observation.added && observation.removed
       ? 'add-remove-points'
       : observation.added ? 'add-points' : 'remove-points';
@@ -75,6 +77,56 @@ export function matchLinePathFrames(
   return {
     strategy: 'match-shape',
     interpolate: matchLinePaths(fromNode, to.path)
+  };
+}
+
+/** Extend a linear prefix/suffix along its existing segments; reverse retracts only that tail. */
+function matchBoundaryObservations(
+  from: LinePathFrame,
+  to: LinePathFrame,
+  renderPoints: (points: readonly LinePathPoint[]) => string
+): LinePathMatch | null {
+  if (from.curve !== 'curveLinear') return null;
+  const adding = from.points.length < to.points.length;
+  const shorter = adding ? from.points : to.points;
+  const longer = adding ? to.points : from.points;
+  if (shorter.length >= longer.length) return null;
+  const matches = (offset: number) => shorter.every((point, index) => {
+    const other = longer[index + offset]!;
+    return point.key === other.key && point.x === other.x && point.y === other.y;
+  });
+  const prefix = matches(0);
+  if (!prefix && !matches(longer.length - shorter.length)) return null;
+  const ordered = prefix ? longer : [...longer].reverse();
+  const anchor = shorter.length - 1;
+  const lengths = ordered.slice(anchor + 1).map((point, index) => {
+    const previous = ordered[anchor + index]!;
+    return Math.hypot(point.x - previous.x, point.y - previous.y);
+  });
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  return {
+    strategy: adding ? 'add-points' : 'remove-points',
+    interpolate: progress => {
+      const value = clampProgress(progress);
+      if (value === 0) return from.path;
+      if (value === 1) return to.path;
+      let remaining = total * (adding ? value : 1 - value);
+      const visible: LinePathPoint[] = ordered.slice(0, anchor + 1);
+      for (let index = 0; index < lengths.length; index += 1) {
+        const start = ordered[anchor + index]!;
+        const end = ordered[anchor + index + 1]!;
+        const length = lengths[index]!;
+        if (remaining >= length) {
+          visible.push(end);
+          remaining -= length;
+        } else {
+          const ratio = remaining / length;
+          visible.push({ x: start.x + (end.x - start.x) * ratio, y: start.y + (end.y - start.y) * ratio });
+          break;
+        }
+      }
+      return renderPoints(prefix ? visible : visible.reverse());
+    }
   };
 }
 

@@ -94,6 +94,22 @@ test('adding and removing a keyed point use the same local path in reverse', () 
   }
 });
 
+test('a retained prefix or suffix stays fixed while the removed tail retracts sequentially', () => {
+  const all = frame(['A', 'B', 'C', 'D', 'E', 'F'].map((key, index) => ({ key, x: index * 10, y: 0 })));
+  for (const points of [all.points.slice(0, 3), all.points.slice(3)]) {
+    const retained = frame(points);
+    const remove = matchLinePathFrames(null, all, retained, renderPoints);
+    const restore = matchLinePathFrames(null, retained, all, renderPoints);
+    assert.equal(remove.strategy, 'remove-points');
+    assert.equal(remove.interpolate(0.5), points[0].key === 'A'
+      ? 'M0,0L10,0L20,0L30,0L35,0'
+      : 'M15,0L20,0L30,0L40,0L50,0');
+    for (const progress of [0, 0.2, 0.5, 0.8, 1]) {
+      assert.equal(remove.interpolate(progress), restore.interpolate(1 - progress));
+    }
+  }
+});
+
 test('a shifted key window combines add and remove timing', () => {
   const first = frame([
     { key: 'A', x: 0, y: 10 },

@@ -33,7 +33,8 @@ export function pointState(spec: ViewSpec = {}, enc: EncodingSpec = {}): PointSt
   return {
     parentField: parentFromGroupby(detail['groupby'] as string[] | null) || (detail['parentField'] as string | null) || colorField(enc),
     detailMode: (detail['mode'] as string) || null,
-    effect: (detail['effect'] as string) || null,
+    effect: (detail['effect'] as string) ||
+      (detail['mode'] === 'aggregate' || detail['mode'] === 'detail' ? 'blend' : null),
     view: (detail['view'] as PointScaleView | undefined) || null
   };
 }

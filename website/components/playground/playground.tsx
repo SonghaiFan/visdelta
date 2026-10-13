@@ -27,6 +27,7 @@ import { useMedia, useModifierKey, usePreference } from './preferences';
 import { RowsPanel, type RowsView } from './rows-panel';
 import { SIZE_LIMITS, SizeControls, type SizeMode } from './size-controls';
 import { Timeline } from './timeline';
+import { STAGE_DURATION, stageDurationFor } from './timing';
 import { stageLabels, stageDetails } from './stage-labels';
 import { StageInspector } from './stage-inspector';
 import { useKeyframePreviews } from './keyframe-previews';
@@ -43,10 +44,6 @@ type Opened = Omit<Story, 'category'> & {
 };
 
 const CHARTS: ChartName[] = ['bar', 'line', 'area', 'point', 'unit'];
-/** One route stage of a live edit. */
-const EDIT_DURATION = 750;
-/** One route stage between kept keyframes; a leg plays its stage count × this. */
-const STAGE_DURATION = 900;
 /** Quiet time after a keystroke before the code runs. */
 const SETTLE = 280;
 const TYPE_DELAY = 24;
@@ -58,8 +55,8 @@ const DEFAULT_STORY = 'sort';
 const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
 /** Timeline panel heights in pixels: one fixed height per view, adjustable by dragging the top edge. */
-const DEFAULT_TIMELINE = { compact: 56, details: 240 };
-const TIMELINE_RANGE = [56, 360] as const;
+const DEFAULT_TIMELINE = { compact: 80, details: 240 };
+const TIMELINE_RANGE = [80, 360] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
 const STORAGE = {
@@ -90,6 +87,7 @@ interface Keyframe extends Version {
 interface Display {
   layer: HTMLElement;
   controller: Controller;
+  size: { width: CanvasSize; height: CanvasSize };
   kind: 'live' | 'replay';
 }
 
@@ -164,6 +162,8 @@ export function Playground() {
   const [inspecting, setInspecting] = useState(false);
   const inspect = useCallback(async () => displayRef.current?.controller.inspect(), []);
   const [value, setValue] = useState(0);
+  const [livePosition, setLivePosition] = useState<number | null>(null);
+  const [livePlaying, setLivePlaying] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [changes, setChanges] = useState<StateChange[]>([]);
   /** Route stages of the motion the Δ line describes. */
@@ -237,24 +237,32 @@ export function Playground() {
 
   /** Build a controller in a hidden layer of the stage. */
   const mount = useCallback(async <C extends Controller>(build: (target: HTMLElement) => Promise<C>) => {
+    const size = canvas();
     const layer = document.createElement('div');
     layer.className = 'pg-layer';
     layer.dataset.state = 'hidden';
     stageRef.current!.append(layer);
     try {
-      return { layer, controller: await build(layer) };
+      return { layer, controller: await build(layer), size };
     } catch (cause) {
       layer.remove();
       throw cause;
     }
-  }, []);
+  }, [canvas]);
 
   /** Show a mounted layer at one exact frame in place of the current one. */
   const show = useCallback((next: Omit<Display, 'kind'>, kind: Display['kind'], at: number, fade = false) => {
+    // A size toggle can happen while the hidden controller is being built.
+    // Measure in the displayed layer and adopt the latest request before drawing.
+    next.layer.dataset.state = fade ? 'entering' : 'shown';
+    const size = canvas();
+    if (next.size.width !== size.width || next.size.height !== size.height) {
+      next.controller.resize(size);
+      next.size = size;
+    }
     next.controller.progress(at);
     const previous = displayRef.current;
     displayRef.current = { ...next, kind };
-    next.layer.dataset.state = fade ? 'entering' : 'shown';
     if (fade) requestAnimationFrame(() => (next.layer.dataset.state = 'shown'));
     if (!previous) return;
     previous.controller.pause();
@@ -268,7 +276,7 @@ export function Playground() {
     } else {
       retire();
     }
-  }, []);
+  }, [canvas]);
 
   /** Remove the chart on screen, as for code that has not run yet. */
   const clearStage = useCallback(() => {
@@ -326,12 +334,24 @@ export function Playground() {
           setChangeStages(stages);
           setMarked(changedLines(from.code, target.code));
           show(next, 'live', 0);
+          const frames = keyframesRef.current;
+          const index = frames.length - 1;
+          const tracked = index > 0 && frames[index].code === target.code && frames[index - 1].code === from.code;
+          const storyToken = storyRun.current;
+          const track = (progress: number) => {
+            if (tracked && keyframesRef.current === frames && storyRun.current === storyToken) setLivePosition(index - 1 + progress);
+          };
+          track(0);
           if (prefersReducedMotion()) {
             next.controller.progress(1);
+            track(1);
             return;
           }
-          next.controller.play({ from: 0, to: 1, duration: EDIT_DURATION });
-          return settle(next.controller, 1);
+          setLivePlaying(tracked);
+          next.controller.play({ from: 0, to: 1, duration: stageDurationFor(difference.stateChanges) });
+          try { await settle(next.controller, 1, track); }
+          finally { setLivePlaying(false); }
+          return;
         } catch {
           // No route between these two states: fall through to a cross-fade.
         }
@@ -380,6 +400,8 @@ export function Playground() {
     if (displayRef.current?.kind === 'replay') displayRef.current.controller.pause();
     setPlaying(false);
     setReplaying(false);
+    setLivePosition(null);
+    setLivePlaying(false);
   }, []);
 
   /**
@@ -486,17 +508,17 @@ export function Playground() {
     (position: number) => {
       const frames = keyframesRef.current;
       setValue(position);
-      const nearest = Math.min(frames.length - 1, Math.max(0, Math.round(position)));
+      const reached = Math.min(frames.length - 1, Math.max(0, Math.floor(position + 1e-9)));
       const leg = Math.min(frames.length - 1, Math.max(1, Math.ceil(position - 1e-6)));
       setChanges(frames[leg]?.changes ?? []);
       setChangeStages(frames[leg]?.stages ?? 0);
-      if (nearest === shownKey.current) return;
-      shownKey.current = nearest;
-      const keyframe = frames[nearest];
+      if (reached === shownKey.current) return;
+      shownKey.current = reached;
+      const keyframe = frames[reached];
       shownRef.current = keyframe;
       setLatest(keyframe);
       writeCode(keyframe.code);
-      setMarked(changedLines(frames[nearest - 1]?.code, keyframe.code));
+      setMarked(changedLines(frames[reached - 1]?.code, keyframe.code));
       setError(null);
     },
     [setLatest, writeCode],
@@ -535,10 +557,17 @@ export function Playground() {
 
   const onScrub = useCallback(
     async (position: number) => {
-      replayRun.current += 1;
+      const token = ++replayRun.current;
+      // Commit the controlled input immediately, before preparing the sequence.
+      // Otherwise its following native change event can restore the old playhead.
+      setValue(position);
+      setLivePosition(position);
+      storyRun.current += 1;
+      displayRef.current?.controller.pause();
+      setLivePlaying(false);
       setPlaying(false);
       const controller = await replay(position);
-      if (!controller) return;
+      if (!controller || token !== replayRun.current) return;
       controller.progress(position);
       follow(position);
     },
@@ -549,9 +578,10 @@ export function Playground() {
   const entry = useCallback(() => {
     const frames = keyframesRef.current;
     if (replaying) return value;
+    if (livePosition !== null) return livePosition;
     const index = frames.findIndex((frame) => frame === shownRef.current);
     return index >= 0 ? index : frames.length - 1;
-  }, [replaying, value]);
+  }, [replaying, value, livePosition]);
 
   /** Play the replay from `from` (default: where it is) to `to`. */
   const playTo = useCallback(
@@ -566,8 +596,19 @@ export function Playground() {
         return;
       }
       setPlaying(true);
-      controller.play({ from: start, to, duration: STAGE_DURATION });
-      await settle(controller, to, (position) => token === replayRun.current && follow(position));
+      // Each authored leg uses the same duration policy as its live edit and
+      // timeline. Let the sequence's own clock play partial and reversed legs.
+      let cursor = start;
+      const direction = Math.sign(to - start);
+      while (Math.abs(to - cursor) > 1e-6 && token === replayRun.current) {
+        const leg = direction > 0 ? Math.floor(cursor) : Math.ceil(cursor) - 1;
+        const end = direction > 0 ? Math.min(to, leg + 1) : Math.max(to, leg);
+        const duration = stageDurationFor(keyframesRef.current[leg + 1].changes);
+        controller.play({ from: cursor, to: end, duration });
+        await settle(controller, end, (position) => token === replayRun.current && follow(position));
+        if (Math.abs(controller.value - end) > 1e-4) break;
+        cursor = end;
+      }
       if (token === replayRun.current) setPlaying(false);
     },
     [entry, follow, replay, settle],
@@ -575,15 +616,18 @@ export function Playground() {
 
   const onPlay = useCallback(() => {
     const last = keyframesRef.current.length - 1;
-    if (playing) {
+    if (playing || livePlaying) {
+      storyRun.current += 1;
       replayRun.current += 1;
+      setLivePlaying(false);
       displayRef.current?.controller.pause();
       setPlaying(false);
       return;
     }
-    const start = !replaying || value >= last - 1e-3 ? 0 : value;
+    const position = entry();
+    const start = position >= last - 1e-3 ? 0 : position;
     void playTo(last, start);
-  }, [playTo, playing, replaying, value]);
+  }, [entry, playTo, playing, livePlaying]);
 
   /** Type from the current code to `target`, the way a person edits. */
   const typeTo = useCallback(
@@ -683,9 +727,11 @@ export function Playground() {
           const version = { state: await evaluate(frame), code: frame };
           if (token !== storyRun.current) return;
           setLatest(version);
-          await present(version);
-          if (token !== storyRun.current) return;
+          // Reserve the complete leg before its clock starts; only the playhead
+          // changes during the transition, not the timeline's duration.
           await keep(version);
+          if (token !== storyRun.current) return;
+          await present(version);
         }
       } catch (cause) {
         if (token === storyRun.current) setError(errorMessage(cause));
@@ -765,7 +811,12 @@ export function Playground() {
   useEffect(() => {
     const request = sizeMode === 'fixed' ? { width: fixedWidth, height: fixedHeight } : { width: 'auto' as const, height: 'auto' as const };
     sizeRef.current = request;
-    displayRef.current?.controller.resize(request);
+    const display = displayRef.current;
+    if (display) {
+      display.controller.resize(request);
+      display.size = request;
+    }
+    if (sizeMode === 'fit') stageRef.current?.scrollTo(0, 0);
   }, [sizeMode, fixedWidth, fixedHeight]);
 
   // A floating window stays inside the workspace when the workspace shrinks.
@@ -1163,10 +1214,10 @@ export function Playground() {
         keyframes={keyframes}
         previews={keyframePreviews.previews}
         onPreview={keyframePreviews.request}
-        value={value}
+        value={replaying ? value : livePosition ?? value}
         stageDuration={STAGE_DURATION}
-        replaying={replaying}
-        playing={playing}
+        replaying={replaying || livePosition !== null}
+        playing={playing || livePlaying}
         onScrub={(position) => void onScrub(position)}
         onSeek={(index) => void playTo(index)}
         onPlay={onPlay}
@@ -1192,9 +1243,9 @@ export function Playground() {
         selectedStage={inspectionStage}
         inspect={inspect} position={value}
         leg={Math.min(keyframes.length - 2, Math.floor(value))}
-        offset={keyframes.slice(1, Math.min(keyframes.length - 2, Math.floor(value)) + 1).reduce((sum, frame) => sum + frame.stages * STAGE_DURATION, 0)}
+        offset={keyframes.slice(1, Math.min(keyframes.length - 2, Math.floor(value)) + 1).reduce((sum, frame) => sum + frame.stages * stageDurationFor(frame.changes), 0)}
         stageCount={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages}
-        duration={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages * STAGE_DURATION}
+        duration={keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stages * stageDurationFor(keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].changes)}
         onScrub={position => void onScrub(position)} />}
       </Timeline>
 

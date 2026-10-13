@@ -301,7 +301,7 @@ test('opposite point flip endpoints use the same transition in reverse', async (
   for (const frame of frames) expect(frame.reverse).toEqual(frame.forward);
 });
 
-test('point rollup and breakdown are the same transition in reverse', async ({ page }) => {
+test('point rollup and breakdown use gooey blending by default and reverse the same frames', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   const frames = await page.evaluate(async () => {
     const [{ point }, { transition }] = await Promise.all([
@@ -323,22 +323,48 @@ test('point rollup and breakdown are the same transition in reverse', async ({ p
     const options = target => ({ target, height: 360 });
     const split = await transition(summary, detailed, options('#split'));
     const merge = await transition(detailed, summary, options('#merge'));
-    const geometry = selector => [...document.querySelectorAll(`${selector} circle.vd-point`)]
+    const geometry = selector => [...document.querySelectorAll(`${selector} circle.vd-point, ${selector} circle.vd-point-blend`)]
       .map(node => ({
-        key: node.getAttribute('data-key'),
+        role: node.getAttribute('data-blend-role'),
+        key: node.getAttribute('data-key') ?? node.__data__.id ?? node.__data__.region,
         x: Number(node.getAttribute('cx')),
         y: Number(node.getAttribute('cy')),
         r: Number(node.getAttribute('r')),
         opacity: Number(node.style.opacity)
       }))
       .sort((a, b) => a.key.localeCompare(b.key));
-    return [0, 0.13, 0.5, 0.82, 1].map(progress => {
+    const frames = [0, 0.13, 0.5, 0.82, 1].map(progress => {
       split.progress(progress);
       merge.progress(1 - progress);
       return { split: geometry('#split'), merge: geometry('#merge') };
     });
+    const snapshot = selector => ({
+      blend: document.querySelector(`${selector} .vd-point-blend-layer`)?.style.visibility ?? null,
+      crisp: document.querySelector(`${selector} .vd-point-crisp-layer`)?.style.visibility,
+      filteredGroups: [...document.querySelectorAll(`${selector} .vd-point-blend-group`)]
+        .filter(group => getComputedStyle(group).filter !== 'none').length,
+      circles: document.querySelectorAll(`${selector} circle.vd-point-blend`).length
+    });
+    const during = (split.stageCount() - 0.5) / split.stageCount();
+    split.progress(during);
+    merge.progress(1 - during);
+    const active = { split: snapshot('#split'), merge: snapshot('#merge') };
+    split.progress(0);
+    const start = snapshot('#split');
+    split.progress(1);
+    const end = snapshot('#split');
+    return { frames, active, start, end };
   });
-  for (const frame of frames) expect(frame.merge).toEqual(frame.split);
+  for (const frame of frames.frames) expect(frame.merge).toEqual(frame.split);
+  expect(frames.active.split).toEqual(frames.active.merge);
+  expect(frames.active.split.blend).toBe('visible');
+  expect(frames.active.split.crisp).toBe('hidden');
+  expect(frames.active.split.filteredGroups).toBe(2);
+  expect(frames.active.split.circles).toBeGreaterThanOrEqual(4);
+  expect(frames.start.crisp).toBe('visible');
+  expect(frames.end.crisp).toBe('visible');
+  expect(frames.start.blend).not.toBe('visible');
+  expect(frames.end.blend).not.toBe('visible');
 });
 
 test('point combine starts slowly and accelerates into the summary', async ({ page }) => {

@@ -541,6 +541,64 @@ test('line filter and restore are the same transition in reverse', async ({ page
   expect(result.isolated).toEqual({ paths: 0, points: 1 });
 });
 
+test('month filters retain each service path while only its removed tail retracts', async ({ page }) => {
+  await page.goto('/tests/fixtures/runtime.html');
+  const results = await page.evaluate(async () => {
+    const [{ line }, { transition }] = await Promise.all([
+      import('/dist/line.js'), import('/dist/transition-entry.js')
+    ]);
+    document.body.innerHTML = '<div id="filter"></div><div id="restore"></div>';
+    const rows = ['Primary care', 'Diagnostics', 'Community care'].flatMap((service, index) =>
+      Array.from({ length: 6 }, (_, month) => ({
+        month: new Date(2025, month, 1), service, requests: 40 + index * 30 + month * 10
+      })));
+    const base = line(rows).x('month').y('requests').key(['month', 'service'])
+      .breakdown('service').color('service');
+    const snapshot = selector => [...document.querySelectorAll(`${selector} path.vd-line`)]
+      .map(path => ({ key: path.dataset.key, d: path.getAttribute('d'), length: path.getTotalLength() }))
+      .sort((a, b) => a.key.localeCompare(b.key));
+    const results = [];
+    for (const operator of ['lt', 'gte']) {
+      const filtered = base.where({ field: 'month', [operator]: new Date(2025, 3, 1) });
+      const filter = await transition(base, filtered, { target: '#filter', width: 640, height: 400 });
+      const restore = await transition(filtered, base, { target: '#restore', width: 640, height: 400 });
+      filter.progress(0);
+      const full = snapshot('#filter');
+      filter.progress(1);
+      const retained = snapshot('#filter');
+      const frames = Array.from({ length: 19 }, (_, index) => (index + 1) / 20).map(progress => {
+        filter.progress(progress);
+        restore.progress(1 - progress);
+        return { progress, filter: snapshot('#filter'), restore: snapshot('#restore') };
+      });
+      results.push({ operator, full, retained, frames });
+      filter.destroy();
+      restore.destroy();
+    }
+    return results;
+  });
+  for (const result of results) {
+    for (const frame of result.frames) {
+      expect(frame.filter).toEqual(frame.restore);
+      expect(frame.filter).toHaveLength(3);
+      frame.filter.forEach((path, index) => {
+        const retained = result.retained[index];
+        expect(path.key).toBe(retained.key);
+        expect(path.length).toBeGreaterThanOrEqual(retained.length);
+        expect(path.length).toBeLessThanOrEqual(result.full[index].length);
+        expect(result.operator === 'lt'
+          ? path.d.startsWith(retained.d)
+          : path.d.endsWith(retained.d.replace(/^M/, 'L'))).toBe(true);
+      });
+    }
+    result.retained.forEach((retained, index) => {
+      const lengths = result.frames.map(frame => frame.filter[index].length);
+      expect(lengths.some(length => length > retained.length && length < result.full[index].length)).toBe(true);
+      lengths.slice(1).forEach((length, position) => expect(length).toBeLessThanOrEqual(lengths[position]));
+    });
+  }
+});
+
 test('line split and merge are one transition in reverse', async ({ page }) => {
   await page.goto('/tests/fixtures/runtime.html');
   const frames = await page.evaluate(async () => {

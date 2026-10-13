@@ -63,6 +63,11 @@ An ordinary entering point grows at its target position. Summary and detail
 motion may use a declared parent position, because that movement carries
 meaning.
 
+Summary/detail transitions use gooey blending by default. Points in the same
+group share a silhouette while they merge or separate; completed endpoints
+return to crisp circles. Forward, reverse and scrubbed playback share the same
+geometry.
+
 <LiveExample id="point-log" code={false} />
 
 ## Try it

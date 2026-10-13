@@ -1,0 +1,19 @@
+month,service,requests,share
+2025-01-01,Primary care,120,0.48
+2025-01-01,Diagnostics,80,0.32
+2025-01-01,Community care,50,0.20
+2025-02-01,Primary care,130,0.50
+2025-02-01,Diagnostics,78,0.30
+2025-02-01,Community care,52,0.20
+2025-03-01,Primary care,142,0.51
+2025-03-01,Diagnostics,79,0.28
+2025-03-01,Community care,58,0.21
+2025-04-01,Primary care,150,0.50
+2025-04-01,Diagnostics,88,0.29
+2025-04-01,Community care,63,0.21
+2025-05-01,Primary care,158,0.50
+2025-05-01,Diagnostics,95,0.30
+2025-05-01,Community care,65,0.20
+2025-06-01,Primary care,165,0.50
+2025-06-01,Diagnostics,103,0.31
+2025-06-01,Community care,64,0.19

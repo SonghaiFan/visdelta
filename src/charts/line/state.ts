@@ -257,8 +257,8 @@ export function lineSeries(rows: Record<string, unknown>[], seriesField: string 
 
 /**
  * Preserve gaps created by `.where()` unless the author explicitly asks to
- * connect across removed observations. The first run keeps the series key so
- * it updates the existing path; later runs enter as additional path pieces.
+ * connect across removed observations. A single surviving run keeps its
+ * series identity; disconnected runs need separate paths to preserve gaps.
  */
 export function connectedLineStretches(
   rows: Record<string, unknown>[],
@@ -286,10 +286,9 @@ export function connectedLineStretches(
     );
 
     return stretches.map((stretch, index) => ({
-      // A filtered run is a new visible piece of the original path. Keeping it
-      // separate lets the intact source path fade while the honest gaps appear,
-      // instead of folding the source geometry into the first surviving run.
-      key: preserveLineage
+      // Keep a contiguous retained line in place. Multiple runs cannot morph
+      // through one continuous path without drawing across a filtered gap.
+      key: preserveLineage && stretches.length > 1
         ? `${entry.key}::filtered-stretch:${index}:${String(pointKey(stretch[0], 0))}`
         : entry.key,
       rows: stretch

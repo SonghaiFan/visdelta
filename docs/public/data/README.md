@@ -16,3 +16,31 @@ original `share` values are retained.
 Every tab in a Lab loads the same tidy CSV. Scenario differences are expressed
 with VisDelta declarations such as `.where()` and `.rollup()` rather than with
 scenario-specific files or JavaScript preparation pipelines.
+
+# Public example data
+
+The existing `iris.csv`, `mtcars.csv`, population, unemployment, and stock
+files retain their upstream provenance described alongside their source
+examples.
+
+## Playground-only teaching data
+
+- `service-demand-monthly.csv` is simulated. Each row is one service's request
+  total for one month, January through June 2025. `requests` is a count;
+  `share` is `requests / sum(requests for that month)`. Monthly totals are
+  250, 260, 279, 301, 318, and 332. The share denominator is therefore explicit
+  and changes by month.
+- `sensor-readings.csv` is simulated. Each row is one daily reading from one
+  sensor, in arbitrary instrument units, from 1–10 January 2025. The value 94
+  is retained in the source but marked `valid=false`; it is not silently
+  converted to zero or removed. The other readings are valid observations.
+- `channel-finance.csv` is simulated. Each row is one channel for one quarter
+  in 2025 Q1. `units` counts sales, `revenue` and `cost` are US dollars, and
+  `profit = revenue - cost`. The channel with the largest revenue is not the
+  channel with the largest profit in this sample.
+- `valve-updates.csv` is simulated event data. Each row records a setting change
+  in arbitrary units; the setting persists until the next timestamp. This
+  makes a step curve a truthful representation of the measurement process.
+
+These small tables are constructed to make the shown comparisons inspectable;
+they do not describe a real service or sensor system.

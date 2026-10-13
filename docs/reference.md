@@ -220,6 +220,12 @@ aggregate can remove source fields that are not part of its output grain.
 It adds filter transforms to the returned state, so `state.rows()` also returns
 only matching rows. The source state is unchanged.
 
+For a default linear Line, filtering a contiguous prefix or suffix keeps the
+surviving path and its coordinates in place. Only the removed tail retracts
+along its original segments; restoring the observations follows the same
+geometry in reverse. Removing interior observations preserves gaps unless
+the author explicitly uses `.connect("across")`.
+
 ```js
 const all = bar(rows).x("country").y("sites");
 const nordic = all.where({ country: ["Norway", "Sweden"] });
@@ -405,6 +411,10 @@ data grain or datum identity. A constant `from` creates lollipop stems. VisDelta
 infers the connector channel when exactly one positional channel is quantitative;
 set `channel` when both x and y are quantitative. A `by` connector groups dots
 and connects adjacent members in `orderBy` order, or input order when omitted.
+
+Point summary/detail transitions use gooey blending by default within each
+parent group. Completed endpoints render crisp circles, and reverse playback
+evaluates the same geometry backward.
 
 ```js
 point(rows)
