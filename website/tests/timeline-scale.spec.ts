@@ -23,8 +23,9 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   expect(await scale()).toBeCloseTo(160, 1);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
   if (width === 1280) {
-    await page.getByRole('button', { name: 'Zoom in timeline' }).click();
-    await page.getByRole('button', { name: 'Zoom in timeline' }).click();
+    await page.getByRole('region', { name: 'Timeline tracks', exact: true }).focus();
+    await page.keyboard.press('+');
+    await page.keyboard.press('+');
     await expect.poll(scale).toBeCloseTo(640, 1);
   }
   const pixelsPerSecond = width === 1280 ? 640 : 160;
@@ -38,13 +39,14 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   const category = (await page.locator('.pg-category-block').filter({ hasText: 'attention.exit(focus)' }).boundingBox())!;
   expect(stage.x).toBeCloseTo(category.x, 0);
   expect(stage.width * 2).toBeCloseTo(category.width, 0);
-  await page.getByRole('checkbox', { name: 'Snap', exact: true }).uncheck();
   await page.locator('.pg-ruler').scrollIntoViewIfNeeded();
   const ruler = (await page.locator('.pg-ruler').boundingBox())!;
   const room = (await viewport.boundingBox())!;
   const targetX = room.x + room.width / 2;
   const expected = Math.max(0, Math.min(2.7, (targetX - ruler.x - 7) / pixelsPerSecond));
+  await page.keyboard.down('Alt');
   await page.mouse.click(targetX, ruler.y + 5);
+  await page.keyboard.up('Alt');
   await expect.poll(async () => Number(await page.getByLabel('Playhead time in seconds').inputValue())).toBeCloseTo(expected, 2);
   const slider = page.getByLabel('Keyframe timeline');
   const before = Number(await slider.inputValue());
@@ -59,7 +61,8 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `/tmp/visdelta-time-scale-${width}.png`, fullPage: true });
   if (width === 1280) {
-    await page.getByRole('button', { name: 'Reset timeline scale to 160 pixels per second' }).click();
+    await viewport.focus();
+    await page.keyboard.press('0');
     await viewport.evaluate(node => { node.scrollLeft = 0; });
     await page.getByRole('region', { name: 'Keyframes', exact: true }).screenshot({ path: '/tmp/visdelta-time-scale-panel.png' });
   }

@@ -134,7 +134,6 @@ export function Timeline({
   const zoomAnchor = useRef<number | null>(null);
   const followedTime = useRef<number | null>(null);
   const [selection, setSelection] = useState<{ id: number; stage: number } | null>(null);
-  const [snap, setSnap] = useState(true);
   const [hover, setHover] = useState<{ id: number; left: number; top: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerInside = useRef(false);
@@ -179,11 +178,23 @@ export function Timeline({
     setZoom(Math.max(0.25, Math.min(8, nextZoom)));
   };
   const showTime = useCallback((time: number) => viewportRef.current?.scrollTo({ left: Math.max(0, TRACK_PAD + time / 1000 * pixelsPerSecond - viewport.width / 2) }), [pixelsPerSecond, viewport.width]);
+  /** The track replaces the old button row: Shift+←/→ step between stages, +/−/0 zoom (arrows alone still scroll). */
+  const trackKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || event.ctrlKey || event.metaKey || event.altKey) return;
+    const center = (start + end) / 2;
+    if (event.shiftKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+      if (!total) return;
+      event.preventDefault();
+      seekTime(event.key === 'ArrowRight' ? boundaries.find(time => time > now + 0.01) ?? total : boundaries.findLast(time => time < now - 0.01) ?? 0);
+    } else if (event.key === '+' || event.key === '=') { event.preventDefault(); setView(zoom * 2, center); }
+    else if (event.key === '-') { event.preventDefault(); setView(zoom / 2, center); }
+    else if (event.key === '0') { event.preventDefault(); setView(1, center); }
+  };
   const scrubRuler = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const time = Math.max(0, Math.min(total, (event.clientX - rect.left - TRACK_PAD) / pixelsPerSecond * 1000));
     const nearest = boundaries.reduce((best, point) => Math.abs(point - time) < Math.abs(best - time) ? point : best, 0);
-    seekTime(snap && Math.abs(nearest - time) / 1000 * pixelsPerSecond < 8 ? nearest : time);
+    seekTime(!event.altKey && Math.abs(nearest - time) / 1000 * pixelsPerSecond < 8 ? nearest : time);
   };
 
   const now = replaying ? timeOf(value) : total;
@@ -268,7 +279,7 @@ export function Timeline({
         onDoubleClick={() => onResetHeight(details)}
       />
       <div className="pg-timeline-body">
-      <div className="pg-row pg-transport">
+      <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2">
         <button
           type="button"
           onClick={onPlay}
@@ -279,56 +290,22 @@ export function Timeline({
         >
           {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5 translate-x-px" />}
         </button>
-        <div className="w-[7.5rem] shrink-0 font-mono text-xs leading-8 tabular-nums" aria-live="off">
-          <span className="text-fd-foreground">{seconds(now)}</span>
-          <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
+        <div className="pg-readout" aria-live="off">
+          <input aria-label="Playhead time in seconds" inputMode="decimal" size={4} disabled={!total}
+            value={timeDraft ?? (now / 1000).toFixed(2)} onChange={event => setTimeDraft(event.target.value)}
+            onFocus={event => event.currentTarget.select()}
+            onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { setTimeDraft(null); event.currentTarget.blur(); } }}
+            onBlur={event => {
+              const time = Number(event.currentTarget.value) * 1000;
+              setTimeDraft(null);
+              if (event.currentTarget.value.trim() && Number.isFinite(time) && Math.abs(time - now) > 5) seekTime(time);
+            }} />
+          <span>s / {seconds(total)}</span>
         </div>
-        {guide && <p className="pg-guide">{guide}</p>}
-        <button
-          type="button"
-          onClick={onKeep}
-          disabled={!canKeep}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
-          title={`Keep this state as a keyframe (${mod}S)`}
-        >
-          <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
-          Keep
-        </button>
-        {count > 0 && (
-          <button
-            type="button"
-            aria-expanded={details}
-            aria-controls="pg-details"
-            onClick={() => setDetails(!details)}
-            title={details ? 'Hide details' : 'Show stages, categories and navigation'}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
-          >
-            Details
-            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
-          </button>
-        )}
-      </div>
-      {details && <div className="pg-time-tools" aria-label="Timeline navigation">
-        <button type="button" disabled={!total || now <= 0} onClick={() => seekTime(boundaries.findLast(time => time < now - 0.01) ?? 0)}>Previous stage</button>
-        <button type="button" disabled={!total || now >= total} onClick={() => seekTime(boundaries.find(time => time > now + 0.01) ?? total)}>Next stage</button>
-        <label>Time <input aria-label="Playhead time in seconds" type="number" min="0" max={total / 1000} step="0.01"
-          value={timeDraft ?? (now / 1000).toFixed(2)} onChange={event => setTimeDraft(event.target.value)}
-          onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-          onBlur={event => {
-            const time = event.currentTarget.valueAsNumber * 1000;
-            setTimeDraft(null);
-            if (Number.isFinite(time) && Math.abs(time - now) > 5) seekTime(time);
-          }} /> s</label>
-        <button type="button" aria-label="Zoom out timeline" disabled={zoom === 0.25} onClick={() => setView(zoom / 2, (start + end) / 2)}>−</button>
-        <button type="button" className="pg-time-scale" disabled={zoom === 1} aria-label="Reset timeline scale to 160 pixels per second" title="Reset to 160 pixels per second" onClick={() => setView(1, (start + end) / 2)}>{pixelsPerSecond}px / s</button>
-        <button type="button" aria-label="Zoom in timeline" disabled={!total || zoom === 8} onClick={() => setView(zoom * 2, (start + end) / 2)}>+</button>
-        <button type="button" disabled={!total} onClick={() => showTime(now)}>Show playhead</button>
-        {selectedKey && <button type="button" onClick={() => showTime(times[selectedLeg] + legs[selectedLeg] / 2)}>Show transition</button>}
-        <label><input type="checkbox" checked={snap} onChange={event => setSnap(event.target.checked)} /> Snap</label>
-      </div>}
         <div className="pg-time-shell" hidden={count === 0}>
           {lanes && <div className="pg-lane-labels" aria-hidden="true">{visibleCategories.map(category => <span className="pg-category-name" key={category.id}>{category.label}</span>)}</div>}
           <div className="pg-time-viewport" ref={viewportRef} role="region" aria-label="Timeline tracks" tabIndex={0}
+            onKeyDown={trackKey}
             onScroll={event => setViewport({ width: event.currentTarget.clientWidth, left: event.currentTarget.scrollLeft })}>
         <div className="pg-track" style={{ width: `${trackWidth}px` }} data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} data-single={count === 1 || undefined}>
           <div className="pg-ruler" onPointerDown={event => {
@@ -373,7 +350,7 @@ export function Timeline({
                     data-active={(local > stage && local < stage + 1) || undefined}
                     aria-pressed={selection?.id === key.id && selectedStage === stage}
                     title={description}
-                    onClick={() => { close(); setSelection({ id: key.id, stage }); }}
+                    onClick={() => { close(); setSelection({ id: key.id, stage }); if (inspecting) onInspect?.(index + (stage + 0.5) / Math.max(1, key.stages)); }}
                     onDoubleClick={() => onPreviewStage?.(index + stage / Math.max(1, key.stages), index + (stage + 1) / Math.max(1, key.stages))}
                     style={{ left: x(times[index] + stage * durations[index]), width: width(durations[index]) }}
                   ><span className="pg-stage-number">{stage + 1}</span><span className="pg-stage-name">{label}</span></button>
@@ -433,20 +410,44 @@ export function Timeline({
         </div>
           </div>
         </div>
-      {details && count > 0 && <div id="pg-details" className="pg-stage-card">
-        {selectedKey && <div className="pg-stage-selection" aria-label="Selected stage">
+        {guide && <p className="pg-guide">{guide}</p>}
+        <button
+          type="button"
+          onClick={onKeep}
+          disabled={!canKeep}
+          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
+          title={`Keep this state as a keyframe (${mod}S)`}
+        >
+          <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
+          Keep
+        </button>
+        {count > 0 && (
+          <button
+            type="button"
+            aria-expanded={details}
+            aria-controls="pg-details"
+            onClick={() => setDetails(!details)}
+            title={details ? 'Hide details' : 'Show stages, categories and navigation'}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-foreground"
+          >
+            Details
+            <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${details ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </div>
+      {details && count > 0 && <div id="pg-details" className="pg-stage-selection" aria-label="Selected stage">
+        {selectedKey && <>
+          <button type="button" className="pg-stage-range" aria-label="Go to start" title="Go to the start of this stage" onClick={() => seekTime(selectedStart)}>{seconds(selectedStart)}–{seconds(selectedStart + selectedDuration)}</button>
           <span className="pg-stage-title">
-            <strong>Transition {selectedLeg + 1} · Stage {selectedStage + 1}</strong> {stageLabel(selectedKey, selectedStage)}
-            <span>{seconds(selectedStart)}–{seconds(selectedStart + selectedDuration)}</span>
+            <strong>{stageLabel(selectedKey, selectedStage).replace(/^Chart stage: /, '')}</strong>
+            <span>{selectedLeg + 1}·{selectedStage + 1}</span>
           </span>
-          <span className="pg-stage-actions">
-            <button type="button" onClick={() => seekTime(selectedStart)}>Go to start</button>
-            <button type="button" onClick={() => onPreviewStage?.(selectedLeg + selectedStage / selectedStages, selectedLeg + (selectedStage + 1) / selectedStages)}>Preview</button>
-            <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : selectedLeg + (selectedStage + 0.5) / selectedStages)}>{inspecting ? 'Hide inspector' : 'Inspect'}</button>
-          </span>
-          {selectedKey.stageDetails?.[selectedStage] && <details className="pg-stage-exact"><summary>Exact configuration</summary><code>{selectedKey.stageDetails[selectedStage]}</code></details>}
-        </div>}
-        <button type="button" className="pg-clear" title="Remove every kept keyframe" onClick={onClear}>Clear keys</button>
+        </>}
+        <span className="pg-stage-actions">
+          {selectedKey && <button type="button" aria-expanded={inspecting} onClick={() => onInspect?.(inspecting ? null : selectedLeg + (selectedStage + 0.5) / selectedStages)}>{inspecting ? 'Hide inspector' : 'Inspect'}</button>}
+          <button type="button" className="pg-clear" title="Remove every kept keyframe" onClick={onClear}>Clear keys</button>
+        </span>
+        {selectedKey?.stageDetails?.[selectedStage] && <details className="pg-stage-exact"><summary>Exact configuration</summary><code>{selectedKey.stageDetails[selectedStage]}</code></details>}
       </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
         <strong>Keyframe {previewIndex + 1} <span>{seconds(times[previewIndex])}</span></strong>

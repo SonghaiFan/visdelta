@@ -4,9 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { InspectedProperty, TransitionInspection } from 'visdelta/transition';
 
+const GROUPS = ['Marks', 'Axes', 'Grid', 'Legend'] as const;
+type Group = typeof GROUPS[number];
+
 const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`;
-const groupOf = (node: Element) => node.closest('.vd-legend, .vd-legend-svg') ? 'Legend'
-  : node.closest('.vd-grid') ? 'Grid' : node.closest('.vd-axis, .vd-axis-label') ? 'Axes' : 'Marks and containers';
+const groupOf = (node: Element): Group => node.closest('.vd-legend, .vd-legend-svg') ? 'Legend'
+  : node.closest('.vd-grid') ? 'Grid' : node.closest('.vd-axis, .vd-axis-label') ? 'Axes' : 'Marks';
 const labelOf = (node: Element) => {
   const key = node.getAttribute('data-key');
   const classes = (node.getAttribute('class') ?? '').trim().split(/\s+/).filter(Boolean).join('.');
@@ -34,6 +37,7 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
   const [filter, setFilter] = useState('');
   const [openPhases, setOpenPhases] = useState<Record<number, boolean>>({});
   const [pages, setPages] = useState<Record<number, number>>({});
+  const [groups, setGroups] = useState<Record<number, Group>>({});
   const [revision, setRevision] = useState(0);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -67,9 +71,14 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
           const stageNumber = Math.floor(stage.start * stageCount + 1e-9);
           const expanded = openPhases[index] ?? selectedStage === stageNumber;
           const active = position - leg >= stage.start && (position - leg < stage.end || stage.end === 1 && position - leg === 1);
-          const rows = stage.properties.filter(track => `${labelOf(track.node)} ${track.name} ${groupOf(track.node)}`.toLowerCase().includes(filter.toLowerCase()));
+          const matches = stage.properties.filter(track => `${labelOf(track.node)} ${track.name} ${groupOf(track.node)}`.toLowerCase().includes(filter.toLowerCase()));
+          const grouped = GROUPS.map(group => matches.filter(track => groupOf(track.node) === group));
+          const group = groups[index] && grouped[GROUPS.indexOf(groups[index])].length ? groups[index] : GROUPS[grouped.findIndex(rows => rows.length)] ?? 'Marks';
+          const rows = grouped[GROUPS.indexOf(group)];
+          const moving = rows.filter(track => track.kind === 'custom' || track.from !== track.to);
+          const ordered = [...moving, ...rows.filter(track => track.kind !== 'custom' && track.from === track.to)];
           const page = Math.min(pages[index] ?? 0, Math.max(0, Math.ceil(rows.length / 50) - 1));
-          const visible = rows.slice(page * 50, (page + 1) * 50);
+          const visible = ordered.slice(page * 50, (page + 1) * 50);
           return <details key={index} open={expanded} onToggle={event => {
             const open = event.currentTarget.open;
             setOpenPhases(previous => previous[index] === open ? previous : { ...previous, [index]: open });
@@ -77,21 +86,26 @@ export function StageInspector({ inspect, position, leg, offset, duration, stage
             <summary>Stage {Math.floor(stage.start * stageCount + 1e-9) + 1} · phase {index + 1} · {seconds(offset + stage.start * duration)}–{seconds(offset + stage.end * duration)} · {stage.properties.length} tracks {active && `· current ${Math.round(Math.max(0, Math.min(1, (position - leg - stage.start) / (stage.end - stage.start))) * 100)}%`}</summary>
             {expanded && <div className="pg-inspector-phase-body">
             <button type="button" className="pg-inspector-seek" onClick={() => onScrub(leg + (stage.start + stage.end) / 2)}>Show phase midpoint</button>
-            {['Marks and containers', 'Axes', 'Grid', 'Legend'].map(group => {
-              const tracks = visible.filter(track => groupOf(track.node) === group);
-              return tracks.length ? <section key={group}><h4>{group}</h4><div className="pg-inspector-table"><table>
+            <div className="pg-inspector-tabs" role="tablist" aria-label={`Element groups for phase ${index + 1}`}>
+              {GROUPS.map((name, groupIndex) => grouped[groupIndex].length ? <button key={name} type="button" role="tab"
+                aria-selected={group === name} onClick={() => { setGroups(previous => ({ ...previous, [index]: name })); setPages(previous => ({ ...previous, [index]: 0 })); }}>
+                {name} <span>{grouped[groupIndex].length}</span>
+              </button> : null)}
+            </div>
+            {rows.length ? <section><h4 className="sr-only">{group}</h4><div className="pg-inspector-table"><table>
                 <thead><tr><th>Element</th><th>Property</th><th>Phase start</th><th>Phase end</th><th>Current</th><th>Scheduled interval</th></tr></thead>
-                <tbody>{tracks.map((track, row) => <tr key={row} data-current={active && (position - leg - stage.start) / (stage.end - stage.start) >= track.start && (position - leg - stage.start) / (stage.end - stage.start) <= track.end || undefined}>
+                <tbody>{visible.map((track, row) => {
+                  const moving = track.kind === 'custom' || track.from !== track.to;
+                  return <tr key={row} data-still={!moving || undefined} data-current={active && (position - leg - stage.start) / (stage.end - stage.start) >= track.start && (position - leg - stage.start) / (stage.end - stage.start) <= track.end || undefined}>
                   <td><button type="button" aria-pressed={selected === track} title={track.selector} onClick={() => setSelected(selected === track ? undefined : track)}>{labelOf(track.node)}</button></td>
                   <td>{track.kind} · {track.name}</td>
                   <td><code>{track.kind === 'custom' ? 'Not exposed' : track.from ?? 'absent'}</code></td>
                   <td><code>{track.kind === 'custom' ? 'Not exposed' : track.to ?? 'absent'}</code></td>
                   <td><code>{read(track) ?? 'absent'}</code></td>
                   <td><span className="pg-property-interval" aria-hidden="true"><span style={{ left: `${track.start * 100}%`, width: `${(track.end - track.start) * 100}%` }} /></span>{seconds(offset + (stage.start + track.start * (stage.end - stage.start)) * duration)}–{seconds(offset + (stage.start + track.end * (stage.end - stage.start)) * duration)}</td>
-                </tr>)}</tbody>
-              </table></div></section> : null;
-            })}
-            {!rows.length && <p>No matching recorded property tracks.</p>}
+                </tr>;
+                })}</tbody>
+              </table></div></section> : <p>No matching recorded property tracks.</p>}
             {rows.length > 50 && <nav aria-label={`Phase ${index + 1} track pages`} className="pg-inspector-pages">
               <button type="button" disabled={page === 0} onClick={() => setPages(previous => ({ ...previous, [index]: page - 1 }))}>Previous tracks</button>
               <span>{page * 50 + 1}–{Math.min((page + 1) * 50, rows.length)} of {rows.length}</span>
