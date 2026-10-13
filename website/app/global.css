@@ -588,7 +588,7 @@ html > body[data-scroll-locked] {
   display: flex;
   flex-direction: column;
   /* Fixed, so opening Details never moves the chart; the reader drags the top edge. */
-  height: var(--pg-time-h, 112px);
+  height: var(--pg-time-h, 56px);
   max-height: 45dvh;
   border-top: 1px solid var(--color-fd-border);
 }
@@ -596,7 +596,8 @@ html > body[data-scroll-locked] {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0.375rem 1rem;
+  /* One 32px row, centred in the compact panel. */
+  padding: 0.7rem 1rem;
   scrollbar-width: thin;
 }
 .pg-timeline-grip {
@@ -883,41 +884,19 @@ html > body[data-scroll-locked] {
   position: relative;
   flex: 1;
   min-width: 0;
-  height: 2.5rem;
+  /* A 24px clip line, centred on the 32px controls. */
+  height: 24px;
+  margin-top: 4px;
 }
 .pg-track[hidden] {
   display: none;
-}
-.pg-ruler {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 14px;
-  pointer-events: none;
-}
-.pg-tick {
-  position: absolute;
-  top: 0;
-  height: 14px;
-  padding-left: 3px;
-  border-left: 1px solid color-mix(in srgb, var(--color-fd-foreground) 18%, transparent);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  line-height: 10px;
-  color: var(--color-fd-muted-foreground);
-}
-.pg-tick:empty {
-  top: 8px;
-  height: 6px;
 }
 .pg-clips {
   position: absolute;
   inset: 0;
 }
 .pg-track[data-details] {
-  height: 3.75rem;
-}
-.pg-track[data-details] .pg-clips {
-  inset: 16px 0 0;
+  height: 44px;
 }
 .pg-clips input {
   position: absolute;
@@ -934,8 +913,8 @@ html > body[data-scroll-locked] {
 }
 .pg-clip {
   position: absolute;
-  top: 2px;
-  height: 20px;
+  top: 0;
+  height: 24px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--color-fd-foreground) 16%, transparent);
   border-radius: var(--radius-sm);
@@ -960,8 +939,8 @@ html > body[data-scroll-locked] {
 /* The lane below: every route stage VisDelta planned, one block per stage. */
 .pg-stage-block {
   position: absolute;
-  top: 26px;
-  height: 5px;
+  top: 28px;
+  height: 4px;
   border-radius: 1px;
   background: color-mix(in srgb, var(--color-fd-foreground) 22%, transparent);
   box-shadow: inset -2px 0 0 var(--color-fd-background);
@@ -978,7 +957,7 @@ html > body[data-scroll-locked] {
   padding: 0 10px;
   font-family: var(--font-mono);
   font-size: 10px;
-  line-height: 18px;
+  line-height: 22px;
   color: var(--color-fd-muted-foreground);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1022,19 +1001,20 @@ html > body[data-scroll-locked] {
 }
 .pg-key-label {
   position: absolute;
-  top: 24px;
+  top: 26px;
   font-family: var(--font-mono);
   font-size: 9px;
   line-height: 1;
   color: var(--color-fd-muted-foreground);
 }
+.pg-track:not([data-details]) .pg-key-label,
 .pg-track[data-dense] .pg-key-label {
   display: none;
 }
 .pg-head {
   position: absolute;
   top: 0;
-  bottom: 4px;
+  bottom: 0;
   z-index: 2;
   width: 2px;
   margin-left: -1px;
@@ -1062,8 +1042,9 @@ html > body[data-scroll-locked] {
 
 /* Category lanes share the overview's time coordinates; labels occupy its gutter. */
 .pg-track[data-lanes] { margin-left: 88px; }
-.pg-track[data-lanes] { height: auto; min-height: 3.75rem; padding-top: 3.75rem; }
+.pg-track[data-lanes] { height: auto; min-height: 44px; padding-top: 52px; }
 .pg-track[data-lanes] .pg-clips { bottom: auto; height: 44px; }
+.pg-track[data-details] .pg-clips { bottom: auto; height: 44px; }
 .pg-category-scroll { margin-left: -88px; }
 .pg-category-row { display: flex; height: 24px; align-items: center; }
 .pg-category-name { width: 88px; flex-shrink: 0; font-size: 10px; color: var(--color-fd-muted-foreground); }
@@ -1071,12 +1052,15 @@ html > body[data-scroll-locked] {
 .pg-category-block { position: absolute; top: 2px; height: 20px; padding: 2px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; border: 1px solid var(--color-fd-border); border-radius: 3px; background: var(--color-fd-muted); }
 .pg-category-block[data-active] { border-color: var(--color-delta); background: color-mix(in srgb, var(--color-delta) 12%, var(--color-fd-background)); }
 .pg-category-head { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-delta); pointer-events: none; }
-.pg-track[data-lanes] > .pg-head { bottom: auto; height: 3.75rem; }
+.pg-track[data-lanes] > .pg-head { bottom: auto; height: 44px; }
 .pg-category-help { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 10px; color: var(--color-fd-muted-foreground); padding: 4px 0 0; animation: pg-details-in 200ms var(--ease-out-quint); }
 .pg-category-help button { margin-left: auto; text-decoration: underline; text-underline-offset: 3px; }
 .pg-category-help button:hover { color: var(--color-fd-foreground); }
-.pg-hint { margin: 2px 0 0; padding-left: 2.75rem; font-size: 12px; color: var(--color-fd-muted-foreground); }
-.pg-hint:empty { display: none; }
+.pg-track[data-single] { flex: 0 0 16px; }
+.pg-guide { flex: 1; min-width: 0; margin: 0; overflow: hidden; font-size: 12px; line-height: 32px; color: var(--color-fd-muted-foreground); text-overflow: ellipsis; white-space: nowrap; }
+/* Warnings float over the chart edge, so the panel never needs a line for them. */
+.pg-notice { position: absolute; right: 1rem; bottom: calc(100% + 8px); z-index: 4; max-width: calc(100% - 2rem); margin: 0; padding: 4px 10px; border: 1px solid var(--color-fd-border); border-radius: 4px; background: var(--color-fd-background); box-shadow: 0 2px 10px #0002; font-size: 12px; color: var(--color-fd-foreground); }
+.pg-notice[hidden] { display: none; }
 @keyframes pg-details-in { from { opacity: 0; transform: translateY(-2px); } }
 .pg-key-preview { position: fixed; z-index: 100; width: min(320px, calc(100vw - 16px)); padding: 8px; box-sizing: border-box; border: 1px solid var(--color-fd-border); border-radius: 4px; background: var(--color-fd-background); color: var(--color-fd-foreground); box-shadow: 0 4px 20px #0002; font-size: 12px; }
 .pg-key-preview strong { display: flex; justify-content: space-between; }
@@ -1085,6 +1069,8 @@ html > body[data-scroll-locked] {
 .pg-preview-placeholder { height: 190px; display: grid; place-items: center; color: var(--color-fd-muted-foreground); }
 @media (max-width: 639.98px) {
   .pg-track[data-lanes] { flex-basis: calc(100% - 88px); }
+  /* The track wraps to its own line on narrow screens. */
+  .pg-timeline:not([data-details]) { min-height: 5.25rem; }
 }
 @media (max-width: 1023.98px) {
   /* The taller timeline must not shrink the chart out of the reading order. */

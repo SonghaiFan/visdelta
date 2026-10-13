@@ -37,14 +37,14 @@ interface TimelineProps {
   /** Shortcut prefix shown in hints, such as ⌘ or Ctrl+. */
   mod?: string;
   className?: string;
-  /** Panel height in pixels; fixed, so toggling details never moves the chart. */
-  height: number;
+  /** Panel heights in pixels: fixed for each view, so only the reader changes them. */
+  heights: { compact: number; details: number };
   /** Smallest and largest panel height, in pixels. */
   heightRange: readonly [number, number];
   /** The reader resizes the panel; `commit` is false while the drag is live. */
-  onHeight: (height: number, commit: boolean) => void;
-  /** Back to the default height. */
-  onResetHeight: () => void;
+  onHeight: (height: number, commit: boolean, details: boolean) => void;
+  /** Back to the default height of one view. */
+  onResetHeight: (details: boolean) => void;
 }
 
 const seconds = (ms: number, digits = 2) => `${(ms / 1000).toFixed(digits)}s`;
@@ -76,9 +76,6 @@ export function timelineGeometry(keyframes: TimelineKey[], stageDuration: number
   return { legs, times, total, timeOf, positionOf, x, width };
 }
 
-/** Ruler steps, in milliseconds, from fine to coarse. */
-const STEPS = [250, 500, 1000, 2000, 5000, 10_000];
-
 /**
  * Kept keyframes on a real-time track, like an editing timeline. Each leg
  * between two keyframes is a clip as long as it plays: VisDelta plans the leg
@@ -103,7 +100,7 @@ export function Timeline({
   notice,
   mod = '⌘',
   className,
-  height,
+  heights,
   heightRange,
   onHeight,
   onResetHeight,
@@ -139,10 +136,9 @@ export function Timeline({
 
   const now = replaying ? timeOf(value) : total;
   const current = replaying && Math.abs(value - Math.round(value)) < 0.002 ? Math.round(value) : -1;
-  const step = STEPS.find((candidate) => total / candidate <= 10) ?? STEPS.at(-1)!;
-  const ticks = total ? Array.from({ length: Math.floor(total / step + 1e-6) + 1 }, (_, index) => index * step) : [0];
-  /** Only say something when there is a next step; a working timeline stays quiet. */
-  const hint = notice || (count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '');
+  /** Guidance takes the track's place until there is something to scrub; a working timeline stays quiet. */
+  const guide = count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit the code, then ${mod}S again to add a second keyframe.` : '';
+  const height = details ? heights.details : heights.compact;
   const clampHeight = (value: number) => Math.min(heightRange[1], Math.max(heightRange[0], Math.round(value)));
   /** Drag the top edge: moving up makes the panel taller. */
   const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -154,13 +150,13 @@ export function Timeline({
     let current = startHeight;
     const move = (moveEvent: globalThis.PointerEvent) => {
       current = clampHeight(startHeight + startY - moveEvent.clientY);
-      onHeight(current, false);
+      onHeight(current, false, details);
     };
     const end = () => {
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', end);
       handle.removeEventListener('pointercancel', end);
-      onHeight(current, true);
+      onHeight(current, true, details);
     };
     handle.addEventListener('pointermove', move);
     handle.addEventListener('pointerup', end);
@@ -170,12 +166,12 @@ export function Timeline({
     const next = { ArrowUp: height + 16, ArrowDown: height - 16, Home: heightRange[0], End: heightRange[1] }[event.key];
     if (next === undefined) return;
     event.preventDefault();
-    onHeight(clampHeight(next), true);
+    onHeight(clampHeight(next), true, details);
   };
   const lanes = details && visibleCategories.length > 0;
 
   return (
-    <section aria-label="Keyframes" className={className} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
+    <section aria-label="Keyframes" className={className} data-details={details || undefined} style={{ '--pg-time-h': `${height}px` } as CSSProperties}>
       <div
         role="separator"
         aria-orientation="horizontal"
@@ -188,10 +184,10 @@ export function Timeline({
         title="Drag to resize · double-click to reset"
         onPointerDown={startResize}
         onKeyDown={nudgeHeight}
-        onDoubleClick={onResetHeight}
+        onDoubleClick={() => onResetHeight(details)}
       />
       <div className="pg-timeline-body">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <button
           type="button"
           onClick={onPlay}
@@ -202,18 +198,11 @@ export function Timeline({
         >
           {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5 translate-x-px" />}
         </button>
-        <div className="w-[7.5rem] shrink-0 font-mono text-xs tabular-nums" aria-live="off">
+        <div className="w-[7.5rem] shrink-0 font-mono text-xs leading-8 tabular-nums" aria-live="off">
           <span className="text-fd-foreground">{seconds(now)}</span>
           <span className="text-fd-muted-foreground"> / {seconds(total)}</span>
         </div>
-        <div className="pg-track" data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} hidden={count === 0}>
-          {details && <div className="pg-ruler" aria-hidden="true">
-            {ticks.map((tick) => (
-              <span key={tick} className="pg-tick" style={{ left: x(tick) }}>
-                {tick % 1000 === 0 ? `${tick / 1000}s` : ''}
-              </span>
-            ))}
-          </div>}
+        <div className="pg-track" data-details={details || undefined} data-lanes={lanes || undefined} data-dense={count > 12 || undefined} data-single={count === 1 || undefined} hidden={count === 0}>
           <div className="pg-clips">
             {keyframes.slice(1).map((key, index) => (
               <span
@@ -296,11 +285,12 @@ export function Timeline({
           </div>}
           {replaying && <span className="pg-head" aria-hidden="true" style={{ left: x(now) }} />}
         </div>
+        {guide && <p className="pg-guide">{guide}</p>}
         <button
           type="button"
           onClick={onKeep}
           disabled={!canKeep}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ${count === 0 ? 'ml-auto' : 'ml-auto sm:ml-0'}`}
+          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
           title={`Keep this state as a keyframe (${mod}S)`}
         >
           <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
@@ -322,7 +312,6 @@ export function Timeline({
       </div>
       {details && count > 0 && <div id="pg-details" className="pg-category-help">
         <span>{count} {count === 1 ? 'key' : 'keys'} · {stages} {stages === 1 ? 'stage' : 'stages'}</span>
-        {lanes && <span>Lanes group changes by category; the strip under the clips shows planned stages.</span>}
         <button type="button" onClick={onClear}>Clear keys</button>
       </div>}
       {hover && previewIndex >= 0 && createPortal(<div id="pg-key-preview" role="tooltip" className="pg-key-preview" style={{ left: hover.left, top: hover.top }} onPointerEnter={() => { pointerInside.current = true; cancelTimer(); }} onPointerLeave={() => { pointerInside.current = false; leave(); }}>
@@ -334,7 +323,7 @@ export function Timeline({
           : <div className="pg-preview-placeholder">{previews[hover.id]?.error ? 'Preview unavailable' : 'Loading preview…'}</div>}
         <p>{previewIndex ? describeLeg(keyframes[previewIndex]) : 'Initial state'}</p>
       </div>, document.body)}
-      <p className="pg-hint" aria-live="polite">{hint}</p>
+      <p className="pg-notice" role="status" hidden={!notice}>{notice}</p>
       </div>
     </section>
   );

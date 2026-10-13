@@ -55,14 +55,15 @@ const DEFAULT_STORY = 'sort';
 /** Editor share of the editor + preview width. */
 const DEFAULT_SPLIT = 0.42;
 const SPLIT_RANGE = [0.25, 0.72] as const;
-/** Timeline panel height in pixels: fixed, and adjustable by dragging its top edge. */
-const DEFAULT_TIMELINE = 112;
-const TIMELINE_RANGE = [72, 360] as const;
+/** Timeline panel heights in pixels: one fixed height per view, adjustable by dragging the top edge. */
+const DEFAULT_TIMELINE = { compact: 56, details: 208 };
+const TIMELINE_RANGE = [56, 360] as const;
 /** Builder members that are not chainable authoring calls. */
 const INTERNAL_MEMBERS = new Set(['constructor', 'state', 'chartModule', 'compileSpec', 'toSpec', 'rows', 'replaceState', 'derive']);
 const STORAGE = {
   split: 'visdelta.playground.split',
   timeline: 'visdelta.playground.timeline-height',
+  timelineDetails: 'visdelta.playground.timeline-details-height',
   autoRun: 'visdelta.playground.autorun',
   sizeMode: 'visdelta.playground.size-mode',
   fixedWidth: 'visdelta.playground.fixed-width',
@@ -166,9 +167,10 @@ export function Playground() {
   const [review, setReview] = useState(false);
   const [autoRunPreference, setAutoRunPreference] = usePreference(STORAGE.autoRun, 'true');
   const [splitPreference, setSplitPreference] = usePreference(STORAGE.split, String(DEFAULT_SPLIT));
-  const [timelinePreference, setTimelinePreference] = usePreference(STORAGE.timeline, String(DEFAULT_TIMELINE));
+  const [compactPreference, setCompactPreference] = usePreference(STORAGE.timeline, String(DEFAULT_TIMELINE.compact));
+  const [detailsPreference, setDetailsPreference] = usePreference(STORAGE.timelineDetails, String(DEFAULT_TIMELINE.details));
   /** The timeline height while its edge is being dragged. */
-  const [dragTimeline, setDragTimeline] = useState<number | null>(null);
+  const [dragTimeline, setDragTimeline] = useState<{ details: boolean; height: number } | null>(null);
   /** The divider while it is being dragged. */
   const [dragSplit, setDragSplit] = useState<number | null>(null);
   /** null follows the layout: open on wide screens, closed on narrow ones. */
@@ -196,7 +198,10 @@ export function Playground() {
     autoRunRef.current = autoRun;
   }, [autoRun]);
   const split = dragSplit ?? clamp(Number(splitPreference) || DEFAULT_SPLIT, SPLIT_RANGE);
-  const timelineHeight = dragTimeline ?? clamp(Number(timelinePreference) || DEFAULT_TIMELINE, TIMELINE_RANGE);
+  const timelineHeights = {
+    compact: dragTimeline && !dragTimeline.details ? dragTimeline.height : clamp(Number(compactPreference) || DEFAULT_TIMELINE.compact, TIMELINE_RANGE),
+    details: dragTimeline?.details ? dragTimeline.height : clamp(Number(detailsPreference) || DEFAULT_TIMELINE.details, TIMELINE_RANGE),
+  };
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
   /** Floating needs room beside the editor, so narrow screens stay docked. */
@@ -1150,15 +1155,15 @@ export function Playground() {
         canKeep={!busy && !error && !review}
         notice={notice}
         mod={mod}
-        height={timelineHeight}
+        heights={timelineHeights}
         heightRange={TIMELINE_RANGE}
-        onHeight={(height, commit) => {
+        onHeight={(height, commit, details) => {
           if (commit) {
-            setTimelinePreference(String(height));
+            (details ? setDetailsPreference : setCompactPreference)(String(height));
             setDragTimeline(null);
-          } else setDragTimeline(height);
+          } else setDragTimeline({ details, height });
         }}
-        onResetHeight={() => setTimelinePreference(String(DEFAULT_TIMELINE))}
+        onResetHeight={(details) => (details ? setDetailsPreference : setCompactPreference)(String(details ? DEFAULT_TIMELINE.details : DEFAULT_TIMELINE.compact))}
       />
 
       <footer className="pg-status">

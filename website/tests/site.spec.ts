@@ -190,38 +190,41 @@ test.describe('playground', () => {
     await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
   });
 
-  test('the timeline panel has a fixed height that the reader can resize', async ({ page }) => {
+  test('the timeline panel has a fixed height per view that the reader can resize', async ({ page }) => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     const panel = page.getByRole('region', { name: 'Keyframes' });
     const grip = page.getByRole('separator', { name: 'Resize timeline' });
     const height = async () => (await panel.boundingBox())!.height;
-    const chartHeight = async () => (await page.locator('.pg-stage').boundingBox())!.height;
-    expect(await height()).toBeCloseTo(112, 0);
-    // Opening Details neither grows the panel nor moves the chart.
-    const chartBefore = await chartHeight();
+    // Compact is exactly one row; its controls sit on one centre line.
+    expect(await height()).toBeCloseTo(56, 0);
+    const centres = await panel.locator('button:visible').evaluateAll(nodes => nodes.filter(node => !node.classList.contains('pg-key')).map(node => { const rect = node.getBoundingClientRect(); return rect.top + rect.height / 2; }));
+    expect(Math.max(...centres) - Math.min(...centres)).toBeLessThan(1.5);
+    // Details opens to its own remembered height, then stays fixed.
     await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(112, 0);
-    expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
-    // Dragging the top edge up makes it taller; the size is remembered.
+    expect(await height()).toBeCloseTo(208, 0);
+    await expect(grip).toHaveAttribute('aria-valuenow', '208');
+    // Dragging the top edge up makes it taller; each view's size is remembered.
     const box = (await grip.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 80, { steps: 5 });
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 40, { steps: 5 });
     await page.mouse.up();
-    expect(await height()).toBeCloseTo(192, 0);
-    await expect(grip).toHaveAttribute('aria-valuenow', '192');
+    expect(await height()).toBeCloseTo(248, 0);
+    await page.getByRole('button', { name: 'Details' }).click();
+    expect(await height()).toBeCloseTo(56, 0);
     await page.reload();
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
-    expect(await height()).toBeCloseTo(192, 0);
+    await page.getByRole('button', { name: 'Details' }).click();
+    expect(await height()).toBeCloseTo(248, 0);
     // The keyboard and a double-click work too, within limits.
     await grip.focus();
     await page.keyboard.press('ArrowDown');
-    await expect(grip).toHaveAttribute('aria-valuenow', '176');
+    await expect(grip).toHaveAttribute('aria-valuenow', '232');
     await page.keyboard.press('Home');
-    await expect(grip).toHaveAttribute('aria-valuenow', '72');
+    await expect(grip).toHaveAttribute('aria-valuenow', '56');
     await grip.dblclick();
-    await expect(grip).toHaveAttribute('aria-valuenow', '112');
+    await expect(grip).toHaveAttribute('aria-valuenow', '208');
   });
 
   test('category lanes share leg geometry without claiming stage timing', async ({ page }) => {
@@ -232,7 +235,7 @@ test.describe('playground', () => {
     await expect(page.locator('.pg-stage-block')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
     await details(page);
-    await expect(page.getByText('Lanes group changes by category; the strip under the clips shows planned stages.')).toBeVisible();
+    await expect(page.getByText('3 keys · 3 stages')).toBeVisible();
     const rows = page.locator('.pg-category-row');
     expect(await rows.count()).toBeGreaterThan(0);
     await expect.poll(() => page.locator('.pg-category-block').evaluateAll(blocks => {
