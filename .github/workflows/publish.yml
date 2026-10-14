@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -26,13 +34,16 @@ jobs:
           package-manager-cache: false
 
       # npm trusted publishing requires npm 11.5.1 or newer.
-      - run: npm install --global npm@latest
+      # Match the CLI whose pack JSON and consumer checks we validate locally.
+      - run: npm install --global npm@11.20.0
 
       - name: Verify tag matches package version
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           node --input-type=module -e '
             import packageJson from "./package.json" with { type: "json" };
-            const tag = process.env.GITHUB_REF_NAME;
+            const tag = process.env.RELEASE_TAG;
             if (tag !== `v${packageJson.version}`) {
               throw new Error(`${tag} does not match package.json version ${packageJson.version}`);
             }
