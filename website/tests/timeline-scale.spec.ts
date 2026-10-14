@@ -35,10 +35,10 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   await viewport.evaluate(node => { node.scrollLeft = node.scrollWidth; });
   await expect.poll(() => viewport.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
   expect(await page.locator('.pg-lane-labels').evaluate(node => node.getBoundingClientRect().left)).toBe(labelLeft);
-  const stage = (await page.locator('.pg-stage-block').nth(1).boundingBox())!;
-  const category = (await page.locator('.pg-category-block').filter({ hasText: 'attention.exit(focus)' }).boundingBox())!;
-  expect(stage.x).toBeCloseTo(category.x, 0);
-  expect(stage.width * 2).toBeCloseTo(category.width, 0);
+  const interval = await page.locator('.pg-category-block').first().evaluate(node => ({ start: Number((node as HTMLElement).dataset.start), end: Number((node as HTMLElement).dataset.end), x: node.getBoundingClientRect().x, width: node.getBoundingClientRect().width }));
+  const origin = (await page.locator('.pg-ruler').boundingBox())!.x + 7;
+  expect(interval.x).toBeCloseTo(origin + interval.start / 1000 * pixelsPerSecond, 0);
+  expect(interval.width).toBeCloseTo((interval.end - interval.start) / 1000 * pixelsPerSecond, 0);
   await page.locator('.pg-ruler').scrollIntoViewIfNeeded();
   const ruler = (await page.locator('.pg-ruler').boundingBox())!;
   const room = (await viewport.boundingBox())!;

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const source = (title: string) => `const chart = bar(rows).x("state").y("population").key(["state", "age"]).where({ age: "<10" }).where({ field: "state", oneOf: ["CA", "TX"] }).title("${title}");`;
 
-for (const width of [1280, 390]) test(`Keep updates, inserts and refreshes saved snapshots at ${width}px`, async ({ page }) => {
+for (const width of [1280, 390]) test(`Saving a draft updates, inserts and refreshes saved snapshots at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 860 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('playground/#split');
@@ -18,7 +18,9 @@ for (const width of [1280, 390]) test(`Keep updates, inserts and refreshes saved
       await page.getByRole('button', { name: 'Run', exact: true }).click();
       await expect(page.getByLabel('Chart', { exact: true }).getByText(title, { exact: true })).toBeVisible();
     }
-    await page.getByRole('button', { name: 'Keep', exact: true }).click();
+    await page.getByLabel('Chart code').click();
+    await page.keyboard.press('ControlOrMeta+S');
+    await expect(page.locator('.pg-snapshot-card[data-draft]')).toHaveCount(0);
   };
   await keys.first().click();
   await expect(page.getByLabel('Playhead time in seconds')).toHaveValue('0.00');

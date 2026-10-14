@@ -135,11 +135,11 @@ export function Timeline({
   const pointerInside = useRef(false);
   const cancelTimer = () => { if (timer.current) clearTimeout(timer.current); };
   const close = () => { cancelTimer(); setHover(null); };
-  const leave = () => { cancelTimer(); timer.current = setTimeout(() => { if (!pointerInside.current && !document.activeElement?.matches('.pg-key:focus-visible')) setHover(null); }, 120); };
+  const leave = () => { cancelTimer(); timer.current = setTimeout(() => { if (!pointerInside.current && !document.activeElement?.matches('.pg-key:focus-visible')) setHover(null); }, 300); };
   const open = (id: number, button: HTMLElement, immediate = false) => {
     cancelTimer();
     const rect = button.getBoundingClientRect();
-    const show = () => setHover({ id, left: Math.max(8, Math.min(window.innerWidth - 328, rect.left + rect.width / 2 - 160)), top: rect.top >= 290 ? rect.top - 282 : Math.max(8, Math.min(window.innerHeight - 280, rect.bottom + 8)) });
+    const show = () => setHover({ id, left: Math.max(8, Math.min(window.innerWidth - 328, rect.left + rect.width / 2 - 160)), top: rect.top >= 290 ? rect.top - 260 : Math.max(8, Math.min(window.innerHeight - 280, rect.bottom + 8)) });
     if (immediate) show(); else timer.current = setTimeout(show, 150);
   };
   useEffect(() => {
@@ -410,7 +410,7 @@ export function Timeline({
                     const start = times[index] + track.start * legs[index];
                     const end = times[index] + track.end * legs[index];
                     const active = replaying && now >= start && now < end;
-                    return <button type="button" key={`${key.id}:${interval}`} className="pg-category-block" data-active={active || undefined}
+                    return <button type="button" key={`${key.id}:${interval}`} className="pg-category-block" data-active={active || undefined} data-start={start} data-end={end}
                       data-muted={!(index === elementLeg && track.start < (elementStage + 1) / elementStageCount && track.end > elementStage / elementStageCount) || undefined}
                       aria-label={`${track.label}: ${seconds(start)}–${seconds(end)}`}
                       title={`${track.label}: ${seconds(start)}–${seconds(end)} · Inspect animated elements`}

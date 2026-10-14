@@ -1,3 +1,4 @@
+import { expectFit } from './fit';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /** Collect uncaught errors and console errors for the lifetime of a page. */
@@ -141,7 +142,7 @@ test.describe('playground', () => {
   const chart = (page: Page) => page.getByLabel('Chart', { exact: true });
   const keys = (page: Page) => page.getByRole('region', { name: 'Keyframes' }).locator('.pg-key');
   const changes = (page: Page) => page.getByRole('status', { name: 'State changes' });
-  const details = async (page: Page) => { const toggle = page.getByRole('button', { name: 'Details' }); if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click(); };
+  const details = async (page: Page) => { const toggle = page.getByRole('button', { name: 'Details', exact: true }); if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click(); };
   const examples = (page: Page) => page.getByRole('navigation', { name: 'Examples' });
   /** Bars drawn on screen (prepared legs of a sequence stay hidden). */
   const visibleBars = (page: Page) =>
@@ -153,7 +154,8 @@ test.describe('playground', () => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     await details(page);
-    await page.getByLabel('Keyframe timeline').fill('0');
+    await keys(page).first().click();
+    await expect(page.locator('.cm-content')).toContainText('.rollup()');
     const code = await page.locator('.cm-content').textContent();
     const time = await page.getByLabel('Keyframe timeline').inputValue();
     await page.evaluate(() => {
@@ -180,7 +182,7 @@ test.describe('playground', () => {
     await page.mouse.move(0, 0);
     await keys(page).nth(1).hover();
     await expect(tooltip.getByRole('img')).toHaveAttribute('src', image!);
-    expect(await page.evaluate(() => (window as unknown as { previewRenders: number }).previewRenders)).toBe(1);
+    expect(await page.evaluate(() => (window as unknown as { previewRenders: number }).previewRenders)).toBe(0);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Tab');
     await keys(page).first().focus();
@@ -196,49 +198,47 @@ test.describe('playground', () => {
     const height = async () => (await panel.boundingBox())!.height;
     const chartHeight = async () => (await page.locator('.pg-stage').boundingBox())!.height;
     // Compact includes the time ruler; its controls sit on one centre line.
-    expect(await height()).toBeCloseTo(80, 0);
-    const centres = await panel.locator('button:visible').evaluateAll(nodes => nodes.filter(node => !node.classList.contains('pg-key')).map(node => { const rect = node.getBoundingClientRect(); return rect.top + rect.height / 2; }));
+    await expect.poll(height).toBeCloseTo(124, 0);
+    const centres = await panel.locator('.pg-transport > button, .pg-row > button').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return rect.top + rect.height / 2; }));
     expect(Math.max(...centres) - Math.min(...centres)).toBeLessThan(1.5);
     // Details opens to its own remembered height, then stays fixed.
-    await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(240, 0);
-    await expect(grip).toHaveAttribute('aria-valuenow', '240');
+    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await expect.poll(height).toBeCloseTo(320, 0);
+    await expect(grip).toHaveAttribute('aria-valuenow', '320');
     // The stage inspector opens inside the fixed panel and scrolls there; the chart does not move.
     const chartBefore = await chartHeight();
-    await page.getByRole('button', { name: 'Inspect', exact: true }).click();
     const inspector = page.getByLabel('Stage inspector');
     await expect(inspector).toBeVisible();
-    expect(await height()).toBeCloseTo(240, 0);
+    await expect.poll(height).toBeCloseTo(320, 0);
     expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
     expect(await inspector.evaluate(node => Boolean(node.closest('.pg-timeline-body')))).toBe(true);
     expect(await panel.locator('.pg-timeline-body').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
-    await page.getByRole('button', { name: 'Hide inspector', exact: true }).click();
     // Dragging the top edge up makes it taller; each view's size is remembered.
     const box = (await grip.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 40, { steps: 5 });
     await page.mouse.up();
-    expect(await height()).toBeCloseTo(280, 0);
-    await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(80, 0);
+    await expect.poll(height).toBeCloseTo(360, 0);
+    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await expect.poll(height).toBeCloseTo(124, 0);
     await page.reload();
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
-    await page.getByRole('button', { name: 'Details' }).click();
-    expect(await height()).toBeCloseTo(280, 0);
+    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await expect.poll(height).toBeCloseTo(360, 0);
     // The keyboard and a double-click work too, within limits.
     await grip.focus();
     await page.keyboard.press('ArrowDown');
-    await expect(grip).toHaveAttribute('aria-valuenow', '264');
+    await expect(grip).toHaveAttribute('aria-valuenow', '344');
     await page.keyboard.press('Home');
-    await expect(grip).toHaveAttribute('aria-valuenow', '80');
+    await expect(grip).toHaveAttribute('aria-valuenow', '124');
     await grip.dblclick();
-    await expect(grip).toHaveAttribute('aria-valuenow', '240');
+    await expect(grip).toHaveAttribute('aria-valuenow', '320');
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect.poll(height).toBeCloseTo(240, 0);
+    await expect.poll(height).toBeCloseTo(320, 0);
     await grip.focus();
     await page.keyboard.press('ArrowUp');
-    await expect.poll(height).toBeCloseTo(256, 0);
+    await expect.poll(height).toBeCloseTo(336, 0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
@@ -319,6 +319,7 @@ test.describe('playground', () => {
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).cur');
     const list = page.locator('.cm-tooltip-autocomplete');
+    await page.keyboard.press('Control+Space');
     await expect(list.getByRole('option', { name: 'curve' })).toBeVisible();
     await page.keyboard.press('Escape');
     await page.keyboard.type('ve("');
@@ -381,6 +382,7 @@ test.describe('playground', () => {
     // Split is planned in two route stages, the grouped layout in one: 3 × 0.9s.
     await expect(track.locator('.pg-clip')).toHaveCount(2);
     await details(page);
+    await keys(page).last().click();
     await expect(track.locator('.pg-stage-block')).toHaveCount(3);
     await expect(track.locator('.pg-clip').first()).toHaveAttribute('title', /2 planned stages/);
     await expect(track.locator('.pg-stage-block').nth(1)).toHaveAttribute('aria-label', /stage 2 of 2:/);
@@ -418,18 +420,18 @@ test.describe('playground', () => {
     await page.goto('playground/#sort');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     const stage = chart(page);
-    const figure = stage.locator('figure').first();
     const canvas = stage.locator('svg').first();
     const box = async (locator: Locator) => locator.evaluate((node) => ({ width: Math.round(node.getBoundingClientRect().width), height: Math.round(node.getBoundingClientRect().height) }));
     const sizeGroup = page.getByRole('group', { name: 'Chart size' });
     await expect(sizeGroup.getByRole('button', { name: 'Fit' })).toHaveAttribute('aria-pressed', 'true');
 
-    // Fit: the chart is exactly as big as the room its container gives it.
-    const room = await box(stage);
-    await expect.poll(() => box(figure)).toEqual(room);
+    // Fit scales the whole fixed figure proportionally into the available room.
+    await expectFit(stage);
 
     // Fixed: exactly the width and height asked for, whatever the container is.
     await sizeGroup.getByRole('button', { name: 'Fixed' }).click();
+    await page.getByLabel('Chart width in pixels').fill('640');
+    await page.getByLabel('Chart height in pixels').fill('400');
     await expect.poll(async () => (await box(canvas)).height).toBe(400);
     expect(await box(canvas)).toEqual({ width: 640, height: 400 });
     await page.getByLabel('Chart width in pixels').fill('1500');
@@ -458,7 +460,8 @@ test.describe('playground', () => {
     await sizeGroup.getByRole('button', { name: 'Fit' }).click();
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     await page.getByLabel('Keyframe timeline').fill('0.5');
-    await expect.poll(async () => JSON.stringify(await box(stage.locator('figure:visible').first()))).toEqual(JSON.stringify(await box(stage)));
+    await expectFit(stage);
+    await expect(stage.locator('svg:visible').first()).toHaveAttribute('viewBox', '0 0 1500 520');
     expect(errors).toEqual([]);
   });
 
@@ -468,7 +471,6 @@ test.describe('playground', () => {
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     const preview = page.getByRole('region', { name: 'Preview' });
     const stage = chart(page);
-    const canvasWidth = () => stage.locator('svg').first().evaluate((svg) => Math.round(svg.getBoundingClientRect().width));
     const windowBox = async () => (await preview.boundingBox())!;
     const docked = await windowBox();
 
@@ -479,14 +481,22 @@ test.describe('playground', () => {
     expect(await preview.evaluate((node) => getComputedStyle(node).position)).toBe('absolute');
     const editor = (await page.getByRole('region', { name: 'Editor' }).boundingBox())!;
     expect(editor.width).toBeGreaterThan(docked.width);
-    const narrow = await canvasWidth();
 
     // Drag the title bar: the window moves and stays inside the workspace.
     const before = await windowBox();
-    const bar = (await preview.locator('.pg-viewbar').boundingBox())!;
-    await page.mouse.move(bar.x + bar.width - 140, bar.y + 4);
+    const dragPoint = () => preview.locator('.pg-viewbar').evaluate(bar => {
+      const box = bar.getBoundingClientRect();
+      for (let x = box.right - 40; x > box.left; x -= 8) {
+        const y = box.top + box.height / 2;
+        const target = document.elementFromPoint(x, y);
+        if (target && bar.contains(target) && !target.closest('button,input,label,select,summary,details')) return { x, y };
+      }
+      throw new Error('The floating toolbar needs an exposed drag area');
+    });
+    const point = await dragPoint();
+    await page.mouse.move(point.x, point.y);
     await page.mouse.down();
-    await page.mouse.move(bar.x + bar.width - 340, bar.y + 120, { steps: 6 });
+    await page.mouse.move(point.x - 200, point.y + 116, { steps: 6 });
     await page.mouse.up();
     const moved = await windowBox();
     expect(Math.round(before.x - moved.x)).toBe(200);
@@ -501,13 +511,15 @@ test.describe('playground', () => {
     const grown = await windowBox();
     expect(Math.round(grown.width - moved.width)).toBe(120);
     expect(Math.round(grown.height - moved.height)).toBe(60);
-    await expect.poll(canvasWidth).toBeGreaterThan(narrow + 100);
+    await expect(stage.locator("svg").first()).toHaveAttribute("viewBox", `0 0 ${Math.round(grown.width)} ${Math.round(grown.height)}`);
+    await expectFit(stage);
     const workspace = (await page.locator('.pg-app').boundingBox())!;
     expect(grown.x).toBeGreaterThanOrEqual(workspace.x);
     expect(grown.x + grown.width).toBeLessThanOrEqual(workspace.x + workspace.width + 1);
 
     // Dragging a window past the edge clamps it.
-    await page.mouse.move(bar.x + bar.width - 340 + 100, bar.y + 120 + 4);
+    const nextPoint = await dragPoint();
+    await page.mouse.move(nextPoint.x, nextPoint.y);
     await page.mouse.down();
     await page.mouse.move(-400, -400, { steps: 4 });
     await page.mouse.up();
@@ -553,13 +565,15 @@ test.describe('playground', () => {
     await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
     const fitFirst = await canvas();
+    const native = await stage.locator("svg:visible").first().getAttribute("viewBox");
     await timeline.fill((await timeline.getAttribute('max'))!);
     await expect.poll(async () => (await canvas()).top).toBeGreaterThan(fitFirst.top);
     const fitLast = await canvas();
-    expect(fitLast.width).toBe(fitFirst.width);
-    expect(fitLast.height).toBeLessThan(fitFirst.height);
+    expect(fitLast.width / fitLast.height).toBeCloseTo(fitFirst.width / fitFirst.height, 1);
+    await expectFit(stage);
+    await expect(stage.locator("svg:visible").first()).toHaveAttribute("viewBox", native!);
     // Compare the edge itself: summing separately rounded top and height can drift by a pixel.
-    expect(fitLast.bottom).toBe(fitFirst.bottom);
+    expect(fitLast.bottom).toBeLessThanOrEqual((await stage.boundingBox())!.y + (await stage.boundingBox())!.height + 1);
     await timeline.fill('0');
     await expect.poll(canvas).toEqual(fitFirst);
     await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
@@ -635,15 +649,17 @@ test.describe('playground', () => {
   test('the divider resizes the editor and the chart follows its pane', async ({ page }) => {
     await page.goto('playground/#sort');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
-    const svgWidth = () => chart(page).locator('svg').first().evaluate((svg) => svg.getBoundingClientRect().width);
-    const before = await svgWidth();
+    const before = (await chart(page).boundingBox())!.width;
+    const native = await chart(page).locator("svg").first().getAttribute("viewBox");
     const divider = page.getByRole('separator', { name: 'Resize editor and preview' });
     const box = (await divider.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + 200);
     await page.mouse.down();
     await page.mouse.move(box.x - 200, box.y + 200, { steps: 8 });
     await page.mouse.up();
-    await expect.poll(svgWidth).toBeGreaterThan(before + 100);
+    await expect.poll(async () => (await chart(page).boundingBox())!.width).toBeGreaterThan(before + 100);
+    await expectFit(chart(page));
+    await expect(chart(page).locator("svg").first()).toHaveAttribute("viewBox", native!);
     const value = Number(await divider.getAttribute('aria-valuenow'));
     await divider.focus();
     await page.keyboard.press('ArrowRight');

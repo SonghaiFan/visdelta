@@ -1271,7 +1271,7 @@ button.pg-category-block:focus-visible { outline: 1px solid var(--color-delta); 
 
 /* The DOM hierarchy occupies the space beneath the transport controls. */
 .pg-transport { display: flex; align-items: center; gap: 12px; }
-.pg-row[data-tree] { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) auto auto; gap: 0 12px; }
+.pg-row[data-tree] { min-width: 0; display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) auto auto; gap: 0 12px; }
 .pg-row[data-tree] > .pg-transport { grid-area: 1 / 1; z-index: 1; justify-self: start; }
 .pg-row[data-tree] > .pg-time-shell { grid-area: 1 / 1 / 2 / 5; padding-right: 180px; }
 .pg-row[data-tree] > button { grid-row: 1; z-index: 1; }

@@ -1406,7 +1406,7 @@ function PlaygroundContent() {
           </Fragment>)}
           <button type="button" className="pg-snapshot-add" data-drop-before={dropSlot === keyframes.length || undefined} aria-label="Add keyframe at end"
             title="Add the edited chart after the last keyframe" disabled={busy || Boolean(error) || review}
-            onClick={() => navigate(async () => { await keep(undefined, 'append'); })}>
+            onClick={() => { void keep(undefined, 'append'); }}>
             <Plus aria-hidden="true" className="size-4" />
           </button>
         </div>

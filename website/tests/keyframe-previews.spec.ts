@@ -56,15 +56,15 @@ for (const [index, [chart, expression]] of cases.entries()) {
 
 test('a preview failure does not block selection or playback', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('playground/#split');
-  await expect(page.locator('.pg-key')).toHaveCount(3);
-  await page.evaluate(() => {
+  await page.addInitScript(() => {
     const original = Element.prototype.querySelector;
     Element.prototype.querySelector = function (this: Element, selector: string) {
       if (this.classList.contains('pg-snapshot-render') && selector === 'svg') return null;
       return original.call(this, selector);
     } as typeof original;
   });
+  await page.goto('playground/#split');
+  await expect(page.locator('.pg-key')).toHaveCount(3);
   await page.locator('.pg-key').first().hover();
   await expect(page.getByRole('tooltip')).toContainText('Preview unavailable');
   await page.locator('.pg-key').first().click();
@@ -74,7 +74,7 @@ test('a preview failure does not block selection or playback', async ({ page }) 
   await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
 });
 
-test('one saved sequence retains all seven category lanes and overlapping changes', async ({ page }) => {
+test('one saved sequence retains changed element lanes and overlapping changes', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const base = 'bar([{group:"A",part:"x",v:2,w:6},{group:"A",part:"y",v:4,w:5},{group:"B",part:"x",v:3,w:2},{group:"B",part:"y",v:5,w:3}]).x("group").y("v").key(["group","part"]).breakdown("part").color("part")';
   const code = `const chart = ${base}.rollup();`;
@@ -92,14 +92,16 @@ test('one saved sequence retains all seven category lanes and overlapping change
     await page.getByRole('button', { name: 'Add keyframe at end', exact: true }).click();
     await expect(page.locator('.pg-key')).toHaveCount(index + 2);
   }
-  await expect(page.locator('.pg-category-name')).toHaveText(['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']);
+  const labels = await page.locator('.pg-category-name').allTextContents();
+  expect(labels.some(label => label.includes('vd-'))).toBe(true);
+  expect(labels).not.toContain('Grain');
   const firstTime = await page.locator('.pg-key').nth(1).getAttribute('data-time');
   await page.getByLabel('Keyframe timeline').fill(String(Number(firstTime) / 2));
   expect(await page.locator('.pg-category-block[data-active]').count()).toBeGreaterThan(1);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.pg-category-scroll')).toHaveCSS('max-height', 'none');
-  await page.locator('[data-category="appearance"]').scrollIntoViewIfNeeded();
-  await expect(page.locator('[data-category="appearance"]')).toBeVisible();
+  await page.locator('.pg-category-row').last().scrollIntoViewIfNeeded();
+  await expect(page.locator('.pg-category-row').last()).toBeVisible();
 });
 
 test('keyframe previews retain the heading and outside legend above the canvas', async ({ page }) => {

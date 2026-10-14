@@ -1,3 +1,4 @@
+import { expectFit } from './fit';
 import { expect, test } from '@playwright/test';
 import { playgroundDemos, storyFrames } from '../components/playground/demos';
 
@@ -41,7 +42,8 @@ test('changing stories and returning a scrolled fixed canvas to Fit keeps the ch
     await stage.evaluate(node => { node.scrollLeft = node.scrollWidth; node.scrollTop = node.scrollHeight; });
     await sizes.getByRole('button', { name: 'Fit', exact: true }).click();
     const figure = stage.locator('.pg-layer[data-state="shown"] figure').first();
-    await expect.poll(() => box(figure), { timeout: 5000 }).toEqual(await box(stage));
+    await expectFit(stage);
+    await expect(figure.locator('svg').first()).toHaveAttribute('viewBox', '0 0 1500 1100');
     await expect.poll(() => stage.evaluate(node => ({ left: node.scrollLeft, top: node.scrollTop }))).toEqual({ left: 0, top: 0 });
     const svg = figure.locator('svg').first();
     await expect(svg).toBeVisible();
@@ -73,13 +75,7 @@ test('Fit remains visible when the size mode changes during example loading and 
     const demo = playgroundDemos.find(demo => demo.id === id)!;
     await expect(page.locator('.pg-key')).toHaveCount(demo.edits.length + 1, { timeout: 25_000 });
     const stage = page.getByLabel('Chart', { exact: true });
-    await expect.poll(() => stage.evaluate(node => {
-      const figure = node.querySelector('.pg-layer[data-state="shown"] figure');
-      if (!figure) return false;
-      const bounds = figure.getBoundingClientRect();
-      return Math.abs(bounds.width - node.clientWidth) < 2 && Math.abs(bounds.height - node.clientHeight) < 2
-        && figure.querySelector('svg')!.getBoundingClientRect().height > 100;
-    })).toBe(true);
+    await expectFit(stage);
   }
   expect(errors).toEqual([]);
 });
@@ -102,12 +98,7 @@ test('a chart prepared during Fixed adopts Fit before replacing the previous cha
   });
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 20_000 });
   await expect(page.getByRole('group', { name: 'Chart size' }).getByRole('button', { name: 'Fit', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect.poll(() => page.locator('.pg-stage').evaluate(stage => {
-    const figure = stage.querySelector('.pg-layer[data-state="shown"] figure');
-    if (!figure) return false;
-    const box = figure.getBoundingClientRect();
-    return Math.abs(box.width - stage.clientWidth) < 2 && Math.abs(box.height - stage.clientHeight) < 2;
-  })).toBe(true);
+  await expectFit(page.locator('.pg-stage'));
 });
 
 test('the car summary uses gooey blending without authored effect settings', async ({ page }) => {
