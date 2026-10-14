@@ -303,11 +303,19 @@ to seek to the keyframe without playing, and press Escape to dismiss the preview
 continue to select keyframes directly. Previews fit the full figure into a
 480 × 300 frame, including its title, subtitle and top legend.
 
-Category lanes show each leg's changes under Data, Grain, Encoding, Coordinate,
-Layout, Attention and Appearance. Only categories present in the saved sequence
-appear. A transition can occupy several lanes at once: these blocks describe
-its changes, not independent animation schedules. The stage strip retains the
-actual planned stage timing. The ruler is always visible, with a default scale of **160 pixels per second**. Short stories leave unused room; long stories scroll horizontally. Category lanes are visible in the default view. **Details** opens the stage inspector directly. A story reserves each leg before playing it, and its playhead follows the chart controller at the same 0.9 seconds per stage used for replay. Clip widths remain fixed during playback; new clips fade in. Pausing or scrubbing takes control from the story. Code changes only when an authored keyframe is reached.
+Element lanes use the real SVG ancestry captured during phase inspection,
+including tag names and all classes (such as `g.tick` and `line`). Repeated marks with the same ancestry share a lane. All element groups that change anywhere in the saved sequence remain in the tree,
+with necessary ancestors retained and unchanged siblings omitted. Groups and
+intervals that change only in other stages are dimmed; the current stage follows
+the playhead when playing or seeking. The left gutter shows their DOM ancestry with indented parent rows,
+aligned with the animation lanes; identical labels under different parents remain
+separate. Blocks use recorded property intervals, merging overlaps while
+preserving gaps; clicking a block opens the stage inspector at its midpoint.
+Equal-endpoint ordinary properties are omitted; custom tweens remain because
+their internal movement is opaque. Immediate writes, unrecorded node lifecycle
+changes and HTML headings are outside this recording coverage.
+The stage strip retains the
+actual planned stage timing. The ruler is always visible, with a default scale of **160 pixels per second**. Short stories leave unused room; long stories scroll horizontally. Element lanes are visible in the default view. **Details** opens the stage inspector directly. A story reserves each leg before playing it, and its playhead follows the chart controller at the same 0.9 seconds per stage used for replay. Clip widths remain fixed during playback; new clips fade in. Pausing or scrubbing takes control from the story. Code changes only when an authored keyframe is reached.
 
 Open **Details** to inspect the saved timeline and expand its compiled SVG
 phases. Each phase lists the element, recorded attribute/style/text track,
@@ -339,3 +347,18 @@ Stage captions describe planner operations in plain language (for example, “Us
 Swarm uses `.layout("beeswarm", { x: "petalLength" })`. Unit layout type, columns and x/y channels form one planner operation, so the timeline shows one layout stage whose internal animation still moves horizontally before falling. Category lanes still describe semantic effects of that operation. Swarm keeps `.size(6)` across both endpoints; mark size is independent of layout. Later x/y assignments replace earlier bindings, including layout options.
 
 The timeline uses a transport header, time navigation, and a dedicated track canvas. On desktop, selected-stage context sits in a 280-pixel side panel; on narrow screens it follows the tracks.
+
+### Draft keyframes and ordering
+
+Editing code marks the current snapshot as a draft, or shows an inserted draft
+between snapshots when the playhead is between keyframes. The draft preview uses
+the latest successfully evaluated code. Moving the playhead or starting playback
+asks whether to save the frame, discard the edit, or keep editing. Invalid code
+keeps the draft open. Command/Ctrl+S saves at the current editing position.
+Drag a saved snapshot onto another to reorder it, or use Alt+Left/Right on a
+focused snapshot. Reordering replans the affected neighboring transitions.
+
+Snapshot selection reflects the exact editing position: an authored keyframe
+highlights its snapshot; a position between keyframes highlights neither and
+shows an insertion caret in their gap. Editing replaces that caret with the
+unsaved draft snapshot at the same insertion position.

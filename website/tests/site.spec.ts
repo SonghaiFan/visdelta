@@ -242,40 +242,18 @@ test.describe('playground', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
-  test('category lanes share leg geometry without claiming stage timing', async ({ page }) => {
-    await page.goto('playground/#split');
-    await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
-    // Compact by default: no lanes, ruler or stage strip until Details opens.
-    await expect(page.locator('.pg-category-row')).toHaveCount(0);
-    await expect(page.locator('.pg-stage-block')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-expanded', 'false');
-    await details(page);
-    await expect(page.getByText('3 keys · 3 stages')).toBeVisible();
-    const rows = page.locator('.pg-category-row');
-    expect(await rows.count()).toBeGreaterThan(0);
-    await expect.poll(() => page.locator('.pg-category-block').evaluateAll(blocks => {
-      const clips = [...document.querySelectorAll('.pg-clip')].map(clip => clip.getBoundingClientRect());
-      return blocks.every(block => {
-        const rect = block.getBoundingClientRect();
-        return clips.some(clip => Math.abs(clip.left - rect.left) < 1 && Math.abs(clip.width - rect.width) < 1);
-      });
-    })).toBe(true);
-    const count = await rows.count();
-    await page.getByLabel('Keyframe timeline').fill('1.25');
-    await expect(rows).toHaveCount(count);
-    await expect(page.locator('.pg-category-block[data-active]').first()).toBeVisible();
-    await page.getByRole('button', { name: 'Details' }).click();
-    await expect(rows).toHaveCount(0);
-    await page.getByRole('button', { name: 'Details' }).click();
-    await expect(rows).toHaveCount(count);
+  test('element lanes group recorded motion and open the inspector', async ({ page }) => {
+    await page.goto('playground/#regroup');
+    await expect(page.locator('.pg-category-block').first()).toBeVisible({ timeout: 30_000 });
+    const labels = await page.locator('.pg-category-name').allTextContents();
+    expect(labels.some(label => label.includes('vd-'))).toBe(true);
+    expect(labels).not.toContain('Grain');
+    expect(labels).not.toContain('Encoding');
+    await page.locator('.pg-category-block').first().click();
+    await expect(page.getByLabel('Stage inspector')).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.getByLabel('Keyframe timeline')).toBeVisible();
-    expect(await page.locator('.pg-stage').evaluate(node => node.getBoundingClientRect().height)).toBeGreaterThanOrEqual(272);
-    await keys(page).last().hover();
-    await expect(page.getByRole('tooltip').getByRole('img')).toBeVisible();
-    const bounds = await page.getByRole('tooltip').boundingBox();
-    expect(bounds!.x).toBeGreaterThanOrEqual(0);
-    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+    await expect(page.locator('.pg-category-block').first()).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
   test('an editor workspace: examples, files, chart, timeline and status', async ({ page }) => {

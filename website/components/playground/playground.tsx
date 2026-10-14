@@ -1,7 +1,7 @@
 'use client';
 
 import { Link2, PanelLeft, Play, Plus, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DeltaResult, StateChange } from 'visdelta/core';
 import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
 import { CodeEditor, type CodeHints } from '@/components/interactive/code-editor';
@@ -29,6 +29,7 @@ import { SIZE_LIMITS, SizeControls, type SizeMode } from './size-controls';
 import { Timeline } from './timeline';
 import { STAGE_DURATION, stageDurationFor } from './timing';
 import { stageLabels, stageDetails } from './stage-labels';
+import { elementTracks, type ElementTrack } from './element-tracks';
 import { StageInspector } from './stage-inspector';
 import { useKeyframePreviews } from './keyframe-previews';
 
@@ -82,6 +83,7 @@ interface Keyframe extends Version {
   stages: number;
   stageLabels: string[];
   stageDetails: string[];
+  elementTracks?: ElementTrack[];
 }
 interface Display {
   layer: HTMLElement;
@@ -171,7 +173,7 @@ export function Playground() {
   const shownKey = useRef(-1);
   const reviewRef = useRef(false);
   /** The last live edit and the route stages it was planned with. */
-  const lastMoveRef = useRef<{ from: ChartState; to: ChartState; stages: number; stageLabels: string[]; stageDetails: string[] } | null>(null);
+  const lastMoveRef = useRef<{ from: ChartState; to: ChartState; stages: number; stageLabels: string[]; stageDetails: string[]; elementTracks: ElementTrack[] } | null>(null);
 
   const [story, setStory] = useState<Opened | null>(null);
   const [code, setCode] = useState('');
@@ -181,9 +183,44 @@ export function Playground() {
   const [dataset, setDataset] = useState<Dataset>(inlineData);
   const [tab, setTab] = useState<'code' | 'rows'>('code');
   const [rowsView, setRowsView] = useState<RowsView>('table');
+  const [edited, setEdited] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<(() => Promise<void>) | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const draftDialog = useRef<HTMLDialogElement>(null);
+  const draggedFrame = useRef<number | null>(null);
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dropSlot, setDropSlot] = useState<number | null>(null);
+  const dropSlotRef = useRef<number | null>(null);
+  const suppressSnapshotClick = useRef(false);
+  const clearSnapshotDrag = () => {
+    draggedFrame.current = null;
+    dropSlotRef.current = null;
+    setDraggedId(null);
+    setDropSlot(null);
+  };
+  useEffect(() => {
+    if (pendingNavigation) draftDialog.current?.showModal();
+    else draftDialog.current?.close();
+  }, [pendingNavigation]);
   const [keyframes, setKeyframes] = useState<Keyframe[]>([]);
   const { previews, request, requestAll } = useKeyframePreviews(keyframes);
   const snapshotTrackRef = useRef<HTMLDivElement>(null);
+  const snapshotOrigins = useRef<Map<string, number> | null>(null);
+  const snapshotAnimations = useRef<Animation[]>([]);
+  useLayoutEffect(() => {
+    const origins = snapshotOrigins.current;
+    snapshotOrigins.current = null;
+    if (!origins || prefersReducedMotion()) return;
+    const cards = Array.from(snapshotTrackRef.current?.querySelectorAll<HTMLElement>('[data-frame-id]') ?? []);
+    // Read every destination before starting animations to avoid layout thrashing.
+    const moves = cards.map(card => ({ card, dx: (origins.get(card.dataset.frameId!) ?? card.offsetLeft) - card.offsetLeft }));
+    snapshotAnimations.current = moves.filter(({ dx }) => Math.abs(dx) > 0.5).map(({ card, dx }) => card.animate(
+      [{ transform: `translateX(${dx}px)` }, { transform: 'translateX(0)' }],
+      { duration: 260, easing: 'cubic-bezier(.22, 1, .36, 1)' },
+    ));
+  }, [keyframes]);
+  useEffect(() => () => { snapshotAnimations.current.forEach(animation => animation.cancel()); }, []);
+
   useEffect(() => {
     const track = snapshotTrackRef.current;
     if (!track) return;
@@ -203,6 +240,7 @@ export function Playground() {
   const [replaying, setReplaying] = useState(false);
   const [inspectionStage, setInspectionStage] = useState<number | undefined>();
   const [inspecting, setInspecting] = useState(false);
+  const getChartRoot = useCallback(() => displayRef.current?.layer ?? null, []);
   const inspect = useCallback(async () => displayRef.current?.controller.inspect(), []);
   const [value, setValue] = useState(0);
   const [livePosition, setLivePosition] = useState<number | null>(null);
@@ -254,7 +292,16 @@ export function Playground() {
   };
   const dragging = dragSplit !== null;
   const explorerOpen = explorerChoice ?? wide;
-  const selectedKeyframe = Math.max(0, Math.min(keyframes.length - 1, Math.round(replaying ? value : livePosition ?? value)));
+  const savePosition = Math.max(0, Math.min(keyframes.length - 1, editPosition.current));
+  const updateFrame = Math.abs(savePosition - Math.round(savePosition)) < 1e-6;
+  const selectedKeyframe = updateFrame ? Math.round(savePosition) : -1;
+  const saveAfter = updateFrame ? Math.round(savePosition) : Math.floor(savePosition);
+  const hasDraft = edited && code !== keyframes[saveAfter]?.code;
+  const draftVersion = hasDraft && latestRef.current?.code === code ? latestRef.current : null;
+  const draftFrames = useMemo(() => draftVersion ? [{ id: -1, state: draftVersion.state }] : [], [draftVersion]);
+  const { previews: draftPreviews, requestAll: requestDraft } = useKeyframePreviews(draftFrames);
+  useEffect(() => { if (draftFrames.length) requestDraft([-1]); }, [draftFrames, requestDraft]);
+
   /** Floating needs room beside the editor, so narrow screens stay docked. */
   const floating = placementPreference === 'float' && wide;
   const updateCanvasSize = useCallback(({ width, height }: { width?: number; height?: number }) => {
@@ -399,7 +446,7 @@ export function Playground() {
         try {
           const next = await mount((layer) => transition(from.state as never, target.state as never, options(layer)));
           const stages = next.controller.stageCount();
-          lastMoveRef.current = { from: from.state, to: target.state, stages, stageLabels: stageLabels(next.controller), stageDetails: stageDetails(next.controller) };
+          lastMoveRef.current = { from: from.state, to: target.state, stages, stageLabels: stageLabels(next.controller), stageDetails: stageDetails(next.controller), elementTracks: elementTracks(await next.controller.inspect()) };
           shownRef.current = target;
           setChanges(difference.stateChanges);
           setChangeStages(stages);
@@ -484,7 +531,7 @@ export function Playground() {
    */
   const measureStages = useCallback(async (from: ChartState, to: ChartState) => {
     const move = lastMoveRef.current;
-    if (move && move.from === from && move.to === to) return { stages: move.stages, stageLabels: move.stageLabels, stageDetails: move.stageDetails };
+    if (move && move.from === from && move.to === to) return { stages: move.stages, stageLabels: move.stageLabels, stageDetails: move.stageDetails, elementTracks: move.elementTracks };
     const { transition } = await loadRuntime();
     const host = document.createElement('div');
     host.className = 'pg-measure vd-docs-chart';
@@ -492,7 +539,7 @@ export function Playground() {
     try {
       const controller = await transition(from as never, to as never, { target: host, height: 240 });
       try {
-        return { stages: controller.stageCount(), stageLabels: stageLabels(controller), stageDetails: stageDetails(controller) };
+        return { stages: controller.stageCount(), stageLabels: stageLabels(controller), stageDetails: stageDetails(controller), elementTracks: elementTracks(await controller.inspect()) };
       } finally { controller.destroy(); }
     } catch {
       return { stages: 1, stageLabels: [], stageDetails: [] }; // No route: the replay reports the failure when it is built.
@@ -566,6 +613,7 @@ export function Playground() {
       setChangeStages(next[index].stages);
       setInspecting(false);
     }
+    if (!story) setEdited(false);
     setNotice(story ? '' : update ? `Updated keyframe ${index + 1}.` : `Inserted keyframe ${index + 1}.`);
   }, [evaluate, goLive, measureStages, present, setLatest]);
 
@@ -603,6 +651,7 @@ export function Playground() {
       setLivePlaying(false);
       setWriting(false);
       setNotice('');
+      setEdited(true);
       writeCode(text);
       if (editTimer.current !== null) window.clearTimeout(editTimer.current);
       if (autoRunRef.current && !reviewRef.current) editTimer.current = window.setTimeout(() => void run(text), SETTLE);
@@ -745,6 +794,99 @@ export function Playground() {
     void playTo(last, start);
   }, [entry, playTo, playing, livePlaying]);
 
+  const navigate = (action: () => Promise<void>) => {
+    if (hasDraft) {
+      if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+      setPendingNavigation(() => action);
+    } else void action();
+  };
+
+  // Preserve the requested destination when saving inserts a new frame.
+  const seekAction = (position: number, inspectStage = false) => {
+    const frames = keyframesRef.current;
+    const left = Math.min(frames.length - 1, Math.floor(position));
+    const id = frames[left]?.id;
+    const fraction = position - left;
+    const rightId = frames[left + 1]?.id;
+    const draftPosition = editPosition.current;
+    return async () => {
+      const index = keyframesRef.current.findIndex(frame => frame.id === id);
+      if (index < 0) return;
+      const right = keyframesRef.current.findIndex(frame => frame.id === rightId);
+      const split = draftPosition - left;
+      const mappedFraction = right === index + 2 && split > 0 && split < 1
+        ? fraction <= split ? fraction / split : 1 + (fraction - split) / (1 - split)
+        : fraction;
+      const nextPosition = Math.min(keyframesRef.current.length - 1, index + mappedFraction);
+      await onScrub(nextPosition);
+      if (inspectStage) {
+        const leg = Math.min(keyframesRef.current.length - 2, Math.floor(nextPosition));
+        setInspectionStage(Math.floor((nextPosition - leg) * keyframesRef.current[leg + 1].stages));
+        setInspecting(true);
+      }
+    };
+  };
+
+  const resolveDraft = async (save: boolean) => {
+    const action = pendingNavigation;
+    if (!action) return;
+    setSavingDraft(true);
+    try {
+      if (save) {
+        const previous = keyframesRef.current;
+        await keep();
+        if (keyframesRef.current === previous) return;
+      } else {
+        ++evalRun.current;
+        if (editTimer.current !== null) window.clearTimeout(editTimer.current);
+        const original = keyframesRef.current[Math.floor(editPosition.current)];
+        if (original) { writeCode(original.code); setLatest(original); }
+        setError(null);
+        setEdited(false);
+      }
+      setPendingNavigation(null);
+      await action();
+    } finally { setSavingDraft(false); }
+  };
+
+  const reorder = async (sourceId: number, targetId: number | null, after = false) => {
+    const frames = keyframesRef.current;
+    const from = frames.findIndex(frame => frame.id === sourceId);
+    const target = targetId === null ? frames.length : frames.findIndex(frame => frame.id === targetId);
+    const slot = target + (targetId !== null && after ? 1 : 0);
+    const to = slot - (from < slot ? 1 : 0);
+    if (from < 0 || target < 0 || from === to) return;
+    setBusy(true);
+    displayRef.current?.controller.pause();
+    ++replayRun.current;
+    ++storyRun.current;
+    try {
+      const next = [...frames];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      for (let index = 0; index < next.length; index++) {
+        if (index === 0) next[index] = { ...next[index], changes: [], stages: 0, stageLabels: [], stageDetails: [], elementTracks: [] };
+        else if (frames.findIndex(frame => frame.id === next[index].id) !== frames.findIndex(frame => frame.id === next[index - 1].id) + 1) {
+          const difference = await compare(next[index - 1].state, next[index].state);
+          next[index] = { ...next[index], changes: difference.stateChanges, ...await measureStages(next[index - 1].state, next[index].state) };
+        }
+      }
+      if (keyframesRef.current !== frames) return;
+      snapshotAnimations.current.forEach(animation => animation.cancel());
+      snapshotOrigins.current = new Map(Array.from(snapshotTrackRef.current?.querySelectorAll<HTMLElement>('[data-frame-id]') ?? [], card => [card.dataset.frameId!, card.offsetLeft]));
+      keyframesRef.current = next;
+      setKeyframes(next);
+      await onScrub(to);
+      setNotice(`Moved frame to position ${to + 1}.`);
+      requestAnimationFrame(() => {
+        const card = snapshotTrackRef.current?.querySelector<HTMLButtonElement>(`[data-frame-id="${sourceId}"]`);
+        card?.focus({ preventScroll: true });
+        card?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      });
+    } catch (cause) { setError(errorMessage(cause)); }
+    finally { setBusy(false); }
+  };
+
   /** Type from the current code to `target`, the way a person edits. */
   const typeTo = useCallback(
     async (target: string, token: number) => {
@@ -801,6 +943,7 @@ export function Playground() {
       setTab('code');
       setChanges([]);
       setMarked([]);
+      setEdited(false);
       setBusy(true);
       reviewRef.current = Boolean(next.review);
       setReview(Boolean(next.review));
@@ -1199,27 +1342,83 @@ export function Playground() {
       </div>
 
       {keyframes.length > 0 && <nav className="pg-snapshot-gallery" aria-label="Saved chart snapshots">
-        <div ref={snapshotTrackRef} className="pg-snapshot-track">
-          {keyframes.map((frame, index) => <button
-            key={frame.id}
+        <div ref={snapshotTrackRef} className="pg-snapshot-track" data-dragging={draggedId !== null || undefined}
+          onDragOver={event => {
+            if (draggedFrame.current === null) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+            const host = event.currentTarget;
+            const cards = Array.from(host.querySelectorAll<HTMLElement>('[data-frame-id]'));
+            const hit = cards.findIndex(card => { const box = card.getBoundingClientRect(); return event.clientX < box.left + box.width / 2; });
+            const slot = hit < 0 ? cards.length : hit;
+            const source = keyframes.findIndex(frame => frame.id === draggedFrame.current);
+            const next = slot === source || slot === source + 1 ? null : slot;
+            dropSlotRef.current = next;
+            setDropSlot(next);
+            const bounds = host.getBoundingClientRect();
+            const edge = 40;
+            if (event.clientX < bounds.left + edge) host.scrollLeft -= 18;
+            else if (event.clientX > bounds.right - edge) host.scrollLeft += 18;
+          }}
+          onDragLeave={event => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) { dropSlotRef.current = null; setDropSlot(null); }
+          }}
+          onDrop={event => {
+            if (draggedFrame.current === null) return;
+            event.preventDefault();
+            const source = draggedFrame.current;
+            const slot = dropSlotRef.current;
+            const targetId = slot === null ? null : keyframes[slot]?.id ?? null;
+            clearSnapshotDrag();
+            if (slot !== null) navigate(() => reorder(source, targetId));
+          }}>
+          {keyframes.map((frame, index) => <Fragment key={frame.id}><button
             data-frame-id={frame.id}
             type="button"
             className="pg-snapshot-card"
             aria-pressed={selectedKeyframe === index}
-            title={`Play to keyframe ${index + 1}`}
-            onClick={() => void playTo(index)}
+            title={`Play to keyframe ${index + 1} · Drag to reorder · Alt+←/→`}
+            draggable={!busy && !savingDraft}
+            data-drag-source={draggedId === frame.id || undefined}
+            data-drop-before={dropSlot === index || undefined}
+            onDragStart={event => {
+              draggedFrame.current = frame.id;
+              suppressSnapshotClick.current = true;
+              setDraggedId(frame.id);
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', String(frame.id));
+              const box = event.currentTarget.getBoundingClientRect();
+              event.dataTransfer.setDragImage(event.currentTarget, box.width / 2, box.height / 2);
+            }}
+            onDragEnd={() => { clearSnapshotDrag(); window.setTimeout(() => { suppressSnapshotClick.current = false; }, 0); }}
+            onKeyDown={event => { if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) { const target = keyframes[index + (event.key === 'ArrowLeft' ? -1 : 1)]; if (target) { event.preventDefault(); navigate(() => reorder(frame.id, target.id, event.key === 'ArrowRight')); } } }}
+            data-draft={hasDraft && updateFrame && index === saveAfter || undefined}
+            onClick={() => { if (suppressSnapshotClick.current) return; navigate(async () => { const target = keyframesRef.current.findIndex(item => item.id === frame.id); if (target >= 0) await playTo(target, editPosition.current); }); }}
           >
             <span className="pg-snapshot-image">
-              {previews[frame.id]?.image
+              {(hasDraft && updateFrame && index === saveAfter ? draftPreviews[-1]?.image : previews[frame.id]?.image)
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={previews[frame.id].image} alt="" />
+                ? <img draggable={false} src={hasDraft && updateFrame && index === saveAfter ? draftPreviews[-1]?.image : previews[frame.id].image} alt="" />
                 : <span>{previews[frame.id]?.error ? 'Preview unavailable' : 'Rendering preview…'}</span>}
             </span>
-            <span className="pg-snapshot-caption"><span>{String(index + 1).padStart(2, '0')}</span>{index === 0 ? 'Start' : `Keyframe ${index + 1}`}</span>
-          </button>)}
-          <button type="button" className="pg-snapshot-add" aria-label="Add keyframe at end"
+            <span className="pg-snapshot-caption"><span>{String(index + 1).padStart(2, '0')}</span>{hasDraft && updateFrame && index === saveAfter ? 'Draft · unsaved' : index === 0 ? 'Start' : `Keyframe ${index + 1}`}</span>
+          </button>
+          {draggedId === null && !hasDraft && !updateFrame && index === saveAfter && <div
+            className="pg-snapshot-insertion" role="img"
+            aria-label={`Insert position between keyframes ${index + 1} and ${index + 2}`}
+            title="Edit the code to create a frame here">
+            <span aria-hidden="true" />
+          </div>}
+          {hasDraft && !updateFrame && index === saveAfter && <div className="pg-snapshot-card" data-draft="true" aria-label="New draft frame">
+            <span className="pg-snapshot-image">{draftVersion && draftPreviews[-1]?.image
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={draftPreviews[-1].image} alt="Draft chart" /> : <span>{error ? 'Fix code to preview' : 'Draft preview…'}</span>}</span>
+            <span className="pg-snapshot-caption">Draft · unsaved</span>
+          </div>}
+          </Fragment>)}
+          <button type="button" className="pg-snapshot-add" data-drop-before={dropSlot === keyframes.length || undefined} aria-label="Add keyframe at end"
             title="Add the edited chart after the last keyframe" disabled={busy || Boolean(error) || review}
-            onClick={() => void keep(undefined, 'append')}>
+            onClick={() => navigate(async () => { await keep(undefined, 'append'); })}>
             <Plus aria-hidden="true" className="size-4" />
           </button>
         </div>
@@ -1374,15 +1573,12 @@ export function Playground() {
       </section>
 
       <Timeline
+        getChartRoot={getChartRoot}
         className="pg-timeline"
         inspecting={inspecting}
-        onInspect={async position => {
+        onInspect={position => {
           if (position === null) { setInspecting(false); return; }
-          await onScrub(position);
-          if (keyframesRef.current !== keyframes) return;
-          const leg = Math.min(keyframes.length - 2, Math.floor(position));
-          setInspectionStage(Math.floor((position - leg) * keyframes[leg + 1].stages));
-          setInspecting(true);
+          navigate(seekAction(position, true));
         }}
         keyframes={keyframes}
         previews={previews}
@@ -1391,11 +1587,16 @@ export function Playground() {
         stageDuration={STAGE_DURATION}
         replaying={replaying || livePosition !== null}
         playing={playing || livePlaying}
-        onScrub={(position) => void onScrub(position)}
-        onSeek={(index) => void onScrub(index)}
-        onPlay={onPlay}
-        onKeep={() => void keep()}
-        canKeep={!busy && !error && !review}
+        onScrub={position => navigate(seekAction(position))}
+        onSeek={index => navigate(seekAction(index))}
+        onPlay={() => {
+          if (!hasDraft) { onPlay(); return; }
+          navigate(async () => {
+            const last = keyframesRef.current.length - 1;
+            const from = editPosition.current >= last - 1e-3 ? 0 : editPosition.current;
+            await playTo(last, from);
+          });
+        }}
         notice={notice}
         mod={mod}
         heights={timelineHeights}
@@ -1421,6 +1622,17 @@ export function Playground() {
         configuration={inspectionStage === undefined ? undefined : keyframes[Math.min(keyframes.length - 1, Math.floor(value) + 1)].stageDetails?.[inspectionStage]} />}
       </Timeline>
 
+      <dialog aria-labelledby="pg-draft-title" ref={draftDialog} className="pg-draft-dialog" onCancel={event => { event.preventDefault(); if (!savingDraft) setPendingNavigation(null); }}>
+        <h2 id="pg-draft-title">Save this draft frame?</h2>
+        <p>{updateFrame ? 'Your edits will update the current keyframe.' : 'Your edits will insert a keyframe between the two snapshots.'}</p>
+        {error && <p role="alert">{error}</p>}
+        <div>
+          <button type="button" disabled={savingDraft} onClick={() => setPendingNavigation(null)}>Keep editing</button>
+          <button type="button" disabled={savingDraft} onClick={() => void resolveDraft(false)}>Discard</button>
+          <button type="button" disabled={savingDraft} onClick={() => void resolveDraft(true)}>{savingDraft ? 'Saving…' : 'Save frame'}</button>
+        </div>
+      </dialog>
+
       <footer className="pg-status">
         <span className="flex min-w-0 items-center gap-1.5" data-tone={status.tone}>
           <span aria-hidden="true" className="pg-status-dot" />
@@ -1441,7 +1653,7 @@ export function Playground() {
           Ln {cursor.line}, Col {cursor.column}
         </span>
         <span className="hidden lg:inline">
-          {mod}↵ run · {mod}S keep · Ctrl+Space complete
+          {mod}↵ run · {mod}S save frame · Ctrl+Space complete
         </span>
         <span className="ml-auto sm:ml-0">Runs in your browser</span>
       </footer>

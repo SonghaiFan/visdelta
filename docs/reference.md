@@ -1016,3 +1016,12 @@ fields and Bar rollup/breakdown measure labels. This does not change figure
 headings or their transition behavior. An omitted label defaults to the field's
 readable name. Compact Unit layout bindings also accept `label` in their channel
 objects and remain equivalent to chained `.x()` / `.y()` declarations.
+
+### Inspection DOM ancestry
+
+`transition.inspect()` property records include `ancestry`, a snapshot array of
+`{ tag, classes }` entries from the SVG root to the recorded element. It is
+captured before phase evaluation can detach nodes and survives restoration of
+the visible frame. Repeated siblings may share the same ancestry; the existing
+`selector` is the positional path within the inspected phase. Empty ancestry
+indicates that a complete SVG path could not be established.

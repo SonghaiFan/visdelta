@@ -5,6 +5,9 @@ import type { DomFrame } from './dom-frame.js';
 export interface InspectedProperty extends RecordedProperty {
   /** Exact element path relative to the chart view at this phase. */
   selector: string;
+  /** Snapshot of tag names and classes, from the SVG root to this element.
+   * Captured while the phase DOM is restored, before seeking can detach nodes. */
+  ancestry: { tag: string; classes: string[] }[];
   /** Values at phase boundaries, not a claim about a custom tween's implementation. */
   from: string | null;
   to: string | null;
@@ -39,14 +42,15 @@ export function inspectFrames(frames: InspectionFrame[], reverse: boolean): Tran
   const stages = frames.map(frame => {
     const backwards = frame.reverse !== reverse;
     frame.dom.restore();
-    frame.evaluator.progress(backwards ? 1 : 0, backwards ? -1 : 1);
     const span = frame.evaluator.span ?? 1;
     const recorded: RecordedProperty[] = (frame.evaluator.recordings ?? []).flatMap(({ item, start, tweens }) => (tweens ?? []).map(tween => ({
       node: item.node, name: tween.name, kind: tween.kind ?? (tween.name.startsWith('style.') ? 'style' : tween.name === 'text' ? 'text' : 'attribute'), start: start / span, end: (start + item.duration) / span,
     })));
-    const properties = recorded.map(property => ({
+    const structure = recorded.map(property => ({ selector: elementPath(property.node), ancestry: elementAncestry(property.node) }));
+    frame.evaluator.progress(backwards ? 1 : 0, backwards ? -1 : 1);
+    const properties = recorded.map((property, index) => ({
       ...property,
-      selector: elementPath(property.node),
+      ...structure[index],
       start: backwards ? 1 - property.end : property.start,
       end: backwards ? 1 - property.start : property.end,
       from: readProperty(property), to: null as string | null,
@@ -74,4 +78,16 @@ function elementPath(node: Element): string {
     current = current.parentElement;
   }
   return parts.join(' > ');
+}
+
+function elementAncestry(node: Element): { tag: string; classes: string[] }[] {
+  const ancestors: { tag: string; classes: string[] }[] = [];
+  for (let current: Element | null = node; current; current = current.parentElement) {
+    if (current.classList.contains('vd-view')) break;
+    const tag = current.tagName.toLowerCase();
+    ancestors.unshift({ tag, classes: Array.from(current.classList) });
+    if (tag === 'svg') return ancestors;
+  }
+  // A detached node has no proven chart path; never expose it as a global tag selector.
+  return [];
 }

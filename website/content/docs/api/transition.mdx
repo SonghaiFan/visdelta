@@ -143,3 +143,10 @@ these to label the stage strip directly. It does not split the full pair's delta
 into guessed phases.
 
 `transition.stageOperations()` returns the exact planner operation for each route stage, in authored playback order. Each entry carries the slot path, action, and previous/next declaration values. Direct and chart-refined stages return `undefined`; semantic categories remain available through `stageChanges()`. These operations do not prove visible motion or alter stage timing.
+
+Each inspected property includes `ancestry`, an array of `{ tag, classes }` from
+its SVG root to the animated element. It is captured with the phase DOM restored,
+before seeking can detach entering or exiting nodes. This snapshot remains readable
+after inspection restores the visible frame. Repeated elements can share an ancestry;
+`selector` retains the phase-specific positional path. An empty ancestry means no
+complete SVG path was available.

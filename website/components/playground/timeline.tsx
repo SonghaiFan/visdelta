@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { categories } from '@/examples/registry';
+import { ElementHighlight } from './element-highlight';
+import { elementTree, type ElementTrack } from './element-tracks';
 import type { KeyframePreview } from './keyframe-previews';
 import { ChevronDown, Pause, Play } from 'lucide-react';
 import type { StateChange } from 'visdelta/core';
@@ -17,9 +18,11 @@ export interface TimelineKey {
   stages: number;
   stageLabels?: string[];
   stageDetails?: string[];
+  elementTracks?: ElementTrack[];
 }
 
 interface TimelineProps {
+  getChartRoot: () => HTMLElement | null;
   keyframes: TimelineKey[];
   previews: Record<number, KeyframePreview>;
   onPreview: (id: number | null) => void;
@@ -33,8 +36,6 @@ interface TimelineProps {
   onScrub: (value: number) => void;
   onSeek: (index: number) => void;
   onPlay: () => void;
-  onKeep: () => void;
-  canKeep: boolean;
   notice?: string;
   /** Shortcut prefix shown in hints, such as ⌘ or Ctrl+. */
   mod?: string;
@@ -98,6 +99,7 @@ const STEPS = [10, 25, 50, 100, 250, 500, 1000, 2000, 5000, 10_000];
  * real `sequence()` of the kept states; the playhead and the code follow it.
  */
 export function Timeline({
+  getChartRoot,
   keyframes,
   previews,
   onPreview,
@@ -108,8 +110,6 @@ export function Timeline({
   onScrub,
   onSeek,
   onPlay,
-  onKeep,
-  canKeep,
   notice,
   mod = '⌘',
   className,
@@ -121,6 +121,7 @@ export function Timeline({
   onHeight,
   onResetHeight,
 }: TimelineProps) {
+  const [highlight, setHighlight] = useState<{ key: number; id: string; path: string[] } | null>(null);
   const resize = useRef<{ pointerId: number; startY: number; startHeight: number; current: number } | null>(null);
   const [timeDraft, setTimeDraft] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -151,7 +152,6 @@ export function Timeline({
     window.addEventListener('resize', resize);
     return () => { if (timer.current) clearTimeout(timer.current); window.removeEventListener('keydown', dismiss); window.removeEventListener('resize', resize); };
   }, []);
-  const visibleCategories = categories.filter(category => keyframes.some(key => key.changes.some(change => change.category === category.id)));
   const previewIndex = hover ? keyframes.findIndex(key => key.id === hover.id) : -1;
   const count = keyframes.length;
   const { durations, legs, times, total, timeOf, positionOf, pixelsPerSecond, length, x, width } = timelineGeometry(keyframes, stageDuration, zoom);
@@ -161,6 +161,16 @@ export function Timeline({
   const picked = selection ? keyframes.findIndex(key => key.id === selection.id) - 1 : -1;
   const selectedLeg = picked >= 0 ? picked : Math.max(-1, Math.min(count - 2, Math.floor(replaying ? value : count - 2)));
   const selectedKey = selectedLeg >= 0 ? keyframes[selectedLeg + 1] : undefined;
+  // Follow the playhead while playing/seeking; otherwise use the selected leg.
+  const elementLeg = replaying ? Math.max(0, Math.min(count - 2, Math.floor(value))) : selectedLeg;
+  const elementKey = count > 1 && elementLeg >= 0 ? keyframes[elementLeg + 1] : undefined;
+  const visibleCategories = elementTree(keyframes.flatMap(key => key.elementTracks ?? []));
+  const elementStageCount = Math.max(1, elementKey?.stages ?? 1);
+  const elementProgress = replaying ? value - elementLeg : picked >= 0 ? (selection!.stage + 0.5) / elementStageCount : 1;
+  const elementStage = Math.min(elementStageCount - 1, Math.max(0, Math.floor(elementProgress * elementStageCount)));
+  const activePaths = new Set((elementKey?.elementTracks ?? [])
+    .filter(track => track.start < (elementStage + 1) / elementStageCount && track.end > elementStage / elementStageCount)
+    .flatMap(track => track.path.map((_, depth) => JSON.stringify(track.path.slice(0, depth + 1)))));
   const selectedStages = Math.max(1, selectedKey?.stages ?? 1);
   const selectedStage = picked >= 0 ? Math.min(selection!.stage, selectedStages - 1) : Math.min(selectedStages - 1, Math.max(0, Math.floor((replaying ? value - selectedLeg : 1) * selectedStages - 1e-9)));
   const stageLabel = (key: TimelineKey, stage: number) => key.stageLabels?.[stage] === '' ? 'No additional semantic change' : key.stageLabels?.[stage] ?? 'Stage details unavailable';
@@ -220,7 +230,7 @@ export function Timeline({
     else if (head > node.scrollLeft + node.clientWidth - TRACK_PAD) node.scrollLeft = head - node.clientWidth + TRACK_PAD;
   }, [now, playing, pixelsPerSecond, replaying]);
   /** Guidance takes the track's place until there is something to scrub; a working timeline stays quiet. */
-  const guide = count === 0 ? `Press ${mod}S to keep this chart as a keyframe.` : count === 1 ? `Edit this keyframe, or use + above to add the next one.` : '';
+  const guide = count === 0 ? `Press ${mod}S to save this chart as a keyframe.` : count === 1 ? `Edit this keyframe, or use + above to add the next one.` : '';
   const height = inspecting ? heights.details : heights.compact;
   const clampHeight = (value: number) => Math.min(heightRange[1], Math.max(heightRange[0], Math.round(value)));
   /** Drag the top edge: moving up makes the panel taller. */
@@ -271,8 +281,10 @@ export function Timeline({
         onKeyDown={nudgeHeight}
         onDoubleClick={() => onResetHeight(inspecting)}
       />
+      {highlight && visibleCategories.some(row => row.id === highlight.id) && <ElementHighlight path={highlight.path} getRoot={getChartRoot} />}
       <div className="pg-timeline-body">
-      <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2">
+      <div className="pg-row flex flex-wrap items-start gap-x-3 gap-y-2" data-tree={lanes || undefined}>
+        <div className="pg-transport">
         <button
           type="button"
           onClick={onPlay}
@@ -295,8 +307,14 @@ export function Timeline({
             }} />
           <span>s / {seconds(total)}</span>
         </div>
+        </div>
         <div className="pg-time-shell" hidden={count === 0}>
-          {lanes && <div className="pg-lane-labels" aria-hidden="true">{visibleCategories.map(category => <span className="pg-category-name" key={category.id}>{category.label}</span>)}</div>}
+          {lanes && <div className="pg-lane-labels" aria-label="Animated element hierarchy">{visibleCategories.map(category => <button type="button" className="pg-category-name" title={JSON.parse(category.id).join(" > ")} key={category.id}
+              data-muted={!activePaths.has(category.id) || undefined}
+              aria-pressed={highlight?.id === category.id}
+              onClick={() => setHighlight(previous => previous?.id === category.id ? null : { key: elementKey!.id, id: category.id, path: JSON.parse(category.id) })}
+              onKeyDown={event => { if (event.key === 'Escape') setHighlight(null); }}
+              style={{ paddingLeft: `${8 + category.depth * 14}px` }}><span className="pg-tree-branch" aria-hidden="true">{category.depth ? "└" : "◇"}</span>{category.label}</button>)}</div>}
           <div className="pg-time-viewport" ref={viewportRef} role="region" aria-label="Timeline tracks" tabIndex={0}
             onKeyDown={trackKey}
             onScroll={event => setViewport({ width: event.currentTarget.clientWidth, left: event.currentTarget.scrollLeft })}>
@@ -385,14 +403,20 @@ export function Timeline({
             ))}
           </div>
           {lanes && <div className="pg-category-scroll">
-            {visibleCategories.map(category => <div className="pg-category-row" key={category.id} data-category={category.id}>
+            {visibleCategories.map(category => <div className="pg-category-row" data-muted={!activePaths.has(category.id) || undefined} key={category.id} data-category={category.id}>
               <div className="pg-category-time" role="group" aria-label={category.label}>
                 {keyframes.slice(1).map((key, index) => {
-                  const changes = key.changes.filter(change => change.category === category.id);
-                  if (!changes.length) return null;
-                  const active = replaying && value > index && value < index + 1;
-                  const label = changes.map(formatChange).join(' · ');
-                  return <span key={key.id} className="pg-category-block" data-active={active || undefined} title={`${category.label}: ${label}${active ? ' — current transition' : ''}`} style={{ left: x(times[index]), width: width(legs[index]) }}>{label}</span>;
+                  return (key.elementTracks ?? []).filter(track => JSON.stringify(track.path) === category.id).map((track, interval) => {
+                    const start = times[index] + track.start * legs[index];
+                    const end = times[index] + track.end * legs[index];
+                    const active = replaying && now >= start && now < end;
+                    return <button type="button" key={`${key.id}:${interval}`} className="pg-category-block" data-active={active || undefined}
+                      data-muted={!(index === elementLeg && track.start < (elementStage + 1) / elementStageCount && track.end > elementStage / elementStageCount) || undefined}
+                      aria-label={`${track.label}: ${seconds(start)}–${seconds(end)}`}
+                      title={`${track.label}: ${seconds(start)}–${seconds(end)} · Inspect animated elements`}
+                      onClick={() => onInspect?.(index + (track.start + track.end) / 2)}
+                      style={{ left: x(start), width: width(end - start) }}>{track.label}</button>;
+                  });
                 })}
                 {replaying && <span className="pg-category-head" aria-hidden="true" style={{ left: x(now) }} />}
               </div>
@@ -403,16 +427,6 @@ export function Timeline({
           </div>
         </div>
         {guide && <p className="pg-guide">{guide}</p>}
-        <button
-          type="button"
-          onClick={onKeep}
-          disabled={!canKeep}
-          className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-md border px-2.5 text-sm transition-colors hover:bg-fd-accent disabled:opacity-40 ml-auto sm:ml-0`}
-          title={`Save at the playhead: update a keyframe or insert between keyframes (${mod}S)`}
-        >
-          <span aria-hidden="true" className="size-2 rotate-45 bg-[var(--color-delta)]" />
-          Keep
-        </button>
         {count > 1 && (
           <button
             type="button"
