@@ -259,8 +259,8 @@ test.describe('playground', () => {
   test('an editor workspace: examples, files, chart, timeline and status', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/');
-    // The studio has its own app bar, outside the docs navigation.
-    await expect(page.getByRole('navigation', { name: 'Studio' }).getByRole('link', { name: 'Playground' })).toHaveAttribute('aria-current', 'page');
+    // Studio views share the same main navigation as Home and Docs.
+    await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Playground' })).toHaveAttribute('aria-current', 'page');
     // Categories are the folders of the examples tree; the default story is Layout → Sort.
     const tree = examples(page);
     for (const label of ['Data', 'Grain', 'Encoding', 'Coordinate', 'Layout', 'Attention', 'Appearance']) {
@@ -658,7 +658,7 @@ test.describe('playground', () => {
       ['[aria-label="Files"]', '[aria-label="Chart code"]', '[aria-label="Chart"]'].map((selector) => document.querySelector(selector)!.getBoundingClientRect().top),
     );
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    await page.getByRole('button', { name: 'Show examples' }).click();
+    await page.getByRole('button', { name: 'Open Sidebar', exact: true }).click();
     await examples(page).getByRole('button', { name: /Is engine power related to fuel economy/ }).click();
     await expect(page).toHaveURL(/#remap$/);
     await expect(examples(page)).toBeHidden();

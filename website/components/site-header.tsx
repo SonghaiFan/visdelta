@@ -5,33 +5,30 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/logo';
 import { cn } from '@/lib/cn';
-import { repositoryUrl } from '@/lib/shared';
+import { basePath, repositoryUrl } from '@/lib/shared';
 
 const tools = [
-  { href: '/playground', label: 'Playground' },
-  { href: '/gallery', label: 'Gallery' },
+  { href: '/', label: 'Home' },
+  { href: '/docs', label: 'Docs' },
 ];
-
-/**
- * The studio's own app bar: Playground and Gallery are tools built on
- * VisDelta, outside the documentation's navigation.
- */
-export function StudioHeader() {
-  const pathname = usePathname().replace(/\/$/, '');
+export function SiteHeader() {
+  const pathname = usePathname().replace(new RegExp(`^${basePath}(?=/|$)`), '').replace(/\/$/, '');
+  const studioViews = [
+    { href: '/playground', label: 'Playground' },
+    { href: '/gallery', label: 'Gallery' },
+  ];
+  const inStudio = pathname.startsWith('/playground') || pathname.startsWith('/gallery') || pathname.startsWith('/studio');
   return (
-    <header className="sticky top-0 z-40 flex h-11 shrink-0 items-center gap-1 border-b bg-fd-background/95 px-3 backdrop-blur sm:gap-3">
+    <header className="vd-site-header sticky top-0 z-40 flex h-11 shrink-0 items-center gap-1 border-b bg-fd-background/95 px-3 backdrop-blur sm:gap-3">
       <Link href="/" className="mr-1 inline-flex items-center rounded-sm px-1 py-1 text-sm" aria-label="VisDelta home">
         <span className="inline-flex items-center gap-2 font-semibold tracking-tight">
           <Logo className="h-4 w-auto" />
           <span className="hidden sm:inline">VisDelta</span>
         </span>
       </Link>
-      <span aria-hidden="true" className="vd-label hidden sm:inline">
-        Studio
-      </span>
-      <nav aria-label="Studio" className="ml-1 flex items-center gap-0.5">
+      <nav aria-label="Main navigation" className="ml-1 flex items-center gap-0.5">
         {tools.map((tool) => {
-          const active = pathname.endsWith(tool.href);
+          const active = tool.label === 'Home' ? pathname === '' : pathname.startsWith('/docs');
           return (
             <Link
               key={tool.href}
@@ -46,11 +43,23 @@ export function StudioHeader() {
             </Link>
           );
         })}
+        <div role="group" aria-label="Studio views" className="ml-1 inline-flex items-center gap-0.5 rounded-md border bg-fd-muted p-0.5">
+          {studioViews.map(({ href, label }) => {
+            const active = inStudio && (pathname === href || pathname.startsWith(`${href}/`));
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? 'page' : undefined}
+                className="rounded-sm px-2 py-1 text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground aria-[current=page]:bg-fd-background aria-[current=page]:text-fd-foreground aria-[current=page]:shadow-sm sm:px-3"
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
       <div className="ml-auto flex items-center gap-1 sm:gap-3">
-        <Link href="/docs" className="px-1 text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground">
-          Docs
-        </Link>
         <a
           href={repositoryUrl}
           target="_blank"

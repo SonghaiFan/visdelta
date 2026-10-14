@@ -77,7 +77,7 @@ const GENERIC_CHART_STYLE: ChartStyleRule = {
 };
 
 /** Restrained D3-inspired grammar used when no style module is supplied. */
-export const d3ChartStyle = defineChartStyle({ key: 'd3' });
+export const d3ChartStyle = /* @__PURE__ */ defineChartStyle({ key: 'd3' });
 
 const PAPER_MARGIN = { top: 28, right: 20, bottom: 50, left: 62 };
 const PAPER_CARTESIAN = {
@@ -89,7 +89,7 @@ const PAPER_CARTESIAN = {
 };
 
 /** Print-oriented spacing paired with the scoped `.vd-style-paper` CSS preset. */
-export const paperChartStyle = defineChartStyle({
+export const paperChartStyle = /* @__PURE__ */ defineChartStyle({
   key: 'paper',
   tickSpacing: { x: 92, y: 62 },
   legendPosition: 'right',
@@ -99,7 +99,7 @@ export const paperChartStyle = defineChartStyle({
 });
 
 /** Compact high-contrast spacing paired with the scoped `.vd-style-dark` CSS preset. */
-export const darkChartStyle = defineChartStyle({
+export const darkChartStyle = /* @__PURE__ */ defineChartStyle({
   key: 'dark',
   tickSpacing: { x: 66, y: 46 },
   edgeTitleInset: { top: 11 },
@@ -107,14 +107,14 @@ export const darkChartStyle = defineChartStyle({
 });
 
 /** Ink-on-paper spacing paired with the scoped `.vd-style-editorial` CSS preset. */
-export const editorialChartStyle = defineChartStyle({
+export const editorialChartStyle = /* @__PURE__ */ defineChartStyle({
   key: 'editorial',
   tickSpacing: { x: 88, y: 52 },
   plot: { margin: { top: 32, right: 18, bottom: 40 }, grid: 'horizontal' }
 });
 
 /** Built-in structural presets. Their matching CSS ships in `visdelta/style.css`. */
-export const chartStylePresets = Object.freeze({
+export const chartStylePresets = /* @__PURE__ */ Object.freeze({
   d3: d3ChartStyle,
   paper: paperChartStyle,
   dark: darkChartStyle,

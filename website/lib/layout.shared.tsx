@@ -1,6 +1,6 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { Wordmark } from '@/components/logo';
-import { libraryVersion, repositoryUrl } from './shared';
+import { repositoryUrl } from './shared';
 
 export function baseOptions(): BaseLayoutProps {
   return {
@@ -9,17 +9,6 @@ export function baseOptions(): BaseLayoutProps {
       url: '/',
     },
     githubUrl: repositoryUrl,
-    links: [
-      { text: 'Documentation', url: '/docs', active: 'url' },
-      { text: 'Playground', url: '/playground' },
-      { text: 'Gallery', url: '/gallery' },
-      { text: 'API', url: '/docs/api', active: 'nested-url' },
-      {
-        text: `v${libraryVersion}`,
-        url: `${repositoryUrl}/blob/main/CHANGELOG.md`,
-        external: true,
-        on: 'menu',
-      },
-    ],
+    links: [],
   };
 }

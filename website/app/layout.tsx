@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { SiteHeader } from '@/components/site-header';
 import { Provider } from '@/components/provider';
 import { appDescription, appName, basePath, siteUrl } from '@/lib/shared';
 import 'visdelta/style.css';
@@ -40,7 +41,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col font-sans">
-        <Provider>{children}</Provider>
+        <Provider><SiteHeader />{children}</Provider>
       </body>
     </html>
   );

@@ -12,18 +12,19 @@ export const metadata: Metadata = {
 
 export default function GalleryPage() {
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 pt-10 pb-24 sm:px-8 sm:pt-14">
-      <header className="mb-6">
-        <h1 className="text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Gallery</h1>
-        <p className="mt-2 max-w-2xl text-fd-muted-foreground">
-          Every chart here is a few lines of VisDelta on a real dataset. Open one to read its code, or take it to
-          the playground and change it.{' '}
-          <Link href="/docs/guides/design-comparisons" className="text-fd-foreground underline-offset-4 hover:underline">
-            Design comparisons →
-          </Link>
-        </p>
-      </header>
-      <IdiomGallery />
+    <main>
+      <IdiomGallery>
+        <header className="mb-6">
+          <h1 className="text-3xl font-semibold tracking-[-0.03em] sm:text-4xl">Gallery</h1>
+          <p className="mt-2 max-w-2xl text-fd-muted-foreground">
+            Every chart here is a few lines of VisDelta on a real dataset. Open one to read its code, or take it to
+            the playground and change it.{' '}
+            <Link href="/docs/guides/design-comparisons" className="text-fd-foreground underline-offset-4 hover:underline">
+              Design comparisons →
+            </Link>
+          </p>
+        </header>
+      </IdiomGallery>
     </main>
   );
 }

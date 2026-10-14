@@ -98,7 +98,9 @@ let gzipBytes = 0;
 // Includes non-blocking diagnostics, native repeated panels and the Bar-owned
 // staged rectangle bridge. Other chart plugins remain excluded from this budget.
 // Includes the staged repeat container and its nested child motion projection.
-const maxSelectedTransitionGzipBytes = 100_000;
+// 0.4 also includes recorded phase endpoints and DOM ancestry for inspection.
+// Keep the selected-chart budget bounded while accounting for that public API.
+const maxSelectedTransitionGzipBytes = 101_000;
 for (const path of loaded) {
   gzipBytes += gzipSync(files.get(resolve(root, path))).byteLength;
   for (const source of Object.keys(outputs[path].inputs)) {

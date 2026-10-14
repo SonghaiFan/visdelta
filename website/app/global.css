@@ -531,20 +531,7 @@ html > body[data-scroll-locked] {
   outline: 2px solid var(--color-fd-ring);
   outline-offset: 2px;
 }
-.pg-explorer {
-  grid-area: side;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--color-fd-border);
-  background: var(--color-fd-background);
-}
-.pg-explorer > nav {
-  flex: 1;
-}
-.pg-backdrop {
-  display: none;
-}
+
 .pg-editor {
   grid-area: edit;
   display: flex;
@@ -773,7 +760,7 @@ html > body[data-scroll-locked] {
 @media (min-width: 1024px) {
   .pg-app {
     position: relative;
-    --pg-side: 13.5rem;
+    --pg-side: 268px;
     display: grid;
     /* A fixed size, not flex: content (a long table) must never size the panes. */
     flex: none;
@@ -781,7 +768,7 @@ html > body[data-scroll-locked] {
     grid-template-columns: var(--pg-side) minmax(0, var(--pg-left, 42fr)) 7px minmax(0, var(--pg-right, 58fr));
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
     grid-template-areas:
-      'tool tool tool tool'
+      'side tool tool tool'
       'side snapshots snapshots snapshots'
       'side edit split view'
       'side time time time'
@@ -790,9 +777,7 @@ html > body[data-scroll-locked] {
   .pg-app[data-explorer='closed'] {
     --pg-side: 0px;
   }
-  .pg-app[data-explorer='closed'] .pg-explorer {
-    display: none;
-  }
+
   .pg-splitter {
     display: block;
     margin: 0 -3px;
@@ -802,7 +787,7 @@ html > body[data-scroll-locked] {
   .pg-app[data-placement='float'] {
     grid-template-columns: var(--pg-side) minmax(0, 1fr);
     grid-template-areas:
-      'tool tool'
+      'side tool'
       'side snapshots'
       'side edit'
       'side time'
@@ -839,32 +824,7 @@ html > body[data-scroll-locked] {
 }
 
 @media (max-width: 1023.98px) {
-  .pg-explorer {
-    position: fixed;
-    top: 2.75rem;
-    bottom: 0;
-    left: 0;
-    z-index: 35;
-    width: min(17rem, 85vw);
-    box-shadow: 0 0 0 1px var(--color-fd-border), 0 12px 32px rgb(0 0 0 / 0.12);
-    transform: translateX(-102%);
-    visibility: hidden;
-    transition:
-      transform 260ms var(--ease-out-quint),
-      visibility 0s 260ms;
-  }
-  .pg-app[data-explorer='open'] .pg-explorer {
-    transform: none;
-    visibility: visible;
-    transition: transform 260ms var(--ease-out-quint);
-  }
-  .pg-app[data-explorer='open'] .pg-backdrop {
-    position: fixed;
-    inset: 2.75rem 0 0;
-    z-index: 34;
-    display: block;
-    background: var(--color-fd-overlay);
-  }
+
   .pg-panel {
     flex: none;
     height: clamp(12rem, 28dvh, 18rem);
@@ -1164,13 +1124,11 @@ html > body[data-scroll-locked] {
   animation: none !important;
 }
 
-
 /* Planned waypoints are named directly on the time strip, between authored keys. */
 
 /* Timeline navigation keeps one time window for every row. */
 .pg-ruler { pointer-events: auto; touch-action: none; cursor: ew-resize; overflow: hidden; }
 .pg-clips, .pg-category-time { overflow: hidden; }
-
 
 /* One stage line: what is selected, and the few things to do with it. */
 
@@ -1194,7 +1152,6 @@ html > body[data-scroll-locked] {
 .pg-readout input { width: 4ch; padding: 0; border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; color: var(--color-fd-foreground); font: inherit; text-align: right; }
 .pg-readout input:hover { border-bottom-color: var(--color-fd-border); }
 .pg-readout input:focus { outline: none; border-bottom-color: var(--color-delta); }
-
 
 /* Inspector: a waterfall of the tracks. Rows that actually move come first. */
 .pg-inspector { margin-top: 8px; border-top: 1px solid var(--color-fd-border); padding-top: 8px; font-size: 11px; }
@@ -1395,3 +1352,37 @@ button.pg-category-block:focus-visible { outline: 1px solid var(--color-delta); 
   .pg-snapshot-card[data-drop-before]::before,
   .pg-snapshot-add[data-drop-before]::before { animation: none; }
 }
+
+/* One global switcher; Studio tools and Docs sections are secondary navigation. */
+:root { --vd-site-header-height: 44px; }
+.vd-site-header { height: var(--vd-site-header-height); }
+#nd-docs-layout {
+  /* Fumadocs uses this offset for the sidebar, TOC and mobile subnav. */
+  --fd-banner-height: var(--vd-site-header-height);
+  min-height: calc(100dvh - var(--vd-site-header-height));
+}
+
+/* Studio uses the same Fumadocs sidebar primitives as Documentation. */
+.studio-sidebar-slot { grid-area: side; position: relative; z-index: 20; min-height: 0; }
+.studio-sidebar { position: absolute; inset: 0 auto 0 0; display: flex; flex-direction: column; width: 268px; border-right: 1px solid var(--color-fd-border); background: var(--color-fd-card); transition: translate 250ms ease, box-shadow 250ms ease; }
+.studio-sidebar[data-collapsed='true'] { translate: -100% 0; }
+.studio-sidebar[data-collapsed='true'][data-hovered='true'] { translate: 8px 0; box-shadow: var(--shadow-lg); border: 1px solid var(--color-fd-border); border-radius: var(--radius-md); }
+.studio-sidebar-overlay { position: fixed; inset: var(--vd-site-header-height) 0 0; z-index: 40; background: var(--color-fd-overlay); }
+.studio-sidebar-drawer { position: fixed; inset: var(--vd-site-header-height) 0 0 auto; z-index: 41; display: flex; flex-direction: column; width: min(85vw, 380px); border-left: 1px solid var(--color-fd-border); background: var(--color-fd-background); }
+.studio-gallery { display: grid; grid-template-columns: 268px minmax(0, 1fr); min-height: calc(100dvh - var(--vd-site-header-height)); }
+.studio-gallery[data-collapsed='true'] { grid-template-columns: 0 minmax(0, 1fr); }
+.studio-gallery > .studio-sidebar-slot { grid-area: auto; position: sticky; top: var(--vd-site-header-height); height: calc(100dvh - var(--vd-site-header-height)); }
+.studio-gallery-content { min-width: 0; width: 100%; max-width: 1280px; margin-inline: auto; padding: 16px 32px 96px; }
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .pg-app[data-explorer='open'] { margin-left: 268px; width: calc(100% - 268px); }
+  .pg-app > .studio-sidebar-slot { position: fixed; top: var(--vd-site-header-height); bottom: 0; left: 0; width: 0; }
+}
+@media (max-width: 767.98px) {
+  .studio-gallery { display: block; }
+  .studio-gallery-content { padding-inline: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .studio-sidebar { transition: none; } }
+.studio-sidebar-hover { position: absolute; inset: 0 auto 0 0; width: 16px; }
+.studio-sidebar-restore { position: fixed; top: calc(var(--vd-site-header-height) + 16px); left: 16px; padding: 2px; border: 1px solid var(--color-fd-border); border-radius: var(--radius-md); background: var(--color-fd-muted); box-shadow: var(--shadow-sm); }
+.pg-sidebar-toggle { display: inline-flex; flex-shrink: 0; }
+.pg-app:has(.studio-sidebar[data-collapsed='true'][data-hovered='true']) .pg-sidebar-toggle { visibility: hidden; }

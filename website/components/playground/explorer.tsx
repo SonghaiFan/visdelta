@@ -30,7 +30,6 @@ export function Explorer({ stories, activeId, activeCategory, onOpen }: Explorer
 
   return (
     <nav aria-label="Examples" className="flex min-h-0 flex-col">
-      <p className="vd-label flex h-9 shrink-0 items-center px-3">Examples</p>
       <ul className="min-h-0 flex-1 overflow-y-auto pb-3 text-[0.8125rem]">
         {categories.map((category) => {
           const open = !collapsed.has(category.id);

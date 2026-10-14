@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { VisualizationTransition } from 'visdelta/transition';
 import type { VisualizationWarning } from 'visdelta';
 import { CodeView } from '@/components/interactive/code-view';
@@ -19,6 +19,7 @@ import {
   type ChartState,
 } from '@/components/interactive/runtime';
 import { cn } from '@/lib/cn';
+import { SidebarProvider, StudioSidebar, StudioSidebarButton, useSidebar } from '@/components/studio/sidebar';
 
 const designGuides: Partial<Record<Idiom['mark'], { url: string; text: string }>> = {
   bar: {
@@ -55,7 +56,13 @@ function TileHost({ id, register }: { id: string; register: (id: string, element
  * bundled dataset. Tiles are frozen renders; the viewer is a live chart that
  * morphs between idioms of the same mark.
  */
-export function IdiomGallery() {
+export function IdiomGallery({ children }: { children?: ReactNode }) {
+  return <SidebarProvider><GalleryContent>{children}</GalleryContent></SidebarProvider>;
+}
+
+function GalleryContent({ children }: { children?: ReactNode }) {
+  const { collapsed, mode, setOpen } = useSidebar();
+  const galleryRef = useRef<HTMLElement>(null);
   const [idioms, setIdioms] = useState<Idiom[]>([]);
   const [groups, setGroups] = useState<IdiomGroup[]>([]);
   const nameOfRef = useRef<(url: string) => string>((url) => url);
@@ -234,6 +241,7 @@ export function IdiomGallery() {
       }, 300);
     });
     resizeObserver.observe(document.documentElement);
+    if (galleryRef.current) resizeObserver.observe(galleryRef.current);
     loadIdioms()
       .then(({ idioms: list, idiomGroups, datasetName }) => {
         if (disposed.current) return;
@@ -255,29 +263,26 @@ export function IdiomGallery() {
   }, [openIdiom, renderTile]);
 
   return (
-    <section aria-label="Visual idioms">
-      <nav aria-label="Idiom marks" className="sticky top-14 z-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-b bg-fd-background py-3">
-        {groups.map((group) => (
-          <a key={group.mark} href={`#marks-${group.mark}`} className="font-medium hover:text-fd-primary">
-            {group.title}{' '}
-            <sup className="font-mono text-[0.65rem] text-fd-muted-foreground">
-              {filtered.filter((idiom) => idiom.mark === group.mark).length}
-            </sup>
-          </a>
-        ))}
-        <label className="ml-auto flex items-center gap-3">
+    <section ref={galleryRef} aria-label="Visual idioms" className="studio-gallery" data-collapsed={collapsed}>
+      <StudioSidebar title="Gallery">
+        <label className="mb-4 block">
           <span className="sr-only">Filter</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder="stacked, scatter, iris…"
-            aria-label="Filter idioms"
-            className="h-8 w-56 max-w-[60vw] border-b bg-transparent px-1 text-sm outline-none focus:border-fd-foreground"
-          />
+          <input type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="stacked, scatter, iris…" aria-label="Filter idioms"
+            className="h-9 w-full rounded-md border bg-fd-muted/50 px-2 text-sm outline-none focus:border-fd-ring" />
         </label>
-      </nav>
-
+        <nav aria-label="Idiom marks" className="flex flex-col gap-0.5 text-sm">
+          {groups.map((group) => (
+            <a key={group.mark} href={`#marks-${group.mark}`} onClick={() => { if (mode === 'drawer') setOpen(false); }}
+              className="flex items-center justify-between rounded-md p-2 text-fd-muted-foreground hover:bg-fd-accent hover:text-fd-foreground">
+              {group.title}<span className="font-mono text-xs">{filtered.filter((idiom) => idiom.mark === group.mark).length}</span>
+            </a>
+          ))}
+        </nav>
+      </StudioSidebar>
+      <div className="studio-gallery-content">
+        <div className="mb-4 h-8">{mode === 'drawer' && <StudioSidebarButton />}</div>
+        {children}
       {idioms.length > 0 && !visibleGroups.length && <p className="py-12 text-fd-muted-foreground">No idiom matches “{query}”.</p>}
 
       {visibleGroups.map((group) => (
@@ -310,6 +315,7 @@ export function IdiomGallery() {
         </section>
       ))}
 
+      </div>
       <dialog
         ref={dialogRef}
         aria-label={current ? current.title : 'Idiom'}

@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2026-10-14
+
+- Publish the Fumadocs documentation site with shared Home, Docs and
+  Playground/Gallery navigation. Studio views reuse the Fumadocs sidebar
+  controls, with collapsible desktop navigation and mobile drawers; the IDE
+  toolbar stays beside its example panel.
 
 - A top legend moved out of the chart's SVG into a block above the canvas, as in
   Observable Plot, so `width` and `height` are the canvas alone and a legend no
@@ -108,7 +113,7 @@
   in the Playground. The Playground chart floats at the top right by
   default and can be docked beside the code.
 - Extracted the site's shared visual values into three-tier design tokens
-  (`docs/.vitepress/theme/tokens.css`), documented on a Design tokens page.
+  (`website/app/global.css`), documented on a Design tokens page.
 
 - Added canonical operation planning for supported Bar, Point, Line, Area and
   Unit declarations. Routes use complete valid states, edit one semantic

@@ -1,6 +1,7 @@
 'use client';
 
-import { Link2, PanelLeft, Play, Plus, RotateCcw } from 'lucide-react';
+import { Link2, Play, Plus, RotateCcw } from 'lucide-react';
+import { SidebarProvider, StudioSidebar, StudioSidebarButton, useSidebar } from '@/components/studio/sidebar';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { DeltaResult, StateChange } from 'visdelta/core';
 import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
@@ -141,6 +142,10 @@ function useTimelineRange(appRef: { current: HTMLDivElement | null }) {
  * keyframes replay as one continuous `sequence()` on the timeline.
  */
 export function Playground() {
+  return <SidebarProvider><PlaygroundContent /></SidebarProvider>;
+}
+
+function PlaygroundContent() {
   const appRef = useRef<HTMLDivElement>(null);
   const timelineRange = useTimelineRange(appRef);
   const editorPaneRef = useRef<HTMLElement>(null);
@@ -156,6 +161,7 @@ export function Playground() {
   const shownRef = useRef<Version | null>(null);
   /** The last version of the code that ran. */
   const latestRef = useRef<Version | null>(null);
+  const [latestVersion, setLatestVersion] = useState<Version | null>(null);
   const keyframesRef = useRef<Keyframe[]>([]);
   /** Editing keeps its authored timeline position even after returning to live mode. */
   const editPosition = useRef(0);
@@ -261,8 +267,7 @@ export function Playground() {
   const [dragTimeline, setDragTimeline] = useState<{ details: boolean; height: number } | null>(null);
   /** The divider while it is being dragged. */
   const [dragSplit, setDragSplit] = useState<number | null>(null);
-  /** null follows the layout: open on wide screens, closed on narrow ones. */
-  const [explorerChoice, setExplorerChoice] = useState<boolean | null>(null);
+  const { mode: sidebarMode, open: sidebarOpen, collapsed: sidebarCollapsed, setOpen: setSidebarOpen } = useSidebar();
   const wide = useMedia('(min-width: 1024px)', true);
   const mod = useModifierKey();
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
@@ -291,13 +296,13 @@ export function Playground() {
     details: clamp(dragTimeline?.details ? dragTimeline.height : Number(detailsPreference) || DEFAULT_TIMELINE.details, timelineRange),
   };
   const dragging = dragSplit !== null;
-  const explorerOpen = explorerChoice ?? wide;
-  const savePosition = Math.max(0, Math.min(keyframes.length - 1, editPosition.current));
+  const explorerOpen = sidebarMode === 'drawer' ? sidebarOpen : !sidebarCollapsed;
+  const savePosition = Math.max(0, Math.min(keyframes.length - 1, livePosition ?? value));
   const updateFrame = Math.abs(savePosition - Math.round(savePosition)) < 1e-6;
   const selectedKeyframe = updateFrame ? Math.round(savePosition) : -1;
   const saveAfter = updateFrame ? Math.round(savePosition) : Math.floor(savePosition);
   const hasDraft = edited && code !== keyframes[saveAfter]?.code;
-  const draftVersion = hasDraft && latestRef.current?.code === code ? latestRef.current : null;
+  const draftVersion = hasDraft && latestVersion?.code === code ? latestVersion : null;
   const draftFrames = useMemo(() => draftVersion ? [{ id: -1, state: draftVersion.state }] : [], [draftVersion]);
   const { previews: draftPreviews, requestAll: requestDraft } = useKeyframePreviews(draftFrames);
   useEffect(() => { if (draftFrames.length) requestDraft([-1]); }, [draftFrames, requestDraft]);
@@ -319,6 +324,7 @@ export function Playground() {
 
   const setLatest = useCallback((version: Version) => {
     latestRef.current = version;
+    setLatestVersion(version);
     setRanCode(version.code);
   }, []);
 
@@ -402,6 +408,7 @@ export function Playground() {
     displayRef.current = null;
     shownRef.current = null;
     latestRef.current = null;
+    setLatestVersion(null);
     setRanCode('');
     if (!display) return;
     display.controller.destroy();
@@ -615,7 +622,7 @@ export function Playground() {
     }
     if (!story) setEdited(false);
     setNotice(story ? '' : update ? `Updated keyframe ${index + 1}.` : `Inserted keyframe ${index + 1}.`);
-  }, [evaluate, goLive, measureStages, present, setLatest]);
+  }, [evaluate, goLive, measureStages, present, setLatest, setInspecting]);
 
   /** Run code; if it is a valid state, the chart moves to it. */
   const run = useCallback(
@@ -639,7 +646,7 @@ export function Playground() {
         if (request === evalRun.current) setError(errorMessage(cause));
       }
     },
-    [evaluate, goLive, keep, present, setLatest],
+    [evaluate, goLive, keep, present, setLatest, setInspecting],
   );
 
   const onEdit = useCallback(
@@ -1114,17 +1121,9 @@ export function Playground() {
     return () => observer.disconnect();
   }, [containFloat, floating]);
 
-  // A narrow layout shows the examples as a drawer; Escape closes it.
-  useEffect(() => {
-    if (wide || !explorerOpen) return;
-    const close = (event: globalThis.KeyboardEvent) => event.key === 'Escape' && setExplorerChoice(false);
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [explorerOpen, wide]);
-
   const select = (next: Opened) => {
     window.history.replaceState(null, '', `#${next.id}`);
-    if (!wide) setExplorerChoice(false);
+    if (sidebarMode === 'drawer') setSidebarOpen(false);
     void open(next);
   };
 
@@ -1287,8 +1286,7 @@ export function Playground() {
     <div
       ref={appRef}
       className="pg-app"
-      // "auto" lets the layout decide until the reader toggles the examples.
-      data-explorer={explorerChoice === null ? 'auto' : explorerOpen ? 'open' : 'closed'}
+      data-explorer={explorerOpen ? 'open' : 'closed'}
       data-placement={floating ? 'float' : 'dock'}
       data-dragging={dragging || undefined}
       data-resizing-timeline={dragTimeline !== null || undefined}
@@ -1296,17 +1294,7 @@ export function Playground() {
     >
       <div role="toolbar" aria-label="Playground" className="pg-toolbar">
         <h1 className="sr-only">Playground</h1>
-        <button
-          type="button"
-          className="pg-tool"
-          aria-label={explorerOpen ? 'Hide examples' : 'Show examples'}
-          aria-expanded={explorerOpen}
-          aria-controls="pg-explorer"
-          title="Examples"
-          onClick={() => setExplorerChoice(!explorerOpen)}
-        >
-          <PanelLeft className="size-4" />
-        </button>
+        {(sidebarMode === 'drawer' || sidebarCollapsed) && <span className="pg-sidebar-toggle"><StudioSidebarButton /></span>}
         <p className="flex min-w-0 items-baseline gap-1.5 truncate text-sm">
           {group && <span className="text-fd-muted-foreground">{group}</span>}
           {group && (
@@ -1424,10 +1412,9 @@ export function Playground() {
         </div>
       </nav>}
 
-      <aside id="pg-explorer" className="pg-explorer">
+      <StudioSidebar title="Examples" floatingRestore={false}>
         <Explorer stories={playgroundDemos} activeId={story?.id} activeCategory={story?.category} onOpen={select} />
-      </aside>
-      <button type="button" className="pg-backdrop" aria-label="Close examples" tabIndex={-1} onClick={() => setExplorerChoice(false)} />
+      </StudioSidebar>
 
       <section ref={editorPaneRef} aria-label="Editor" className="pg-editor vd-code-surface">
         <div role="tablist" aria-label="Files" className="pg-tabs">

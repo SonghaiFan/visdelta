@@ -10,14 +10,14 @@ plugin imports. This template creates a transition controlled by a slider.
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/visdelta.css">
   </head>
   <body>
     <div id="chart"></div>
     <input id="progress" type="range" min="0" max="1" step="0.01" value="0">
 
     <script type="module">
-      import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.3.0/+esm";
+      import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.4.0/+esm";
 
       const rows = [
         { category: "A", revenue: 12, profit: 5 },
@@ -56,8 +56,8 @@ authoring API, while chart renderers still load lazily. When a page deliberately
 wants a narrower initial authoring entry, it can request a packaged file:
 
 ```js
-import { bar } from "https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/bar.js/+esm";
-import { transition } from "https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/transition-entry.js/+esm";
+import { bar } from "https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/bar.js/+esm";
+import { transition } from "https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/transition-entry.js/+esm";
 ```
 
 These longer URLs are an optimization, not the default learning path.
@@ -71,8 +71,8 @@ For a page without modules, load the self-contained global bundle. The `d3-*`
 modules VisDelta uses are compiled in; nothing else is needed.
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.3.0/dist/visdelta.css">
-<script src="https://cdn.jsdelivr.net/npm/visdelta@0.3.0"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/visdelta.css">
+<script src="https://cdn.jsdelivr.net/npm/visdelta@0.4.0"></script>
 <script>
   const { bar, transition } = VisDelta;
   // same authoring code as above

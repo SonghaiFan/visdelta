@@ -9,7 +9,7 @@ if (lock.version !== pkg.version || lock.packages[''].version !== pkg.version) {
   throw new Error('Package and lockfile release versions disagree.');
 }
 // The Fumadocs site's MDX pages and live examples carry CDN URLs too.
-const files = ['README.md', 'llms.txt', 'index.html', ...await walk('docs'), ...await walk('examples'),
+const files = ['README.md', 'llms.txt', ...await walk('docs'), ...await walk('examples'),
   ...await walk('website/content'), ...await walk('website/examples')];
 let urls = 0;
 for (const file of files) {
