@@ -39,8 +39,9 @@ export function viewRows(
 }
 
 export function domainTransforms(transforms: TransformSpec[] = []): TransformSpec[] {
-  // Domain inference uses the full, unsorted data lineage. A trailing
-  // filter/limit/sort is display-only and must not reassign categorical
+  // Lineage domains retain the full, unsorted population for colors, legends
+  // and shared layouts. Position renderers can infer separate domains from
+  // visible rows. A trailing filter/limit/sort must not reassign categorical
   // palette slots or reorder the legend. Upstream subsets are different:
   // aggregate and bin derive new values from their input population, so their
   // filters and limits are part of the value definition and must survive.

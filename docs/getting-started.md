@@ -32,7 +32,7 @@ VisDelta's ESM entry and rewrites its version-pinned `d3-*` dependencies.
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>My first VisDelta transition</title>
     <link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/visdelta.css">
+      href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
   </head>
   <body>
     <div id="chart"></div>
@@ -40,7 +40,7 @@ VisDelta's ESM entry and rewrites its version-pinned `d3-*` dependencies.
 
     <script type="module">
       import * as vd from
-        "https://cdn.jsdelivr.net/npm/visdelta@0.4.1/+esm";
+        "https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm";
 
       const rows = [
         { category: "Hardware", revenue: 12, profit: 5 },

@@ -14,6 +14,6 @@ const all = line(readings)
   .x('day', { type: 'temporal', label: 'Day' })
   .y('temperature', { label: 'Temperature (°C)' });
 
-// The line extends to the new observation before its point appears.
+// The axes fit visible observations; the line extends before the new point appears.
 export const from = all.where({ field: 'day', lt: '2026-03-07' });
 export const to = all;

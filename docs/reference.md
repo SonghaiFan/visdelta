@@ -66,6 +66,10 @@ Channel options can include `type`, `label`, `format`, `domain`, `scale`,
 `sort`, `aggregate`, `timeUnit`, and `bin`. Core fills a missing type from data;
 an authored type always wins.
 
+Explicit numeric and temporal position domains keep their authored bounds;
+only inferred domains are rounded with `nice()`. Log axes use ordinary D3 log
+ticks without injecting arbitrary data-endpoint ticks.
+
 Quantitative position channels support `scale: { type: "linear" }`,
 `scale: { type: "sqrt" }`, and `scale: { type: "log", base? }`. Log scales
 default to base 10; for example, use `scale: { type: "log", base: 2 }` for
@@ -220,11 +224,16 @@ aggregate can remove source fields that are not part of its output grain.
 It adds filter transforms to the returned state, so `state.rows()` also returns
 only matching rows. The source state is unchanged.
 
-For a default linear Line, filtering a contiguous prefix or suffix keeps the
-surviving path and its coordinates in place. Only the removed tail retracts
-along its original segments; restoring the observations follows the same
-geometry in reverse. Removing interior observations preserves gaps unless
-the author explicitly uses `.connect("across")`.
+Line infers its x/y position domains from the visible rows after filtering.
+Color categories and legend mappings retain the full data lineage. An authored
+position `domain` takes priority; repeated panels with shared scales use their
+shared domain. Removing interior observations preserves gaps unless the author
+explicitly uses `.connect("across")`.
+
+With fixed position domains, filtering a contiguous prefix or suffix keeps the
+surviving path in place while the tail retracts. With inferred domains, retained
+observations move with the axes to fit the visible data. Restoring observations
+traverses the same route backward.
 
 ```js
 const all = bar(rows).x("country").y("sites");

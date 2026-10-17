@@ -21,6 +21,7 @@ export interface RuntimeScale {
   bandwidth?: () => number;
   step?: () => number;
   ticks?: (count?: number) => unknown[];
+  nice?: (count?: number) => RuntimeScale;
   copy?: () => RuntimeScale;
   invert?: (value: number) => unknown;
   __visDeltaChannel?: RenderChannel;

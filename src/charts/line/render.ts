@@ -77,7 +77,9 @@ class LineChart extends BaseChart<LineViewState> {
     const lineageRows = state.detailPosition === 'total'
       ? lineRowsAtTotal(domainRows, xField, yField, state.detailParentOp)
       : domainRows;
-    const scaleRows = state.filtersRows || chart.sharedDomains ? lineageRows : plottedRows;
+    // Lineage keeps missing observations and stable color slots; position
+    // domains follow the visible rows unless panels explicitly share scales.
+    const scaleRows = chart.sharedDomains ? lineageRows : plottedRows;
     const authoredPointRadius = Number.isFinite(Number(spec.pointSize))
       ? Number(spec.pointSize)
       : themeValue('--vd-line-point-size', 4.5);

@@ -22,7 +22,8 @@ export function bandOrLinear(
     const dataDomain = extent(values);
     const domain = (resolved.domain || dataDomain)
       .map((value) => channelValue(value, resolved)) as Array<Date | number>;
-    scale = asRuntimeScale(scaleTime().domain(domain).range(range).nice());
+    scale = asRuntimeScale(scaleTime().domain(domain).range(range));
+    if (!explicitDomain) scale.nice!();
     scale.__visDeltaDataDomain = dataDomain;
     if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
   } else {
@@ -51,12 +52,13 @@ export function quantitativeScale(
     const base = Number.isFinite(requestedBase) && requestedBase > 0 && requestedBase !== 1
       ? requestedBase
       : 10;
-    scale = asRuntimeScale(scaleLog().base(base).domain(safeDomain).range(range).nice());
+    scale = asRuntimeScale(scaleLog().base(base).domain(safeDomain).range(range));
   } else if (scaleType === 'sqrt') {
-    scale = asRuntimeScale(scaleSqrt().domain(domain).range(range).nice());
+    scale = asRuntimeScale(scaleSqrt().domain(domain).range(range));
   } else {
-    scale = asRuntimeScale(scaleLinear().domain(domain).range(range).nice());
+    scale = asRuntimeScale(scaleLinear().domain(domain).range(range));
   }
+  if (!explicitDomain) scale.nice!();
   scale.__visDeltaDataDomain = dataDomain;
   if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);
   scale.__visDeltaChannel = { ...channel, type: 'quantitative' };

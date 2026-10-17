@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.2 - 2026-10-18
+
+- Share scene-owned motion tracks across independently bundled lazy chart modules,
+  fixing invisible entering bars and lines through jsDelivr `+esm` (#11).
+- Fit Line position domains to filtered observations while retaining topology,
+  category colors and legends (#12). Explicit domains and shared panels keep
+  their declared domain policy.
+- Preserve explicit numeric and temporal position bounds, including Bar layouts,
+  and omit data-endpoint tick injection on log axes (#13).
+- Check browser distributions, playback, reversal, resizing and sequence endpoints
+  in CI and before publishing.
+
 ## 0.4.1 - 2026-10-18
 
 - Keep mobile navigation compact.

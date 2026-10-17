@@ -143,9 +143,14 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
   );
   const newEncoding: Encoding = {
     ...cloneEncoding(spec.encoding) as Encoding,
-    x: channelFromField(categoryField, (detailSpec['categoryTitle'] as string) || (encoding['x'] as ChannelSpec)?.label || null, 'nominal'),
+    x: {
+      ...channelFromField(categoryField, (detailSpec['categoryTitle'] as string) || (encoding['x'] as ChannelSpec)?.label || null, 'nominal'),
+      ...(encoding['x']?.domain ? { domain: [...encoding['x'].domain] } : {})
+    },
     y: {
       ...channelFromField(valueField, (detailSpec['valueTitle'] as string) || (encoding['y'] as ChannelSpec)?.label || null, 'quantitative'),
+      // Aggregation reconstructs field bindings, not independently authored bounds.
+      ...(encoding['y']?.domain ? { domain: [...encoding['y'].domain] } : {}),
       ...((encoding['y'] as ChannelSpec)?.format
         ? { format: (encoding['y'] as ChannelSpec).format }
         : {})

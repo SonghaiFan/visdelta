@@ -271,8 +271,10 @@ Selection and interoperates by structure, not by instance.
 
 For an independently bundled plugin, prefer `runtime.motion` from
 `createRenderer(runtime)`. This uses the host's recorder even when the plugin bundle
-contains another copy of the SDK. The standalone `motion` export requires the
-renderer and host to share the same recorder module instance.
+contains another copy of the SDK. The standalone `motion` export also records
+into the mounted scene's queue, so independently bundled modules can hand their
+tracks to the host controller without a global registry. Each scene owns and
+drains its own batch; copied panel contexts do not inherit another scene's queue.
 
 The same injected services are available to built-in and external renderers:
 

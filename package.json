@@ -1,6 +1,6 @@
 {
   "name": "visdelta",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Declarative visualization states and seekable animated transitions for the browser.",
   "type": "module",
   "license": "MIT",
@@ -114,7 +114,8 @@
     "smoke": "node scripts/smoke.mjs",
     "test": "npm run check && npm run manifest:check && npm run build && npm run bundle:check && npm run examples:check && npm run docs:check && npm run package:check && npm run smoke && node --test tests/*.test.mjs",
     "prepack": "npm test",
-    "prepublishOnly": "npm run release:check"
+    "prepublishOnly": "npm run release:check",
+    "browser:check": "node scripts/check-browser-distributions.mjs"
   },
   "dependencies": {
     "@types/d3-axis": "^3.0.6",

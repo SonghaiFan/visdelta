@@ -268,6 +268,13 @@ point(rows)
   .size("population");
 ```
 
+Explicit numeric and temporal position domains retain their authored bounds.
+Automatic domain rounding applies only when bounds are inferred. Line infers
+position domains from its visible transformed rows, while full lineage remains
+available for topology, colors and legends; shared repeated panels retain their
+shared domain. A filter can therefore change both membership and derived scale
+geometry without adding a new authored Coordinate operation.
+
 ### Selection words have separate meanings
 
 ```js

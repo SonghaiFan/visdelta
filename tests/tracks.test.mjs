@@ -164,3 +164,30 @@ test('compiled property diagnostics retain kinds and actual delayed intervals', 
   frame.progress(1);
   assert.equal(node.getAttribute('x'), '12');
 });
+
+test('independently loaded custom plugin records into its scene for the host controller', async () => {
+  const { motion: pluginMotion } = await import('../dist/runtime/recorder.js?independent-plugin');
+  const { drainRecordedTracks, recordedTracks } = await import('../dist/runtime/recorder.js');
+  const { defineChartType } = await import('../dist/plugins.js');
+  const { createChartRuntime } = await import('../dist/runtime/chart-runtime.js');
+  const scene = {};
+  const other = {};
+  const node = fakeNode({ x: 0 });
+  node.parentNode.__visDeltaScene = scene;
+  const plugin = defineChartType({ key: 'external-copy', renderer() {
+    pluginMotion(d3.select(node), { delay: 0, duration: 100, ease: t => t }).attr('x', 100);
+  } });
+  plugin.createChartType(createChartRuntime()).renderer();
+  assert.deepEqual(drainRecordedTracks(other), []);
+  assert.deepEqual(drainRecordedTracks({ ...scene }), [], 'panel copies do not inherit a queue');
+  const items = drainRecordedTracks(scene);
+  assert.equal(items.length, 1);
+  assert.deepEqual(drainRecordedTracks(scene), [], 'a batch is drained once');
+  const frame = createProgressController(items).compile();
+  for (const p of [0, 0.5, 1, 0.5, 0]) {
+    frame.progress(p);
+    assert.equal(x(node), p * 100);
+  }
+  assert.notEqual(recordedTracks(scene), items, 'subsequent renders own a fresh batch');
+  drainRecordedTracks(scene);
+});

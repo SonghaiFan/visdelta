@@ -82,6 +82,10 @@ base.color('region');
 Channel methods accept options such as `type`, `label`, `format`, `domain`,
 `scale`, `sort`, `aggregate`, `timeUnit` and `bin`.
 
+Explicit numeric and temporal position `domain` bounds are kept exactly;
+only inferred domains are rounded. Log axes use ordinary D3 log ticks without
+adding data-endpoint ticks.
+
 ```ts
 line(rows)
   .x('date', { type: 'temporal', label: 'Date' })

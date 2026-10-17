@@ -69,7 +69,8 @@ export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
     const stackDomain = stackedValueDomain(domainStackedRows, measureChannel);
     const baseCategoryScale = asRuntimeScale(scaleBand().domain(categories).range(categoryRange).padding(0.24));
     const baseMeasureScale = asRuntimeScale(scaleLinear().domain(stackDomain)
-      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
+      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]));
+    if (!Array.isArray(measureChannel.domain)) baseMeasureScale.nice!();
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
     const baseGeom: StackedGeom = { x: baseX, y: baseY, categoryField, valueField, chart, horizontal };

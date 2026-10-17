@@ -68,7 +68,8 @@ export function createGroupedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
       .range([0, baseCategoryBand.bandwidth()]).padding(0.08));
     const baseMeasureScale = asRuntimeScale(scaleLinear()
       .domain(baselineDomain(domainRows, measureChannel, 0))
-      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
+      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]));
+    if (!Array.isArray(measureChannel.domain)) baseMeasureScale.nice!();
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
     const baseX1 = horizontal ? null : baseSegmentScale;

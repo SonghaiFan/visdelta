@@ -11,7 +11,10 @@ test('bar baseline warns in both orientations without changing the declaration',
   assert.deepEqual(await codes(chart), ['bar.truncated-baseline']);
   assert.deepEqual(await codes(chart.flip()), ['bar.truncated-baseline']);
   assert.deepEqual(chart.toSpec(), before);
-  assert.deepEqual(await codes(bar(rows).x('label').y('value', { domain: [0.01, 20] })), []);
+  const nearZero = bar(rows).x('label').y('value', { domain: [0.01, 20] });
+  assert.deepEqual(await codes(nearZero), ['bar.truncated-baseline']);
+  const [warning] = await visualizationWarnings(nearZero);
+  assert.deepEqual(warning.evidence, { start: 0.01, end: 20 });
   assert.deepEqual(await codes(bar(rows).x('label').y('value', { domain: [0, 20] })), []);
   assert.deepEqual(await codes(bar(rows).x('label').y('value', { domain: [-20, 20] })), []);
 });

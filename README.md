@@ -44,16 +44,16 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 ## Install
 
 ```sh
-npm install visdelta@0.4.1
+npm install visdelta@0.4.2
 ```
 
 Or import it directly in a browser, using the same jsDelivr `+esm` convention
 as D3:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/visdelta.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
 <script type="module">
-  import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.4.1/+esm";
+  import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm";
 
   const state = vd.bar(rows);
 </script>

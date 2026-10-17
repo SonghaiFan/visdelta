@@ -26,6 +26,10 @@ export function alignEdgeTickLabels(
  */
 export function prioritizedContinuousTicks(scale: RuntimeScale, count: number, minSpacing: number): unknown[] {
   const ordinary = typeof scale.ticks === 'function' ? scale.ticks(count) : scale.domain();
+  // Log ticks already communicate multiplicative spacing. Injecting arbitrary
+  // observation endpoints obscures that structure (for example 2.18k beside 1k).
+  const channel = scale.__visDeltaChannel;
+  if ((channel?.scale?.type || channel?.scaleType) === 'log') return ordinary;
   const scaleDomain = scale.domain().map((value) => Number(value));
   const domainMin = Math.min(...scaleDomain);
   const domainMax = Math.max(...scaleDomain);

@@ -23,6 +23,11 @@ base.focus({ region: 'North' });     // keep rows; move the camera
 Matching rows stay and non-matching rows exit. `where()` adds a filter
 transform, so `state.rows()` also returns only the matching rows.
 
+Line fits its inferred x/y domains to the visible rows. Colors and legend
+mappings keep their full data lineage, and missing interior observations still
+leave gaps. Supply explicit position domains when a story needs fixed axes;
+repeated panels with shared scales retain a common domain.
+
 <LiveExample id="bar-filter" />
 
 ## highlight(selector, options?)

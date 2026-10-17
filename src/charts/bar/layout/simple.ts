@@ -60,7 +60,8 @@ export function createSimpleBarRenderer(runtime: ChartRuntime, kit: BarRenderKit
       : bandOrLinear(rows, categoryChannel, categoryRange);
     const baseMeasureScale = asRuntimeScale(scaleLinear()
       .domain(baselineDomain(domainRows, measureChannel, 0))
-      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]).nice());
+      .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]));
+    if (!Array.isArray(measureChannel.domain)) baseMeasureScale.nice!();
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
     const baseGeom: SimpleGeom = { x: baseX, y: baseY, categoryField, valueField, chart, horizontal, position };

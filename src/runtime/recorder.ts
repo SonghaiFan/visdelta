@@ -39,8 +39,8 @@ interface Entry<Datum> {
   item: TrackItem;
 }
 
-/** Any scene object; recorded items are kept off the scene in a WeakMap. */
-type SceneWithTracks = object;
+/** Scene-local transport shared by independently bundled chart and controller modules. */
+type SceneWithTracks = object & { __visDeltaPendingTracks?: TrackItem[] };
 
 /**
  * The authoring surface of a Recorder — the d3-transition method shape chart
@@ -109,18 +109,22 @@ function sceneOf(node: Node): SceneWithTracks | null {
   return null;
 }
 
-const pendingTracks = new WeakMap<SceneWithTracks, TrackItem[]>();
-
 /** The array a scene accumulates recorded items in until the next controller drains it. */
 export function recordedTracks(scene: SceneWithTracks): TrackItem[] {
-  let items = pendingTracks.get(scene);
-  if (!items) { items = []; pendingTracks.set(scene, items); }
-  return items;
+  if (!scene.__visDeltaPendingTracks) {
+    // Keep the queue on its owner, not in module-local storage: CDN rewrites
+    // can evaluate separate recorder copies for lazy chart modules. A hidden
+    // property also keeps {...scene} panel contexts from copying this queue.
+    Object.defineProperty(scene, '__visDeltaPendingTracks', {
+      value: [], configurable: true
+    });
+  }
+  return scene.__visDeltaPendingTracks!;
 }
 
 export function drainRecordedTracks(scene: SceneWithTracks): TrackItem[] {
-  const items = pendingTracks.get(scene) ?? [];
-  pendingTracks.delete(scene);
+  const items = scene.__visDeltaPendingTracks ?? [];
+  delete scene.__visDeltaPendingTracks;
   return items;
 }
 
