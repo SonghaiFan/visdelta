@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 - 2026-10-18
+
+- Keep mobile navigation compact.
+- Expand Studio browser coverage for drafts, DOM tracks and fixed-canvas Fit.
+- Fix the npm CLI version used by the publishing workflow.
+
 ## 0.4.0 - 2026-10-14
 
 - Publish the Fumadocs documentation site with shared Home, Docs and

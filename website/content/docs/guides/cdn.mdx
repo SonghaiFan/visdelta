@@ -16,14 +16,14 @@ use, for example `npx serve`, and open the URL it prints.
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>My first VisDelta transition</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/visdelta.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/visdelta.css">
   </head>
   <body>
     <div id="chart"></div>
     <input id="progress" type="range" min="0" max="1" step="0.01" value="0">
 
     <script type="module">
-      import * as vd from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.0/+esm';
+      import * as vd from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.1/+esm';
 
       const rows = [
         { category: 'Hardware', revenue: 12, profit: 5 },
@@ -60,8 +60,8 @@ The root URL is the recommended path. A page that deliberately wants a narrower
 initial entry can request a packaged file directly:
 
 ```js
-import { bar } from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/bar.js/+esm';
-import { transition } from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/transition-entry.js/+esm';
+import { bar } from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/bar.js/+esm';
+import { transition } from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/transition-entry.js/+esm';
 ```
 
 ## Global script
@@ -70,8 +70,8 @@ For a page without modules, load the self-contained global bundle. The `d3-*`
 modules VisDelta uses are compiled in.
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.0/dist/visdelta.css">
-<script src="https://cdn.jsdelivr.net/npm/visdelta@0.4.0"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.1/dist/visdelta.css">
+<script src="https://cdn.jsdelivr.net/npm/visdelta@0.4.1"></script>
 <script>
   const { bar, transition } = VisDelta;
   // same authoring code as above

@@ -1,6 +1,6 @@
 {
   "name": "visdelta",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Declarative visualization states and seekable animated transitions for the browser.",
   "type": "module",
   "license": "MIT",
