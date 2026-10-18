@@ -1,0 +1,33 @@
+import { chart } from './sales.mjs'
+
+# Which region sells the most?
+
+Compare the whole picture, then take a closer look at North.
+
+<Scrolly>
+
+<Step chart={chart}>
+
+## Compare all three regions
+
+Each bar shows one region's revenue.
+
+</Step>
+
+<Step chart={chart.highlight({ region: 'North' })}>
+
+## Look at North
+
+North has the highest revenue. The other regions remain visible.
+
+</Step>
+
+<Step chart={chart}>
+
+## Return to the whole picture
+
+Compare North with the other regions again.
+
+</Step>
+
+</Scrolly>

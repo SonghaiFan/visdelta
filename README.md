@@ -44,7 +44,9 @@ Chart states are immutable: creating `profit` does not change `revenue`.
 ## Building with an agent
 
 For downstream MDX applications, see the [authoring integration guide](website/content/docs/guides/mdx.mdx)
-and the [native state module](examples/authoring/network-states.mjs). The accompanying
+and the [minimal Bar declaration](examples/authoring/sales.mjs). Each
+[MDX step](examples/authoring/story.mdx) pairs its text with `chart={...}`.
+The accompanying
 [mount example](examples/authoring/mount-story.mjs) covers asynchronous generations,
 pending progress, single states and cleanup. Run `npm run authoring:check` to verify
 these examples against an installed package.

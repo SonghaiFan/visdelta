@@ -28,15 +28,16 @@ try {
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
   const installed = JSON.parse(await readFile(join(consumer, 'node_modules/visdelta/package.json'), 'utf8'));
   console.log(`Installed consumer: ${installed.name}@${installed.version}`);
-  for (const file of ['network-states.mjs', 'mount-story.mjs']) {
+  for (const file of ['network-states.mjs', 'sales.mjs', 'mount-story.mjs']) {
     await writeFile(join(consumer, file), await readFile(join(root, 'examples/authoring', file)));
   }
   const bundle = (await build({ stdin: { contents: `
     import { mountStory } from './mount-story.mjs';
     import { states, network } from './network-states.mjs';
+    import { chart as salesChart } from './sales.mjs';
     import { transition, sequence, point } from 'visdelta';
     import { defineChartType, registerChartModule } from 'visdelta/plugins';
-    window.storyExample = { mountStory, states, network, transition, sequence, point, defineChartType, registerChartModule };
+    window.storyExample = { mountStory, states, network, salesChart, transition, sequence, point, defineChartType, registerChartModule };
   `, resolveDir: consumer }, bundle: true, write: false, format: 'esm' })).outputFiles[0].text;
   const css = await readFile(join(consumer, 'node_modules/visdelta/dist/visdelta.css'));
   server = createServer((req, res) => {
@@ -157,8 +158,41 @@ try {
   assert.ok(lifecycle.independent);
   assert.match(lifecycle.error, /same chart type/);
   assert.equal(lifecycle.remaining, 0, 'Preparation/error cleanup leaked hidden mounts');
+  const minimal = await page.evaluate(async () => {
+    const { salesChart, mountStory, transition } = window.storyExample;
+    // This is the order the application collects from Step chart props.
+    const steps = [salesChart, salesChart.highlight({ region: 'North' }), salesChart];
+    const a = document.querySelector('#a'), b = document.querySelector('#b');
+    a.style.width = b.style.width = '600px';
+    const session = mountStory(a, steps);
+    await session.ready;
+    const capture = host => ({
+      bars: [...host.querySelectorAll('.vd-bar')].map(node => ({
+        geometry: ['x', 'y', 'width', 'height', 'fill'].map(name => node.getAttribute(name)),
+        opacity: getComputedStyle(node).opacity,
+      })),
+      ticks: [...host.querySelectorAll('.vd-axis .tick')].map(node => ({ text: node.textContent, transform: node.getAttribute('transform') })),
+    });
+    const frames = [];
+    for (const index of [0, 1, 2, 1, 0]) {
+      session.seek(index);
+      const reference = await transition(steps[index], steps[index], { target: b, width: 'auto', height: 'auto' });
+      reference.progress(1);
+      frames.push({ index, actual: capture(a), expected: capture(b) });
+      reference.destroy(); b.replaceChildren();
+    }
+    session.destroy();
+    return frames;
+  });
+  for (const { index, actual, expected } of minimal) {
+    assert.deepEqual(actual, expected, 'Minimal Bar Step must match an independently mounted declaration');
+    assert.equal(actual.bars.length, 3, 'Every region remains present without an explicit key');
+    assert.ok(actual.bars.every(bar => Number(bar.geometry[2]) > 0 && Number(bar.geometry[3]) > 0), 'All minimal bars have nonzero geometry');
+    assert.equal(actual.bars.filter(bar => Number(bar.opacity) === 1).length, index === 1 ? 1 : 3, 'Only the highlighted Step dims other regions');
+  }
   assert.deepEqual(errors, []);
   console.log('ok   installed story: cancelled generation, static state, independent instances and preparation failure cleanup');
+  console.log('ok   minimal Bar: inferred identity, inline Step attention and independent endpoints in both directions');
 } finally {
   await browser?.close();
   if (server) await new Promise(resolve => server.close(resolve));

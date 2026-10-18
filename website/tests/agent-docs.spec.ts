@@ -32,6 +32,12 @@ for (const width of [1280, 390]) {
     for (const slug of ['agent-workflow', 'automatic-behaviors', 'mdx', 'scroll-template']) {
       await page.goto(`docs/guides/${slug}/`);
       await expect(page.locator('h1').first()).toBeVisible();
+      if (slug === 'mdx') {
+        const content = await page.locator('main').innerText();
+        expect(content).toContain('<Step chart={chart}>');
+        expect(content).toContain("chart.highlight({ region: 'North' })");
+        expect(content).not.toContain('<Scrolly states=');
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       const origin = new URL(page.url()).origin;
       const links = await page.locator('main a[href]').evaluateAll(nodes => nodes.map(n => (n as HTMLAnchorElement).href));

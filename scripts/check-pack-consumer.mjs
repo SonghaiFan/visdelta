@@ -73,6 +73,7 @@ try {
 
   await writeConsumerSmoke(consumerDir);
   await writeFile(join(consumerDir, 'network-states.mjs'), await readFile(join(root, 'examples/authoring/network-states.mjs')));
+  await writeFile(join(consumerDir, 'sales.mjs'), await readFile(join(root, 'examples/authoring/sales.mjs')));
   run("node", ["consumer-smoke.mjs"], consumerDir);
   await writeFile(join(consumerDir, "consumer.ts"), await readFile(join(root, "tests/types/consumer.ts")));
   run(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
@@ -101,6 +102,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import * as api from "visdelta";
 import { network, states as authoredStates, rows as storyRows } from './network-states.mjs';
+import { chart as salesChart, sales } from './sales.mjs';
 import * as browserApi from "visdelta/browser";
 import { D3_AREA_CURVE_NAMES as selectedAreaCurveNames, area as selectedArea, areaModule } from "visdelta/area";
 import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
@@ -118,6 +120,15 @@ import {
 } from "visdelta/plugins";
 
 const expectedApi = ${JSON.stringify(expectedApi, null, 2)};
+const emphasizedSales = salesChart.highlight({ region: 'North' });
+const repeatedSales = salesChart.highlight({ region: 'North' });
+deepStrictEqual(emphasizedSales.toSpec(), repeatedSales.toSpec(), 'Repeated inline highlight has an equivalent declaration');
+deepStrictEqual(api.delta(salesChart, emphasizedSales).stateChanges, [{ category: 'attention', action: 'enter', target: 'highlight' }], 'The minimal Step changes only attention');
+deepStrictEqual(api.resolveMarkIdentity(salesChart.toSpec()).fields, ['region'], 'Simple Bar infers the region mark key');
+deepStrictEqual(salesChart.rows(), sales, 'Deriving an inline Step preserves source membership');
+deepStrictEqual(emphasizedSales.rows(), sales, 'Attention preserves every region');
+deepStrictEqual(await api.visualizationWarnings(salesChart), [], 'Minimal native Bar needs no extra configuration');
+if (salesChart.toSpec().meta?.state?.scopes?.highlight != null) throw new Error('An inline Step changed the base chart.');
 if (authoredStates.length !== 3 || authoredStates[0] !== authoredStates[2]) throw new Error('Packed authoring story lost its authored return boundary.');
 if (network.overview.toSpec().meta?.state?.scopes?.highlight != null) throw new Error('Deriving attention mutated the base story state.');
 deepStrictEqual(network.north.rows(), network.overview.rows(), 'Attention preserves membership');

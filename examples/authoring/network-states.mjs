@@ -22,5 +22,6 @@ export const network = Object.freeze({
   north: all.highlight({ route: 'North' }),
 });
 
-// Step order is authored, including a return to a previous state.
+// Low-level sequence fixture. MDX authors attach network.overview/north directly
+// to each Step's chart property; the application collects that authored order.
 export const states = Object.freeze([network.overview, network.north, network.overview]);

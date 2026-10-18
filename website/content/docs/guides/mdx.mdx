@@ -8,38 +8,83 @@ narrative components. VisDelta supplies chart state and rendering; the applicati
 supplies MDX compilation, layouts, scrolling, editing and error presentation.
 There is no VisDelta MDX compiler or exported `Scrolly`/`Step` component.
 
-## Keep authoring separate from mounting
+## A paragraph and its chart belong together
 
-The complete, DOM-free
-[`network-states.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/network-states.mjs)
-module imports `line` from the installed `visdelta` package. It declares stable
-source-record identities, a fixed y domain and two named immutable states.
-Its authored order is overview → highlight North → overview. Deriving the
-highlight preserves both routes and leaves the overview unchanged.
-The state serializes `Date` values to ISO strings; `rows()` need not return
-`Date` objects. Keep the explicit temporal binding and compare instants when
-checking serialized dates. Source rows remain unchanged.
+Start with the complete
+[`sales.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/sales.mjs)
+module. These three rows have unique regions, so Bar infers its mark key.
+This simple example needs no explicit `key()` or `datumKey()`:
 
-An application that implements `Scrolly` and `Step` could consume those states
-with the following **application-owned component contract**:
+```js title="sales.mjs"
+import { bar } from 'visdelta';
+
+export const sales = [
+  { region: 'North', revenue: 18 },
+  { region: 'South', revenue: 12 },
+  { region: 'West', revenue: 9 },
+];
+
+export const chart = bar(sales).x('region').y('revenue');
+```
+
+The accompanying
+[`story.mdx`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/story.mdx)
+uses the following **application-owned component contract**. The MDX application
+supplies `Scrolly` and `Step` as default components:
 
 ```mdx
-import { Scrolly, Step } from './components/story.jsx'
-import { states } from './network-states.mjs'
+import { chart } from './sales.mjs'
 
-# One route becomes a network
+# Which region sells the most?
 
-<Scrolly states={states}>
-  <Step>Compare both routes on the same scale.</Step>
-  <Step>Attention moves to North; South remains visible.</Step>
-  <Step>Return to the whole network.</Step>
+<Scrolly>
+
+<Step chart={chart}>
+
+## Compare all three regions
+
+Each bar shows one region's revenue.
+
+</Step>
+
+<Step chart={chart.highlight({ region: 'North' })}>
+
+## Look at North
+
+North has the highest revenue. The other regions remain visible.
+
+</Step>
+
+<Step chart={chart}>
+
+## Return to the whole picture
+
+Compare North with the other regions again.
+
+</Step>
+
 </Scrolly>
 ```
 
-The JSX components in this example are not provided by VisDelta. Choose the
-application's MDX/JSX runtime and compiler integration separately. Each step
-corresponds to an authored state; repeated states are valid boundaries. Avoid
-reconstructing the fluent API as a second YAML chart grammar.
+Read ordinary Markdown, use `Scrolly` to group the story, and give each `Step`
+the chart to show while reading it. Each `chart` prop is a complete immutable
+VisDelta declaration. Highlighting creates a new declaration; it does not modify
+the base chart or inherit changes from the preceding step. Repeating `chart`
+returns to the overview. The application collects those declarations in step
+order and creates the sequence; authors maintain no parallel `states` array.
+
+`chart` is a prop name, not a new builder or a rendered controller. VisDelta does
+not export `chart()`, `Scrolly` or `Step`. Applications own their component
+registration and may allow explicit standard MDX imports to override defaults.
+They also own optional IDs, accessible titles, layouts and hold policies. Avoid
+reconstructing VisDelta as another YAML grammar or a second highlighting prop.
+
+The onboarding target is to copy the template, change fields and add a highlight
+step in two minutes. This is a design target, not a measured user-study result.
+More complex stories can use the
+[`network-states.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/network-states.mjs)
+Line example with explicit identity and temporal bindings. Dates serialize to
+ISO strings; compare instants rather than requiring `rows()` to return `Date`s.
 
 ## Installed-package contract
 
@@ -54,7 +99,7 @@ not be presented as the published 0.4.2 package.
 
 | Concern | Implemented behavior | Application responsibility |
 | --- | --- | --- |
-| State construction | Builders, `rows()`, `toSpec()` and `delta()` do not need a DOM | Construct stable states outside rendering/effects; choose date and identity conventions |
+| State construction | Builders, `rows()`, `toSpec()` and `delta()` do not need a DOM | Keep source data and base declarations stable; choose date and identity conventions |
 | Mount | `await sequence(states, options)` requires at least two states and a browser DOM | Attach an empty, exclusively owned target; set its dimensions |
 | One static state | `await transition(state, state, options)`, then `.progress(1)` | Keep a single-state story at authored position 0 |
 | Scroll position | Sequence uses `0..states.length - 1`; finite inputs clamp | Measure anchors, apply holds and coalesce events; do not normalize the whole story to 0..1 |
@@ -69,6 +114,28 @@ marks, `where()` changes membership, and `focus()` changes the view. A legacy
 field named “focus” must be interpreted by its behavior rather than translated
 by spelling.
 
+## Inline declarations and React rendering
+
+`chart.highlight({ region: 'North' })` produces a fresh immutable object on each
+call, even when its declaration is unchanged. Collecting child props also creates
+a new array. An application must not use either reference alone to rebuild its
+session on every parent render or status update. Asking MDX authors to use React
+memoization defeats the simple authoring contract.
+
+Within a compiled document generation, the application can compare the complete
+detached `toSpec()` declarations and retain equivalent step inputs. Preserve array
+order and distinguish real data, encoding and metadata changes. Keep plugin
+module identity and external dataset/reload inputs in the lifecycle dependencies;
+equal serialized specs alone do not prove equivalent custom plugins or remote
+data. Do not introduce a second chart normalizer.
+
+Standard chart declarations are JSON-safe: serialization turns dates into ISO
+strings and does not preserve arbitrary callbacks or class instances. A custom
+builder's non-JSON output needs a conservative identity policy or a clear error,
+not a fingerprint that silently drops values. Test repeated inline expressions
+under parent/status/theme renders: initialization must settle, while changed
+chart data must rebuild. Those component tests belong to the application.
+
 ## Isolate asynchronous generations
 
 [`mount-story.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/mount-story.mjs)
@@ -78,13 +145,13 @@ states, and disposes a controller that arrives after unmount. Its `ready` proper
 belongs to the example wrapper, not to VisDelta's controller.
 
 ```js
-const chart = mountStory(host, states);
-chart.seek(currentPosition);
-chart.ready.catch(error => {
+const session = mountStory(host, states);
+session.seek(currentPosition);
+session.ready.catch(error => {
   if (thisGenerationIsCurrent()) showError(error);
 });
-// Theme change: chart.resize();
-// Effect cleanup: remove application listeners, then chart.destroy();
+// Theme change: session.resize();
+// Effect cleanup: remove application listeners, then session.destroy();
 ```
 
 Removing a mount does not cancel creation or network requests. Pending work can
