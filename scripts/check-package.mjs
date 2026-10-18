@@ -67,7 +67,9 @@ const publicExports = {
   "./style.css": "./dist/visdelta.css",
   "./themes/default.css": "./dist/themes/default.css",
   "./themes/dark.css": "./dist/themes/dark.css",
-  "./themes/paper.css": "./dist/themes/paper.css"
+  "./themes/paper.css": "./dist/themes/paper.css",
+  "./react": { types: "./dist/react.d.ts", import: "./dist/react.js" },
+  "./render": { types: "./dist/render.d.ts", import: "./dist/render.js" }
 };
 const requiredFiles = [
   "CHANGELOG.md",
@@ -154,7 +156,7 @@ if (!packageJson.devDependencies?.esbuild) {
   throw new Error("package.json must pin esbuild as a devDependency for the global build.");
 }
 assertEqual(packageJson.scripts["pack:check"], "node scripts/check-pack-consumer.mjs", "pack:check");
-assertEqual(packageJson.scripts["release:check"], "npm test && npm run pack:check", "release:check");
+assertEqual(packageJson.scripts["release:check"], "npm test && npm run react:check && npm run render:check && npm run pack:check", "release:check");
 assertEqual(packageJson.scripts.prepublishOnly, "npm run release:check", "prepublishOnly");
 if (!changelog.includes(`## ${packageJson.version} - `)) {
   throw new Error(`CHANGELOG.md must include an entry for ${packageJson.version}.`);

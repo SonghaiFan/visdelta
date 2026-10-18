@@ -252,14 +252,44 @@ function fitContainer(change: ResizableTransition, story: SizedSequence, size: C
   return story.resize({ width: "auto", height: size });
 }
 void fixedSize; void fitSize; void fitContainer;
-const headed = bar([{ city: 'Oslo', visitors: 31 }]).x('city').y('visitors').title('Visitors').subtitle('March').subtitle(null);
-const headingText: string | null | undefined = headed.toSpec().title;
-void headingText;
+const headed = bar([{ city: 'Oslo', visitors: 31 }]).x('city').y('visitors');
 
 selectedUnit([{ x: 1, y: 2 }]).layout('beeswarm', { x: 'x', radius: 5 });
 selectedUnit([{ x: 1, y: 2 }]).layout('force', { x: { field: 'x', label: 'X' }, y: 'y' });
 selectedUnit([{ x: 1, y: 2 }]).size(6).layout('beeswarm', { x: 'x' }).x('y');
 
-selectedBar([{ hp: 1, mpg: 2 }]).x('hp', { label: 'Horsepower' }).title('Cars');
+selectedBar([{ hp: 1, mpg: 2 }]).x('hp', { label: 'Horsepower' });
 // @ts-expect-error Channel names use label, not the figure title property.
 selectedBar([{ hp: 1 }]).x('hp', { title: 'Horsepower' });
+
+import { parseSpec, stringifySpec, type ViewSpec } from 'visdelta';
+const jsonSpec: ViewSpec = { mark: 'bar', data: [{ x: 'A', y: 1 }] };
+const restoredSpec: ViewSpec = parseSpec(stringifySpec(jsonSpec));
+void restoredSpec;
+
+import { render as renderChart, type ChartView } from 'visdelta';
+import { createRenderer as scopedRenderer } from 'visdelta/render';
+import { barModule as renderBarModule } from 'visdelta/bar';
+async function persistentChart(): Promise<ChartView> {
+  const view = await renderChart('#chart', JSON.stringify(jsonSpec), { updates: { policy: 'latest', duration: 600 } });
+  const result = await view.update(jsonSpec, { animate: false, data: { sales: [] } });
+  const status: 'applied' | 'superseded' | 'destroyed' = result.status;
+  const revision: number = view.snapshot().revision;
+  const manual = await view.transition(jsonSpec);
+  manual.progress(1);
+  view.resize({ width: 'auto' });
+  void status; void revision;
+  return view;
+}
+void persistentChart;
+void scopedRenderer({ modules: [renderBarModule] });
+
+import type { EditMessage, FluentEdit } from 'visdelta/render';
+const fluentCall: FluentEdit = { method: 'flip', args: [] };
+const editMessage: EditMessage = { requestId: 'consumer', baseRevision: 0, edits: [fluentCall] };
+void editMessage;
+
+// @ts-expect-error Figure headings belong in the surrounding page.
+bar([]).title('Title');
+// @ts-expect-error Figure headings belong in the surrounding page.
+bar([]).subtitle('Subtitle');

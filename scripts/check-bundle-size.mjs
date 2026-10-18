@@ -100,7 +100,8 @@ let gzipBytes = 0;
 // Includes the staged repeat container and its nested child motion projection.
 // 0.4 also includes recorded phase endpoints and DOM ancestry for inspection.
 // Keep the selected-chart budget bounded while accounting for that public API.
-const maxSelectedTransitionGzipBytes = 101_000;
+// The lazy fluent adapter adds shared authoring/codec chunk overhead (~0.6k over the prior cap).
+const maxSelectedTransitionGzipBytes = 102_000;
 for (const path of loaded) {
   gzipBytes += gzipSync(files.get(resolve(root, path))).byteLength;
   for (const source of Object.keys(outputs[path].inputs)) {

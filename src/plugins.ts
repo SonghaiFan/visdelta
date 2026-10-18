@@ -25,3 +25,5 @@ export type {
 } from './types/index.js';
 
 export type { VisualizationWarning, ChartWarningInspector } from './types/index.js';
+
+export type { EditMessage, FluentEdit } from './fluent-edits.js';

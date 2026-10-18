@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Add JSON-first `render()` and scoped `createRenderer()` entry points, persistent
+  `view.update()` with latest-pending scheduling, accepted-state snapshots, manual
+  transitions and owned cleanup. Update results distinguish applied, superseded
+  and destroyed submissions.
+
+- Add `parseSpec` and `stringifySpec` for JSON transport of the existing `ViewSpec`,
+  shared by builders, imperative playback and React.
+
+- Add the optional `visdelta/react` entry with a unified `Chart` for single states,
+  pairs and state arrays, sharing asynchronous mounting, replacement and cleanup. Migrate
+  the documentation players, homepage, style previews and gallery
+  viewer to the components.
+
 - Keep Paper's neutral marks in its own dark ink when the surrounding page
   switches to a dark theme. Explicit authored colors and palettes still win.
 - Keep transition runtime services scoped to the actual chart root when a
@@ -231,3 +244,12 @@ API in this release.
 
 The implementation rules are documented in
 [docs/language-framework.md](docs/language-framework.md).
+
+### Fluent edits
+
+- Add `view.edit()` with atomic revision checks, request deduplication and the
+  existing latest update scheduler. Bar supports a conservative fluent method
+  subset; custom modules can supply an edit adapter.
+- Liveshow sends compact edits against the accepted chart; Grain remains a
+  complete-state update. Request retries, conflicts and cumulative edits are
+  covered by browser regressions.

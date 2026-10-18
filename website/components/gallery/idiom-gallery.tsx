@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { VisualizationTransition } from 'visdelta/transition';
+import { Chart, type ChartProps } from 'visdelta/react';
+import type { Visualization } from 'visdelta/transition';
 import type { VisualizationWarning } from 'visdelta';
 import { CodeView } from '@/components/interactive/code-view';
 import { loadIdioms, type Idiom, type IdiomGroup } from '@/components/interactive/corpus';
@@ -12,7 +13,6 @@ import {
   evaluateChart,
   loadCsv,
   loadFactory,
-  loadRuntime,
   prefersReducedMotion,
   renderFrozen,
   yieldToBrowser,
@@ -72,13 +72,12 @@ function GalleryContent({ children }: { children?: ReactNode }) {
   const [viewerStatus, setViewerStatus] = useState('');
   const [warnings, setWarnings] = useState<VisualizationWarning[]>([]);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
+  const [scene, setScene] = useState<ChartProps | null>(null);
   const tiles = useRef(new Map<string, HTMLElement>());
   const drawnWidths = useRef(new Map<string, number>());
   const pending = useRef(new Set<string>());
   const queue = useRef<Promise<void>>(Promise.resolve());
   const observer = useRef<IntersectionObserver | null>(null);
-  const viewerChart = useRef<VisualizationTransition | null>(null);
   const viewerState = useRef<{ mark: string; state: ChartState } | null>(null);
   const viewerVersion = useRef(0);
   const disposed = useRef(false);
@@ -154,47 +153,43 @@ function GalleryContent({ children }: { children?: ReactNode }) {
     setViewerStatus('Rendering');
     setWarnings([]);
     try {
-      const [state, { visualizationWarnings }, { transition }] = await Promise.all([
+      const [state, { visualizationWarnings }] = await Promise.all([
         evaluateIdiom(idiom),
         import('visdelta'),
-        loadRuntime(),
       ]);
       const advice = await visualizationWarnings(state as never);
       if (version !== viewerVersion.current || disposed.current) return;
       setWarnings(advice);
-      const stage = stageRef.current;
-      if (!stage) return;
-      const host = document.createElement('div');
-      host.style.cssText = 'position:absolute;inset:0;visibility:hidden;pointer-events:none;';
-      stage.append(host);
-      // Moving between idioms of one mark morphs the previous chart; anything
-      // VisDelta cannot route is simply redrawn.
       const previous = viewerState.current;
       const from = previous && previous.mark === idiom.mark ? previous.state : state;
       const height = Math.max(300, Math.min(560, Math.round(window.innerHeight * 0.58)));
-      let chart: VisualizationTransition;
-      try {
-        chart = await transition(from as never, state as never, { target: host, height });
-      } catch {
-        chart = await transition(state as never, state as never, { target: host, height });
-      }
-      if (version !== viewerVersion.current || disposed.current) {
-        chart.destroy();
-        host.remove();
-        return;
-      }
-      viewerChart.current?.destroy();
-      stage.replaceChildren(host);
-      host.style.cssText = '';
-      viewerChart.current = chart;
-      viewerState.current = { mark: idiom.mark, state };
-      if (from !== state && !prefersReducedMotion()) {
-        chart.progress(0);
-        chart.play({ from: 0, to: 1, duration: 700 });
-      } else {
-        chart.progress(1);
-      }
-      setViewerStatus('');
+      const props: ChartProps = {
+        state: [from as unknown as Visualization, state as unknown as Visualization],
+        height,
+        onReady(chart) {
+          if (version !== viewerVersion.current) return;
+          viewerState.current = { mark: idiom.mark, state };
+          if (from !== state && !prefersReducedMotion()) {
+            chart.progress(0);
+            chart.play({ from: 0, to: 1, duration: 700 });
+          } else chart.progress(1);
+          setViewerStatus('');
+        },
+        onError(cause) {
+          if (version !== viewerVersion.current) return;
+          if (from === state) setViewerStatus(errorMessage(cause));
+          else setScene({ ...props, state: state as unknown as Visualization,
+            onReady(chart) {
+              if (version !== viewerVersion.current) return;
+              viewerState.current = { mark: idiom.mark, state };
+              chart.progress(1);
+              setViewerStatus('');
+            },
+            onError: error => setViewerStatus(errorMessage(error)),
+          });
+        },
+      };
+      setScene(props);
     } catch (cause) {
       if (version === viewerVersion.current) setViewerStatus(errorMessage(cause));
     }
@@ -208,8 +203,7 @@ function GalleryContent({ children }: { children?: ReactNode }) {
 
   const onClose = () => {
     viewerVersion.current += 1;
-    viewerChart.current?.destroy();
-    viewerChart.current = null;
+    setScene(null);
     viewerState.current = null;
     setOpenId(null);
     if (window.location.hash) window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -258,7 +252,6 @@ function GalleryContent({ children }: { children?: ReactNode }) {
       observer.current?.disconnect();
       resizeObserver.disconnect();
       window.clearTimeout(resizeTimer);
-      viewerChart.current?.destroy();
     };
   }, [openIdiom, renderTile]);
 
@@ -357,7 +350,9 @@ function GalleryContent({ children }: { children?: ReactNode }) {
             </header>
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               <div className="relative min-h-80 rounded-lg border bg-fd-card p-2">
-                <div ref={stageRef} className="vd-docs-chart relative" aria-label="Live chart" />
+                <div className="vd-docs-chart relative" aria-label="Live chart">
+                  {scene && <Chart {...scene} />}
+                </div>
                 {viewerStatus && (
                   <p role={viewerStatus === 'Rendering' ? 'status' : 'alert'} className="absolute inset-0 grid place-items-center font-mono text-xs text-fd-muted-foreground">
                     {viewerStatus}

@@ -119,6 +119,24 @@ but it never decides that a data field should mean x, y, color, size, or detail.
 | `visdelta/browser` | Browser-global dependency adapter |
 | `visdelta/style.css` | Required chart styles |
 
+## React
+
+The optional `visdelta/react` entry provides one `Chart` component for React 18/19. Keep chart states and arrays stable between renders.
+`pair` below is `[a, b]`; `states` can contain any non-empty ordered sequence.
+
+```jsx
+import { Chart } from 'visdelta/react';
+
+<Chart state={a} height={320} />
+<Chart state={pair} progress={progress} />
+<Chart state={states} progress={position} />
+```
+
+A single state (or one-element array) displays immediately at progress 0. Empty
+arrays report an error. Pair progress is 0–1; sequence progress uses
+state boundaries 0, 1, 2, … . Omit `progress` and use `onReady` for imperative
+playback. See the [React guide](https://songhaifan.github.io/visdelta/docs/guides/react/).
+
 ## Design rules
 
 - Every frame is true: marks, scales, ticks, grid lines, and titles agree.
@@ -168,3 +186,54 @@ const chart = pie([{ part: 'A', value: 25 }, { part: 'B', value: 75 }])
 
 See [Design comparisons](docs/design-guides.md) for contextual alternatives,
 runnable data and code, and seekable arc examples.
+
+## JSON specs
+
+`parseSpec(json)` and `stringifySpec(state, space?)`, exported from `visdelta`
+and `visdelta/core`, read and write the existing `ViewSpec` declaration.
+`state` may be a builder or plain spec. Parsed specs work directly with `delta`,
+`transition`, `sequence`, and the React components. Register the required chart
+modules before rendering JSON-only states.
+
+```ts
+import { parseSpec, stringifySpec } from 'visdelta/core';
+const restored = parseSpec(stringifySpec(chart));
+```
+
+The helpers validate JSON values, common structure and transforms; chart-specific
+validity and data availability remain runtime/plugin concerns. Custom fields are
+preserved. Dates serialize to ISO strings and undefined object properties are
+omitted. Non-finite numbers, functions, symbols, bigints, cycles, unsupported
+object classes and undefined array entries are rejected. Builder validation starts
+with `toSpec()` output. Existing aliases normalize into `meta`; no separate JSON
+timeline, renderer or module implementation is serialized.
+
+### JSON and agent updates
+
+```ts
+import { render } from 'visdelta';
+
+const view = await render('#chart', json, { data: { sales }, height: 280 });
+await view.update(nextSpec);
+view.destroy();
+```
+
+Pass complete JSON strings or spec objects. Built-in modules load automatically.
+The default `latest` policy finishes the active update and retains only the
+newest validated pending state. Update promises report `applied`, `superseded`
+or `destroyed`; invalid updates reject. See the persistent-view section in
+[the API reference](docs/reference.md) for data, revisions and manual control.
+
+For small Bar edits, send a fluent batch against the accepted revision:
+
+```ts
+await view.edit({
+  requestId: 'turn-1-flip',
+  baseRevision: view.snapshot().revision,
+  edits: [{ method: 'flip', args: [] }],
+});
+```
+
+Identical retries reuse their outcome; stale revisions reject. See the
+[fluent edit reference](docs/reference.md#fluent-json-edits-on-a-persistent-view)
+for the supported Bar methods, per-view request limit and custom adapter contract.

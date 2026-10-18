@@ -6,6 +6,7 @@ import type { ChartModule } from './charts/module.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import { analyzeViewLineage } from './data/view-lineage.js';
 import { classifyStateChanges } from './grammar/state-changes.js';
+import { assertSpecShape, assertSpecValues } from './spec-json.js';
 import { declarationEdits } from './grammar/declaration-edits.js';
 
 export type Visualization = ViewSpec | {
@@ -38,6 +39,26 @@ function withInferredTypes(spec: ViewSpec): ViewSpec {
   const data = spec.data as { values?: unknown[] } | unknown[] | undefined;
   const rows = Array.isArray(data) ? data : Array.isArray(data?.values) ? data.values : null;
   return rows ? resolveSpecDataTypes(spec, rows) : spec;
+}
+
+/** Parse a JSON ViewSpec using the same declaration normalization as builders. */
+export function parseSpec(json: string): ViewSpec {
+  if (typeof json !== 'string') throw new Error('parseSpec() expects a JSON string.');
+  return jsonSpec(JSON.parse(json));
+}
+
+/** Serialize a builder or ViewSpec without silently losing non-JSON values. */
+export function stringifySpec(input: Visualization, space?: number): string {
+  const value = input && typeof input.toSpec === 'function' ? input.toSpec() : input;
+  return JSON.stringify(jsonSpec(value), null, space);
+}
+
+function jsonSpec(value: unknown): ViewSpec {
+  assertSpecValues(value);
+  assertSpecShape(value);
+  const spec = declaredSpec(value);
+  assertSpecShape(spec);
+  return spec;
 }
 
 /** Compute the declarative difference between two states of the same chart type. */

@@ -15,6 +15,25 @@ Use the [Playground](/playground) to
 edit a pair of immutable states, inspect its directional `stateChanges`, and
 scrub the generated transition. This reference stays focused on the API shape.
 
+## React
+
+The optional `visdelta/react` entry exports `Chart`, with `ChartProps` and
+`ChartController` types, for React 18 and 19. `state` accepts one visualization
+or a non-empty readonly array. One state displays a static chart; two states
+use `transition()`; longer arrays use `sequence()`. `progress` uses authored
+state positions: 0 is the first state, 1 the second, and 1.5 is midway through
+the second leg. Single states stay at 0; empty arrays report an error.
+Updating input does not automatically start playback.
+
+`Chart` accepts `data`, `width`, `height`, `chartStyle`, host attributes, `onReady`
+and `onError`. `onReady` receives the controller and may return a cleanup;
+the component owns controller destruction. Stable state/data/style identities
+avoid rebuilding on unrelated renders. Callbacks and progress updates do not
+rebuild. Replacement preserves progress unless controlled, keeps the previous
+chart visible until ready, and reports setup errors through `onError` or an
+error boundary. Server rendering emits an empty host. See the
+[React guide](/docs/guides/react/) for examples and lifecycle details.
+
 ## Chart state
 
 ```js
@@ -1041,3 +1060,124 @@ captured before phase evaluation can detach nodes and survives restoration of
 the visible frame. Repeated siblings may share the same ancestry; the existing
 `selector` is the positional path within the inspected phase. Empty ancestry
 indicates that a complete SVG path could not be established.
+
+## JSON specs
+
+`parseSpec(json)` and `stringifySpec(state, space?)`, exported from `visdelta`
+and `visdelta/core`, read and write the existing `ViewSpec` declaration.
+`state` may be a builder or plain spec. Parsed specs work directly with `delta`,
+`transition`, `sequence`, and the React components. For standalone `transition`, `sequence` and React, register the required chart
+modules before rendering JSON-only states. Persistent `render()` supplies built-in
+modules automatically.
+
+```ts
+import { parseSpec, stringifySpec } from 'visdelta/core';
+const restored = parseSpec(stringifySpec(chart));
+```
+
+The helpers validate JSON values, common structure and transforms; chart-specific
+validity and data availability remain runtime/plugin concerns. Custom fields are
+preserved. Dates serialize to ISO strings and undefined object properties are
+omitted. Non-finite numbers, functions, symbols, bigints, cycles, unsupported
+object classes and undefined array entries are rejected. Builder validation starts
+with `toSpec()` output. Existing aliases normalize into `meta`; no separate JSON
+timeline, renderer or module implementation is serialized.
+
+## Persistent chart views
+
+`render(target, spec, options?)` from `visdelta` or `visdelta/browser` mounts a
+persistent view. `spec` accepts a JSON string, plain `ViewSpec`, or builder.
+Built-in chart modules load lazily without global registration. The existing
+`transition()` and React APIs retain their module registration contracts.
+
+```ts
+import { render } from 'visdelta';
+const view = await render('#chart', initialJson, {
+  data: { sales }, height: 280,
+  updates: { policy: 'latest', duration: 600 },
+});
+const result = await view.update(nextJson);
+view.snapshot(); // { revision, spec }: defensive copy of the accepted declaration.
+view.resize({ width: 'auto', height: 320 });
+view.destroy();
+```
+
+The only update policy is `latest`, also the default. Each update supplies a
+complete state of the same chart type. Common JSON validation, data resolution
+and a hidden static render precede acceptance. Chart validity follows the
+existing plugin/runtime checks; this is not a stricter field-schema validator.
+Older asynchronous validations cannot replace newer accepted submissions.
+The active update (including preparation) finishes; there is at most one
+accepted pending state, and a newer accepted state supersedes it. Validation
+can run concurrently. Partial JSON and response/request freshness are the
+application's responsibility: call `update` only with complete output and reject
+obsolete agent turns before submission.
+
+`update()` resolves to `{ status, revision? }`, where status is `applied`,
+`superseded`, or `destroyed`. Invalid updates reject; their validation does not
+replace the visible chart or pending accepted state. Revision starts at zero
+and increments on acceptance, not on animation completion. Snapshot reports
+accepted intent and may be ahead of the visible frame; a later route preparation
+failure rejects that update and leaves the preceding chart visible. It does not
+turn its accepted revision into a rendered endpoint.
+
+`update(spec, { animate: false })` and `view.render(spec)` schedule an immediate
+replacement after the active update finishes. `duration` defaults to 600 ms
+**per route stage**, and may be overridden per update; zero skips animation.
+`data` on an update replaces the named binding map for that and subsequently
+submitted updates after acceptance. Data is resolved into detached endpoints:
+changes to caller-owned objects or URL responses do not alter an active route.
+Dimensions and chart style are retained from mount; `resize()` changes retained
+width/height. Destroy is idempotent, removes owned mounts, settles outstanding
+update promises as `destroyed`, and prevents late work from mounting.
+
+For manual control, wait for updates to settle, then call
+`await view.transition(nextSpec)`. It returns the existing transition controls
+without autoplay. Finish or pause at progress 0 or 1 before submitting another
+state; submissions during preparation, playback or a paused intermediate frame
+reject. The next route starts from that physical endpoint. Manual controllers
+are released on the next submission; their `destroy()` destroys the owning view
+while they still own it. `play()` remains chainable, not a completion promise.
+
+For a module-scoped renderer with no built-in chart imports:
+
+```ts
+import { createRenderer } from 'visdelta/render';
+import { barModule } from 'visdelta/bar';
+const renderer = createRenderer({ modules: [barModule] });
+const view = await renderer.render('#chart', json, { data: { sales } });
+```
+
+This renderer neither reads nor writes global registrations. A builder's carried
+module takes precedence at mount. The module list remains fixed for that view.
+
+### Fluent JSON edits on a persistent view
+
+`view.edit({ requestId, baseRevision, edits: [{ method, args }] }, options?)`
+accepts an object or complete JSON string and returns the same completion result
+as `update()`. The batch derives one endpoint from the accepted snapshot; calls
+are not animation stages. Revision checks run again after asynchronous validation.
+A stale edit rejects with `code: 'REVISION_CONFLICT'` and the current `revision`.
+Read a fresh snapshot and use a new request ID after a conflict.
+
+Identical retries (including playback options) reuse the original outcome, even
+if their base revision is now stale. Reusing an ID with different contents rejects.
+A view retains up to 1024 request outcomes, including failures, then rejects new
+IDs; create a new view to begin a new session. IDs are scoped to a view, not durable
+across reloads. There is no automatic rebase. Submit complete messages, not tokens.
+
+The Bar module supports `flip()`; `title(text|null)`; `subtitle(text|null)`;
+`color(string)`; `x(field, options?)` and `y(field, options?)` with string-valued
+`type`, `label`, `format`; `sort(field, order?)`; and `where`, `focus`, `highlight`
+with one selector object. Filters, sorting and attention retain native append
+semantics. Axis edits refer to the current physical channel, including after a
+flip. Aggregate axis edits, grain editing, reset, arbitrary methods and other
+built-in chart adapters are unsupported. Use `update()` for those complete states
+and for replacing data bindings. Unsupported rehydration or invalid endpoints
+reject without accepting any part of a batch.
+
+Custom chart modules can implement `edit(spec, calls, resolvedSource)` to derive
+and validate a complete endpoint. The runtime passes detached declarations and
+resolved data; adapters must allowlist methods, preserve authored controls and
+validate against actual data. This local API can be wrapped by a tool; it does
+not register an MCP server.

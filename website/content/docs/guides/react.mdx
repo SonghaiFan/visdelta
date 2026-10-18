@@ -1,94 +1,122 @@
 ---
 title: Use with React
-description: Mount a transition in an effect, drive it from component state and destroy it on unmount.
+description: One Chart component for static states, transitions and sequences.
 ---
 
-VisDelta owns the contents of its target element. In React, give it an empty
-element through a ref, create the transition in an effect, and destroy it in
-the effect's cleanup.
+Import `Chart` from `visdelta/react`. React is an
+optional peer dependency (React 18 or 19); other VisDelta entries do not import it.
+The component owns mounting, asynchronous replacement and cleanup. Import
+`visdelta/style.css` once in your application.
 
-```tsx title="TransitionChart.tsx"
+```tsx title="SalesChart.tsx"
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { transition, type Visualization, type VisualizationTransition } from 'visdelta/transition';
+import { useMemo, useState } from 'react';
+import { bar } from 'visdelta/bar';
+import { Chart } from 'visdelta/react';
 import 'visdelta/style.css';
 
-export function TransitionChart({ from, to }: { from: Visualization; to: Visualization }) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const changeRef = useRef<VisualizationTransition | null>(null);
+export function SalesChart({ rows }: {
+  rows: { category: string; sales: number; profit: number }[];
+}) {
   const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const states = useMemo(() => {
+    const a = bar(rows).x('category').y('sales');
+    const b = a.y('profit');
+    return [a, b, b.sort('profit', 'descending')];
+  }, [rows]);
 
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-
-    // A private mount per effect run: a creation still pending from a previous
-    // run (for example under Strict Mode) can never write into the new one.
-    const mount = document.createElement('div');
-    host.append(mount);
-    let cancelled = false;
-    let created: VisualizationTransition | null = null;
-
-    transition(from, to, { target: mount, height: 320 })
-      .then((change) => {
-        if (cancelled) return change.destroy();
-        created = change;
-        changeRef.current = change;
-      })
-      .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
-      });
-
-    return () => {
-      cancelled = true;
-      created?.destroy();
-      changeRef.current = null;
-      mount.remove();
-    };
-  }, [from, to]);
+  const pair = useMemo(() => states.slice(0, 2), [states]);
 
   return (
-    <figure>
-      <div ref={hostRef} />
-      {error && <p role="alert">{error}</p>}
-      <input
-        type="range" min={0} max={1} step={0.01} value={progress}
-        aria-label="Transition progress"
-        onChange={(event) => {
-          const value = event.currentTarget.valueAsNumber;
-          setProgress(value);
-          changeRef.current?.progress(value);
-        }}
-      />
-      <button type="button" onClick={() => changeRef.current?.play({ duration: 800 })}>
-        Play
-      </button>
-    </figure>
+    <section>
+      <Chart state={states[0]} height={280} aria-label="Sales" />
+      <Chart state={pair} progress={progress} height={280} />
+      <Chart state={states} progress={progress * 2} height={280} />
+      <label>
+        Progress
+        <input type="range" min={0} max={1} step={0.01} value={progress}
+          onChange={event => setProgress(event.currentTarget.valueAsNumber)} />
+      </label>
+    </section>
   );
 }
 ```
 
-## Things to get right
+See [one chart, three ways](/docs/guides/json#one-chart-three-ways) for a
+side-by-side example of the chain API, JSON spec and React.
 
-- **Keep states stable.** The effect re-runs whenever `from` or `to` changes
-  identity. Create states outside the component, or memoize them with
-  `useMemo`, so a re-render doesn't rebuild the transition.
-- **Don't render children into the target.** VisDelta replaces the target's
-  contents. Leave the host element empty in JSX.
-- **Handle asynchronous creation.** `transition()` returns a promise. If the
-  component unmounts first, destroy the controller as soon as it resolves, as
-  the `cancelled` flag does above.
-- **Run in the browser only.** Rendering needs the DOM. In frameworks with
-  server rendering, mark the component as a client component (as above) or load
-  it only on the client. `delta()` is DOM-free and can run on the server.
-- **Refresh after theme changes.** VisDelta reads colour tokens from CSS when it
-  renders. After changing a theme class, call `change.resize()` to re-read them.
+## Component contracts
+
+`state` accepts a builder, a plain `ViewSpec`, or a non-empty readonly array of
+those values:
+
+- One state or a one-element array displays a static chart at progress 0.
+- Two states use the existing `transition()` runtime. Progress ranges from 0 to 1.
+- Longer arrays use `sequence()`. Progress uses authored state positions: 0 is
+  the first state, 1 the second, and 1.5 is halfway from the second to the third.
+- Empty arrays report an error through `onError` or an error boundary.
+
+Changing `state` does not automatically start playback. Automatic planner stages
+do not change the authored progress units.
+
+`Chart` accepts `data` (named datasets), `width`, `height`, `chartStyle`,
+`onReady`, `onError`, and ordinary host attributes such as `className`, `style`
+and `aria-label`. The host's children belong to VisDelta; do not supply children
+or `dangerouslySetInnerHTML`. Builders carry their chart modules; plain specs
+still require the appropriate registered module.
+
+Keep states, state arrays, named-data maps and chart-style modules stable
+between unrelated renders. Avoid creating a new array directly in JSX when
+its contents have not changed. Use module constants or `useMemo`; changing their
+identity prepares a replacement. Dimension prop changes also prepare a new
+controller; container resizing uses the runtime's existing resize handling.
+For `height="auto"`, give the component host a CSS height, for example
+`style={{ height: 400 }}`.
+A replacement retains the previous progress, clamped to its range, unless
+`progress` is supplied. The old chart stays visible until the new one is ready.
+Failed replacements keep the old chart and call `onError`; without `onError`,
+the error reaches React's nearest error boundary.
+
+## Playback and custom controls
+
+Omit `progress` when the controller owns playback. `onReady` exposes the existing
+controller API (`ChartController` is the transition/sequence controller union), including `play()`, `pause()`, `progress()` and `resize()`:
+
+```tsx
+const controller = useRef<ChartController | null>(null);
+
+<Chart state={pair} height={320}
+  onReady={change => {
+    controller.current = change;
+    return () => { controller.current = null; };
+  }}
+  onError={error => setError(error.message)}
+/>
+<button onClick={() => controller.current?.play({ from: 0, to: 1, duration: 800 })}>
+  Play
+</button>
+```
+
+Import `useRef` from React and `ChartController` from
+`visdelta/react`. The optional cleanup returned by `onReady` runs before
+replacement or unmount. The component destroys its controller; callers should
+not destroy it themselves. Changing callbacks does not recreate the chart.
+
+Choose one progress owner: a controlled `progress` prop for a slider or scroll
+position, or the controller for playback. Buttons, looping, viewport detection
+and reduced-motion policies remain application concerns. After a CSS theme
+change, call the controller's `resize()` to refresh its colours.
+
+## Server rendering
+
+The entry is marked `'use client'`. Server rendering emits an empty host;
+chart rendering begins after mounting in the browser. This is not server-side
+SVG rendering. In Next.js, construct builder instances inside a client
+component rather than passing class instances across the server/client boundary.
+`delta()` remains DOM-free and can run on the server.
 
 ## Other frameworks
 
-The same three steps apply anywhere: create the transition when the element is
-attached, drive it with `progress()`/`play()`, and call `destroy()` when the
-element is removed. In Vue that is `onMounted`/`onBeforeUnmount`; in Svelte,
-`onMount` and its returned cleanup function.
+Use the existing imperative API: create a transition when its host is attached,
+drive `progress()` or `play()`, and call `destroy()` when the host is removed.

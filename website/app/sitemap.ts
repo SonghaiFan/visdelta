@@ -8,6 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: absoluteUrl('/'), changeFrequency: 'weekly', priority: 1 },
     { url: absoluteUrl('/playground'), changeFrequency: 'weekly', priority: 0.9 },
+    { url: absoluteUrl('/liveshow'), changeFrequency: 'weekly', priority: 0.8 },
     { url: absoluteUrl('/gallery'), changeFrequency: 'weekly', priority: 0.8 },
     ...source.getPages().map((page) => ({
       url: absoluteUrl(page.url),

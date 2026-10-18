@@ -7,7 +7,7 @@ export type { DeclarationEdit, DeclarationValue, DeclarationPlan, DeclarationPla
 
 export { area, availableChartTypes, bar, buildGroupingTree, compileLineage, correspondLineage, createBarGrainDeclarationOperationCodec, D3_AREA_CURVE_NAMES, D3_CURVE_NAMES, delta, detectDataTypes, diffViewStates, defineChartType, lineageMarkKey,
   chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, editorialChartStyle, line, paperChartStyle, point, pie, registerChartType, registerChartModule, unit,
-  resolveEncodingTypes, UNIT_LAYOUTS, viewLineageCorrespondence, visualizationSpec, visualizationWarnings } from './index.js';
+  resolveEncodingTypes, UNIT_LAYOUTS, viewLineageCorrespondence, visualizationSpec, visualizationWarnings, parseSpec, stringifySpec } from './index.js';
 
 export function transition(from: Visualization, to: Visualization, options: TransitionOptions) {
   return core.transition(from, to, options);
@@ -25,3 +25,6 @@ export type { VisualizationWarning, ChartWarningInspector } from './index.js';
 
 export { smallMultiples } from './facet.js';
 export type { FacetLayout, FacetedViewState } from './facet.js';
+
+export { render, createRenderer } from './index.js';
+export type { EditMessage, FluentEdit, ChartInput, RenderOptions, UpdateOptions, UpdateResult, ChartSnapshot, ChartView, ChartRenderer } from './render.js';

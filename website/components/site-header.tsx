@@ -16,8 +16,9 @@ export function SiteHeader() {
   const studioViews = [
     { href: '/playground', label: 'Playground' },
     { href: '/gallery', label: 'Gallery' },
+    { href: '/liveshow', label: 'Liveshow' },
   ];
-  const inStudio = pathname.startsWith('/playground') || pathname.startsWith('/gallery') || pathname.startsWith('/studio');
+  const inStudio = pathname.startsWith('/playground') || pathname.startsWith('/gallery') || pathname.startsWith('/studio') || pathname.startsWith('/liveshow');
   return (
     <header className="vd-site-header sticky top-0 z-40 flex h-11 shrink-0 items-center gap-1 border-b bg-fd-background/95 px-1 backdrop-blur sm:gap-3 sm:px-3">
       <Link href="/" className="sm:mr-1 inline-flex items-center rounded-sm px-1 py-1 text-sm" aria-label="VisDelta home">
@@ -35,7 +36,7 @@ export function SiteHeader() {
               href={tool.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'rounded-sm px-1.5 py-1 text-sm transition-colors',
+                'rounded-sm px-1 py-1 text-xs transition-colors sm:px-1.5 sm:text-sm',
                 active ? 'bg-fd-accent text-fd-foreground' : 'text-fd-muted-foreground hover:text-fd-foreground',
               )}
             >
@@ -51,7 +52,7 @@ export function SiteHeader() {
                 key={href}
                 href={href}
                 aria-current={active ? 'page' : undefined}
-                className="rounded-sm px-1.5 py-1 text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground aria-[current=page]:bg-fd-background aria-[current=page]:text-fd-foreground aria-[current=page]:shadow-sm sm:px-3"
+                className="rounded-sm px-1 py-1 text-xs text-fd-muted-foreground transition-colors hover:text-fd-foreground aria-[current=page]:bg-fd-background aria-[current=page]:text-fd-foreground aria-[current=page]:shadow-sm sm:px-3 sm:text-sm"
               >
                 {label}
               </Link>

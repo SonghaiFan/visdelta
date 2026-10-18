@@ -1,3 +1,4 @@
+import { createSpecDataResolver } from './runtime/resolve-spec-data.js';
 import type { TransitionInspection } from './runtime/inspection.js';
 export type { TransitionInspection, InspectedStage, InspectedProperty } from './runtime/inspection.js';
 import type { ViewSpec, DeltaResult, RuntimeOptions, DeclarationOperationChange, StateChange } from './types/index.js';
@@ -5,15 +6,12 @@ import { cloneState } from './grammar/view-state.js';
 import { delta, visualizationChartModule, visualizationSpec } from './core.js';
 import type { Visualization } from './core.js';
 import type { ChartModule } from './charts/module.js';
-import { normalizeDataSource } from './charts/authoring.js';
-import { loadData } from './runtime/data.js';
 import { createTransitionSurface } from './runtime/transition-surface.js';
 import { transitionRegistry } from './runtime/chart-registry.js';
 import { validateTransforms } from './data/validate.js';
 import { createChartRuntime } from './runtime/chart-runtime.js';
 import { resolveTarget } from './runtime/target.js';
 import { d3ChartStyle } from './charts/style.js';
-import { resolveSpecDataTypes } from './data/types.js';
 import type { TimedVisualizationTransition } from './runtime/transition-controller.js';
 import { assertCanvasSize, contentHeight } from './runtime/canvas-size.js';
 import type { CanvasSize } from './runtime/canvas-size.js';
@@ -38,7 +36,7 @@ export interface TransitionOptions extends RuntimeOptions {
    * Outer height of the canvas (the SVG), margins included. A number is a fixed
    * height in pixels and overrides the chart's default. `"auto"` makes the canvas
    * exactly the container's content height and re-fits when it changes; the
-   * figure's border and empty title strip give way. The container needs a height
+   * figure's border gives way. The container needs a height
    * of its own (a fixed height, a flex or grid track), otherwise the chart keeps
    * its default height. Omitted: the chart's default height.
    */
@@ -99,14 +97,22 @@ export async function transition(
   to: Visualization,
   options: TransitionOptions
 ): Promise<VisualizationTransition> {
-  const localModules = [visualizationChartModule(from), visualizationChartModule(to)]
+  return transitionWithModules(from, to, options);
+}
+
+/** Internal scoped entry used by persistent renderers. */
+export async function transitionWithModules(
+  from: Visualization, to: Visualization, options: TransitionOptions,
+  modules?: ChartModule<any>[]
+): Promise<VisualizationTransition> {
+  const localModules = modules ?? [visualizationChartModule(from), visualizationChartModule(to)]
     .filter((module): module is ChartModule => module !== null);
   const source = visualizationSpec(from);
   const target = visualizationSpec(to);
   if (!source.mark || source.mark !== target.mark) {
     throw new Error('transition() requires two states of the same chart type.');
   }
-  for (const module of localModules) {
+  for (const module of modules ? [] : localModules) {
     if (normalizeChartKey(module.key) !== normalizeChartKey(source.mark)) {
       throw new Error(`Visualization uses chart module "${module.key}" but declares mark "${source.mark}".`);
     }
@@ -115,38 +121,13 @@ export async function transition(
   validateTransforms(target.transform ?? []);
   assertCanvasSize('transition() width', options.width);
   assertCanvasSize('transition() height', options.height);
-  const declared = cloneState(options.data ?? {});
-  const sourceCache = new Map<string, Promise<unknown[]>>();
-  const resolveData = async (spec: ViewSpec): Promise<ViewSpec> => {
-    let data = normalizeDataSource(spec.data);
-    if (data && typeof data === 'object' && 'name' in data && !('url' in data)) {
-      const name = String((data as { name: string }).name);
-      if (!(name in declared)) throw new Error(`transition(): missing dataset "${name}". Pass options.data or bind inline data.`);
-      data = normalizeDataSource(declared[name]);
-    }
-    if (!data || typeof data !== 'object') throw new Error('transition(): each visualization needs a data source.');
-    if (!Array.isArray(data) && !Array.isArray((data as { values?: unknown }).values) && !('url' in data)) {
-      throw new Error('transition(): expected rows, { values }, or { url }.');
-    }
-    if (!Array.isArray(data) && 'url' in data) {
-      const urlSource = data as { url: string; type?: string; format?: { type?: string } };
-      data = { ...urlSource, type: urlSource.type ?? urlSource.format?.type ?? (/\.json(?:[?#]|$)/i.test(urlSource.url) ? 'json' : 'csv') };
-    }
-    const cacheKey = JSON.stringify(data);
-    let pending = sourceCache.get(cacheKey);
-    if (!pending) {
-      pending = loadData({ rows: data }).then(result => cloneState(result.rows));
-      sourceCache.set(cacheKey, pending);
-    }
-    const rows = await pending;
-    return resolveSpecDataTypes({ ...spec, data: { values: rows } }, rows);
-  };
+  const resolveData = createSpecDataResolver(options.data);
   const [resolvedFrom, resolvedTo] = await Promise.all([resolveData(source), resolveData(target)]);
   const transitionDelta = delta(resolvedFrom, resolvedTo);
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
   const renderContext = { root: host, chartStyle };
-  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime(renderContext), localModules);
+  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime(renderContext), localModules, modules !== undefined);
   const surface = createTransitionSurface(resolvedFrom, resolvedTo, {
     ...options, chartStyle
   }, chartTypes);

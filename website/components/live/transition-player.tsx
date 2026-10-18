@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTheme } from 'next-themes';
 import { Pause, Play } from 'lucide-react';
+import { Chart } from 'visdelta/react';
+import type { Visualization } from 'visdelta/transition';
 import type { ChartStyleModule } from 'visdelta/chart-style';
 import type { StateChange } from 'visdelta/core';
 import type { VisualizationSequence, VisualizationTransition } from 'visdelta/transition';
@@ -88,6 +90,7 @@ export function TransitionPlayer({
   }, []);
   const interactedRef = useRef(false);
   const onReadyRef = useRef(onReady);
+  const [scene, setScene] = useState<{ states: readonly Visualization[]; style: ChartStyleModule } | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [value, setValue] = useState(0);
   const [max, setMax] = useState(1);
@@ -136,87 +139,42 @@ export function TransitionPlayer({
     return () => query.removeEventListener('change', update);
   }, []);
 
-  // Create the controller in a private mount, so a pending creation from a
-  // previous run can never write into the new one. The previous chart stays on
-  // screen until its replacement is ready, so parameter changes never flash.
+  // Loading examples and their presentation belongs to the docs, mounting to visdelta/react.
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host || !requested) return;
+    if (!requested) return;
     let cancelled = false;
-    let created: Controller | null = null;
-    let resizeObserver: ResizeObserver | null = null;
-    const mount = document.createElement('div');
-    mount.style.cssText = 'position:absolute;inset:0;visibility:hidden;pointer-events:none;';
-    host.appendChild(mount);
-
     (async () => {
       const loader = load ?? (example ? exampleLoaders[example] : undefined);
       if (!loader) throw new Error(`Unknown example "${example}".`);
-      const [module, runtime, styles, core] = await Promise.all([
-        loader(),
-        import('visdelta/transition'),
-        import('visdelta/chart-style'),
-        import('visdelta/core'),
-      ]);
-      const states = exampleStates(module);
-      const styleModule: ChartStyleModule = styles.chartStylePresets[chartStyle];
-      const options = { target: mount, height, chartStyle: styleModule };
-      const controller: Controller =
-        states.length > 2 ? await runtime.sequence(states, options) : await runtime.transition(states[0], states[1], options);
-      if (cancelled) {
-        controller.destroy();
-        return;
-      }
-      created = controller;
-      const restored = Math.min(valueRef.current, states.length - 1);
-      if (restored > 0) controller.progress(restored);
-      // Swap: the new chart takes the place of the old one in a single frame.
-      controllerRef.current?.destroy();
-      for (const child of [...host.children]) if (child !== mount) child.remove();
-      mount.style.cssText = '';
-      controllerRef.current = controller;
-      const legs: StateChange[][] = [];
-      for (let index = 0; index < states.length - 1; index += 1) {
-        legs.push(core.delta(states[index], states[index + 1]).stateChanges);
-      }
-      setChanges(legs);
-      setMax(states.length - 1);
-      setValue(controller.value);
-      setPlaying(false);
-      setStatus({ kind: 'ready' });
-      onReadyRef.current?.(controller);
-      if (states.length > 2 && typeof ResizeObserver !== 'undefined') {
-        let width = mount.clientWidth;
-        resizeObserver = new ResizeObserver(() => {
-          if (mount.clientWidth === width) return;
-          width = mount.clientWidth;
-          controller.resize();
-        });
-        resizeObserver.observe(mount);
-      }
+      const [module, styles] = await Promise.all([loader(), import('visdelta/chart-style')]);
+      if (!cancelled) setScene({ states: exampleStates(module), style: styles.chartStylePresets[chartStyle] });
     })().catch((error: unknown) => {
-      if (cancelled) return;
-      mount.remove();
-      setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
+      if (!cancelled) setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
     });
+    return () => { cancelled = true; };
+  }, [example, load, chartStyle, requested]);
 
+  const mounted = (controller: Controller) => {
+    const states = scene!.states;
+    controller.progress(Math.min(valueRef.current, states.length - 1));
+    controllerRef.current = controller;
+    setChanges('delta' in controller ? [controller.delta.stateChanges] : []);
+    if (!('delta' in controller)) {
+      void import('visdelta/core').then(({ delta }) => {
+        if (controllerRef.current !== controller) return;
+        setChanges(states.slice(1).map((state, index) => delta(states[index], state).stateChanges));
+      });
+    }
+    setMax(states.length - 1);
+    setValue(controller.value);
+    setPlaying(false);
+    setStatus({ kind: 'ready' });
+    onReadyRef.current?.(controller);
     return () => {
-      cancelled = true;
       stopTracking();
-      resizeObserver?.disconnect();
-      created?.pause();
-      if (!created) mount.remove();
+      if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [example, load, height, chartStyle, requested, stopTracking]);
-
-  // Destroy whatever is mounted when the player itself unmounts.
-  useEffect(
-    () => () => {
-      controllerRef.current?.destroy();
-      controllerRef.current = null;
-    },
-    [],
-  );
+  };
 
   // VisDelta reads colour tokens at render time; refresh on theme changes.
   useEffect(() => {
@@ -308,7 +266,12 @@ export function TransitionPlayer({
   return (
     <figure className={cn('not-prose my-8', className)} aria-label={label}>
       <div className="relative">
-        <div ref={hostRef} className="vd-docs-chart relative" style={{ minHeight: height }} aria-busy={!ready} />
+        <div ref={hostRef} className="vd-docs-chart relative" style={{ minHeight: height }} aria-busy={!ready}>
+          {scene && (
+            <Chart state={scene.states} height={height} chartStyle={scene.style} onReady={mounted}
+              onError={(error) => setStatus({ kind: 'error', message: error.message })} />
+          )}
+        </div>
         {status.kind !== 'ready' && (
           <div
             className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-fd-muted-foreground"

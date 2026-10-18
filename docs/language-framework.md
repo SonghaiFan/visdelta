@@ -190,6 +190,10 @@ Data -> Transform -> Chart state -> Difference -> Transition -> Frame -> Control
 - A **Control** supplies progress. Time, a slider, a button, scroll, or any other
   input can control the same transition from outside the library.
 
+The optional React `Chart` component adapts these same contracts: its `state`
+prop accepts one state, a pair, or an array of authored waypoints. A `progress` prop supplies control; it does not add a state-change
+category or change route planning.
+
 Other public terms stay literal:
 
 | Term | Meaning |
@@ -620,3 +624,32 @@ references, phase-boundary values and scheduled intervals describe a particular
 render at particular dimensions. They do not classify semantic changes, define
 new actions, or equate category membership with phase order. Opaque custom
 motion and unrecorded DOM writes must be identified as coverage limits.
+
+### JSON transport
+
+JSON transports the existing `ViewSpec` state declaration. `parseSpec` and
+`stringifySpec` reuse declaration normalization; they do not define new state-change
+categories or a playback grammar. Shared structural checks do not replace chart-owned
+validity checks. Modules, host elements and playback controls remain outside the spec.
+
+### Persistent view control
+
+`render()` mounts a persistent view from a complete declaration. `view.update()`
+accepts complete same-chart states and supplies time control automatically. Its
+`latest` policy finishes the active route and retains only the latest accepted
+pending state. This scheduling policy introduces no state-change category or
+planner operation. `snapshot()` reports the accepted declaration and revision,
+not a frame; pending intent may be ahead of playback. Manual `view.transition()`
+requires an idle view and must reach a physical endpoint before another state
+is submitted. JSON transport and agent request ordering remain outside the
+four semantic layers.
+
+### Fluent messages on persistent views
+
+`view.edit()` is an authoring adapter, not a new state-change category or playback
+language. A chart module interprets an allowlisted batch of fluent calls against
+the latest accepted declaration and validates one complete destination. Existing
+endpoint classification and transition contracts remain authoritative. Call order
+preserves builder semantics but does not prescribe animation stages. Revision
+conflicts reject atomically; accepted intent persists even when its pending
+animation is superseded by the latest policy. Request deduplication is view-local.

@@ -6,6 +6,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import type { MDXComponents } from 'mdx/types';
 import { basePath } from '@/lib/shared';
+import { AuthoringComparison } from '@/components/demos/authoring-comparison';
 import { BarGrainDemo } from '@/components/demos/bar-grain-demo';
 import { ChartStyleGallery } from '@/components/demos/chart-style-gallery';
 import { DesignComparisons } from '@/components/demos/design-comparisons';
@@ -43,6 +44,7 @@ export function getMDXComponents(components?: MDXComponents) {
     Tab,
     Tabs,
     TypeTable,
+    AuthoringComparison,
     BarGrainDemo,
     ChartStyleGallery,
     DesignComparisons,

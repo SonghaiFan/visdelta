@@ -61,7 +61,7 @@ they serve whatever the last build produced.
 ```text
 website/
   app/                       Routes: home, docs, search, llms.txt, sitemap; (studio)/ holds
-                             playground and gallery under their own full-screen layout
+                             playground, gallery and liveshow under their own full-screen layout
   content/docs/              Documentation pages (MDX) and sidebar order (meta.json)
   examples/                  Live example modules and their registry
   components/live/           The transition player, example loaders, error boundary
@@ -129,10 +129,10 @@ To add one:
    disagree, or if `delta()` does not report the declared category.
 5. Use it with `<LiveExample id="<id>" />`.
 
-The player (`components/live/transition-player.tsx`) mounts the real
-`transition()` or `sequence()` when the chart is near the viewport, drives it
+The player (`components/live/transition-player.tsx`) renders `Chart` with a state array
+from `visdelta/react` when the chart is near the viewport, drives it
 with `progress()`, `play()` and `pause()`, refreshes it with `resize()` on theme
-changes, and calls `destroy()` on unmount. Below the chart it prints the
+changes; the React components own controller replacement and destruction. Below the chart it prints the
 transition's `delta().stateChanges` as the **Δ** line.
 
 ### Playground
@@ -366,3 +366,12 @@ Snapshot selection reflects the exact editing position: an authored keyframe
 highlights its snapshot; a position between keyframes highlights neither and
 shows an insertion caret in their gap. Editing replaces that caret with the
 unsaved draft snapshot at the same insertion position.
+
+### Liveshow
+
+`/liveshow` demonstrates persistent JSON updates with local presets (no AI
+connection). The source data and seven category presets live in
+`components/liveshow/presets.ts` and are checked by `examples:check`. The page
+uses `view.edit()` with revisions and request IDs; Grain uses a complete
+`view.update()` state. Both share the latest policy. Browser tests cover retries,
+conflicts, bursts, invalid JSON, cleanup, idle rendering and narrow layouts.

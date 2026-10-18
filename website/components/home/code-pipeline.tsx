@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { VisualizationTransition } from 'visdelta/transition';
+import { Chart, type ChartProps } from 'visdelta/react';
+import type { Visualization } from 'visdelta/transition';
 import { CodeView } from '@/components/interactive/code-view';
 import {
   errorMessage,
   evaluateChart,
   loadFactories,
-  loadRuntime,
   prefersReducedMotion,
   type ChartName,
   type ChartState,
@@ -100,8 +100,8 @@ const STEP_GAP = 1200;
  * transition() from the previous chart state to the new one.
  */
 export function CodePipeline() {
-  const targetRef = useRef<HTMLDivElement>(null);
-  const controllerRef = useRef<VisualizationTransition | null>(null);
+  const [scene, setScene] = useState<ChartProps | null>(null);
+  const pendingRef = useRef<((success: boolean) => void) | null>(null);
   const stateRef = useRef<ChartState | null>(null);
   const factoriesRef = useRef<Awaited<ReturnType<typeof loadFactories>> | null>(null);
   const versionRef = useRef(0);
@@ -123,57 +123,54 @@ export function CodePipeline() {
   /** Evaluate `nextCode`, transition to it from the chart on screen, then publish the code. */
   const commit = useCallback(
     async (chart: ChartKey, nextActive: boolean[], animate: boolean, operation?: { op: Operation; adding: boolean }) => {
-      const target = targetRef.current;
       const factories = factoriesRef.current;
-      if (!target || !factories) return false;
+      if (!factories) return false;
       const version = ++versionRef.current;
       const nextCode = sourceFor(chart, nextActive);
-      const candidate = document.createElement('div');
-      candidate.style.cssText = 'position:absolute;inset:0;visibility:hidden;pointer-events:none;';
-      target.append(candidate);
-      let next: VisualizationTransition | null = null;
+      pendingRef.current?.(false);
+      pendingRef.current = null;
       try {
-        const { transition } = await loadRuntime();
         const nextState = await evaluateChart(nextCode, factories, rows, { withD3: false });
         const previous = stateRef.current;
         const from = previous && previous.toSpec().mark === nextState.toSpec().mark ? previous : nextState;
-        next = await transition(from as never, nextState as never, {
-          target: candidate,
-          height: window.innerWidth < 640 ? 280 : 340,
+        if (version !== versionRef.current) return false;
+        return await new Promise<boolean>((resolve) => {
+          pendingRef.current = resolve;
+          setScene({
+            state: [from as unknown as Visualization, nextState as unknown as Visualization],
+            height: window.innerWidth < 640 ? 280 : 340,
+            onError: (cause) => {
+              if (version === versionRef.current) setStatus(errorMessage(cause));
+              resolve(false);
+            },
+            onReady: (next) => {
+              if (version !== versionRef.current) return;
+              stateRef.current = nextState;
+              setCode(nextCode);
+              setType(chart);
+              setActive(nextActive);
+              setChangedLine(
+                operation?.adding ? nextCode.split('\n').findIndex((line) => line.includes(operation.op.line)) : -1,
+              );
+              setStatus(
+                operation
+                  ? `${operation.adding ? 'Adding' : 'Removing'} ${operation.op.label}`
+                  : `${chartTypes.find((entry) => entry.key === chart)!.label} code and chart are linked`,
+              );
+              if (animate && !prefersReducedMotion()) {
+                next.progress(0.1);
+                next.play({ from: 0.1, to: 1, duration: 950 });
+              } else {
+                next.progress(1);
+              }
+              pendingRef.current = null;
+              resolve(true);
+            },
+          });
         });
-        if (version !== versionRef.current) {
-          next.destroy();
-          return false;
-        }
-        next.progress(0);
-        target.replaceChildren(...candidate.childNodes);
-        controllerRef.current?.destroy();
-        controllerRef.current = next;
-        stateRef.current = nextState;
-        setCode(nextCode);
-        setType(chart);
-        setActive(nextActive);
-        setChangedLine(
-          operation?.adding ? nextCode.split('\n').findIndex((line) => line.includes(operation.op.line)) : -1,
-        );
-        setStatus(
-          operation
-            ? `${operation.adding ? 'Adding' : 'Removing'} ${operation.op.label}`
-            : `${chartTypes.find((entry) => entry.key === chart)!.label} code and chart are linked`,
-        );
-        if (animate && !prefersReducedMotion()) {
-          next.progress(0.1);
-          next.play({ from: 0.1, to: 1, duration: 950 });
-        } else {
-          next.progress(1);
-        }
-        return true;
       } catch (cause) {
-        next?.destroy();
         if (version === versionRef.current) setStatus(errorMessage(cause));
         return false;
-      } finally {
-        candidate.remove();
       }
     },
     [],
@@ -231,16 +228,12 @@ export function CodePipeline() {
         void selectChart('bar');
       })
       .catch((cause) => setStatus(errorMessage(cause)));
-    const target = targetRef.current;
-    const observer = new ResizeObserver(() => controllerRef.current?.resize());
-    if (target) observer.observe(target);
     return () => {
       cancelled = true;
       versionRef.current += 1;
       clearTimer();
-      observer.disconnect();
-      controllerRef.current?.destroy();
-      controllerRef.current = null;
+      pendingRef.current?.(false);
+      pendingRef.current = null;
     };
   }, [selectChart]);
 
@@ -324,7 +317,9 @@ export function CodePipeline() {
             {status}
           </span>
         </div>
-        <div ref={targetRef} className="vd-docs-chart relative min-h-[296px] sm:min-h-[356px]" />
+        <div className="vd-docs-chart relative min-h-[296px] sm:min-h-[356px]">
+          {scene && <Chart {...scene} />}
+        </div>
       </section>
     </div>
   );

@@ -85,7 +85,15 @@
     "./style.css": "./dist/visdelta.css",
     "./themes/default.css": "./dist/themes/default.css",
     "./themes/dark.css": "./dist/themes/dark.css",
-    "./themes/paper.css": "./dist/themes/paper.css"
+    "./themes/paper.css": "./dist/themes/paper.css",
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "import": "./dist/render.js"
+    }
   },
   "files": [
     "dist",
@@ -110,14 +118,16 @@
     "manifest:check": "node scripts/check-chart-manifest.mjs",
     "pack:check": "node scripts/check-pack-consumer.mjs",
     "package:check": "node scripts/check-package.mjs",
-    "release:check": "npm test && npm run pack:check",
+    "release:check": "npm test && npm run react:check && npm run render:check && npm run pack:check",
     "smoke": "node scripts/smoke.mjs",
     "test": "npm run check && npm run manifest:check && npm run build && npm run bundle:check && npm run examples:check && npm run docs:check && npm run package:check && npm run smoke && node --test tests/*.test.mjs",
     "prepack": "npm test",
     "prepublishOnly": "npm run release:check",
     "browser:check": "node scripts/check-browser-distributions.mjs && node scripts/check-agent-examples.mjs && node scripts/check-authoring-consumer.mjs",
     "authoring:check": "node scripts/check-authoring-consumer.mjs",
-    "agent:check": "node scripts/check-agent-examples.mjs"
+    "agent:check": "node scripts/check-agent-examples.mjs",
+    "react:check": "node --test tests/browser/react.test.mjs",
+    "render:check": "node --test tests/browser/render.test.mjs tests/browser/edit.test.mjs"
   },
   "dependencies": {
     "@types/d3-axis": "^3.0.6",
@@ -159,8 +169,20 @@
     "@types/d3-interpolate": "^3.0.4",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-timer": "^3.0.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "d3": "^7.0.0",
     "esbuild": "0.28.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   }
 }

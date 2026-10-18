@@ -19,6 +19,7 @@ const expectedApi = [
   "correspondLineage",
   "correspondMarks",
   "createBarGrainDeclarationOperationCodec",
+  "createRenderer",
   "d3ChartStyle",
   "darkChartStyle",
   "declarationEdits",
@@ -32,15 +33,18 @@ const expectedApi = [
   "lineageMarkKey",
   "markKeyValue",
   "paperChartStyle",
+  "parseSpec",
   "pie",
   "planDeclarationTransition",
   "point",
   "registerChartModule",
   "registerChartType",
+  "render",
   "resolveEncodingTypes",
   "resolveMarkIdentity",
   "sequence",
   "smallMultiples",
+  "stringifySpec",
   "transition",
   "unit",
   "viewLineageCorrespondence",
@@ -83,11 +87,40 @@ try {
   // neither requires a separate authoring or peer installation.
   run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball], consumerDir);
   run(process.execPath, ["--input-type=module", "--eval", `
-    import { bar, delta } from 'visdelta';
+    import { bar, delta, parseSpec, stringifySpec, render } from 'visdelta';
+    import { createRenderer } from 'visdelta/render';
+    if (typeof render !== 'function' || typeof createRenderer !== 'function') throw new Error('Render entry missing');
     const a = bar([{ key: 'A', value: 1, next: 2 }]).x('key').y('value');
     if (a.rollup().rows()[0].value !== 1) throw new Error('Normal install did not materialize transforms.');
+    if (stringifySpec(parseSpec(stringifySpec(a))) !== stringifySpec(a)) throw new Error('JSON round trip failed.');
     if (!delta(a, a.y('next')).hasDelta('encoding.y')) throw new Error('Normal installed authoring failed.');
   `], consumerDir);
+  await writeFile(join(consumerDir, "react-consumer.ts"), `
+    import { createElement } from 'react';
+    import { Chart, type ChartProps, type ChartController } from 'visdelta/react';
+    import { bar } from 'visdelta/bar';
+    const a = bar([{ x: 'A', y: 2 }]).x('x').y('y');
+    const props: ChartProps = { state: a, height: 320, onReady: c => { c.resize(); return () => {}; } };
+    createElement(Chart, props);
+    const single = [a] as const;
+    createElement(Chart, { state: single });
+    createElement(Chart, { state: [a, a], progress: 0.5 });
+    createElement(Chart, { state: [a, a, a], progress: 1.5, onReady: (c: ChartController) => { c.pause(); } });
+  `);
+  for (const version of [19, 18]) {
+    run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", `react@${version}`, `react-dom@${version}`, `@types/react@${version}`], consumerDir);
+    run(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
+      "--noEmit", "--strict", "--target", "ES2022", "--module", "NodeNext",
+      "--lib", "ES2022,DOM", "react-consumer.ts"], consumerDir);
+    run(process.execPath, ["--input-type=module", "--eval", `
+      import { createElement } from 'react';
+      import { renderToString } from 'react-dom/server';
+      import { Chart } from 'visdelta/react';
+      import { bar } from 'visdelta/bar';
+      const html = renderToString(createElement(Chart, { state: bar([{ x: 'A', y: 2 }]).x('x').y('y') }));
+      if (!html.startsWith('<div')) throw new Error('Installed React host did not server-render.');
+    `], consumerDir);
+  }
   console.log("Pack consumer invariants ok.");
 } finally {
   if (tarball) await rm(tarball, { force: true });
@@ -186,6 +219,9 @@ const repeatedLine = selectedLine([{ date: 1, ticker: "A", close: 20 }]).x("date
 if (repeatedLine.toSpec().mark !== "line" || (await repeatedLine.chartModule().load()).plugin.key !== "line") throw new Error("Packed Line repeat changed chart type");
 if (selectedCurveNames.length !== 20) throw new Error("line subpath did not export all D3 curve names");
 if (typeof selectedUnit !== "function" || selectedUnitLayouts.length !== 4) throw new Error("unit subpath did not export Unit grammar");
+const editable = selectedBar([{ x: "A", y: 2 }]).x("x").y("y").toSpec();
+const edited = await barModule.edit(editable, [{ method: "flip", args: [] }], editable);
+if (edited.encoding.x.field !== "y") throw new Error("Installed fluent adapter failed");
 if (areaModule.key !== "area" || barModule.key !== "bar" || pointModule.key !== "point" || lineModule.key !== "line" || unitModule.key !== "unit") throw new Error("focused chart module mismatch");
 if (typeof selectedDelta !== "function") throw new Error("core subpath did not export delta()");
 if (typeof selectedTransition !== "function") throw new Error("transition subpath did not export transition()");

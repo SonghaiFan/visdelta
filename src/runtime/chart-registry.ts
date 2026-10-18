@@ -67,14 +67,15 @@ export function availableChartTypes(): string[] {
 export async function transitionRegistry(
   spec: ViewSpec,
   runtime: ChartRuntime = DEFAULT_CHART_RUNTIME,
-  localModules: ChartModule<any>[] = []
+  localModules: ChartModule<any>[] = [],
+  isolated = false
 ) {
   const key = normalizeMarkRendererKey(spec.mark);
   const localModule = localModules.find(candidate => normalizeMarkRendererKey(candidate.key) === key);
 
   let chartType: ChartType<any> | undefined;
   while (!chartType) {
-    const registration = registrations.get(key);
+    const registration = isolated ? undefined : registrations.get(key);
     if (registration && registration.kind !== 'module') {
       chartType = instantiate(registration, runtime);
       break;
@@ -90,13 +91,13 @@ export async function transitionRegistry(
     } catch (error) {
       // A stale load failure must not hide a replacement registered while it
       // was pending. Retry with the current descriptor before surfacing it.
-      if (registrations.get(key) !== registration) continue;
+      if (!isolated && registrations.get(key) !== registration) continue;
       throw error;
     }
 
     // Check staleness before validating the loaded module: the result may be
     // invalid for this key but irrelevant because a newer registration won.
-    if (registrations.get(key) !== registration) continue;
+    if (!isolated && registrations.get(key) !== registration) continue;
     const pluginKey = registrationKey(loaded.plugin.key);
     if (pluginKey !== key) {
       throw new Error(`Chart module "${key}" loaded plugin "${pluginKey}".`);

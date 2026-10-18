@@ -25,7 +25,7 @@ export { chartStylePresets, darkChartStyle, defineChartStyle, d3ChartStyle, edit
 export type { ChartGridStyle, ChartLegendPosition, ChartStyleDefinition, ChartStyleModule, ChartStyleRule, ChartStyleRuleDefinition } from "./charts/style.js";
 export { transition } from "./transition.js";
 export { sequence } from "./sequence.js";
-export { buildGroupingTree, compileLineage, correspondLineage, correspondMarks, delta, diffViewStates, lineageMarkKey, markKeyValue, resolveMarkIdentity, viewLineageCorrespondence, visualizationSpec } from "./core.js";
+export { buildGroupingTree, compileLineage, correspondLineage, correspondMarks, delta, diffViewStates, lineageMarkKey, markKeyValue, resolveMarkIdentity, viewLineageCorrespondence, visualizationSpec, parseSpec, stringifySpec } from "./core.js";
 export { detectDataTypes, resolveEncodingTypes } from "./data/types.js";
 export type { Visualization } from "./core.js";
 export { declarationEdits, applyDeclarationEdits } from './core.js';
@@ -34,7 +34,7 @@ export { planDeclarationTransition } from './core.js';
 export type { DeclarationPlan, DeclarationPlanOptions, DeclarationStage, CanonicalDeclarationOperation, DeclarationCodecResult, DeclarationOperationChange, DeclarationOperationCodec } from './core.js';
 export type { MarkCorrespondence, MarkEndpoint, MarkIdentity, MarkKeySpec, MarkMatch } from "./core.js";
 export type { CorrespondenceOptions, DatumKey, DatumKeySpec, GroupingTreeNode, LineageAtom, LineageCapability, LineageCompileOptions, LineageComponent, LineageContribution, LineageCorrespondence, LineageEdge, LineageOperation, LineageRow, LineageTable } from "./core.js";
-export type { ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
+export type { ViewSpec, ChannelType, ConnectorSpec, DeltaResult, GrainDescription, GrainMeasure, StateChange, StateChangeCategory } from "./types/index.js";
 export type { CanvasSize, TransitionOptions, PlayOptions, VisualizationTransition } from "./transition.js";
 export type { SequenceOptions, SequencePlayOptions, VisualizationSequence } from "./sequence.js";
 
@@ -45,3 +45,7 @@ export { smallMultiples } from './facet.js';
 export type { FacetLayout, FacetedViewState } from './facet.js';
 
 export type { TransitionInspection, InspectedStage, InspectedProperty } from './transition.js';
+
+export { render } from './render-default.js';
+export { createRenderer } from './render.js';
+export type { EditMessage, FluentEdit, ChartInput, RenderOptions, UpdateOptions, UpdateResult, ChartSnapshot, ChartView, ChartRenderer } from './render.js';

@@ -9,10 +9,11 @@ import { createDefaultTransitionPlan } from '../dist/charts/transition-plan.js';
 import { resolveSceneTransition } from '../dist/transitions/index.js';
 
 test('core, runtime, SDK and toolkit do not import any official chart implementation', async () => {
-  for (const entry of ['core', 'transition-entry', 'plugins', 'toolkit']) {
+  for (const entry of ['core', 'transition-entry', 'plugins', 'toolkit', 'react', 'render']) {
     const result = await build({ entryPoints: [`dist/${entry}.js`], bundle: true, write: false, metafile: true });
     const families = Object.keys(result.metafile.inputs).filter(path => /charts\/(area|bar|line|point|unit)\//.test(path));
     assert.deepEqual(families, [], entry);
+    if (entry !== 'react') assert.equal(Object.keys(result.metafile.inputs).some(path => /node_modules\/react\//.test(path)), false, `${entry} must not load React`);
   }
   assert.deepEqual(availableChartTypes(), []);
   await import('../dist/index.js');

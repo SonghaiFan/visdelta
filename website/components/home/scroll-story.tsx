@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { VisualizationSequence } from 'visdelta/transition';
+import type { Visualization } from 'visdelta/transition';
+import { Chart } from 'visdelta/react';
 import { CodeView } from '@/components/interactive/code-view';
 import { Scrubber } from '@/components/interactive/scrubber';
 import { cn } from '@/lib/cn';
@@ -29,7 +30,8 @@ const steps = [
 export function ScrollStory() {
   const chartRef = useRef<HTMLDivElement>(null);
   const stepRefs = useRef<(HTMLElement | null)[]>([]);
-  const storyRef = useRef<VisualizationSequence | null>(null);
+  const [states, setStates] = useState<readonly Visualization[] | null>(null);
+  const [height, setHeight] = useState(360);
   const [value, setValue] = useState(0);
 
   useEffect(() => {
@@ -53,7 +55,6 @@ export function ScrollStory() {
     const update = () => {
       frame = 0;
       const next = position();
-      storyRef.current?.progress(next);
       setValue(next);
     };
     const onScroll = () => {
@@ -61,29 +62,24 @@ export function ScrollStory() {
     };
 
     (async () => {
-      const [{ bar }, { sequence }] = await Promise.all([import('visdelta/bar'), import('visdelta/transition')]);
+      const { bar } = await import('visdelta/bar');
       const a = bar(products).x('product', { label: 'Product' }).y('revenue', { label: 'Revenue ($M)' }).key('product');
       const b = a.y('profit', { label: 'Profit ($M)' });
       const c = b.sort('profit', 'descending');
       const d = c.highlight({ product: ['Software', 'Cloud'] });
-      const story = await sequence([a, b, c, d], { target, height: window.innerWidth < 640 ? 260 : 360 });
-      if (cancelled) return story.destroy();
-      storyRef.current = story;
+      if (cancelled) return;
+      setStates([a, b, c, d]);
+      setHeight(window.innerWidth < 640 ? 260 : 360);
       update();
     })();
 
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
-    const observer = new ResizeObserver(() => storyRef.current?.resize());
-    observer.observe(target);
     return () => {
       cancelled = true;
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
-      observer.disconnect();
-      storyRef.current?.destroy();
-      storyRef.current = null;
     };
   }, []);
 
@@ -113,7 +109,9 @@ export function ScrollStory() {
         ))}
       </ol>
       <div className="sticky top-14 z-10 order-1 self-start bg-fd-background pt-3 pb-1 lg:top-24 lg:order-2 lg:pt-0">
-        <div ref={chartRef} className="vd-docs-chart min-h-[260px] sm:min-h-[360px]" aria-label="Chart driven by scroll position" />
+        <div ref={chartRef} className="vd-docs-chart min-h-[260px] sm:min-h-[360px]" aria-label="Chart driven by scroll position">
+          {states && <Chart state={states} height={height} progress={value} />}
+        </div>
         <Scrubber value={value} max={steps.length - 1} onChange={() => {}} disabled label="Scroll position" className="pointer-events-none mt-1" />
       </div>
     </div>

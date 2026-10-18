@@ -27,9 +27,9 @@ export interface SortSpec {
 export interface ChannelSpec {
   field?: string;
   type?: ChannelType;
-  /** Display name for this channel, independent of the figure title. */
+  /** Display name for this channel. */
   label?: string;
-  /** Channel display names use label; title belongs to the figure. */
+  /** Channel display names use label. */
   title?: never;
   /** D3 format specifier used by a quantitative axis, for example "~s". */
   format?: string;
@@ -277,7 +277,7 @@ export type Mark = string;
 
 export interface ViewSpec {
   mark?: Mark;
-  data?: string | { name: string } | Record<string, unknown>;
+  data?: string | { name: string } | Record<string, unknown> | Record<string, unknown>[];
   encoding?: EncodingSpec;
   transform?: TransformSpec[];
   filter?: FilterSpec;
@@ -294,10 +294,6 @@ export interface ViewSpec {
   connector?: ConnectorSpec | null;
   meta?: SpecMeta;
   margin?: Partial<MarginSpec>;
-  /** Heading above the chart, outside the canvas. Appearance, not a data binding. */
-  title?: string | null;
-  /** Secondary line under the title. */
-  subtitle?: string | null;
   [field: string]: unknown;
 }
 
@@ -699,3 +695,6 @@ export interface RuntimeOptions {
   /** Structural chart presentation; CSS can target its generated style class. */
   chartStyle?: import('../charts/style.js').ChartStyleModule;
 }
+
+/** Fluent authoring input; these calls are not state-change operations. */
+export type { EditMessage, FluentEdit } from '../fluent-edits.js';

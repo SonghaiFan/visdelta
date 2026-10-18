@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import type { VisualizationTransition } from 'visdelta/transition';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Chart } from 'visdelta/react';
+import type { Visualization } from 'visdelta/transition';
 import { CodeView } from '@/components/interactive/code-view';
 import { errorMessage } from '@/components/interactive/runtime';
 import { cn } from '@/lib/cn';
@@ -44,7 +45,7 @@ const unitRows = [
 ];
 
 type Api = typeof import('visdelta');
-const demos: { key: string; name: string; note: string; states: (api: Api) => [unknown, unknown] }[] = [
+const demos: { key: string; name: string; note: string; states: (api: Api) => [Visualization, Visualization] }[] = [
   {
     key: 'bar',
     name: 'Bar',
@@ -94,73 +95,19 @@ const demos: { key: string; name: string; note: string; states: (api: Api) => [u
 
 /** One structural style applied to five chart types, all driven by one progress value. */
 export function ChartStyleGallery() {
-  const targets = useRef(new Map<string, HTMLDivElement>());
-  const changes = useRef(new Map<string, VisualizationTransition>());
-  const progressRef = useRef(0.5);
+  const [api, setApi] = useState<Api | null>(null);
   const [selected, setSelected] = useState<PresetKey>('d3');
   const [progress, setProgress] = useState(0.5);
   const [status, setStatus] = useState('Loading');
+  const completed = useRef(new Set<string>());
+  const scenes = useMemo(() => api ? demos.map((demo) => ({ ...demo, states: demo.states(api) })) : [], [api]);
 
   useEffect(() => {
     let cancelled = false;
-    const created = new Map<string, VisualizationTransition>();
-    const candidates = new Map<string, HTMLElement>();
-    const live = changes.current;
-    (async () => {
-      try {
-        const api = await import('visdelta');
-        await Promise.all(
-          demos.map(async (demo) => {
-            const target = targets.current.get(demo.key);
-            if (!target) return;
-            const candidate = document.createElement('div');
-            candidate.style.cssText = 'position:absolute;inset:0;visibility:hidden;';
-            target.append(candidate);
-            candidates.set(demo.key, candidate);
-            const [from, to] = demo.states(api);
-            created.set(demo.key, await api.transition(from as never, to as never, { target: candidate, height: 240, chartStyle: api.chartStylePresets[selected] }));
-          }),
-        );
-        if (cancelled) return;
-        for (const [key, change] of created) {
-          change.progress(progressRef.current);
-          const target = targets.current.get(key)!;
-          const candidate = candidates.get(key)!;
-          live.get(key)?.destroy();
-          target.replaceChildren(candidate);
-          candidate.style.cssText = '';
-          live.set(key, change);
-        }
-        setStatus(`${presets.find((preset) => preset.key === selected)!.name} active · ${demos.length} charts`);
-      } catch (cause) {
-        if (!cancelled) setStatus(errorMessage(cause));
-      }
-    })();
-    return () => {
-      cancelled = true;
-      for (const [key, change] of created) if (live.get(key) !== change) change.destroy();
-      for (const candidate of candidates.values()) if (candidate.style.visibility === 'hidden') candidate.remove();
-    };
-  }, [selected]);
-
-  useEffect(() => {
-    const live = changes.current;
-    const observer = new ResizeObserver(() => {
-      for (const change of live.values()) change.resize();
-    });
-    for (const target of targets.current.values()) observer.observe(target);
-    return () => {
-      observer.disconnect();
-      for (const change of live.values()) change.destroy();
-      live.clear();
-    };
+    void import('visdelta').then((module) => { if (!cancelled) setApi(module); })
+      .catch((cause) => { if (!cancelled) setStatus(errorMessage(cause)); });
+    return () => { cancelled = true; };
   }, []);
-
-  const seek = (value: number) => {
-    progressRef.current = value;
-    setProgress(value);
-    for (const change of changes.current.values()) change.progress(value);
-  };
 
   const preset = presets.find((item) => item.key === selected)!;
   const snippet = `import { ${preset.importName} } from "visdelta/chart-style";
@@ -191,6 +138,7 @@ await transition(from, to, {
             aria-pressed={selected === item.key}
             onClick={() => {
               if (item.key === selected) return;
+              completed.current.clear();
               setStatus('Applying style');
               setSelected(item.key);
             }}
@@ -202,17 +150,20 @@ await transition(from, to, {
         ))}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Live previews for all chart types">
-        {demos.map((demo) => (
+        {scenes.map((demo) => (
           <section key={demo.key} className="overflow-hidden rounded-md border">
             <header className="flex items-baseline justify-between border-b px-3 py-2 text-xs">
               <strong>{demo.name}</strong>
               <span className="text-fd-muted-foreground">{demo.note}</span>
             </header>
-            <div
-              ref={(element) => {
-                if (element) targets.current.set(demo.key, element);
-                else targets.current.delete(demo.key);
+            <Chart
+              state={demo.states} height={240} progress={progress}
+              chartStyle={api!.chartStylePresets[selected]}
+              onReady={() => {
+                completed.current.add(demo.key);
+                if (completed.current.size === demos.length) setStatus(`${preset.name} active · ${demos.length} charts`);
               }}
+              onError={(error) => setStatus(error.message)}
               className="vd-docs-chart relative min-h-[248px]"
               aria-label={`${demo.name} style preview`}
             />
@@ -231,7 +182,7 @@ await transition(from, to, {
           step={0.01}
           value={progress}
           aria-label="Style preview transition progress"
-          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
+          onChange={(event) => setProgress(event.currentTarget.valueAsNumber)}
           className="vd-scrubber flex-1"
           style={{ ['--fill' as string]: `${progress * 100}%` }}
         />

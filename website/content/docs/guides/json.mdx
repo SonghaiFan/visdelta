@@ -1,0 +1,146 @@
+---
+title: JSON specs
+description: Save and load ViewSpec declarations with the same runtime as builders and React.
+---
+
+A JSON spec is a serialized `ViewSpec`. It describes one chart state, including
+its data source, encodings, ordered transforms and chart-specific options.
+Full specs use the existing rendering engine. Fluent edit messages below are a separate authoring input.
+
+## One chart, three ways
+
+Switch between the chain API, JSON and React below. Each renders the same bar
+chart: categories A, B and C with values 12, 28 and 19.
+
+<AuthoringComparison />
+
+## Render and update directly
+
+```ts
+import { render } from 'visdelta';
+
+const view = await render('#chart', json, {
+  data: { sales },
+  height: 280,
+  updates: { policy: 'latest', duration: 600 },
+});
+
+// Pass a complete JSON string or spec object from your agent.
+const result = await view.update(nextSpec);
+// result.status: 'applied', 'superseded', or 'destroyed'
+
+view.destroy();
+```
+
+No parsing or registration step is needed for built-in charts with `render()`.
+Each update is a complete state of the same chart type. The default `latest`
+policy finishes the active update, then plays only the newest valid pending
+state. Invalid JSON, missing named data and runtime validation failures reject
+without replacing the visible chart. Catch update errors in your application.
+Send complete JSON output; partial token streams are not chart states. Reject
+responses from obsolete agent turns before calling `update()`.
+
+The promise settles when the update is applied, superseded or destroyed.
+Duration is milliseconds per planned route stage. Use
+`view.update(nextSpec, { animate: false })` for a scheduled immediate replacement.
+Supply `{ data: { sales: newRows } }` to replace named bindings; already resolved
+endpoints retain their own data. `view.snapshot()` returns a detached
+`{ revision, spec }` for the latest accepted state, which can be ahead of the
+visible animation. Acceptance does not guarantee later route preparation will
+succeed. `view.resize()` retains new dimensions, and `view.destroy()` also settles
+outstanding updates and prevents late mounts.
+
+For manual progress control, use `await view.transition(nextSpec)` once updates
+have settled. It does not autoplay. Finish or pause at an endpoint before the
+next submission; updates during manual playback or at an intermediate frame
+reject. Its `play()` method returns the controller, not a promise.
+
+To include only selected chart modules:
+
+```ts
+import { createRenderer } from 'visdelta/render';
+import { barModule } from 'visdelta/bar';
+
+const renderer = createRenderer({ modules: [barModule] });
+const view = await renderer.render('#chart', json, { data: { sales } });
+```
+
+This module list belongs to the renderer and ignores global registrations.
+
+## Reading and writing specs
+
+`parseSpec(json: string): ViewSpec` reads JSON and normalizes the declaration
+using the same logic as `delta()` and the runtime. `stringifySpec(state, space?)`
+accepts a builder or plain `ViewSpec`; `space` is JSON indentation. Both are
+exported from `visdelta` and `visdelta/core`. TypeScript callers can import
+`ViewSpec` from either entry.
+
+Both helpers check common structure, ordered transforms and JSON values.
+They preserve custom chart types and extension fields. They do not load modules,
+fetch data, check field availability or prove that a particular chart supports
+an encoding combination. Those checks remain in the data pipeline and chart
+plugins when you render or plan a transition.
+
+Object properties with `undefined` are omitted; valid dates become ISO strings.
+Non-finite numbers, functions, symbols, bigints, circular references, unsupported
+object classes and undefined array entries throw instead of silently losing
+values. For builders, validation sees the declaration returned by `toSpec()`.
+Existing aliases such as `key` normalize into `meta`; this is a declaration
+round trip, not preservation of JSON whitespace or property placement.
+
+Use explicit `{ "name": "sales" }` or `{ "url": "sales.csv" }` data sources.
+Named data is supplied through the existing `data` option on the runtime or
+React component. Inline rows may use an array or `{ "values": [...] }`.
+
+## React and sequences
+
+Parse stored specs once when loading them, then pass the resulting objects to
+`Chart`. Keep their references stable across renders.
+
+```tsx
+import { Chart } from 'visdelta/react';
+
+// Define these once when loading the specs, or memoize them.
+const pair = [from, to];
+const states = [from, to, next];
+<Chart state={from} />
+<Chart state={pair} progress={0.5} />
+<Chart state={states} progress={1.5} />
+```
+
+Register the required chart modules before mounting, just as for the imperative
+runtime. Playback options, callbacks, host elements and React props are not part
+of the spec. A sequence remains an array of states supplied to `sequence()` or
+`Chart`; this API does not introduce a JSON timeline format.
+
+## Small edits from an agent
+
+The Bar module accepts fluent JSON commands on the existing chart:
+
+```ts
+const { revision } = view.snapshot();
+await view.edit({
+  requestId: 'turn-1-flip',
+  baseRevision: revision,
+  edits: [{ method: 'flip', args: [] }],
+});
+```
+
+A batch builds one destination. Earlier accepted edits survive skipped pending
+animations. `snapshot()` reports acceptance; the returned promise reports playback
+completion, supersession or destruction. A stale revision rejects with
+`code: 'REVISION_CONFLICT'`. Read the new snapshot before generating a replacement
+request. Identical request IDs and payloads reuse their original outcome; changing
+a payload requires a new ID. Each view retains up to 1024 requests, including
+failures; start a new view session after that limit.
+
+Bar supports `flip`, `title`, `subtitle`, `color`, `x`, `y`, `sort`, `where`, `focus`
+and `highlight`. Axis options support `type`, `label` and `format` strings. Axis
+bindings refer to the current channels after a flip. Filters and highlights
+accumulate as they do in native chains. Aggregation edits, aggregate axis remaps,
+other built-in charts and arbitrary builder methods are unsupported; use full
+`update()` states for these. Edits cannot replace dataset bindings.
+
+Try [Liveshow](/liveshow). Its Grain category deliberately uses `update()`.
+This is a local, tool-friendly API; an application can expose it through MCP,
+but VisDelta does not start an MCP server.

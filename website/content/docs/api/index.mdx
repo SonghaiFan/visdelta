@@ -20,11 +20,16 @@ import { transition, sequence } from 'visdelta/transition';  // rendering
 import 'visdelta/style.css';
 ```
 
+JSON transport uses `parseSpec` and `stringifySpec` from `visdelta/core` or
+`visdelta`. See [JSON specs](/docs/guides/json) for validation boundaries and
+using the same `ViewSpec` with builders, playback and React.
+
 ## Reference pages
 
 <Cards>
   <Card title="transition()" href="/docs/api/transition" description="Options and the pair controller." />
   <Card title="sequence()" href="/docs/api/sequence" description="Options and the timeline controller." />
+  <Card title="React" href="/docs/guides/react" description="One Chart component for states, pairs and sequences." />
   <Card title="Builders" href="/docs/api/builders" description="Every builder method, by chart." />
   <Card title="Core" href="/docs/api/core" description="delta(), declaration edits and planning, identity and lineage." />
   <Card title="Types" href="/docs/api/types" description="StateChange, VisualizationWarning, styles and layout options." />
@@ -42,6 +47,7 @@ import 'visdelta/style.css';
 | `visdelta/unit`        | `unit`, `UnitState`, `unitModule`, `UNIT_LAYOUTS`                                                  |
 | `visdelta/pie`         | `pie`, `PieState`, `pieModule`                                                                     |
 | `visdelta/transition`  | `transition`, `sequence`                                                                           |
+| `visdelta/react`       | Optional React `Chart`, `ChartProps` and `ChartController` |
 | `visdelta/core`        | `delta`, `visualizationSpec`, declaration edits and planning, identity, lineage and camera helpers |
 | `visdelta/facet`       | `smallMultiples`                                                                                   |
 | `visdelta/chart-style` | `defineChartStyle`, `d3ChartStyle`, `paperChartStyle`, `darkChartStyle`, `editorialChartStyle`, `chartStylePresets` |
@@ -72,3 +78,17 @@ import type { ChartStyleModule } from 'visdelta/chart-style';
   or configurable.
 - Declared transforms execute within VisDelta; data cleaning stays outside it.
 - Controls call `progress()` from outside the library.
+
+## Persistent views
+
+Use `render(target, spec, options)` from `visdelta` to mount JSON strings, plain
+specs or builders. The returned view provides `update`, `render`, `transition`,
+`snapshot`, `resize` and `destroy`. Updates use a latest-pending policy by
+default. See [JSON specs](/docs/guides/json) for scheduling, lifecycle and scoped
+module examples.
+
+`view.edit(message, options?)` accepts a fluent JSON batch with `requestId`,
+`baseRevision` and `edits: [{ method, args }]`. It returns the same completion
+result as `update()`. The Bar adapter supports a conservative method subset;
+see [small agent edits](/docs/guides/json#small-edits-from-an-agent) for supported
+methods, conflict handling and retry limits.
