@@ -34,6 +34,8 @@ export interface TransitionSurfaceOptions extends RuntimeOptions {
 }
 
 export interface TransitionSurface {
+  /** Stable chart scope, even when a sequence reparents this surface. */
+  readonly root: Element;
   readonly view: Element;
   /** Number of serial route stages chosen for this authored pair. */
   stageCount(): number;
@@ -224,6 +226,7 @@ export function createTransitionSurface(
   }
 
   return {
+    root,
     view: node,
     stageCount() { return Math.max(1, routeStages); },
     stageOperations() {

@@ -16,6 +16,11 @@ function sequence(
 and hands off between them at shared endpoints, so the chart host stays mounted
 and never shows an empty frame between legs.
 
+Each leg's runtime reads fonts and theme tokens from its actual chart root,
+including after that root moves into the visible host. Resizing and reverse
+handoffs keep that scope. Preparation uses hidden mounts under `document.body`;
+make shared theme tokens available on the document root before initialization.
+
 ```ts
 const story = await sequence([revenue, profit, ranked, revenue], {
   target: '#chart',

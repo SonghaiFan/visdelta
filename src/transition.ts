@@ -145,10 +145,15 @@ export async function transition(
   const transitionDelta = delta(resolvedFrom, resolvedTo);
   const host = resolveTarget(options.target);
   const chartStyle = options.chartStyle ?? d3ChartStyle;
-  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime({ root: host, chartStyle }), localModules);
+  const renderContext = { root: host, chartStyle };
+  const chartTypes = await transitionRegistry(resolvedFrom, createChartRuntime(renderContext), localModules);
   const surface = createTransitionSurface(resolvedFrom, resolvedTo, {
     ...options, chartStyle
   }, chartTypes);
+  // A sequence moves this root between its preparation mount and visible host.
+  // Keep theme, color and text measurements bound to the chart itself rather
+  // than the now-empty preparation mount after that handoff.
+  renderContext.root = surface.root;
   let value = 0;
   let lastDirection = 1;
   let animation: number | null = null;

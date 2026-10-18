@@ -36,6 +36,10 @@ npm run dev        # http://localhost:3000
 
 `npm run dev` and `npm run build` run `scripts/prepare.mjs` first. It fails with a
 clear message if the library has not been built, and runs the example check.
+It copies `../examples/templates/` unchanged into `public/templates/`; edit the
+repository HTML source, not that generated copy. `llms.txt` in the repository
+is also the shared preamble for both agent endpoints. The agent acceptance tests
+check those exports and the same runnable template.
 
 Browser tests use Playwright's Chromium. Run `npx playwright install chromium`
 once, or point `VISDELTA_CHROME_PATH` at an existing Chromium binary.

@@ -42,22 +42,13 @@ story.play({ to: 2 });  // from the current position to ranked
 
 ## Scroll-driven steps
 
-Map each step of a scrolling narrative to an integer, and the scroll between
-them to the fraction:
+Start from the [single-file scroll template](/docs/guides/scroll-template).
+It maps measured step positions to sequence leg units, holds each authored
+state before advancing, and handles reverse scrolling, replay, resize,
+reduced motion and iframe fallback. Keep scroll control outside the library.
 
-```ts
-const steps = document.querySelectorAll<HTMLElement>('.step');
-
-function onScroll() {
-  let position = 0;
-  steps.forEach((step, index) => {
-    const rect = step.getBoundingClientRect();
-    const t = (window.innerHeight * 0.6 - rect.top) / rect.height;
-    if (t > 0) position = Math.min(steps.length - 1, index + Math.min(1, t));
-  });
-  story.progress(Math.min(position, story.states.length - 1));
-}
-```
+The [progress model](/docs/concepts/progress) explains why authored states stay
+at integers even when the planner inserts extra route stages.
 
 ## Authored states are fixed
 

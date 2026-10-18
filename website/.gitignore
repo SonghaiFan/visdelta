@@ -30,3 +30,6 @@ next-env.d.ts
 
 # demo datasets copied from ../docs/public/data by scripts/prepare.mjs
 /public/data/
+
+# single-file examples copied by scripts/prepare.mjs
+/public/templates/

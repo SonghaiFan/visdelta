@@ -1,0 +1,82 @@
+---
+title: Start here for agents
+description: A verified entry point, observable API facts and a short workflow for building a correct VisDelta story.
+---
+
+Start with the [machine-readable quick start](/llms.txt). Its first example is
+a complete, version-pinned HTML page; the same quick start is included before
+the reference in [llms-full.txt](/llms-full.txt).
+
+For a scrolling story, copy the [single-file template](/templates/scroll-story.html)
+and follow its [scroll and iframe contract](/docs/guides/scroll-template).
+It contains inline fictional data, real chart states and controls. Serve the
+file over HTTP; no bundler or data service is required.
+
+## Before drawing
+
+1. Supply tidy rows and check the fields and types you will bind.
+2. Choose stable source-record identity separately from mark identity. A line
+   with several series commonly uses `.key(['date', 'series'])`.
+3. Decide whether dates are local calendar dates or absolute instants. ISO
+   date-only strings are parsed by JavaScript as UTC instants; the current
+   temporal axis uses local time. Neither “always local midnight” nor “always
+   UTC” is a safe universal conversion rule.
+4. Declare position domains when a story requires fixed comparison scales.
+   Leave them inferred when the axis should fit visible data. Read the
+   [chart-specific domain rules](/docs/guides/automatic-behaviors).
+
+## Query what exists today
+
+```ts
+import { delta, visualizationWarnings } from 'visdelta';
+
+const declared = state.toSpec();        // declaration, not final pixel geometry
+const visibleRows = state.rows();       // transformed inline rows
+const changes = delta(from, to).stateChanges;
+const warnings = await visualizationWarnings(state);
+```
+
+These are useful for inline data. Warning inspection can also receive named
+rows, but does not fetch remote sources. Rendering can load a declared URL;
+await controller creation before using the resolved endpoint declarations.
+
+```ts
+const change = await transition(from, to, { target: '#chart' });
+console.log(change.from, change.to, change.delta.stateChanges);
+console.log(change.stageCount(), change.stageOperations());
+console.log(await change.inspect());
+change.progress(1);
+```
+
+`inspect()` reports compiled SVG tracks, phase boundaries and property endpoint
+values. Custom tween internals, immediate writes, node lifecycle changes and
+HTML headings are outside its coverage. It does not return a list of marks or
+prove that a line is visible. `state.resolve()`, `inspect(t)`, global strict/debug
+configuration and `bindScroll()` are not implemented APIs.
+
+## Verify behavior, then appearance
+
+- Check the exact start/end states against independent static charts at the
+  same size, margins and theme. An SVG node alone is insufficient: check actual
+  bar dimensions and line drawing state.
+- Check forward/reverse playback and seeking. To sample a phase, use its
+  compiled interval from `inspect()`, rather than equating semantic changes
+  with rendered phases. Unit's opt-in `directionalEase()` has its documented
+  directional exception.
+- Check narrow and desktop layouts, resize, theme refresh and reduced motion.
+- Check that filtering keeps colors and legend categories stable where the
+  chart contract requires it, and that empty selections can be restored.
+- Use screenshots for the final visual review, after the numerical assertions.
+
+The repository runs the [distribution and template browser checks](https://github.com/SonghaiFan/visdelta/tree/main/scripts)
+with `npm run browser:check`. The single-file templates are copied unchanged into
+the built documentation site and tested through their real controls.
+
+## Avoid plausible but unsupported fixes
+
+Do not invent `scale.nice`, `axis.endpointTicks`, `utc`, `domain: 'filtered'`,
+`story.ready` or a `play()` completion Promise. Check the
+[automatic behavior table](/docs/guides/automatic-behaviors) before adding an option.
+Do not assume every combination of data, grain and scale edits has a planned
+route; the [chart contracts](/docs/concepts/transitions) define the supported
+subsets and fallback boundaries.

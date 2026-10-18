@@ -35,6 +35,12 @@ const dataTarget = fileURLToPath(new URL('../public/data/', import.meta.url));
 mkdirSync(dataTarget, { recursive: true });
 cpSync(dataSource, dataTarget, { recursive: true, filter: (path) => !path.endsWith('README.md') });
 
+// Single-file templates are authored once in examples/ and copied verbatim.
+const templateSource = fileURLToPath(new URL('../../examples/templates/', import.meta.url));
+const templateTarget = fileURLToPath(new URL('../public/templates/', import.meta.url));
+mkdirSync(templateTarget, { recursive: true });
+cpSync(templateSource, templateTarget, { recursive: true });
+
 const verify = spawnSync(process.execPath, [fileURLToPath(new URL('./verify-examples.mjs', import.meta.url))], {
   stdio: 'inherit',
 });

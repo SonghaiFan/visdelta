@@ -1,0 +1,111 @@
+---
+title: Author a downstream MDX story
+description: Use native VisDelta states in a narrative application, with explicit ownership of progress and asynchronous chart creation.
+---
+
+An MDX application can import native VisDelta states and supply them to its own
+narrative components. VisDelta supplies chart state and rendering; the application
+supplies MDX compilation, layouts, scrolling, editing and error presentation.
+There is no VisDelta MDX compiler or exported `Scrolly`/`Step` component.
+
+## Keep authoring separate from mounting
+
+The complete, DOM-free
+[`network-states.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/network-states.mjs)
+module imports `line` from the installed `visdelta` package. It declares stable
+source-record identities, a fixed y domain and two named immutable states.
+Its authored order is overview → highlight North → overview. Deriving the
+highlight preserves both routes and leaves the overview unchanged.
+The state serializes `Date` values to ISO strings; `rows()` need not return
+`Date` objects. Keep the explicit temporal binding and compare instants when
+checking serialized dates. Source rows remain unchanged.
+
+An application that implements `Scrolly` and `Step` could consume those states
+with the following **application-owned component contract**:
+
+```mdx
+import { Scrolly, Step } from './components/story.jsx'
+import { states } from './network-states.mjs'
+
+# One route becomes a network
+
+<Scrolly states={states}>
+  <Step>Compare both routes on the same scale.</Step>
+  <Step>Attention moves to North; South remains visible.</Step>
+  <Step>Return to the whole network.</Step>
+</Scrolly>
+```
+
+The JSX components in this example are not provided by VisDelta. Choose the
+application's MDX/JSX runtime and compiler integration separately. Each step
+corresponds to an authored state; repeated states are valid boundaries. Avoid
+reconstructing the fluent API as a second YAML chart grammar.
+
+## Installed-package contract
+
+Use `import 'visdelta/style.css'` once in the browser application. Pin the
+package version used by the story. The current integration baseline is 0.4.2.
+
+An unreleased fix in this checkout preserves chart-root theme/font scope when
+sequence legs move out of their hidden preparation mounts. Version 0.4.2 can
+measure legend labels using the empty preparation host's font after a handoff.
+Integration snapshots containing this fix must use a distinct prerelease version,
+not be presented as the published 0.4.2 package.
+
+| Concern | Implemented behavior | Application responsibility |
+| --- | --- | --- |
+| State construction | Builders, `rows()`, `toSpec()` and `delta()` do not need a DOM | Construct stable states outside rendering/effects; choose date and identity conventions |
+| Mount | `await sequence(states, options)` requires at least two states and a browser DOM | Attach an empty, exclusively owned target; set its dimensions |
+| One static state | `await transition(state, state, options)`, then `.progress(1)` | Keep a single-state story at authored position 0 |
+| Scroll position | Sequence uses `0..states.length - 1`; finite inputs clamp | Measure anchors, apply holds and coalesce events; do not normalize the whole story to 0..1 |
+| Playback | `.progress()` stops controller-owned playback; `.play()` returns the controller | Choose one input owner at a time; implement reduced-motion policy |
+| Resize/theme | `.resize()` retains current progress and re-reads dimensions/theme | Give `height: 'auto'` a measurable CSS height; refresh after theme changes |
+| Initialization | Creation returns a Promise; no cancellation signal or separate controller `ready` | Buffer desired progress and destroy late results from obsolete generations |
+| Errors | Creation can reject; invalid progress/dimensions throw | Show the current generation's error and prevent stale errors replacing a newer preview |
+| Cleanup | `.destroy()` is idempotent | Disconnect application observers, listeners and RAFs; remove the generation's mount |
+
+Position domains are independent of narrative progress. `highlight()` emphasizes
+marks, `where()` changes membership, and `focus()` changes the view. A legacy
+field named “focus” must be interpreted by its behavior rather than translated
+by spelling.
+
+## Isolate asynchronous generations
+
+[`mount-story.mjs`](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/mount-story.mjs)
+is a copyable application integration example. It creates a private child mount
+per call, buffers the latest seek while creation is pending, supports single
+states, and disposes a controller that arrives after unmount. Its `ready` property
+belongs to the example wrapper, not to VisDelta's controller.
+
+```js
+const chart = mountStory(host, states);
+chart.seek(currentPosition);
+chart.ready.catch(error => {
+  if (thisGenerationIsCurrent()) showError(error);
+});
+// Theme change: chart.resize();
+// Effect cleanup: remove application listeners, then chart.destroy();
+```
+
+Removing a mount does not cancel creation or network requests. Pending work can
+finish into the detached mount before its controller is destroyed. Do not reuse
+that target for a newer generation. A published preview can keep the previous
+chart until a replacement is ready; implementing that swap is application policy.
+
+Sequence preparation uses hidden mounts under `document.body`. Put shared theme
+tokens on the document root so preparation and visible charts see the same
+theme. Scope styles and DOM queries per instance; avoid global chart IDs.
+
+## Verification and feedback
+
+`npm run authoring:check` installs a frozen tarball in a separate consumer,
+bundles the actual example imports and checks authored endpoints against
+independent static renders. It also covers pending seeks, reverse scrubbing,
+jumps, resizing, static states, multiple instances, obsolete generations and
+failed preparation cleanup. It never aliases package imports to source files.
+
+A downstream application still needs its own MDX compile/build, editing/save,
+scroll mapping, desktop/narrow layout and accessibility tests. Report library
+issues with the package version, native states, dimensions, requested progress,
+observed frame and expected behavior. An unsupported authoring option is not
+automatically a renderer bug. Diagnostic API proposals remain unimplemented.

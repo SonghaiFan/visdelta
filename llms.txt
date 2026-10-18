@@ -1,67 +1,94 @@
-# VisDelta machine-readable guide
+# VisDelta: start here for agents
 
-VisDelta declares chart states and computes seekable transitions between two
-states of the same chart type.
+Current package: visdelta@0.4.2. Copy this complete HTML into index.html,
+serve it over HTTP (for example `npx serve .`), and open the printed URL.
 
-Canonical model:
-
-Data -> Transform -> Chart state -> Difference -> Transition -> Frame -> Control
-
-Minimal usage:
-
-```js
-import * as d3 from "d3";
-import { bar } from "visdelta/bar";
-import { transition } from "visdelta/transition";
-
-const from = bar(rows).x("category").y("revenue").key("category");
-const to = from.y("profit");
-const change = await transition(from, to, { target: "#chart" });
-change.progress(0.5);
+```html
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
+<div id="chart" style="width:100%;max-width:640px;height:400px"></div>
+<script type="module">
+  import { bar, transition, visualizationWarnings }
+    from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm';
+  const rows = [
+    { product: 'Hardware', revenue: 12, profit: 5 },
+    { product: 'Software', revenue: 18, profit: 11 },
+    { product: 'Services', revenue: 9, profit: 7 },
+  ];
+  const from = bar(rows).x('product').y('revenue').key('product');
+  const to = from.y('profit');
+  console.log(await visualizationWarnings(to));
+  const change = await transition(from, to, {
+    target: '#chart', width: 'auto', height: 400,
+  });
+  // A complete, synchronous endpoint. play() returns a controller, not a Promise.
+  change.progress(1);
+</script>
 ```
 
-Rules:
+## Invariants and current boundaries
 
-- Input data is tidy. Data cleaning is outside the library.
-- Every visual encoding is explicit.
-- `.where()` changes membership, `.highlight()` changes attention, and
-  `.focus()` changes only the camera.
-- Every frame keeps marks, scale, axes, ticks, labels, and grid lines coherent.
-- Exit marks before scale change; scale before enter. Reverse reuses the frames.
-- Core is chart-agnostic. Area, Bar, Line, Point, and Unit own their behavior.
-- Unit layouts are `grid`, centered `force`, `bar`, and `beeswarm`; matching minimizes travel after
-  preserving explicit keys.
+- Supply tidy rows. Declare each encoding; there is no implicit color field.
+- Keep source-record identity (datumKey) separate from mark identity (key).
+- where() changes membership; highlight() changes emphasis; focus() moves the
+  camera without filtering. Filters do not reset category colors or legends.
+- Line fits inferred x/y domains to visible rows. Other charts have their own
+  domain rules: do not assume where() always refits every chart's axes.
+- Explicit valid numeric/temporal position domains are not niced. Inferred
+  domains may be rounded. Write fixed domains only when the story needs them.
+- Decide whether dates mean local calendar time or absolute instants before
+  parsing. The temporal axis uses local-time scaleTime; there is no utc option.
+- Every frame couples marks and the scales/axes that explain them. Source data,
+  semantic changes, planned stages and rendered frames are distinct layers.
+- transition progress is 0..1. sequence progress is 0..states.length-1:
+  1.5 means halfway through the second leg. A stage is not a state-change count.
+- duration is per serial route stage, not per whole story. play() is not awaitable.
+- Await transition()/sequence() before seeking; there is no additional ready.
+- inspect() reports compiled SVG property tracks. It is not a mark snapshot.
+  state.resolve(), inspect(t), global strict/debug and bindScroll are unavailable.
+- The optional Unit directionalEase profile is an exception to strict identical
+  forward/reverse frames. Follow the chart-specific contract instead of guessing.
 
-Public package entries:
+## Verification workflow
 
-- `visdelta`
-- `visdelta/core`
-- `visdelta/area`
-- `visdelta/bar`
-- `visdelta/line`
-- `visdelta/point`
-- `visdelta/unit`
-- `visdelta/transition`
-- `visdelta/plugins`
-- `visdelta/chart-style`
-- `visdelta/browser`
-- `visdelta/style.css`
-- `visdelta/themes/default.css`
-- `visdelta/themes/dark.css`
-- `visdelta/themes/paper.css`
+1. Check tidy rows, field types and unique identities; preserve the source state.
+2. Inspect state.rows(), state.toSpec(), delta(a, b).stateChanges and
+   await visualizationWarnings(state). These work without rendering for inline
+   or supplied named data; warnings do not fetch a remote dataset for you.
+3. Await creation, seek exact endpoints, and inspect stageCount(), stageChanges(),
+   stageOperations() and await inspect() on pair controllers. A sequence exposes
+   inspect() for its active leg, not the pair's stage-count methods.
+4. Check actual mark geometry, visibility and axes in a browser. Cover forward,
+   reverse, scroll/scrub, resizing and reduced motion. Compare endpoints with
+   independent static charts under the same dimensions, margins and theme.
+5. Use screenshots for final appearance checks; a successful import or an SVG
+   element alone does not prove the chart is drawn correctly.
 
-VisDelta depends only on the `d3-*` modules it renders with; declared transforms
-run without any extra package. Chart states are JSON-safe; selectors and data
-sources are objects (`{ field, gte }`, `{ url }`, `{ name }`), never strings.
+## Copy a tested story instead of inventing a scroll controller
 
-Published documentation, written for agents: https://songhaifan.github.io/visdelta/llms.txt
-(every page as Markdown) and https://songhaifan.github.io/visdelta/llms-full.txt.
+- [Single-file scroll story](https://songhaifan.github.io/visdelta/templates/scroll-story.html)
+- [Agent workflow](https://songhaifan.github.io/visdelta/docs/guides/agent-workflow/)
+- [Automatic behaviors](https://songhaifan.github.io/visdelta/docs/guides/automatic-behaviors/)
+- [Scroll template and iframe contract](https://songhaifan.github.io/visdelta/docs/guides/scroll-template/)
+- [Progress model](https://songhaifan.github.io/visdelta/docs/concepts/progress/)
+- [Troubleshooting](https://songhaifan.github.io/visdelta/docs/guides/troubleshooting/)
 
-Source-of-truth docs:
+Repository template: examples/templates/scroll-story.html. Its inline data is
+fictional, and its only network dependencies are pinned VisDelta JS and CSS.
+A content-height iframe needs manual controls or a cooperating parent page;
+child scroll code cannot observe cross-origin parent scrolling on its own.
 
-- `docs/language-framework.md`
-- `docs/reference.md`
-- `docs/chart-types.md`
-- `docs/data-sources-and-transforms.md`
-- `docs/runtime-api.md`
-- `docs/extending-with-plugins.md`
+## API and semantic references
+
+- [Reference](https://songhaifan.github.io/visdelta/docs/api/)
+- [Machine-readable page index](https://songhaifan.github.io/visdelta/llms.txt)
+- [Complete current documentation](https://songhaifan.github.io/visdelta/llms-full.txt)
+
+The repository's semantic constitution is docs/language-framework.md;
+docs/reference.md records implemented behavior. Public entries include visdelta,
+visdelta/core, visdelta/area, visdelta/bar, visdelta/line, visdelta/point,
+visdelta/unit, visdelta/pie, visdelta/facet, visdelta/transition, visdelta/plugins,
+visdelta/toolkit, visdelta/chart-style, visdelta/browser and visdelta/style.css.
+Diagnostic API proposals are design documents, not available exports.

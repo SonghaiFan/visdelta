@@ -1,0 +1,44 @@
+---
+title: Automatic behaviors
+description: What VisDelta derives automatically, what affects it and which controls exist in 0.4.2.
+---
+
+This table describes **implemented behavior in 0.4.2**. “No switch” means that
+an option is unavailable, not that an agent should try an undocumented spelling.
+A declaration (`toSpec()`) is not a resolved layout; actual ticks and geometry
+also depend on chart type, dimensions, margins, theme and sometimes fonts.
+
+| Behavior | Trigger and result | Existing control or boundary |
+| --- | --- | --- |
+| Field types | Missing channel types are inferred from bound data. Authored types take priority. | Set `type` on the channel. Validate the actual values; inference does not clean data. |
+| Line position domains | Inferred x/y domains fit visible transformed observations. Lineage remains available for gaps, category colors and legends. Repeated panels with shared scales retain their shared domain. | Declare a channel `domain: [min, max]` for fixed bounds; there is no `'filtered'` / `'source'` domain mode. |
+| Other position domains | Bar's category axis follows displayed categories; its measure domain uses lineage values and includes the baseline unless overridden. Area retains lineage-derived stack/position domains. Point uses its plotted/view rows, or a shared panel domain. Unit domains depend on its layout. | Read each [chart's contract](/docs/charts). Do not generalize Line's filter behavior to every chart. |
+| Rounding inferred domains | The numeric linear/sqrt/log and temporal scale helpers apply D3 `nice()` to inferred domains. The log helper uses 1 as its default lower bound before rounding; declare valid positive bounds when that is not the intended range. | Explicit supported position bounds are preserved, including Bar measure domains. The current log guard clamps positive bounds below 0.1; exact sub-0.1 log domains are unsupported in 0.4.2. `scale: { nice: false }` is not a supported switch. |
+| Data-endpoint ticks | Continuous non-log axes prioritize available data endpoints, then admit ordinary ticks with sufficient space. | Tick spacing is part of the chart style. No `axis.endpointTicks` switch exists. Log axes use ordinary log ticks without injected data endpoints. |
+| Color and legends | A declared field color creates a legend. Categorical mappings/legend membership retain lineage rather than changing slots after a display filter. With no color mapping, marks are black and there is no color legend. | Declare a constant `.color('#3269b5')` when a field legend is not needed. This changes color meaning; it is not a “hide legend” toggle. A global `legend: false` switch is unavailable. |
+| Legend layout | Top legends occupy a separate block above the canvas. Width and label measurement affect wrapping. | Chart styles support `legendPosition: 'right'`; panels own their local legends. Constrained `height: 'auto'` may hide a legend when there is insufficient room. |
+| Default presentation | Themes provide spacing, type, axis styling and colors for an already-declared mapping. | Use chart styles and `--vd-*` tokens; call controller `resize()` after a theme change. For sequences, place shared tokens on the document root because preparation mounts live under `body`. |
+| CSS variable colors | Color ranges such as `['var(--story-north)', 'var(--story-south)']` resolve variables when rendered. | Define them on the document root for sequences and call `resize()` after changing them; they are not continuously re-read on every cached frame. |
+| Date parsing and axis timezone | Temporal values accept valid `Date` objects and supported ISO strings. JavaScript parses date-only ISO strings as UTC instants; the axis uses local-time `scaleTime`. | Choose a date convention explicitly. There is no UTC axis switch; tests that depend on the displayed date should control the browser timezone. |
+| Focus camera | `focus()` fits selected mark bounds with one aspect-preserving zoom and pan. The other axis may gain empty space; membership and the underlying data domain are unchanged. | Use an earlier unfocused state to clear the camera, or use `where()` when rows should actually leave. Focus is not an independent x/y domain fit. |
+| Generated intermediate states | A chart's supported planner/transition policy can insert complete states and motion phases within an authored leg. Unsupported combinations retain the documented fallback. | `sequence()` fixes authored waypoints. Pair controllers expose `stageCount()`, `stageChanges()`, `stageOperations()` and `inspect()`; semantic change count is not phase count. |
+| Lazy modules and preparation | Focused builders carry lazy chart modules. `transition()` resolves inputs/prepares its surface; `sequence()` awaits each adjacent pair before returning. Some frame work can remain lazy. | Await creation. The returned controller can seek immediately; there is no extra `.ready` property. Plain specs require registered modules. |
+| Progress and duration | A pair uses 0..1. A sequence uses 0..number of states minus one. `duration` applies per serial route stage. | `progress()` synchronously seeks and stops owned playback. `play()` returns the controller, not a completion Promise. See the [progress model](/docs/concepts/progress). |
+| Resize | Automatic canvas dimensions observe their container. Explicit pixel dimensions stay fixed until changed. | Use `width: 'auto'` / `height: 'auto'` with a sized host, or `resize({ width, height })`. Refresh after changing fonts or theme. |
+| Warnings | Chart-owned advisory rules inspect prepared state and transformed rows. Rendering reports them; cached frames need not run those rules again. | `visualizationWarnings()` inspects without drawing for supplied data. It is not a per-frame invariant checker or an unknown-option strict mode. |
+| Scroll, replay and reduced motion | The library evaluates requested progress; it does not install scroll listeners, sticky layout or a reduced-motion policy for an application. | The [single-file template](/docs/guides/scroll-template) supplies these controls and a manual iframe fallback outside the library. |
+
+## Choose the intended domain policy
+
+```ts
+// Let Line fit the surviving observations.
+const selected = all.where({ series: 'North' });
+
+// Or deliberately fix the comparison frame for the whole story.
+const fixed = all.y('value', { domain: [0, 100] });
+const selectedFixed = fixed.where({ series: 'North' });
+```
+
+An explicit domain can intentionally clip marks. That is different from missing,
+non-finite or incorrectly transformed geometry; “all marks must be inside the
+domain” is not a universal validity test.

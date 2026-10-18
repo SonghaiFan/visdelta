@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>A growing network — VisDelta scroll story</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
+  <style>
+    :root { color-scheme: light; --page: #faf9f6; --ink: #25282c; --muted: #616770; --line: #d7d9dc; --accent: #3269b5;
+      --vd-color-surface: var(--page); --vd-color-bg: var(--page); --vd-color-on-surface: var(--ink);
+      --vd-color-muted: var(--muted); --vd-color-border: var(--line); --vd-color-outline: var(--muted);
+      --vd-color-outline-variant: var(--line); --vd-figure-radius: 3px; }
+    :root[data-theme="dark"] { color-scheme: dark; --page: #171b20; --ink: #e7eaf0; --muted: #a6adb7; --line: #39414c; --accent: #90b9f2; }
+    * { box-sizing: border-box; }
+    html { background: var(--page); color: var(--ink); font: 16px/1.6 system-ui, sans-serif; scroll-behavior: auto; }
+    body { margin: 0; }
+    main { max-width: 1160px; margin: auto; padding: 40px 24px; }
+    h1, h2, p { margin: 0 0 16px; }
+    h1 { max-width: 700px; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.1; letter-spacing: -.04em; }
+    h2 { font-size: 1.3rem; line-height: 1.3; }
+    .intro { max-width: 740px; margin-bottom: 36px; }
+    .eyebrow, .muted { color: var(--muted); }
+    .eyebrow { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; }
+    details { border-block: 1px solid var(--line); padding: 12px 0; }
+    summary { cursor: pointer; }
+    pre { max-height: 280px; overflow: auto; padding: 12px; font-size: .8rem; line-height: 1.5; border: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+    .story { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 48px; align-items: start; }
+    .visual { position: sticky; top: 16px; min-width: 0; background: var(--page); z-index: 2; padding-block: 12px; }
+    #chart { width: 100%; height: clamp(240px, 47svh, 450px); }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    button { font: inherit; color: inherit; background: transparent; padding: 5px 10px; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+    button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+    button:disabled, input:disabled { opacity: .5; cursor: wait; }
+    .scrubber { display: flex; gap: 8px; align-items: center; flex: 1 1 200px; font-size: .8rem; }
+    input { min-width: 70px; width: 100%; accent-color: var(--accent); }
+    output { min-width: 68px; text-align: right; font-variant-numeric: tabular-nums; }
+    #status, #embed-note { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+    .step { min-height: clamp(480px, 78svh, 900px); padding: 36px 0; border-top: 2px solid var(--line); }
+    .step[aria-current="step"] { border-color: var(--accent); }
+    .steps { padding-top: min(26svh, 240px); padding-bottom: min(70svh, 700px); }
+    footer { border-top: 1px solid var(--line); padding-block: 24px; color: var(--muted); }
+    @media (max-width: 720px) {
+      main { padding: 24px 16px; }
+      .story { display: block; }
+      .visual { top: 0; padding-top: 6px; }
+      #chart { height: clamp(210px, 34svh, 320px); }
+      .controls { padding: 6px 0; }
+      .steps { padding-top: min(12svh, 120px); }
+      .step { min-height: clamp(480px, 78svh, 900px); padding-top: 24px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <p class="eyebrow">A fictional network · VisDelta 0.4.2</p>
+    <h1>One route becomes a network</h1>
+    <p>Scroll through four chapters. Each chapter holds its state before the chart moves to the next one. You can also use the position slider.</p>
+    <details>
+      <summary>Source data and chart states</summary>
+      <p class="muted">Fictional weekly journeys, in thousands. Dates are local calendar dates; the charts use a local-time axis.</p>
+      <div id="data-table"></div>
+      <pre id="state-code"></pre>
+    </details>
+  </header>
+  <section class="story" aria-label="Network story">
+    <div class="visual">
+      <div id="chart" aria-label="Weekly journeys chart"></div>
+      <div class="controls">
+        <button id="replay" disabled>Replay</button>
+        <button id="theme" disabled>Dark theme</button>
+        <div class="scrubber"><label for="position">Position</label><input id="position" type="range" min="0" max="3" step="0.001" value="0" disabled><output id="readout" for="position">0.00 / 3</output></div>
+      </div>
+      <p id="status" role="status">Preparing the story…</p>
+      <p id="embed-note" hidden>This embed has no internal scroll area. Use the position slider, or connect scroll progress from its parent page.</p>
+    </div>
+    <div class="steps">
+      <article class="step" data-step="0"><h2>1. A single route</h2><p>The North route starts with 18 thousand weekly journeys and reaches 38 thousand. Its full timeline is visible.</p></article>
+      <article class="step" data-step="1"><h2>2. Two routes, one scale</h2><p>The South route appears. The y axis now fits both routes. Category colors stay attached to their routes.</p></article>
+      <article class="step" data-step="2"><h2>3. Attention moves north</h2><p>Both routes remain in the data. Highlighting North dims South without filtering or changing the axes.</p></article>
+      <article class="step" data-step="3"><h2>4. Back to the whole network</h2><p>The highlight clears. Scroll backward to retrace the same story, or choose Replay to begin again.</p></article>
+    </div>
+  </section>
+  <footer>Replace the inline rows and authored states to tell your own story. No scroll library or data service is required.</footer>
+</main>
+<script type="module">
+  // These functions are the template's scroll contract, not VisDelta APIs.
+  // BEGIN SCROLL MAPPING
+  export function positionForScroll(scrollY, anchors, hold = 0.45) {
+    if (!Number.isFinite(scrollY) || anchors.length < 2 || !Number.isFinite(hold) || hold < 0 || hold >= 1) throw new Error('Invalid scroll mapping inputs.');
+    if (anchors.some((value, index) => !Number.isFinite(value) || (index > 0 && value <= anchors[index - 1]))) throw new Error('Step anchors must be increasing.');
+    if (scrollY <= anchors[0]) return 0;
+    const last = anchors.length - 1;
+    if (scrollY >= anchors[last]) return last;
+    const index = anchors.findIndex((end, i) => i > 0 && scrollY < end) - 1;
+    const fraction = (scrollY - anchors[index]) / (anchors[index + 1] - anchors[index]);
+    return index + Math.max(0, (fraction - hold) / (1 - hold));
+  }
+  export function scrollForPosition(position, anchors, hold = 0.45) {
+    if (!Number.isFinite(position)) throw new Error('Invalid story position.');
+    positionForScroll(anchors[0], anchors, hold); // validate the same coordinate system
+    const last = anchors.length - 1;
+    const value = Math.max(0, Math.min(last, position));
+    if (Number.isInteger(value)) return anchors[value];
+    const index = Math.floor(value);
+    return anchors[index] + (hold + (value - index) * (1 - hold)) * (anchors[index + 1] - anchors[index]);
+  }
+  // END SCROLL MAPPING
+
+  // Optional cooperative iframe mode. Set an exact parent origin to opt in;
+  // leave null for a standalone page or a normally scrolling iframe.
+  const PARENT_ORIGIN = null; // e.g. 'https://your-publication.example'
+  const STORY_ID = 'network-story';
+  const HOLD = 0.45;
+  const replayButton = document.querySelector('#replay');
+  const themeButton = document.querySelector('#theme');
+  const slider = document.querySelector('#position');
+  const output = document.querySelector('#readout');
+  const status = document.querySelector('#status');
+  const steps = [...document.querySelectorAll('[data-step]')];
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const dark = matchMedia('(prefers-color-scheme: dark)');
+  const embedded = window !== window.parent;
+  let story, anchors = [], scheduled = 0, replayFrame = 0, destroyed = false;
+  let source = 'scroll', noInternalScroll = false;
+  const cleanup = [];
+  const listen = (target, name, callback, options) => {
+    target.addEventListener(name, callback, options);
+    cleanup.push(() => target.removeEventListener(name, callback, options));
+  };
+  document.documentElement.dataset.theme = dark.matches ? 'dark' : 'light';
+
+  // BEGIN AUTHORED STORY
+  const rows = [
+    [1, 18, 25], [8, 22, 31], [15, 27, 39], [22, 25, 44], [29, 34, 52], [36, 38, 60],
+  ].flatMap(([day, north, south]) => [
+    { date: new Date(2026, 0, day), route: 'North', journeys: north },
+    { date: new Date(2026, 0, day), route: 'South', journeys: south },
+  ]);
+  function makeStates(line) {
+    const all = line(rows).x('date', { type: 'temporal', label: 'Week' })
+      .y('journeys', { label: 'Weekly journeys (thousands)' })
+      .key(['date', 'route']).breakdown('route').color('route');
+    return [all.where({ route: 'North' }), all, all.highlight({ route: 'North' }), all];
+  }
+  // END AUTHORED STORY
+
+  function updateControls(value) {
+    slider.value = String(value);
+    output.value = `${value.toFixed(2)} / ${steps.length - 1}`;
+    steps.forEach((step, index) => {
+      if (index === Math.floor(value)) step.setAttribute('aria-current', 'step');
+      else step.removeAttribute('aria-current');
+    });
+  }
+  function show(value) {
+    const bounded = Math.max(0, Math.min(steps.length - 1, value));
+    const next = reduced.matches ? Math.round(bounded) : bounded;
+    if (story.value !== next) story.progress(next);
+    updateControls(next);
+  }
+  function cancelReplay() {
+    cancelAnimationFrame(replayFrame); replayFrame = 0;
+    replayButton.textContent = 'Replay';
+  }
+  function measure() {
+    const trigger = window.innerHeight * 0.65;
+    anchors = steps.map(step => step.getBoundingClientRect().top + window.scrollY - trigger);
+    noInternalScroll = embedded && document.documentElement.scrollHeight <= innerHeight + 2;
+    document.querySelector('#embed-note').hidden = !noInternalScroll;
+    if (noInternalScroll && source === 'scroll') source = 'manual';
+  }
+  function schedule({ resize = false } = {}) {
+    if (resize) needsResize = true;
+    if (scheduled || destroyed || !story) return;
+    scheduled = requestAnimationFrame(() => {
+      scheduled = 0;
+      measure();
+      if (needsResize) { story.resize(); needsResize = false; }
+      if (source === 'scroll') show(positionForScroll(scrollY, anchors, HOLD));
+      else show(story.value);
+    });
+  }
+  let needsResize = false;
+
+  try {
+    // Keep JS and CSS on the same fixed version. Awaiting sequence is the
+    // readiness boundary; it has no extra .ready Promise.
+    const { line, sequence } = await import('https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm');
+    const states = makeStates(line);
+    if (states.length !== steps.length) throw new Error('Use one step card per authored state.');
+    slider.max = String(states.length - 1);
+    await document.fonts.ready;
+    story = await sequence(states, { target: '#chart', width: 'auto', height: 'auto' });
+    measure(); show(source === 'scroll' ? positionForScroll(scrollY, anchors, HOLD) : story.value);
+    const table = document.createElement('table');
+    table.innerHTML = '<caption>Source rows</caption><thead><tr><th>Date</th><th>Route</th><th>Journeys</th></tr></thead><tbody></tbody>';
+    for (const row of rows) {
+      const tr = table.querySelector('tbody').insertRow();
+      for (const value of [row.date.toLocaleDateString('en-GB'), row.route, row.journeys]) tr.insertCell().textContent = String(value);
+    }
+    document.querySelector('#data-table').append(table);
+    document.querySelector('#state-code').textContent = makeStates.toString();
+    for (const control of [replayButton, themeButton, slider]) control.disabled = false;
+    themeButton.textContent = document.documentElement.dataset.theme === 'dark' ? 'Light theme' : 'Dark theme';
+    status.textContent = 'Scroll to explore, or choose a position.';
+
+    listen(window, 'scroll', () => { source = noInternalScroll ? 'manual' : 'scroll'; schedule(); }, { passive: true });
+    listen(window, 'resize', () => { cancelReplay(); schedule({ resize: true }); });
+    for (const name of ['wheel', 'touchstart']) listen(window, name, cancelReplay, { passive: true });
+    listen(window, 'keydown', event => {
+      if (event.target?.closest?.('input, button, select, textarea, a, [contenteditable]')) return;
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) cancelReplay();
+    });
+    listen(slider, 'input', () => { cancelReplay(); source = 'manual'; show(Number(slider.value)); });
+    listen(replayButton, 'click', () => {
+      if (replayFrame) { cancelReplay(); return; }
+      measure(); source = noInternalScroll ? 'manual' : 'scroll';
+      const start = Math.max(0, anchors[0]), end = Math.min(anchors.at(-1), document.documentElement.scrollHeight - innerHeight);
+      if (reduced.matches) { if (!noInternalScroll) window.scrollTo(0, end); show(steps.length - 1); return; }
+      replayButton.textContent = 'Stop replay';
+      const began = performance.now();
+      const duration = (steps.length - 1) * 2200;
+      const tick = now => {
+        const t = Math.min(1, (now - began) / duration);
+        if (noInternalScroll) show(positionForScroll(t * (steps.length - 1), steps.map((_, index) => index), HOLD));
+        else {
+          window.scrollTo(0, start + (end - start) * t);
+          show(positionForScroll(scrollY, anchors, HOLD));
+        }
+        if (t < 1) replayFrame = requestAnimationFrame(tick);
+        else { cancelReplay(); }
+      };
+      replayFrame = requestAnimationFrame(tick);
+    });
+    function applyTheme(theme) {
+      cancelReplay();
+      document.documentElement.dataset.theme = theme;
+      themeButton.textContent = theme === 'dark' ? 'Light theme' : 'Dark theme';
+      story.resize(); updateControls(story.value);
+    }
+    listen(themeButton, 'click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+    listen(reduced, 'change', () => { cancelReplay(); show(story.value); });
+    const resizeObserver = new ResizeObserver(() => schedule());
+    resizeObserver.observe(document.querySelector('.steps'));
+    cleanup.push(() => resizeObserver.disconnect());
+    listen(document.querySelector('details'), 'toggle', () => schedule());
+
+    // A cross-origin child cannot read its parent's scroll position. A parent
+    // can send leg-unit positions only after explicitly configuring its origin.
+    listen(window, 'message', event => {
+      if (!PARENT_ORIGIN || event.origin !== PARENT_ORIGIN || event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || data.type !== 'visdelta:story-progress' || data.id !== STORY_ID || !Number.isFinite(data.progress)) return;
+      cancelReplay(); source = 'parent'; show(data.progress);
+    });
+    if (embedded && PARENT_ORIGIN) window.parent.postMessage({ type: 'visdelta:story-ready', id: STORY_ID, max: steps.length - 1 }, PARENT_ORIGIN);
+    document.documentElement.dataset.storyReady = 'true';
+    listen(window, 'pagehide', event => {
+      if (event.persisted) { cancelReplay(); return; }
+      destroyed = true; cancelReplay(); cancelAnimationFrame(scheduled);
+      cleanup.forEach(dispose => dispose()); story.destroy();
+    });
+  } catch (error) {
+    status.textContent = `Could not prepare the story: ${error.message}. Serve this file over HTTP and check the pinned CDN requests.`;
+    status.setAttribute('role', 'alert');
+    console.error(error);
+  }
+</script>
+</body>
+</html>

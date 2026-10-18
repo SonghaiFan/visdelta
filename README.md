@@ -41,6 +41,19 @@ change.play({ duration: 800 });
 
 Chart states are immutable: creating `profit` does not change `revenue`.
 
+## Building with an agent
+
+For downstream MDX applications, see the [authoring integration guide](website/content/docs/guides/mdx.mdx)
+and the [native state module](examples/authoring/network-states.mjs). The accompanying
+[mount example](examples/authoring/mount-story.mjs) covers asynchronous generations,
+pending progress, single states and cleanup. Run `npm run authoring:check` to verify
+these examples against an installed package.
+
+Start with [llms.txt](llms.txt), the [automatic behavior table](https://songhaifan.github.io/visdelta/docs/guides/automatic-behaviors/),
+and the runnable [single-file scroll story](examples/templates/scroll-story.html).
+The [diagnostic API design](docs/proposals/diagnostics-api.md) is a proposal,
+not an implemented API.
+
 ## Install
 
 ```sh

@@ -72,6 +72,7 @@ try {
   ], consumerDir);
 
   await writeConsumerSmoke(consumerDir);
+  await writeFile(join(consumerDir, 'network-states.mjs'), await readFile(join(root, 'examples/authoring/network-states.mjs')));
   run("node", ["consumer-smoke.mjs"], consumerDir);
   await writeFile(join(consumerDir, "consumer.ts"), await readFile(join(root, "tests/types/consumer.ts")));
   run(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
@@ -99,6 +100,7 @@ import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import * as api from "visdelta";
+import { network, states as authoredStates, rows as storyRows } from './network-states.mjs';
 import * as browserApi from "visdelta/browser";
 import { D3_AREA_CURVE_NAMES as selectedAreaCurveNames, area as selectedArea, areaModule } from "visdelta/area";
 import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
@@ -116,6 +118,12 @@ import {
 } from "visdelta/plugins";
 
 const expectedApi = ${JSON.stringify(expectedApi, null, 2)};
+if (authoredStates.length !== 3 || authoredStates[0] !== authoredStates[2]) throw new Error('Packed authoring story lost its authored return boundary.');
+if (network.overview.toSpec().meta?.state?.scopes?.highlight != null) throw new Error('Deriving attention mutated the base story state.');
+deepStrictEqual(network.north.rows(), network.overview.rows(), 'Attention preserves membership');
+deepStrictEqual(network.north.rows().map(row => ({ ...row, date: new Date(row.date).getTime() })), storyRows.map(row => ({ ...row, date: row.date.getTime() })), 'Story identity and date instants survive serialization');
+if (!storyRows.every(row => row.date instanceof Date)) throw new Error('Authoring mutated the source Date values.');
+if (!api.delta(network.overview, network.north).stateChanges.some(change => change.category === 'attention')) throw new Error('Authored story must emit Attention.');
 const actualApi = Object.keys(api).sort();
 assertSame(actualApi, expectedApi, "public API");
 assertSame(Object.keys(browserApi).sort(), expectedApi, "browser public API");

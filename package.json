@@ -115,7 +115,9 @@
     "test": "npm run check && npm run manifest:check && npm run build && npm run bundle:check && npm run examples:check && npm run docs:check && npm run package:check && npm run smoke && node --test tests/*.test.mjs",
     "prepack": "npm test",
     "prepublishOnly": "npm run release:check",
-    "browser:check": "node scripts/check-browser-distributions.mjs"
+    "browser:check": "node scripts/check-browser-distributions.mjs && node scripts/check-agent-examples.mjs && node scripts/check-authoring-consumer.mjs",
+    "authoring:check": "node scripts/check-authoring-consumer.mjs",
+    "agent:check": "node scripts/check-agent-examples.mjs"
   },
   "dependencies": {
     "@types/d3-axis": "^3.0.6",

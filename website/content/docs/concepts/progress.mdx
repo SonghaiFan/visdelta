@@ -13,7 +13,7 @@ change.value;           // where it is now
 ```
 
 `progress()` draws that frame immediately and stops any playback. You can seek
-in any order; the same number always draws the same frame.
+in any order. Ordinary reversible routes reuse the same frames backward; Unit's opt-in `directionalEase()` is a documented exception.
 
 ## Play
 
@@ -35,6 +35,33 @@ current frame.
 For a [`sequence()`](/docs/api/sequence), progress runs from `0` to the number
 of states minus one. `1.5` is halfway between the second and third state.
 Whole numbers always land exactly on a state you wrote.
+
+## States, legs and stages
+
+For authored states `[A, B, C]`, the two legs are `A → B` and `B → C`.
+A chart may insert intermediate states and rendered phases *inside* either leg;
+these do not add new integer positions to a sequence.
+
+| Sequence position | Location |
+| --- | --- |
+| `0` | Authored A |
+| `0.5` | Halfway through the complete A → B leg |
+| `1` | Authored B |
+| `1.5` | Halfway through the complete B → C leg |
+| `2` | Authored C |
+
+A pair controller's route stages split its 0..1 progress range equally.
+`inspect()` gives the actual compiled phase intervals inside that range. A
+semantic action can span several phases; neither the number of actions nor
+`states.length` is a phase count. If the two legs contain 2 and 3 serial route
+stages, `play({ duration: 800 })` takes `(2 + 3) × 800 = 4000 ms` for the
+whole sequence. The midpoint of a leg is not necessarily half of its semantic
+operations.
+
+`play()` returns its controller, so `await change.play()` does **not** wait for
+completion. Await `transition()` or `sequence()` to prepare a controller, then
+read `value` while playback runs. The [scroll template](/docs/guides/scroll-template)
+drives progress externally and never assumes `play()` is a Promise.
 
 ## Resize and clean up
 

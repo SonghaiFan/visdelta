@@ -1,0 +1,108 @@
+---
+title: Copy a scroll story
+description: A runnable single-file template with measured step positions, holds, replay, themes and an explicit iframe contract.
+---
+
+[Open the complete HTML template](/templates/scroll-story.html). Save that file
+as `index.html`, run a static server such as `npx serve .`, and open its HTTP
+URL. It pins both JavaScript and CSS to VisDelta **0.4.2**; it needs network
+access to jsDelivr, but no bundler, application framework or external dataset.
+
+The source of truth is
+[`examples/templates/scroll-story.html`](https://github.com/SonghaiFan/visdelta/blob/main/examples/templates/scroll-story.html).
+The documentation build copies it unchanged. Its inline data is fictional.
+
+## Replace data, then authored states
+
+The `AUTHORED STORY` section contains rows and `makeStates(line)`. Each state
+must have one matching `.step` card, and all states use the same chart type.
+The template currently shows Data membership, then Attention, then clearing
+Attention; categories still describe the changes, not the scroll schedule.
+
+Dates in this example mean local calendar dates, constructed with
+`new Date(year, monthIndex, day)`. Use an explicit instant/timezone convention
+instead when your data represents timestamps. The current axis is local-time.
+
+The source data and actual state-construction code appear before the chart in
+the page's expandable source section. Edit those source definitions rather than
+maintaining a second, separately synchronized animation.
+
+## Scroll contract
+
+Step anchors are measured from card positions in document coordinates. The
+reading trigger is 65% down the viewport. Between two anchors:
+
+| Fraction of the interval scrolled | Story position |
+| --- | --- |
+| 0 to 0.45 | Hold the current integer keyframe |
+| 0.45 to 1 | Interpolate to the next integer keyframe |
+| At the next anchor | Exactly the next authored state |
+
+`HOLD` controls the hold fraction in the template. This is page-control policy,
+not a VisDelta timing option. The same measured mapping works in reverse and
+with unequal card heights. Layout changes remeasure anchors. Events are
+coalesced with `requestAnimationFrame`, and unchanged progress does not redraw
+the chart. The template waits for fonts and `await sequence(...)` before
+installing its controls; no `story.ready` Promise is needed.
+
+Replay advances through the same scroll mapping, including holds. Wheel,
+touch, scroll-navigation keys, slider input or a parent message can take over.
+The slider uses **leg units**, from 0 to 3 for four authored states. It works
+without any scrolling; the next real scroll event takes control back from a manual selection. With reduced motion, positions snap to authored states
+and Replay jumps to the last state rather than animating.
+
+Theme tokens live on the document root so sequence preparation mounts see the
+same theme. A theme change calls `story.resize()` at the current position.
+Automatic dimensions follow the chart container; viewport resize also refreshes
+the controller. The page disconnects listeners/observers and destroys the
+sequence when it leaves the document.
+
+## Iframes: pick one owner for progress
+
+- **An iframe with an internal scroll area:** the child uses its own scroll
+  position and the normal template behavior.
+- **A frame expanded to its content height:** the child has no internal scroll
+  travel. The template shows a note and retains the position slider and replay.
+  Its capped section heights avoid viewport-height sizing expanding forever.
+- **A cooperating parent:** configure the exact `PARENT_ORIGIN` in the template
+  and send positions in sequence leg units. The child accepts only the configured
+  origin, its actual parent window, the matching story ID and a finite position.
+  Values are clamped to the story range.
+
+A cross-origin child cannot read its parent's scroll position. CSS sticky is
+relative to the child's viewport; this template does not promise to keep a chart
+visible while a very tall iframe scrolls past in the parent. Prefer a normally
+scrolling frame or host the story in the parent for that presentation.
+
+For cooperative control, set `PARENT_ORIGIN` in the child and adapt this parent
+code to the publication's own step measurements:
+
+```js
+const childOrigin = 'https://story.example'; // exact child origin
+const frame = document.querySelector('iframe');
+let ready = false;
+window.addEventListener('message', (event) => {
+  if (event.origin !== childOrigin || event.source !== frame.contentWindow) return;
+  if (event.data?.type === 'visdelta:story-ready' && event.data.id === 'network-story') ready = true;
+});
+function sendPosition(progress) {
+  if (!ready || !Number.isFinite(progress)) return;
+  frame.contentWindow.postMessage({
+    type: 'visdelta:story-progress', id: 'network-story', progress,
+  }, childOrigin);
+}
+// Map the parent publication's step measurements to 0..3, then call sendPosition.
+```
+
+The initial handshake prevents early progress messages being lost while the
+sequence is preparing. The template never accepts wildcard origins.
+
+## What is verified
+
+Browser checks exercise the actual copied HTML at desktop and narrow widths:
+forward/reverse scroll, holds, complete keyframes, replay/interruption,
+resizing, dark theme, reduced motion, an internally scrolling iframe, a
+content-height iframe and the opt-in parent message contract. Offline CI routes
+the pinned package URLs to the frozen local build; a separate CDN smoke mode
+runs the unchanged page against the published package. See the
+[agent workflow](/docs/guides/agent-workflow) for the current diagnostic APIs.

@@ -1,6 +1,10 @@
 {
   "title": "Guides",
   "pages": [
+    "agent-workflow",
+    "automatic-behaviors",
+    "scroll-template",
+    "mdx",
     "controlling-playback",
     "stories",
     "updating-a-chart",

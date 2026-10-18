@@ -68,7 +68,8 @@ an authored type always wins.
 
 Explicit numeric and temporal position domains keep their authored bounds;
 only inferred domains are rounded with `nice()`. Log axes use ordinary D3 log
-ticks without injecting arbitrary data-endpoint ticks.
+ticks without injecting arbitrary data-endpoint ticks. The current log guard
+clamps positive bounds below 0.1; exact sub-0.1 log domains remain unsupported.
 
 Quantitative position channels support `scale: { type: "linear" }`,
 `scale: { type: "sqrt" }`, and `scale: { type: "log", base? }`. Log scales
@@ -368,9 +369,9 @@ on a two-pixel grid, preserving gaps and curved boundaries. Labels that cannot
 fit are omitted, and moving labels are checked again during playback. Text uses
 black or white according to the underlying fill. Single/rolled-up areas have no
 series labels. Custom label text, outside placement and callouts are unsupported.
-The color legend remains governed by its existing `legend` option, so it can
-identify thin layers whose direct labels are omitted. Label placement is
-recomputed on resize.
+The color legend follows the declared field-color mapping and can identify
+thin layers whose direct labels are omitted. There is no global `legend: false`
+switch. Label placement is recomputed on resize.
 
 ```js
 area(rows).x("year").y("revenue")
@@ -702,6 +703,12 @@ margin. A chart that repeats panels draws its legends inside the panels.
 `sequence()` makes an ordered set of authored states a single seekable
 timeline. Adjacent legs are explicit: `A → B`, then `B → C`. Its `value` uses
 state positions, so `1.5` is halfway from the second state to the third.
+
+Runtime theme, color and text measurement services remain scoped to each leg's
+actual chart root as it moves between preparation and visible mounts. This
+keeps chart-root font measurements and scoped tokens stable during handoffs and
+resizing. Preparation still takes place under `document.body`; shared theme
+tokens should be available there before a leg is activated.
 
 ```js
 import { sequence } from "visdelta/transition";

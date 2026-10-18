@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Keep transition runtime services scoped to the actual chart root when a
+  sequence moves it between preparation and visible mounts. This preserves
+  measured legend spacing and chart-scoped theme tokens across leg handoffs,
+  reverse seeking and resizing, including custom plugins.
+- Add native-state authoring and asynchronous mounting examples with an
+  installed-package browser check for downstream MDX applications.
+
 ## 0.4.2 - 2026-10-18
 
 - Share scene-owned motion tracks across independently bundled lazy chart modules,

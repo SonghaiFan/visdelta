@@ -41,22 +41,13 @@ mid-animation.
 
 ## Scroll position
 
-Map scroll position to progress. VisDelta draws whatever frame you ask for, in
-any order, so fast scrolling and scrolling backward need no special handling.
+Use the [tested, single-file scroll story](/docs/guides/scroll-template) for
+step cards, holds and replay. It measures actual card positions, coalesces events
+and includes explicit handling for content-height iframes. Mapping progress from
+an iframe's own viewport cannot reveal a cross-origin parent's scroll position.
 
-```ts
-const section = document.querySelector<HTMLElement>('#story')!;
-
-function onScroll() {
-  const rect = section.getBoundingClientRect();
-  const travel = rect.height - window.innerHeight;
-  const t = Math.min(1, Math.max(0, -rect.top / travel));
-  change.progress(t);
-}
-
-window.addEventListener('scroll', onScroll, { passive: true });
-onScroll();
-```
+All control modes call the same `progress()` API, so reverse scrolling needs no
+separate chart animation.
 
 ## Your own clock
 
