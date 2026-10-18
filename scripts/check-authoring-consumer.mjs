@@ -37,7 +37,8 @@ try {
     import { chart as salesChart } from './sales.mjs';
     import { transition, sequence, point } from 'visdelta';
     import { defineChartType, registerChartModule } from 'visdelta/plugins';
-    window.storyExample = { mountStory, states, network, salesChart, transition, sequence, point, defineChartType, registerChartModule };
+    import { chartStylePresets, defineChartStyle } from 'visdelta/chart-style';
+    window.storyExample = { mountStory, states, network, salesChart, transition, sequence, point, defineChartType, registerChartModule, chartStylePresets, defineChartStyle };
   `, resolveDir: consumer }, bundle: true, write: false, format: 'esm' })).outputFiles[0].text;
   const css = await readFile(join(consumer, 'node_modules/visdelta/dist/visdelta.css'));
   server = createServer((req, res) => {
@@ -193,6 +194,87 @@ try {
   assert.deepEqual(errors, []);
   console.log('ok   installed story: cancelled generation, static state, independent instances and preparation failure cleanup');
   console.log('ok   minimal Bar: inferred identity, inline Step attention and independent endpoints in both directions');
+  const styles = await page.evaluate(async () => {
+    const { salesChart, sequence, transition, chartStylePresets, defineChartStyle } = window.storyExample;
+    const a = document.querySelector('#a'), b = document.querySelector('#b');
+    a.style.width = b.style.width = '600px';
+    const theme = document.createElement('style');
+    theme.textContent = ':root[data-page-theme=dark]{--vd-color-mark-default:#edf1ee;--vd-color-surface:#141b20;--vd-figure-bg:#141b20}';
+    document.head.append(theme);
+    document.documentElement.dataset.pageTheme = 'dark';
+    const capture = host => ({
+      style: host.querySelector('.vd-transition-root').dataset.chartStyle,
+      font: getComputedStyle(host.querySelector('.vd-transition-root')).fontFamily,
+      background: getComputedStyle(host.querySelector('.vd-figure')).backgroundColor,
+      bars: [...host.querySelectorAll('.vd-bar')].map(n => ['x', 'y', 'width', 'height', 'fill', 'style'].map(attr => n.getAttribute(attr))),
+      axes: [...host.querySelectorAll('.vd-axis .tick')].map(n => [n.textContent, n.getAttribute('transform'), getComputedStyle(n.querySelector('text')).fill]),
+      legend: [...host.querySelectorAll('.vd-legend-item')].map(n => [n.textContent, n.getAttribute('transform')]),
+    });
+    const collected = [];
+    const custom = defineChartStyle({ key: 'integration-compact', legendPosition: 'right', plot: { grid: 'horizontal', margin: { top: 40, right: 85 } } });
+    for (const style of [...Object.values(chartStylePresets), custom]) {
+      const colored = salesChart.color('region');
+      const steps = [colored, colored.highlight({ region: 'North' }), colored];
+      const story = await sequence(steps, { target: a, width: 'auto', height: 'auto', chartStyle: style });
+      for (const index of [0, 1, 2, 1, 0]) {
+        story.progress(index); story.resize();
+        const reference = await transition(steps[index], steps[index], { target: b, width: 'auto', height: 'auto', chartStyle: style });
+        reference.progress(1);
+        collected.push({ key: style.key, actual: capture(a), expected: capture(b) });
+        reference.destroy(); b.replaceChildren();
+      }
+      story.destroy(); a.replaceChildren();
+      for (const [declaration, expectedFills] of [
+        [salesChart.color('#c31c48'), ['#c31c48', '#c31c48', '#c31c48']],
+        [salesChart.color('region', { range: ['#990000', '#009900', '#000099'] }), ['#990000', '#009900', '#000099']],
+        [salesChart.color('region', { scheme: 'Tableau10' }), ['#4e79a7', '#f28e2c', '#e15759']],
+      ]) {
+        const fixed = await transition(declaration, declaration, { target: a, width: 'auto', height: 'auto', chartStyle: style });
+        fixed.progress(1);
+        collected.push({ key: style.key, fills: [...a.querySelectorAll('.vd-bar')].map(n => n.getAttribute('fill')), expectedFills });
+        fixed.destroy(); a.replaceChildren();
+      }
+    }
+    const neutral = await transition(salesChart, salesChart, { target: a, width: 'auto', height: 'auto', chartStyle: chartStylePresets.paper });
+    neutral.progress(1);
+    const ink = {
+      actual: a.querySelector('.vd-bar').getAttribute('fill'),
+      expected: getComputedStyle(a.querySelector('.vd-transition-root')).getPropertyValue('--vd-color-on-surface').trim(),
+      background: getComputedStyle(a.querySelector('.vd-figure')).backgroundColor,
+    };
+    neutral.destroy(); a.replaceChildren();
+    const paper = await sequence([salesChart, salesChart.highlight({ region: 'North' }), salesChart], { target: a, width: 'auto', height: 'auto', chartStyle: chartStylePresets.paper });
+    const dark = await sequence([salesChart, salesChart.highlight({ region: 'North' }), salesChart], { target: b, width: 'auto', height: 'auto', chartStyle: chartStylePresets.dark });
+    const coexist = [];
+    for (const themeName of ['light', 'dark', 'light']) {
+      document.documentElement.dataset.pageTheme = themeName;
+      paper.progress(2); dark.progress(1); paper.resize(); dark.resize();
+      coexist.push({ paper: capture(a), dark: capture(b) });
+    }
+    paper.destroy(); dark.destroy(); a.replaceChildren(); b.replaceChildren();
+    delete document.documentElement.dataset.pageTheme; theme.remove();
+    return { collected, ink, coexist };
+  });
+  for (const sample of styles.collected) {
+    if (sample.actual) {
+      assert.equal(sample.actual.style, sample.key);
+      assert.deepEqual(sample.actual, sample.expected, `Style ${sample.key} must retain its scope across leg handoffs`);
+    } else {
+      assert.deepEqual(sample.fills, sample.expectedFills, 'Authored colors override preset palettes');
+    }
+  }
+  assert.equal(styles.ink.background, 'rgb(255, 253, 247)', 'Paper keeps its light surface on a dark page');
+  assert.equal(styles.ink.actual, styles.ink.expected, 'Paper neutral marks must use its ink rather than inherit dark-page white');
+  for (const sample of styles.coexist) {
+    assert.equal(sample.paper.style, 'paper'); assert.equal(sample.dark.style, 'dark');
+    assert.equal(sample.paper.background, 'rgb(255, 253, 247)');
+    assert.equal(sample.dark.background, 'rgb(17, 22, 28)');
+    assert.notEqual(sample.paper.font, sample.dark.font);
+    assert.equal(sample.paper.bars[0][4], styles.ink.expected, 'Paper ink remains stable when page theme changes');
+    assert.equal(sample.dark.bars[0][4], '#ffffff', 'The dark preset retains its own neutral ink');
+  }
+  assert.deepEqual(errors, []);
+  console.log('ok   styles: every preset/custom module, scoped fonts/axes/legends, authored colors and paper ink on a dark page');
 } finally {
   await browser?.close();
   if (server) await new Promise(resolve => server.close(resolve));

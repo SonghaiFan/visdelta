@@ -363,6 +363,7 @@
   --vd-color-surface: #fffdf7;
   --vd-color-bg: #f4eee2;
   --vd-color-on-surface: #21180f;
+  --vd-color-mark-default: var(--vd-color-on-surface);
   --vd-color-muted: #746653;
   --vd-color-border: #cbbda5;
   --vd-color-outline: #a4957d;

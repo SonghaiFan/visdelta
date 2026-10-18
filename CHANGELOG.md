@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep Paper's neutral marks in its own dark ink when the surrounding page
+  switches to a dark theme. Explicit authored colors and palettes still win.
 - Keep transition runtime services scoped to the actual chart root when a
   sequence moves it between preparation and visible mounts. This preserves
   measured legend spacing and chart-scoped theme tokens across leg handoffs,
