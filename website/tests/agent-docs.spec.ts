@@ -36,6 +36,7 @@ for (const width of [1280, 390]) {
         const content = await page.locator('main').innerText();
         expect(content).toContain('<Step chart={chart}>');
         expect(content).toContain("chart.highlight({ region: 'North' })");
+        expect(content).toContain('<Scrolly chartStyle="paper">');
         expect(content).not.toContain('<Scrolly states=');
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);

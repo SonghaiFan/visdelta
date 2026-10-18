@@ -86,6 +86,36 @@ More complex stories can use the
 Line example with explicit identity and temporal bindings. Dates serialize to
 ISO strings; compare instants rather than requiring `rows()` to return `Date`s.
 
+## Optional chart presentation
+
+An application can expose a `chartStyle` prop on `Scrolly` and map preset names
+through the existing `chartStylePresets` export:
+
+```mdx
+<Scrolly chartStyle="paper">
+
+<Step chart={chart}>Compare all regions.</Step>
+
+<Step chart={chart.highlight({ region: 'North' })}>Look at North.</Step>
+
+</Scrolly>
+```
+
+`chartStyle` here is an application prop, not a new VisDelta builder or string
+option. The application resolves `d3`, `paper`, `dark` or `editorial` to a module
+from `visdelta/chart-style`, or accepts a native `defineChartStyle(...)` module,
+and passes it as the library's `options.chartStyle`. Both `sequence()` and the
+single-state `transition(chart, chart)` path need that option.
+
+One module applies to the whole sequence. Steps keep using native chart
+declarations for authored color changes; they do not interpolate style modules.
+The application validates names, retains stable module identity through parent
+renders, and preserves desired progress when replacing a controller for a new
+module. Keep page-theme refreshes separate: they use `resize()`.
+
+See [Styling and themes](/docs/guides/styling/) for CSS inheritance, explicit-color
+precedence and the difference between structural modules and CSS token themes.
+
 ## Installed-package contract
 
 Use `import 'visdelta/style.css'` once in the browser application. Pin the
@@ -96,6 +126,10 @@ sequence legs move out of their hidden preparation mounts. Version 0.4.2 can
 measure legend labels using the empty preparation host's font after a handoff.
 Integration snapshots containing this fix must use a distinct prerelease version,
 not be presented as the published 0.4.2 package.
+
+The Paper neutral-ink correction is also unreleased: older builds can inherit
+light neutral marks from a dark page. Pin the tested package or integration
+snapshot rather than assuming this checkout's fixes exist in 0.4.2.
 
 | Concern | Implemented behavior | Application responsibility |
 | --- | --- | --- |
