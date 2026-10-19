@@ -542,57 +542,6 @@ test.describe('playground', () => {
     expect(fits).toBe(true);
   });
 
-  test('a title is figure text above the chart; Fit uses the remaining room, Fixed slides it', async ({ page }) => {
-    const errors = trackErrors(page);
-    await page.goto('playground/#headline');
-    // Start, then add a title and subtitle: three kept states.
-    await expect(keys(page)).toHaveCount(3, { timeout: 30_000 });
-    const stage = chart(page);
-    const title = stage.locator('.vd-figure-title:visible').first();
-    await expect(title).toContainText('Residents under 10');
-    await expect(changes(page)).toContainText('appearance.restyle(subtitle)');
-    // The heading remains outside the SVG in both sizing modes.
-    expect(await stage.locator('svg').first().evaluate((svg) => svg.querySelector('.vd-figure-title') !== null)).toBe(false);
-    expect(await stage.locator('figure').first().evaluate((figure) => figure.querySelector('figcaption') !== null && figure.querySelector('svg')!.closest('figcaption') === null)).toBe(true);
-
-    // Fit keeps the figure in its container and gives the canvas the remaining room.
-    const timeline = page.getByLabel('Keyframe timeline');
-    const canvas = () => stage.locator('svg:visible').first().evaluate((svg) => {
-      const box = svg.getBoundingClientRect();
-      return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom) };
-    });
-    await timeline.fill('0');
-    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
-    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
-    const fitFirst = await canvas();
-    const native = await stage.locator("svg:visible").first().getAttribute("viewBox");
-    await timeline.fill((await timeline.getAttribute('max'))!);
-    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(fitFirst.top);
-    const fitLast = await canvas();
-    expect(fitLast.width / fitLast.height).toBeCloseTo(fitFirst.width / fitFirst.height, 1);
-    await expectFit(stage);
-    await expect(stage.locator("svg:visible").first()).toHaveAttribute("viewBox", native!);
-    // Compare the edge itself: summing separately rounded top and height can drift by a pixel.
-    expect(fitLast.bottom).toBeLessThanOrEqual((await stage.boundingBox())!.y + (await stage.boundingBox())!.height + 1);
-    await timeline.fill('0');
-    await expect.poll(canvas).toEqual(fitFirst);
-    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
-
-    // Fixed leaves the canvas size alone, so the heading's room opens by progress and the
-    // first frame is the chart drawn without one.
-    await page.getByRole('group', { name: 'Chart size' }).getByRole('button', { name: 'Fixed' }).click();
-    await timeline.fill('0');
-    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
-    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
-    const first = await canvas();
-    await timeline.fill((await timeline.getAttribute('max'))!);
-    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(1);
-    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(first.top + 20);
-    const last = await canvas();
-    expect({ width: last.width, height: last.height }).toEqual({ width: first.width, height: first.height });
-    expect(errors).toEqual([]);
-  });
-
   test('rows are a file: upload your own or edit them, and the chart follows', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#sort');

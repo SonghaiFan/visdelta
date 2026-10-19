@@ -196,8 +196,8 @@ const chart = bar(cases)
     data: POPULATION,
     code: underTen,
     edits: [
-      { add: '.title("Residents under 10 by state")' },
-      { add: '.sort("population", "descending")' },
+      { add: '.sort("population", "ascending")' },
+      { replace: '.sort("population", "ascending")', with: '.sort("population", "descending")' },
     ],
   },
   {
@@ -209,7 +209,7 @@ const chart = bar(cases)
     data: './data/area-lab.csv',
     code: `const chart = area(rows)
   .x("date", { label: "Date" })
-  .y("unemployed", { label: "Unemployed (thousands)", format: "," })
+  .y("unemployed", { label: "Unemployed (thousands)" })
   .key(["date", "industry"])
   .breakdown("industry")
   .color("industry");`,
@@ -250,19 +250,6 @@ const chart = bar(cases)
     ],
   },
   {
-    id: 'headline',
-    title: 'Can this chart explain itself when shared?',
-    category: 'appearance',
-    chart: 'bar',
-    line: 'Name the measure and its source so a reader can interpret the chart outside this analysis session.',
-    data: POPULATION,
-    code: underTen,
-    edits: [
-      { add: '.title("Residents under 10")' },
-      { add: '.subtitle("US Census, by state")' },
-    ],
-  },
-  {
     id: 'steps',
     title: 'Does a valve setting change between update events?',
     category: 'appearance',
@@ -284,7 +271,7 @@ const chart = bar(cases)
     data: './data/service-demand-monthly.csv',
     code: `const chart = area(rows)
   .x("month", { label: "Month" })
-  .y("requests", { label: "Requests", format: "," })
+  .y("requests", { label: "Requests" })
   .key(["month", "service"])
   .rollup();`,
     edits: [
@@ -301,13 +288,13 @@ const chart = bar(cases)
     data: './data/service-demand-monthly.csv',
     code: `const chart = area(rows)
   .x("month", { label: "Month" })
-  .y("requests", { label: "Requests", format: "," })
+  .y("requests", { label: "Requests" })
   .key(["month", "service"])
   .rollup();`,
     edits: [
       { replace: '.rollup()', with: '.breakdown("service")' },
       { add: '.color("service")' },
-      { replace: '.y("requests", { label: "Requests", format: "," })', with: '.y("share", { label: "Share of monthly requests", format: ".0%" })' },
+      { replace: '.y("requests", { label: "Requests" })', with: '.y("share", { label: "Share of monthly requests", format: ".0%" })' },
     ],
   },
   {
@@ -408,17 +395,16 @@ const chart = unit(counts)
     title: 'Can the service layers be read without a legend?',
     category: 'appearance',
     chart: 'area',
-    line: 'Label the service layers directly, then add the measure and simulated-data context for a standalone chart.',
+    line: 'Label the service layers directly to make the simulated monthly request totals easy to read.',
     data: './data/service-demand-monthly.csv',
     code: `const chart = area(rows)
   .x("month", { label: "Month" })
-  .y("requests", { label: "Requests", format: "," })
+  .y("requests", { label: "Requests" })
   .key(["month", "service"])
   .breakdown("service")
   .color("service");`,
     edits: [
       { add: '.labels("inside")' },
-      { add: '.title("Monthly service requests").subtitle("Simulated counts by service")' },
     ],
   },
   {
@@ -430,7 +416,7 @@ const chart = unit(counts)
     data: './data/service-demand-monthly.csv',
     code: `const chart = area(rows)
   .x("month", { label: "Month" })
-  .y("requests", { label: "Requests", format: "," })
+  .y("requests", { label: "Requests" })
   .key(["month", "service"])
   .breakdown("service")
   .color("service");`,

@@ -56,14 +56,3 @@ body { background: var(--vd-color-bg); }
 .vd-figure {
   border-top: 2px solid var(--vd-color-on-surface);   /* heavy top rule, newspaper column-top */
 }
-.vd-figure-heading {
-  border-bottom: 1px solid var(--vd-color-border);
-}
-.vd-figure-title {
-  color: var(--vd-fg);
-  font-family: var(--vd-type-family);
-  font-size: clamp(1rem, 1.6vw, 1.3rem);
-  font-weight: 700;
-  font-style: italic;             /* italic titles — magazine masthead style   */
-  letter-spacing: 0;
-}

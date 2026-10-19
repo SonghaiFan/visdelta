@@ -100,50 +100,6 @@
   overflow: hidden;
 }
 
-/* Title and subtitle sit above the canvas, outside the SVG. The header is
-   hidden until a state declares one. */
-.vd-figure-header {
-  box-sizing: border-box;
-}
-
-.vd-figure-heading {
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid var(--vd-border);
-}
-
-.vd-figure-header[hidden],
-.vd-figure-title[hidden],
-.vd-figure-subtitle[hidden] {
-  display: none;
-}
-
-/* The outgoing and incoming text share one cell, so the line is as tall as the
-   taller of the two and never moves the canvas while it changes. */
-.vd-figure-title,
-.vd-figure-subtitle {
-  margin: 0;
-  display: grid;
-}
-
-.vd-figure-title > span,
-.vd-figure-subtitle > span {
-  grid-area: 1 / 1;
-}
-
-.vd-figure-title {
-  color: var(--vd-fg);
-  font-size: clamp(1.12rem, 1.8vw, 1.42rem);
-  line-height: 1.12;
-  font-weight: 740;
-}
-
-.vd-figure-subtitle {
-  margin-top: 4px;
-  color: var(--vd-muted);
-  font-size: 0.875rem;
-  line-height: 1.3;
-}
-
 .vd-view {
   width: 100%;
   min-height: 420px;
@@ -507,5 +463,3 @@
 .vd-transition-root[data-hide-legend='true'] .vd-legend-svg {
   display: none;
 }
-
-.vd-figure-header { flex-shrink: 0; }

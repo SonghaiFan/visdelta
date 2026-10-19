@@ -51,13 +51,3 @@
 body {
   background: var(--vd-color-bg);
 }
-
-.vd-figure-header {
-  background: transparent;
-}
-
-.vd-figure-title {
-  color: var(--vd-fg);
-  font-weight: 650;
-  letter-spacing: -0.018em;
-}

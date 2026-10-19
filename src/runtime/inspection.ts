@@ -64,7 +64,6 @@ export function inspectFrames(frames: InspectionFrame[], reverse: boolean): Tran
     'Values are compiled phase endpoints. Timing is the recorded property interval within that phase.',
     'Custom tweens may update nested elements; their individual properties are not exposed.',
     'Node insertion/removal and immediate renderer writes are not recorded property tracks.',
-    'HTML title and subtitle follow whole-transition progress separately from these SVG phases.',
   ] };
 }
 

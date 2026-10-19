@@ -272,44 +272,7 @@ test('the public ontology vocabulary is covered by reachable state differences',
   ]);
 });
 
-test('title and subtitle are appearance restyles, not data or layout changes', () => {
-  const plain = base();
-  const headed = plain.title('Sales by state').subtitle('Latest census');
-
-  assert.deepEqual(summary(delta(plain, headed).stateChanges), [
-    { category: 'appearance', action: 'restyle', property: 'title' },
-    { category: 'appearance', action: 'restyle', property: 'subtitle' }
-  ]);
-  assert.deepEqual(summary(delta(headed, headed.title('Sales by state')).stateChanges), []);
-  assert.deepEqual(summary(delta(headed, headed.title('Revenue by state')).stateChanges), [
-    { category: 'appearance', action: 'restyle', property: 'title' }
-  ]);
-  // The inverse is the same fact: the heading is removed.
-  assert.deepEqual(summary(delta(headed, plain).stateChanges), [
-    { category: 'appearance', action: 'restyle', property: 'title' },
-    { category: 'appearance', action: 'restyle', property: 'subtitle' }
-  ]);
-  // They are lossless declaration edits too.
-  assert.deepEqual(delta(plain, plain.title('A')).edits, [
-    { path: ['title'], previous: { present: false }, next: { present: true, value: 'A' } }
-  ]);
-});
-
-test('title and subtitle are immutable declarations that blank text and null remove', () => {
-  const headed = base().title('Sales').subtitle('2024');
-
-  assert.equal(base().toSpec().title, undefined);
-  assert.equal(headed.toSpec().title, 'Sales');
-  assert.equal(headed.toSpec().subtitle, '2024');
-  assert.equal(headed.title('  ').toSpec().title, undefined);
-  assert.equal('title' in headed.title(null).toSpec(), false);
-  assert.equal(headed.title(null).toSpec().subtitle, '2024');
-  // Blank text is the same state as no heading, so it reports no change.
-  assert.deepEqual(summary(delta(base(), base().title('   ')).stateChanges), []);
-  // The text is kept as written.
-  assert.equal(base().title('  Padded ').toSpec().title, '  Padded ');
-  assert.throws(() => base().title(3), /\.title\(\) takes text, or null/);
-  assert.throws(() => base().subtitle({}), /\.subtitle\(\) takes text, or null/);
-  // reset() returns to the declaration before the first scope, heading included.
-  assert.equal(headed.where({ state: 'AL' }).reset().toSpec().title, 'Sales');
+test('figure headings are outside the chart API', () => {
+  assert.equal(base().title, undefined);
+  assert.equal(base().subtitle, undefined);
 });

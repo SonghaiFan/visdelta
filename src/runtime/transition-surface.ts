@@ -22,7 +22,6 @@ import type { ChartTypeRegistry } from '../charts/index.js';
 import { viewRows, domainTransforms } from './data.js';
 import { applyTransforms } from '../data/transforms.js';
 import type { CanvasSize } from './canvas-size.js';
-import { bareLayout, createHeading } from './heading.js';
 
 export interface TransitionSurfaceOptions extends RuntimeOptions {
   /** Canvas width: pixels, or "auto" (default) to follow the container. */
@@ -71,12 +70,6 @@ export function createTransitionSurface(
     renderSeekPhase, applySeekSequence } = createViewRenderer(chartTypes);
   const chartType = chartTypes.get(from);
   if (!chartType) throw new Error(`Unsupported chart type: ${String(from.mark)}`);
-  // Title and subtitle belong to the figure, not to the route: planning, drawing
-  // and the cached frames see the pair without them, and the heading follows the
-  // authored progress on its own.
-  const authored = { from, to };
-  from = bareLayout(from);
-  to = bareLayout(to);
   const canonical = canonicalTransitionPair(chartType, from, to);
   const source = canonical.from;
   const target = canonical.to;
@@ -97,7 +90,6 @@ export function createTransitionSurface(
   root.dataset.chartStyle = styleKey;
   const shell = renderChartShell(root, 'main');
   const node = shell.views.main as SceneHostElement;
-  const heading = createHeading(shell.heading, authored.from, authored.to);
   // A top legend sits in a block above the canvas, outside the SVG, so `width` and
   // `height` are the canvas alone. A side legend stays in the right margin.
   const legendOutside = options.chartStyle?.legendPosition !== 'right';
@@ -132,8 +124,7 @@ export function createTransitionSurface(
    * the SVG, margins included. A fixed width lets the root shrink-wrap the view,
    * so the host overflows instead of the chart being clipped. "auto" makes the
    * canvas exactly the container's content box on that axis, so the figure's own
-   * chrome there (its theme border, and on the vertical axis the empty title
-   * strip) gives way. Omitted dimensions keep the chrome and the figure fits.
+   * chrome there (its theme border) gives way. Omitted dimensions keep the chrome and the figure fits.
    */
   function applyCanvasStyles() {
     const fixedWidth = typeof requestedWidth === 'number';
@@ -153,7 +144,6 @@ export function createTransitionSurface(
     figure.display = fill ? 'flex' : '';
     figure.flexDirection = fill ? 'column' : '';
     node.style.flex = fill ? '1 1 0' : '';
-    heading.suppress(0);
   }
   applyCanvasStyles();
 
@@ -262,11 +252,7 @@ export function createTransitionSurface(
     },
     progress(value, direction = 0) {
       hideTooltip(shell.tooltip);
-      heading.progress(value);
       if (layoutDirty) {
-        // The heading's own room is read before the canvas is laid out for what is left.
-        heading.suppress(0);
-        heading.measure();
         const width = layoutWidth = node.clientWidth || 720;
         // Use the maximum legend room only to decide which chrome fits. The
         // displayed room follows the active route leg below.
@@ -279,13 +265,11 @@ export function createTransitionSurface(
           // A readable canvas scales with the available width, capped at 200px.
           // Below that budget, decoration gives way in priority order.
           const minimumCanvas = Math.min(200, width / 2);
-          const available = () => Math.round(shell.figure.clientHeight - heading.maximumRoom() - (config.legendHeight ?? 0));
+          const available = () => Math.round(shell.figure.clientHeight - (config.legendHeight ?? 0));
           if (available() < minimumCanvas) {
             config.legendHeight = 0;
             root.dataset.hideLegend = 'true';
           }
-          if (available() < minimumCanvas) { heading.suppress(1); heading.measure(); }
-          if (available() < minimumCanvas) { heading.suppress(2); heading.measure(); }
         }
         // "auto" reads the room the container gives the view, less the legend block.
         // A container with no height of its own gives none, and the chart keeps its own height.
@@ -303,7 +287,6 @@ export function createTransitionSurface(
         legendRooms = layoutStates.map(spec => legendOutside && !root.dataset.hideLegend
           ? legendBlockHeight(chartType, [spec], sizing) : 0);
         fittedHeight = requestedHeight === 'auto' ? shell.figure.clientHeight : 0;
-        heading.measure();
         layoutDirty = false;
       }
       const routeProgress = canonicalProgress(value);
@@ -313,7 +296,7 @@ export function createTransitionSurface(
       const legendHeight = (legendRooms[legIndex] ?? 0) * (1 - fraction)
         + (legendRooms[legIndex + 1] ?? legendRooms[legIndex] ?? 0) * fraction;
       const height = fittedHeight > 0
-        ? Math.max(1, fittedHeight - heading.room(value) - legendHeight)
+        ? Math.max(1, fittedHeight - legendHeight)
         : config.height;
       let margin = config.margin;
       if (!legendOutside) {

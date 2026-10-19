@@ -27,7 +27,6 @@ export const exampleLoaders: Record<string, () => Promise<ExampleModule>> = {
   'bar-sort': () => import('@/examples/bar-sort'),
   'bar-split': () => import('@/examples/bar-split'),
   'bar-story': () => import('@/examples/bar-story'),
-  'bar-title': () => import('@/examples/bar-title'),
   'line-add': () => import('@/examples/line-add'),
   'line-curve': () => import('@/examples/line-curve'),
   'line-split': () => import('@/examples/line-split'),

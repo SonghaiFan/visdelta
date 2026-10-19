@@ -31,7 +31,7 @@ export interface ChannelSpec {
   label?: string;
   /** Channel display names use label. */
   title?: never;
-  /** D3 format specifier used by a quantitative axis, for example "~s". */
+  /** D3 number format for quantitative axes, or UTC time format for temporal axes. */
   format?: string;
   aggregate?: string | boolean;
   timeUnit?: string;

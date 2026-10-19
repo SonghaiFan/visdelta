@@ -127,7 +127,7 @@
     "authoring:check": "node scripts/check-authoring-consumer.mjs",
     "agent:check": "node scripts/check-agent-examples.mjs",
     "react:check": "node --test tests/browser/react.test.mjs",
-    "render:check": "node --test tests/browser/render.test.mjs tests/browser/edit.test.mjs"
+    "render:check": "node --test tests/browser/render.test.mjs tests/browser/edit.test.mjs tests/browser/ticks.test.mjs"
   },
   "dependencies": {
     "@types/d3-axis": "^3.0.6",

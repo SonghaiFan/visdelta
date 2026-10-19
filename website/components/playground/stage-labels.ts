@@ -47,7 +47,6 @@ export function operationLabel(operation: DeclarationOperationChange): string {
   if (name === 'layout') return `Change layout from ${field(before)} to ${field(after)}`;
   if (name === 'focus') return after === undefined ? 'Remove focus' : 'Focus on selected marks';
   if (name === 'highlight') return after === undefined ? 'Remove highlighting' : 'Highlight selected marks';
-  if (name === 'title' || name === 'subtitle') return after === undefined ? `Remove the ${name}` : `Change the ${name} to “${String(after)}”`;
   const label = words(name);
   if (after === undefined) return `Remove the ${label} setting`;
   if (after === null || typeof after !== 'object') return `Set ${label} to ${String(after)}`;

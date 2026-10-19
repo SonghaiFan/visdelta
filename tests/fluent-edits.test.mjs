@@ -27,7 +27,7 @@ test('Bar fluent edits preserve chains, identity, scopes, margins and caller inp
 
 test('Bar fluent edits reject unsupported calls and invalid complete states atomically', async () => {
   const source = base().toSpec();
-  for (const [method, args] of [['constructor', []], ['flip', [true]], ['y', ['missing']], ['x', ['revenue', { type: 'quantitative' }]], ['rollup', []]]) {
+  for (const [method, args] of [['title', ['Caption']], ['subtitle', ['Source']], ['constructor', []], ['flip', [true]], ['y', ['missing']], ['x', ['revenue', { type: 'quantitative' }]], ['rollup', []]]) {
     await assert.rejects(apply(source, method, ...args));
   }
   await assert.rejects(barModule.edit(source, [{ method: 'color', args: ['red'] }, { method: 'unknown', args: [] }], source));

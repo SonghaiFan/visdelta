@@ -852,36 +852,29 @@ test('Unit size is a constant mark channel and positional assignments are last-w
 });
 
 
-test('Unit omitted compact bindings preserve channels and title scopes remain independent', () => {
+test('Unit omitted compact bindings preserve channels and labels', () => {
   const base = unit([{ id: 'a', x: 2, y: 4 }]).key('id')
-    .x('x', { label: 'Position', domain: [0, 10] }).y('y')
-    .title('Figure').subtitle('Source');
+    .x('x', { label: 'Position', domain: [0, 10] }).y('y');
   const before = base.toSpec();
   const compact = base.layout('force', { columns: 3 });
   const chained = base.layout('force').columns(3);
   assert.deepEqual(compact.toSpec(), chained.toSpec());
   assert.deepEqual(compact.toSpec().encoding, before.encoding);
-  assert.equal(compact.toSpec().title, 'Figure');
   assert.equal(compact.toSpec().encoding.x.label, 'Position');
-  assert.equal(compact.title('New figure').toSpec().encoding.x.label, 'Position');
-  assert.equal(compact.x('y').toSpec().title, 'Figure');
   assert.deepEqual(base.toSpec(), before);
 });
 
 
-test('channel labels survive compilation independently of figure titles', () => {
+test('channel labels survive compilation', () => {
   const rows = [{ id: 'a', x: 1, y: 2 }];
   for (const make of [bar, point, line, area, unit]) {
     const chart = make(rows).x('x', { label: 'Horizontal' })
-      .y('y', { label: 'Vertical' }).title('Figure').subtitle('Source');
+      .y('y', { label: 'Vertical' });
     const spec = chart.toSpec();
-    assert.equal(spec.title, 'Figure');
-    assert.equal(spec.subtitle, 'Source');
     assert.equal(spec.encoding.x.label, 'Horizontal');
     assert.equal(spec.encoding.y.label, 'Vertical');
     assert.equal('title' in spec.encoding.x, false);
     assert.equal('title' in spec.encoding.y, false);
-    assert.equal(chart.title('Other').toSpec().encoding.x.label, 'Horizontal');
-    assert.equal(chart.x('x', { label: 'Other axis' }).toSpec().title, 'Figure');
+    assert.equal(chart.toSpec().encoding.x.label, 'Horizontal');
   }
 });

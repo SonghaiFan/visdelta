@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const source = (title: string) => `const chart = bar(rows).x("state").y("population").key(["state", "age"]).where({ age: "<10" }).where({ field: "state", oneOf: ["CA", "TX"] }).title("${title}");`;
+const source = (title: string) => `const chart = bar(rows).x("state").y("population").key(["state", "age"]).where({ age: "<10" }).where({ field: "state", oneOf: ["CA", "TX"] }).y("population", { label: "${title}" });`;
 
 for (const width of [1280, 390]) test(`Saving a draft updates, inserts and refreshes saved snapshots at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 860 });
@@ -16,7 +16,7 @@ for (const width of [1280, 390]) test(`Saving a draft updates, inserts and refre
     await page.keyboard.insertText(source(title));
     if (runBeforeKeep) {
       await page.getByRole('button', { name: 'Run', exact: true }).click();
-      await expect(page.getByLabel('Chart', { exact: true }).getByText(title, { exact: true })).toBeVisible();
+      await expect(page.getByLabel('Chart', { exact: true }).locator('.pg-layer[data-state=shown] .vd-y-label')).toContainText(title);
     }
     await page.getByLabel('Chart code').click();
     await page.keyboard.press('ControlOrMeta+S');

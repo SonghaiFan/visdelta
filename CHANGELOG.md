@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Use compact numeric axis labels and UTC interval-aware date labels by default;
+  preserve explicit channel formats.
+
+- Remove chart `title` and `subtitle` declarations and fluent methods. Add captions
+  in surrounding page markup; legends and axis labels remain supported.
+
 - Add JSON-first `render()` and scoped `createRenderer()` entry points, persistent
   `view.update()` with latest-pending scheduling, accepted-state snapshots, manual
   transitions and owned cleanup. Update results distinguish applied, superseded

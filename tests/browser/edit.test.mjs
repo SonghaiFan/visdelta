@@ -41,7 +41,7 @@ test('fluent edits: retries, revisions, cumulative acceptance and latest playbac
   assert.equal(retry.x, 'y');
   const conflict = await page.evaluate(async () => {
     const baseRevision = view.snapshot().revision;
-    return Promise.all(['one', 'two'].map(requestId => view.edit({ requestId, baseRevision, edits: [{ method: 'title', args: [requestId] }] }, { animate: false }).then(() => 'ok', e => e.code)));
+    return Promise.all(['one', 'two'].map(requestId => view.edit({ requestId, baseRevision, edits: [{ method: 'x', args: ['y', { type: 'quantitative', label: requestId }] }] }, { animate: false }).then(() => 'ok', e => e.code)));
   });
   assert.deepEqual(conflict.sort(), ['REVISION_CONFLICT', 'ok']);
   const before = await page.evaluate(() => view.snapshot());
@@ -49,7 +49,7 @@ test('fluent edits: retries, revisions, cumulative acceptance and latest playbac
     const failure = await page.evaluate(async kind => {
       try {
         if (kind === 'stale') await view.edit({ ...edit('stale', 'flip'), baseRevision: 0 });
-        if (kind === 'reuse') await view.edit(edit('flip', 'title', ['Different']));
+        if (kind === 'reuse') await view.edit(edit('flip', 'color', ['#333333']));
         if (kind === 'unknown') await view.edit(edit('bad', '__proto__'));
         if (kind === 'data') await view.edit(edit('missing', 'x', ['missing', { type: 'quantitative' }]));
       } catch (error) { return error.message; }
@@ -57,14 +57,14 @@ test('fluent edits: retries, revisions, cumulative acceptance and latest playbac
     assert.ok(failure, kind);
     assert.deepEqual(await page.evaluate(() => view.snapshot()), before);
   }
-  await page.evaluate(() => { window.a = view.edit(edit('a', 'title', ['Retained title'])); });
-  await page.waitForFunction(() => view.snapshot().spec.title === 'Retained title');
+  await page.evaluate(() => { window.a = view.edit(edit('a', 'x', ['y', { type: 'quantitative', label: 'Retained label' }])); });
+  await page.waitForFunction(() => view.snapshot().spec.encoding.x.label === 'Retained label');
   await page.evaluate(() => { window.b = view.edit(edit('b', 'color', ['#4269d0'])); });
   await page.waitForFunction(() => view.snapshot().spec.encoding.color?.value === '#4269d0');
   await page.evaluate(() => { window.c = view.edit(edit('c', 'color', ['#ff725c'])); });
   const results = await page.evaluate(async () => (await Promise.all([a, b, c])).map(item => item.status));
   assert.deepEqual(results, ['applied', 'superseded', 'applied']);
-  assert.equal(await page.evaluate(() => view.snapshot().spec.title), 'Retained title');
+  assert.equal(await page.evaluate(() => view.snapshot().spec.encoding.x.label), 'Retained label');
   await page.evaluate(async () => { window.reference = await api.render('#reference', view.snapshot().spec, { height: 280 }); });
   const geometry = selector => page.locator(`${selector} svg rect`).evaluateAll(nodes => nodes.map(node => ['x', 'y', 'width', 'height', 'fill'].map(key => key === 'fill' ? getComputedStyle(node).fill : node.getAttribute(key))));
   assert.deepEqual(await geometry('#chart'), await geometry('#reference'));
@@ -73,15 +73,15 @@ test('fluent edits: retries, revisions, cumulative acceptance and latest playbac
   const custom = await page.evaluate(async () => {
     const module = { key: 'bar', load: api.barModule.load, async edit(spec, calls) {
       await new Promise(resolve => { window.releaseEdit = resolve; });
-      return { ...spec, title: calls[0].args[0] };
+      return { ...spec, meta: { note: calls[0].args[0] } };
     } };
     const spec = api.bar([{ x: 'A', y: 3 }]).x('x').y('y').toSpec();
     window.customView = await api.createRenderer({ modules: [module] }).render('#chart', spec);
     window.delayed = customView.edit({ requestId: 'delayed', baseRevision: 0, edits: [{ method: 'caption', args: ['Old'] }] }).then(() => 'accepted', e => e.code);
     await new Promise(resolve => setTimeout(resolve, 0));
-    await customView.render({ ...spec, title: 'New' });
+    await customView.render({ ...spec, meta: { note: 'New' } });
     releaseEdit();
-    return { result: await delayed, title: customView.snapshot().spec.title };
+    return { result: await delayed, title: customView.snapshot().spec.meta.note };
   });
   assert.deepEqual(custom, { result: 'REVISION_CONFLICT', title: 'New' });
   const destroyed = await page.evaluate(async () => {
@@ -98,7 +98,7 @@ test('fluent edits: retries, revisions, cumulative acceptance and latest playbac
   await page.evaluate(async () => {
     const spec = api.bar({ url: '/edit-data.json' }).x('x').y('y').toSpec();
     const remote = await api.render('#chart', spec);
-    await remote.edit({ requestId: 'remote', baseRevision: 0, edits: [{ method: 'title', args: ['Remote'] }] }, { animate: false });
+    await remote.edit({ requestId: 'remote', baseRevision: 0, edits: [{ method: 'color', args: ['#4269d0'] }] }, { animate: false });
     remote.destroy();
   });
   assert.equal(reads, 2, 'one data read per render/edit; adapter validation and playback share rows');

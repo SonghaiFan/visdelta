@@ -322,7 +322,7 @@ function appearanceChanges(previous: ViewSpec, next: ViewSpec): StateChange[] {
   if (!sameValue(previousSize, nextSize)) {
     changes.push({ category: 'appearance', action: 'reshape', property: 'size' });
   }
-  for (const property of ['strokeWidth', 'labels', 'title', 'subtitle'] as const) {
+  for (const property of ['strokeWidth', 'labels'] as const) {
     if (!sameValue(previous[property] ?? null, next[property] ?? null)) {
       changes.push({ category: 'appearance', action: 'restyle', property });
     }

@@ -31,7 +31,6 @@ export function presetEdits(category: string, spec: ViewSpec = initialSpec) {
     case 'data': return [{ method: 'where', args: [{ revenue: { gt: 60 } }] }];
     case 'encoding': return [
       { method: spec.encoding?.x?.type === 'quantitative' ? 'x' : 'y', args: ['profit', { type: 'quantitative', label: 'Profit ($k)' }] },
-      { method: 'title', args: ['Profit by product'] },
     ];
     case 'coordinate': return [{ method: 'flip', args: [] }];
     case 'layout': return [{ method: 'sort', args: ['revenue', 'descending'] }];

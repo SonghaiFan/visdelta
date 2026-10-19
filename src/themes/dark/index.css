@@ -56,16 +56,5 @@ body { color-scheme: dark; }
 .vd-figure {
   border-top: 2px solid var(--vd-color-primary);
 }
-.vd-figure-heading {
-  border-bottom: 1px solid var(--vd-color-border);
-}
-.vd-figure-title {
-  color: var(--vd-fg);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: clamp(0.85rem, 1.5vw, 1.05rem);
-}
-
 /* Tooltip */
 .vd-tooltip { background: rgba(200, 215, 228, 0.97); color: #0c0f13; }

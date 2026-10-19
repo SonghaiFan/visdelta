@@ -33,6 +33,7 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   assert.deepEqual(await page.evaluate(() => api.availableChartTypes()), []);
   const geometry = selector => page.locator(`${selector} svg rect`).evaluateAll(nodes => nodes.map(n => ['x','y','width','height'].map(k => n.getAttribute(k))));
   const initial = await geometry('#chart');
+  assert.equal(await page.locator('#chart figcaption, #chart .vd-figure-header').count(), 0);
   await page.evaluate(() => {
     window.results = [];
     window.first = view.update(make(2)).then(r => { results.push(['first', r.status]); return r; });
@@ -44,7 +45,7 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   });
   const statuses = await page.evaluate(async () => (await Promise.all([first, second, third])).map(r => r.status));
   assert.deepEqual(statuses, ['applied','superseded','applied']);
-  assert.equal(await page.evaluate(() => view.snapshot().spec.title), '4');
+  assert.equal(await page.evaluate(() => view.snapshot().spec.data[0].y), 4);
   await page.evaluate(async () => { window.reference = await api.render('#reference', make(4), { height: 280 }); });
   assert.deepEqual(await geometry('#chart'), await geometry('#reference'), 'final frame equals independent static render');
   assert.notDeepEqual(await geometry('#chart'), initial);
@@ -63,8 +64,8 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   }
   assert.equal(await page.locator('#chart [aria-hidden]').count(), 0);
   await page.evaluate(async () => {
-    const s = view.snapshot(); s.spec.title = 'mutated';
-    if (view.snapshot().spec.title !== '4') throw Error('snapshot leaked');
+    const s = view.snapshot(); s.spec.data[0].y = 'mutated';
+    if (view.snapshot().spec.data[0].y !== 4) throw Error('snapshot leaked');
     await view.render(make(1));
     view.resize({ width: 320 });
   });
@@ -98,9 +99,9 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
     const next = { ...make(25), data: { name: 'sales' } };
     const updating = view.update(next, { data: { sales: rows }, animate: false });
     rows[0].y = 999;
-    next.title = 'mutated';
+    next.encoding.y.label = 'mutated';
     await updating;
-    if (view.snapshot().spec.title !== '25') throw Error('input mutation leaked');
+    if (view.snapshot().spec.encoding.y.label === 'mutated') throw Error('input mutation leaked');
     await view.update({ ...make(26), data: { name: 'sales' } }, { animate: false });
     reference.destroy();
     window.reference = await api.render('#reference', make(25), { height: 280, width: 'auto' });
@@ -115,11 +116,11 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   await page.evaluate(async () => { await view.update(make(9), { animate: false }); });
   release();
   assert.equal(await page.evaluate(async () => (await slow).status), 'superseded');
-  assert.equal(await page.evaluate(() => view.snapshot().spec.title), '9');
+  assert.equal(await page.evaluate(() => view.snapshot().spec.data[0].y), 9);
   await page.evaluate(() => {
     window.a = view.update(make(10), { duration: 1000 });
   });
-  await page.waitForFunction(() => view.snapshot().spec.title === '10' && !document.querySelector('#chart [aria-hidden]'));
+  await page.waitForFunction(() => view.snapshot().spec.data[0].y === 10 && !document.querySelector('#chart [aria-hidden]'));
   await page.evaluate(() => {
     window.b = view.update(make(11));
     view.destroy(); view.destroy();
@@ -176,12 +177,12 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   });
   await page.waitForFunction(() => customView.snapshot().revision === 1 && !document.querySelector('#chart [aria-hidden]'));
   await page.evaluate(() => { window.customPending = customView.update(make(3)); });
-  await page.waitForFunction(() => customView.snapshot().spec.title === '3');
+  await page.waitForFunction(() => customView.snapshot().spec.data[0].y === 3);
   assert.match(await page.evaluate(async () => {
     try { await customView.update({ ...make(13), meta: { rejectRender: true } }); } catch (e) { return e.message; }
   }), /custom rejection/);
   assert.deepEqual(await page.evaluate(async () => (await Promise.all([customFirst,customPending])).map(r => r.status)), ['applied','applied']);
-  assert.equal(await page.evaluate(() => customView.snapshot().spec.title), '3');
+  assert.equal(await page.evaluate(() => customView.snapshot().spec.data[0].y), 3);
   await page.evaluate(() => customView.destroy());
   assert.equal(await page.locator('#chart').evaluate(n => n.childElementCount), 0);
   assert.deepEqual(errors, []);

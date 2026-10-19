@@ -117,7 +117,7 @@ export function yieldToBrowser(): Promise<void> {
 
 /**
  * `height` is the canvas height. With `fit` it is instead the height of the whole
- * figure: a heading and a top legend sit outside the canvas, so a fixed card must
+ * figure: a top legend sits outside the canvas, so a fixed card must
  * give the canvas what they leave or the chart's bottom is clipped.
  */
 export async function renderFrozen(state: ChartState, target: HTMLElement, height: number, { fit = false } = {}) {

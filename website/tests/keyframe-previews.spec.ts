@@ -104,9 +104,9 @@ test('one saved sequence retains changed element lanes and overlapping changes',
   await expect(page.locator('.pg-category-row').last()).toBeVisible();
 });
 
-test('keyframe previews retain the heading and outside legend above the canvas', async ({ page }) => {
+test('keyframe previews retain the outside legend above the canvas', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const code = 'const chart = bar([{x:"A",y:2,g:"North"},{x:"B",y:4,g:"South"}]).x("x").y("y").color("g").title("Regional totals").subtitle("Saved heading and legend");';
+  const code = 'const chart = bar([{x:"A",y:2,g:"North"},{x:"B",y:4,g:"South"}]).x("x").y("y").color("g");';
   const hash = deflateRawSync(JSON.stringify({ chart: 'bar', code })).toString('base64url');
   await page.goto(`playground/#share=${hash}`);
   await page.getByRole('button', { name: 'Run', exact: true }).click();
@@ -120,20 +120,18 @@ test('keyframe previews retain the heading and outside legend above the canvas',
     const canvas = svg.querySelector('svg > svg:not(.vd-legend-svg)')!;
     const legend = svg.querySelector('.vd-legend-svg')!;
     return {
-      title: svg.querySelector('.vd-figure-title')?.textContent,
-      subtitle: svg.querySelector('.vd-figure-subtitle')?.textContent,
       labels: legend.textContent,
       visibleItems: [...legend.querySelectorAll<SVGElement>('.vd-legend-item')].every(item => Number(item.style.opacity) === 1),
       correctSwatches: [...legend.querySelectorAll<SVGElement>('rect')].every(item => item.style.fill === item.getAttribute('fill')),
       legendAbove: Number(legend.getAttribute('y')) + Number(legend.getAttribute('height')) <= Number(canvas.getAttribute('y')) + 1,
-      // Width and height size the canvas; the heading and legend are added above it.
+      // Width and height size the canvas; the legend is added above it.
       canvasHeight: canvas.getAttribute('height'),
       figureHeight: Number(svg.documentElement.getAttribute('height')),
       chromeAbove: Number(canvas.getAttribute('y')),
       loaded: image.complete && image.naturalWidth > 0,
     };
   });
-  expect(details).toMatchObject({ title: 'Regional totals', subtitle: 'Saved heading and legend', legendAbove: true, visibleItems: true, correctSwatches: true, loaded: true, canvasHeight: '300' });
+  expect(details).toMatchObject({ legendAbove: true, visibleItems: true, correctSwatches: true, loaded: true, canvasHeight: '300' });
   expect(details.figureHeight).toBeCloseTo(300 + details.chromeAbove, 0);
   expect(details.chromeAbove).toBeGreaterThan(0);
   expect(details.labels).toContain('North');

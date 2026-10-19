@@ -1,3 +1,4 @@
+import { readableTickFormat } from './tick-format.js';
 import { axisBottom, axisLeft, axisRight, axisTop } from 'd3-axis';
 import type { AxisScale, AxisDomain } from 'd3-axis';
 import type { RenderChartContext, RuntimeScale, MotionTransition, AxisOptions } from './render-types.js';
@@ -39,6 +40,10 @@ export function createAxes(themeValue: ThemeValue) {
       : axisFactory(axisScale).ticks(tickCount, options.tickFormat);
     if (typeof scale.bandwidth !== 'function') {
       axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 44) as AxisDomain[]);
+    }
+    if (options.tickFormat == null) {
+      const formatter = readableTickFormat(scale, tickCount);
+      if (formatter) axis = axis.tickFormat(formatter);
     }
     axis = axis.tickSizeOuter(0);
     // Adaptive label thinning for band (categorical) x-axes:
@@ -118,6 +123,10 @@ export function createAxes(themeValue: ThemeValue) {
       : axisFactory(axisScale).ticks(tickCount, options.tickFormat);
     if (typeof scale.bandwidth !== 'function') {
       axis = axis.tickValues(prioritizedContinuousTicks(scale, tickCount, 22) as AxisDomain[]);
+    }
+    if (options.tickFormat == null) {
+      const formatter = readableTickFormat(scale, tickCount);
+      if (formatter) axis = axis.tickFormat(formatter);
     }
     axis = axis.tickSizeOuter(0);
     // Adaptive label thinning for band (categorical) y-axes (horizontal bar charts):

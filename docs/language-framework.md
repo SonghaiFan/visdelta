@@ -65,8 +65,7 @@ Category boundaries are strict:
 - **Attention** preserves the data and marks while focus moves the camera or
   highlight changes emphasis.
 - **Appearance** is fixed visual styling or form that does not bind a field. A
-  `.title()` or `.subtitle()` is Appearance: it names the chart without binding
-  data.
+  constant mark color is Appearance.
 
 The array's stable categorical order is for inspection only. It is not a
 priority list, route, or playback schedule.
@@ -503,8 +502,7 @@ no warning. Equivalent final states must produce the same difference and route,
 regardless of declaration form. This does not require separate planner stages:
 Unit still plans layout and position bindings as one complete operation.
 
-Names in different scopes, such as figure `.title()` and channel `{ label }`,
-remain distinct properties; they must not overwrite or normalize into each other.
+Channel display names use the `label` property.
 
 The detailed signatures live in the [API reference](/reference). Working
 behavior lives in the unified Playground.
@@ -529,33 +527,14 @@ The Area operation codec keeps this control in its own slot. Omitted labels
 retain the default of no direct labels; thin or narrow layers may omit text
 without changing the authored declaration or color legend.
 
-### Titles and subtitles
+### Chart captions
 
-`.title(text)` and `.subtitle(text)` are independently authored presentation
-controls on every chart state. A change emits Appearance `restyle` with property
-`title` or `subtitle`, using the existing public vocabulary; they are not an
-encoding, a grain or a mark key. Blank text and `null` declare no heading, so a
-state with a blank title is the same state as one without.
-
-A heading is figure text above the canvas, outside the SVG, so it never changes
-the canvas's fixed `width` or `height` (see [the reference](/reference#canvas-size)).
-It belongs to the figure, not to the route: planning, the generated waypoints and
-the frame caches see each endpoint without its heading, so a heading change does
-not remove an intermediate route and no operation codec carries it. The heading
-is a function of the authored progress `p` of the pair alone: the old text fades
-out over the first half and the new text fades in over the second, so no frame
-shows both and reverse playback shows the same frames backward. The heading's
-room follows the same progress: its height runs between the natural height of the
-old heading and that of the new one, so the first frame is the old state drawn on
-its own and the last frame is the new state drawn on its own. A fixed-height
-canvas only slides; a fitted canvas (`height: "auto"`) uses the remaining
-container height at each progress value. A `sequence()` hands over between legs
-at the shared state's own heading height. An absent heading takes no space and
-shows no separator, including after reverse playback.
+Add titles and subtitles in the surrounding page markup. VisDelta renders the
+visualization and its legends; chart captions are not part of chart state.
 
 ### Legend placement
 
-A top legend is figure chrome like a heading: it is drawn in a block above the
+A top legend is figure chrome: it is drawn in a block above the
 canvas, outside the chart's SVG, so it never counts toward the canvas's `width`
 or `height`. This changes where the legend lives, not what it means: it remains
 advisory presentation derived from the declared color binding, still emits no

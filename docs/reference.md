@@ -106,8 +106,6 @@ base-2 tick selection.
 .focus(selector)
 .reset()
 .axis(config)
-.title(text | null)
-.subtitle(text | null)
 .transition({ duration?, ease?, stagger? })
 ```
 
@@ -116,34 +114,10 @@ VisDelta owns its D3 runtime and executes transforms itself, so no runtime objec
 Inline data is read directly; pass source rows only when the state uses a named
 dataset.
 
-### Title and subtitle
+### Chart captions
 
-```ts
-.title(text | null)
-.subtitle(text | null)
-```
-
-A heading above the chart, in the figure and outside the canvas, so it never
-changes the canvas's `width` or `height`. Blank text and `null` remove it. They
-are fixed styling: a change is Appearance `restyle` with property `title` or
-`subtitle`.
-
-```js
-bar(rows).x("state").y("population").title("Residents under 10").subtitle("US Census, 2020");
-```
-
-In a transition the old text fades out over the first half and the new text
-fades in over the second, driven by the authored progress of the pair, so
-reverse playback shows the same frames backward. The heading's room follows the
-same progress: the first frame is the old state drawn on its own and the last
-frame the new one, with the room opening or closing in between, so the canvas
-only slides at a fixed height. With `height: "auto"` the canvas uses the
-remaining container height as the heading opens or closes. Sequence endpoints
-use their own heading space, including zero space for an absent heading. Headings are not part of
-route planning: a pair that differs in grain and in title keeps its automatic
-intermediate states. A figure with no heading takes no room for one. Themes
-style `.vd-figure-title` and `.vd-figure-subtitle`; the padding and rule under
-the heading belong to `.vd-figure-heading`.
+Add titles and subtitles in the surrounding page markup. VisDelta renders the
+visualization and its legends; chart captions are not part of chart state.
 
 ### Selectors
 
@@ -706,9 +680,9 @@ An explicit `height` is the canvas height, not a floor under it: the view's
 `min-height` is released, so a 300px chart is not given 420px of room. The
 container's padding is not part of its content box.
 
-Like Plot, VisDelta draws the title, the subtitle and a top legend outside the
-canvas: they sit above it in the figure and never count toward `width` or
-`height`. With `"auto"` they take their room from the container and the canvas
+VisDelta draws a top legend outside the
+canvas: it sits above it in the figure and never counts toward `width` or
+`height`. With `"auto"` it takes its room from the container and the canvas
 fills the rest. The legend is a second `<svg class="vd-legend-svg">` that exists
 only while there is a legend to show; it comes after the canvas in the document
 and above it on screen, so `querySelector("svg")` is still the canvas. A
@@ -1021,13 +995,11 @@ it after resize or theme changes; node references must not be mutated and expire
 on reconstruction, resize or destruction. `await sequence.inspect()` inspects
 the currently mounted leg. Compiled phases may subdivide route stages; category
 membership is not an animation schedule. Custom tweens have null values because
-the recorder cannot infer their nested writes. Immediate writes, topology changes
-and the independent HTML heading are outside this property-track report.
+the recorder cannot infer their nested writes. Immediate writes and topology changes are outside this property-track report.
 
-When height is `"auto"` (Fit), a constrained container hides the legend first,
-then the subtitle, then the title to preserve the main canvas. The canvas budget
-is half the available width, capped at 200 pixels. These elements return when
-space allows; fixed pixel heights retain the authored heading and legend.
+When height is `"auto"` (Fit), a constrained container hides the legend to
+preserve the main canvas. The canvas budget is half the available width, capped
+at 200 pixels. The legend returns when space allows; fixed pixel heights retain it.
 
 `change.stageChanges()` returns one `StateChange[]` per planned route stage, in
 authored playback order, by comparing that stage's actual intermediate states.
@@ -1041,14 +1013,10 @@ Unit layout options accept `x` and `y` as field names or complete channel specif
 Unit `.size(6)` declares `encoding.size: { value: 6 }` independently of layout. For the current circle renderer this is a requested radius in pixels; layout fitting can reduce it to fit the available space. `.radius(6)` and legacy layout `{ radius: 6 }` are aliases. Field-driven Unit size, rectangles and glyphs are currently unsupported. The last size, x or y assignment wins, including assignments in layout options; replacing a channel also replaces its earlier domain/label options.
 
 
-### Channel labels and figure titles
+### Channel labels
 
-Use `.title(text)` and `.subtitle(text)` for the whole figure. Use `label` in
-channel options for the display name of a field, for example
-`.x("hp", { label: "Horsepower" }).title("Cars")`. Channel `title` has been
-replaced by `label`; update existing channel configurations, including tooltip
-fields and Bar rollup/breakdown measure labels. This does not change figure
-headings or their transition behavior. An omitted label defaults to the field's
+Use `label` in channel options for a field display name, for example
+`.x("hp", { label: "Horsepower" })`. An omitted label defaults to the field's
 readable name. Compact Unit layout bindings also accept `label` in their channel
 objects and remain equivalent to chained `.x()` / `.y()` declarations.
 
@@ -1166,7 +1134,7 @@ A view retains up to 1024 request outcomes, including failures, then rejects new
 IDs; create a new view to begin a new session. IDs are scoped to a view, not durable
 across reloads. There is no automatic rebase. Submit complete messages, not tokens.
 
-The Bar module supports `flip()`; `title(text|null)`; `subtitle(text|null)`;
+The Bar module supports `flip()`;
 `color(string)`; `x(field, options?)` and `y(field, options?)` with string-valued
 `type`, `label`, `format`; `sort(field, order?)`; and `where`, `focus`, `highlight`
 with one selector object. Filters, sorting and attention retain native append
@@ -1181,3 +1149,12 @@ and validate a complete endpoint. The runtime passes detached declarations and
 resolved data; adapters must allowlist methods, preserve authored controls and
 validate against actual data. This local API can be wrapped by a tool; it does
 not register an MCP server.
+
+### Readable axis ticks
+
+Default non-log numeric axes use plain decimals for small values and `k`, `m`,
+and `b` for thousands, millions, and billions. Temporal scales use UTC calendar
+ticks with labels matched to their interval (years, months, dates, or times).
+Month and date labels include the year when the domain crosses a year boundary.
+An explicit channel `format` overrides the default: numeric channels accept D3
+number formats, and temporal channels accept D3 time formats such as `%b %Y`.

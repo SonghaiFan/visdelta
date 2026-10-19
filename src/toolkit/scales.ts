@@ -1,6 +1,6 @@
 import { extent } from 'd3-array';
 import type { AxisDomain } from 'd3-axis';
-import { scaleBand, scaleLinear, scaleLog, scaleSqrt, scaleTime } from 'd3-scale';
+import { scaleBand, scaleLinear, scaleLog, scaleSqrt, scaleUtc } from 'd3-scale';
 import { channelValue, inferFieldType } from '../data/types.js';
 import type { RenderDatum, RenderChannel, RuntimeScale, ScaleOptions } from '../runtime/render-types.js';
 export function bandOrLinear(
@@ -22,7 +22,7 @@ export function bandOrLinear(
     const dataDomain = extent(values);
     const domain = (resolved.domain || dataDomain)
       .map((value) => channelValue(value, resolved)) as Array<Date | number>;
-    scale = asRuntimeScale(scaleTime().domain(domain).range(range));
+    scale = asRuntimeScale(scaleUtc().domain(domain).range(range));
     if (!explicitDomain) scale.nice!();
     scale.__visDeltaDataDomain = dataDomain;
     if (!explicitDomain) padContinuousDomain(scale, options.domainPadding);

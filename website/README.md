@@ -305,7 +305,7 @@ Hover a numbered timeline marker, or focus it with the keyboard, to see a still
 preview of its saved state. Hovering leaves playback and code unchanged; click
 to seek to the keyframe without playing, and press Escape to dismiss the preview. Touch taps
 continue to select keyframes directly. Previews fit the full figure into a
-480 × 300 frame, including its title, subtitle and top legend.
+480 × 300 frame, including its top legend.
 
 Element lanes use the real SVG ancestry captured during phase inspection,
 including tag names and all classes (such as `g.tick` and `line`). Repeated marks with the same ancestry share a lane. All element groups that change anywhere in the saved sequence remain in the tree,
@@ -328,7 +328,7 @@ row to outline its mounted node, filter by element or property, or use **Show
 phase midpoint** to seek. The timeline and inspector share one scrollable panel. Drag its top edge to resize it from 124 pixels up to the available viewport space, reserving 160 pixels for the workspace above the toolbar and status overhead (124 for compact and 320 for Details by default); arrow keys adjust it, Home/End select the limits, and double-click resets it. The chosen height is remembered. Opening the inspector preserves the panel and chart heights. On narrow screens the code pane has a stable viewport-based height and scrolls internally as lines are added.
 Custom tweens are labelled explicitly: their nested properties are not exposed.
 Immediate renderer writes and node insertion/removal are not property tracks;
-title/subtitle HTML follows whole-transition progress separately. These limits
+External page captions are outside the chart. These limits
 are also shown under **Coverage and timing**, rather than guessed from categories.
 
 While the inspector is open, the timeline's stage strip shows numbered, named intermediate stages. Labels prefer the planner's exact declaration

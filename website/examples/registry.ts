@@ -60,7 +60,6 @@ export const registry: ExampleMeta[] = [
   { id: 'bar-highlight', chart: 'bar', category: 'attention', title: 'Highlight categories', description: 'All bars remain; non-matching bars dim.' },
   { id: 'bar-focus', chart: 'bar', category: 'attention', title: 'Focus the camera', description: 'focus() pans and zooms around two bars without filtering any data.' },
   { id: 'line-curve', chart: 'line', category: 'appearance', title: 'Change curve and weight', description: 'An exact D3 curve name, line width and point size change together.' },
-  { id: 'bar-title', chart: 'bar', category: 'appearance', title: 'Change the title', description: 'The title and subtitle sit above the canvas; the old text fades out, the new text fades in, and the chart does not move.' },
   { id: 'pie-donut', chart: 'pie', category: 'appearance', title: 'Pie to donut', description: 'innerRadius() opens a hole as a fraction of the outer radius.' },
   { id: 'bar-story', chart: 'bar', category: 'layout', title: 'A four-state story', description: 'sequence() joins revenue → profit → ranked → highlighted into one timeline.' },
 ];

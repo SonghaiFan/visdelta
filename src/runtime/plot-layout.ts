@@ -5,6 +5,7 @@ import type { createColors } from './colors.js';
 import { legendEntries, legendLayout } from './legend-layout.js';
 import type { ChartStyleRule } from '../charts/style.js';
 import { format } from 'd3-format';
+import { readableNumber } from './tick-format.js';
 import { createTextMeasure } from './text-measure.js';
 
 /** Room between the legend block and the canvas below it, in CSS pixels. */
@@ -51,7 +52,7 @@ export function createPlotLayout(context: RenderContext, themeValue: ThemeValue,
     const title = themeValue('--vd-axis-title-font-size', 11);
     const padding = font * 1.2;
     const { x, y } = channels;
-    const tickLabel = y?.type === 'quantitative' ? format(y.format || '~g') : String;
+    const tickLabel = y?.type === 'quantitative' ? (y.format ? format(y.format) : readableNumber) : String;
     const tickWidth = y?.field ? rows.reduce((max, row) => Math.max(max, measureTick(tickLabel(row[y.field!] as number))), 0) : 0;
     const floors = {
       left: y ? Math.max(font * 2, tickWidth + padding) + (!plot.edgeTitles && y.label ? title * 2 : 0) : padding,

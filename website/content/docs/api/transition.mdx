@@ -53,15 +53,14 @@ await transition(from, to, { target: '#panel', width: 'auto', height: 'auto' });
 ```
 
 A chart is wrapped in a figure that a theme may give a border. A number is always
-the canvas itself, so that chrome sits outside it. A title, a subtitle and a top
-legend also sit outside the canvas, above it, and never count toward `width` or
-`height`. For `"auto"` the figure's border on that axis gives way and the heading
-and legend take their room from the container, so the canvas fills exactly what
+the canvas itself, so that chrome sits outside it. A top
+legend also sits outside the canvas, above it, and never counts toward `width` or
+`height`. For `"auto"` the figure's border on that axis gives way and the legend
+takes its room from the container, so the canvas fills exactly what
 is left and nothing overflows the container. The legend is a second
 `<svg class="vd-legend-svg">` that exists only while there is a legend, after the
 canvas in the document, so `querySelector('svg')` is still the canvas. A
-transition opens or closes the heading and legend space with playback progress;
-returning to an unheaded state removes the heading rule and its space. In Fit
+transition opens or closes the legend space with playback progress. In Fit
 mode the canvas uses the remaining height.
 A style with `legendPosition: 'right'` keeps its legend inside the canvas.
 
@@ -127,15 +126,14 @@ a delayed or chained property interval.
 
 `await sequence.inspect()` reads the active leg. Refresh after resize or theme
 changes. Borrowed nodes must not be mutated; reconstruction, resize and destroy
-invalidate them. Custom tweens are explicitly opaque. Immediate DOM writes,
-insertions/removals, and the independent HTML title/subtitle are outside this
+invalidate them. Custom tweens are explicitly opaque. Immediate DOM writes
+and insertions/removals are outside this
 recorded SVG report. The playground's **Inspect stages** control displays these
 tracks alongside the timeline, including the coverage limits.
 
-When height is `"auto"` (Fit), a constrained container hides the legend first,
-then the subtitle, then the title to preserve the main canvas. The canvas budget
-is half the available width, capped at 200 pixels. These elements return when
-space allows; fixed pixel heights retain the authored heading and legend.
+When height is `"auto"` (Fit), a constrained container hides the legend to
+preserve the main canvas. The canvas budget is half the available width, capped
+at 200 pixels. The legend returns when space allows; fixed pixel heights retain it.
 
 `change.stageChanges()` reports the semantic changes between each actual pair of
 planned intermediate states, in authored playback order. The playground uses
