@@ -22,6 +22,8 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   await expect(page.locator('.pg-key').last()).toHaveAttribute('data-time', '2.7');
   expect(await scale()).toBeCloseTo(160, 1);
   await page.getByRole('button', { name: 'Details', exact: true }).click();
+  await expect(page.getByLabel('Stage inspector')).toBeVisible();
+  const timeBeforeViewportChange = await page.getByLabel('Playhead time in seconds').inputValue();
   if (width === 1280) {
     await page.getByRole('region', { name: 'Timeline tracks', exact: true }).focus();
     await page.keyboard.press('+');
@@ -35,6 +37,7 @@ for (const width of [1280, 390]) test(`timeline seconds keep their pixel scale a
   await viewport.evaluate(node => { node.scrollLeft = node.scrollWidth; });
   await expect.poll(() => viewport.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
   expect(await page.locator('.pg-lane-labels').evaluate(node => node.getBoundingClientRect().left)).toBe(labelLeft);
+  await expect(page.getByLabel('Playhead time in seconds')).toHaveValue(timeBeforeViewportChange);
   const interval = await page.locator('.pg-category-block').first().evaluate(node => ({ start: Number((node as HTMLElement).dataset.start), end: Number((node as HTMLElement).dataset.end), x: node.getBoundingClientRect().x, width: node.getBoundingClientRect().width }));
   const origin = (await page.locator('.pg-ruler').boundingBox())!.x + 7;
   expect(interval.x).toBeCloseTo(origin + interval.start / 1000 * pixelsPerSecond, 0);

@@ -10,14 +10,15 @@ for (const width of [1280, 390]) test(`Saving a draft updates, inserts and refre
   const snapshots = page.locator('.pg-snapshot-card');
   await expect(keys).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('switch', { name: 'Auto-run' }).uncheck({ force: true });
-  const edit = async (title: string, runBeforeKeep = false) => {
+  const edit = async (title: string, runBeforeSave = false) => {
     await page.getByLabel('Chart code').click();
     await page.keyboard.press('ControlOrMeta+A');
     await page.keyboard.insertText(source(title));
-    if (runBeforeKeep) {
+    if (runBeforeSave) {
       await page.getByRole('button', { name: 'Run', exact: true }).click();
       await expect(page.getByLabel('Chart', { exact: true }).locator('.pg-layer[data-state=shown] .vd-y-label')).toContainText(title);
     }
+    await expect(page.locator('.pg-snapshot-card[data-draft]')).toHaveCount(1);
     await page.getByLabel('Chart code').click();
     await page.keyboard.press('ControlOrMeta+S');
     await expect(page.locator('.pg-snapshot-card[data-draft]')).toHaveCount(0);

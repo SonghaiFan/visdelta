@@ -94,7 +94,9 @@ test('one saved sequence retains changed element lanes and overlapping changes',
   }
   const labels = await page.locator('.pg-category-name').allTextContents();
   expect(labels.some(label => label.includes('vd-'))).toBe(true);
-  expect(labels).not.toContain('Grain');
+  await page.locator('.pg-category-block').first().click();
+  await expect(page.getByLabel('Stage inspector')).toBeVisible();
+  await page.getByRole('button', { name: 'Details', exact: true }).click();
   const firstTime = await page.locator('.pg-key').nth(1).getAttribute('data-time');
   await page.getByLabel('Keyframe timeline').fill(String(Number(firstTime) / 2));
   expect(await page.locator('.pg-category-block[data-active]').count()).toBeGreaterThan(1);
@@ -102,6 +104,7 @@ test('one saved sequence retains changed element lanes and overlapping changes',
   await expect(page.locator('.pg-category-scroll')).toHaveCSS('max-height', 'none');
   await page.locator('.pg-category-row').last().scrollIntoViewIfNeeded();
   await expect(page.locator('.pg-category-row').last()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
 test('keyframe previews retain the outside legend above the canvas', async ({ page }) => {

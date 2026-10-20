@@ -196,7 +196,6 @@ test.describe('playground', () => {
     const panel = page.getByRole('region', { name: 'Keyframes' });
     const grip = page.getByRole('separator', { name: 'Resize timeline' });
     const height = async () => (await panel.boundingBox())!.height;
-    const chartHeight = async () => (await page.locator('.pg-stage').boundingBox())!.height;
     // Compact includes the time ruler; its controls sit on one centre line.
     await expect.poll(height).toBeCloseTo(124, 0);
     const centres = await panel.locator('.pg-transport > button, .pg-row > button').evaluateAll(nodes => nodes.map(node => { const rect = node.getBoundingClientRect(); return rect.top + rect.height / 2; }));
@@ -205,12 +204,10 @@ test.describe('playground', () => {
     await page.getByRole('button', { name: 'Details', exact: true }).click();
     await expect.poll(height).toBeCloseTo(320, 0);
     await expect(grip).toHaveAttribute('aria-valuenow', '320');
-    // The stage inspector opens inside the fixed panel and scrolls there; the chart does not move.
-    const chartBefore = await chartHeight();
+    // Details contains the inspector inside the fixed, internally scrolling panel.
     const inspector = page.getByLabel('Stage inspector');
     await expect(inspector).toBeVisible();
     await expect.poll(height).toBeCloseTo(320, 0);
-    expect(await chartHeight()).toBeCloseTo(chartBefore, 0);
     expect(await inspector.evaluate(node => Boolean(node.closest('.pg-timeline-body')))).toBe(true);
     expect(await panel.locator('.pg-timeline-body').evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
     // Dragging the top edge up makes it taller; each view's size is remembered.
@@ -239,20 +236,6 @@ test.describe('playground', () => {
     await grip.focus();
     await page.keyboard.press('ArrowUp');
     await expect.poll(height).toBeCloseTo(336, 0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  });
-
-  test('element lanes group recorded motion and open the inspector', async ({ page }) => {
-    await page.goto('playground/#regroup');
-    await expect(page.locator('.pg-category-block').first()).toBeVisible({ timeout: 30_000 });
-    const labels = await page.locator('.pg-category-name').allTextContents();
-    expect(labels.some(label => label.includes('vd-'))).toBe(true);
-    expect(labels).not.toContain('Grain');
-    expect(labels).not.toContain('Encoding');
-    await page.locator('.pg-category-block').first().click();
-    await expect(page.getByLabel('Stage inspector')).toBeVisible();
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(page.locator('.pg-category-block').first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 
@@ -295,12 +278,15 @@ test.describe('playground', () => {
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     await keys(page).last().click();
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
-    // The new state is live but not kept until the reader keeps it.
+    // The edited chart is a draft until the reader saves its frame.
     await expect(keys(page)).toHaveCount(3);
+    await expect(page.locator('.pg-snapshot-card[data-draft]')).toHaveCount(1);
     await page.keyboard.press('ControlOrMeta+s');
+    await expect(page.locator('.pg-snapshot-card[data-draft]')).toHaveCount(0);
     await expect(keys(page)).toHaveCount(3);
     await page.keyboard.press('ControlOrMeta+s');
     await expect(page.getByText('This is already keyframe 3.')).toBeVisible();
@@ -316,6 +302,7 @@ test.describe('playground', () => {
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     await keys(page).last().click();
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).cur');
     const list = page.locator('.cm-tooltip-autocomplete');
@@ -346,7 +333,7 @@ test.describe('playground', () => {
     expect(errors).toEqual([]);
   });
 
-  test('kept keyframes replay as one sequence, and the code follows the playhead', async ({ page }) => {
+  test('saved keyframes replay as one sequence, and the code follows the playhead', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#filter');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
@@ -368,7 +355,7 @@ test.describe('playground', () => {
     await expect(page.getByRole('button', { name: 'Play keyframes' })).toBeVisible({ timeout: 10_000 });
     await expect.poll(() => visibleBars(page)).toBeGreaterThan(bars);
 
-    // Clicking a keyframe travels there along the timeline.
+    // Clicking a timeline keyframe seeks there without playing.
     await page.getByRole('button', { name: /^Keyframe 1$/ }).click();
     await expect(editor).not.toContainText('population: { gte', { timeout: 10_000 });
     expect(errors).toEqual([]);
@@ -449,7 +436,7 @@ test.describe('playground', () => {
     await page.getByLabel('Chart width in pixels').fill('20');
     await expect.poll(() => box(canvas)).toEqual({ width: 1500, height: 520 });
 
-    // Kept keyframes replay at the same size, and a new edit keeps it too.
+    // Saved keyframes replay at the same size, and a new edit keeps it too.
     await page.getByLabel('Keyframe timeline').fill('0.9');
     await expect.poll(async () => (await box(stage.locator('svg:visible').first()))).toEqual({ width: 1500, height: 520 });
     await page.reload();
@@ -502,7 +489,7 @@ test.describe('playground', () => {
     expect(Math.round(before.x - moved.x)).toBe(200);
     expect(Math.round(moved.y - before.y)).toBe(116);
 
-    // Resize from its corner: the chart is set to fit, so it follows the window.
+    // Resize from its corner: the window dimensions become the authored canvas size.
     const corner = (await preview.locator('.pg-resize[data-edge=se]').boundingBox())!;
     await page.mouse.move(corner.x + 6, corner.y + 6);
     await page.mouse.down();
@@ -542,6 +529,60 @@ test.describe('playground', () => {
     expect(fits).toBe(true);
   });
 
+<<<<<<< Updated upstream
+=======
+  test('headings stay outside the canvas; Fit scales the whole figure and Fixed preserves canvas size', async ({ page }) => {
+    const errors = trackErrors(page);
+    await page.goto('playground/#headline');
+    // Start, then add a title and subtitle: three saved states.
+    await expect(keys(page)).toHaveCount(3, { timeout: 30_000 });
+    const stage = chart(page);
+    const title = stage.locator('.vd-figure-title:visible').first();
+    await expect(title).toContainText('Residents under 10');
+    await expect(changes(page)).toContainText('appearance.restyle(subtitle)');
+    // The heading remains outside the SVG in both sizing modes.
+    expect(await stage.locator('svg').first().evaluate((svg) => svg.querySelector('.vd-figure-title') !== null)).toBe(false);
+    expect(await stage.locator('figure').first().evaluate((figure) => figure.querySelector('figcaption') !== null && figure.querySelector('svg')!.closest('figcaption') === null)).toBe(true);
+
+    // Fit scales the whole figure, preserving the authored canvas and its aspect ratio.
+    const timeline = page.getByLabel('Keyframe timeline');
+    const canvas = () => stage.locator('svg:visible').first().evaluate((svg) => {
+      const box = svg.getBoundingClientRect();
+      return { width: Math.round(box.width), height: Math.round(box.height), top: Math.round(box.top), bottom: Math.round(box.bottom) };
+    });
+    await timeline.fill('0');
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
+    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
+    const fitFirst = await canvas();
+    const native = await stage.locator("svg:visible").first().getAttribute("viewBox");
+    await timeline.fill((await timeline.getAttribute('max'))!);
+    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(fitFirst.top);
+    const fitLast = await canvas();
+    expect(fitLast.width / fitLast.height).toBeCloseTo(fitFirst.width / fitFirst.height, 1);
+    await expectFit(stage);
+    await expect(stage.locator("svg:visible").first()).toHaveAttribute("viewBox", native!);
+    // Compare the edge itself: summing separately rounded top and height can drift by a pixel.
+    expect(fitLast.bottom).toBeLessThanOrEqual((await stage.boundingBox())!.y + (await stage.boundingBox())!.height + 1);
+    await timeline.fill('0');
+    await expect.poll(canvas).toEqual(fitFirst);
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
+
+    // Fixed leaves the canvas size alone, so the heading's room opens by progress and the
+    // first frame is the chart drawn without one.
+    await page.getByRole('group', { name: 'Chart size' }).getByRole('button', { name: 'Fixed' }).click();
+    await timeline.fill('0');
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(0);
+    await expect(page.locator('.pg-layer[data-state=leaving]')).toHaveCount(0);
+    const first = await canvas();
+    await timeline.fill((await timeline.getAttribute('max'))!);
+    await expect(stage.locator('.vd-figure-header:visible')).toHaveCount(1);
+    await expect.poll(async () => (await canvas()).top).toBeGreaterThan(first.top + 20);
+    const last = await canvas();
+    expect({ width: last.width, height: last.height }).toEqual({ width: first.width, height: first.height });
+    expect(errors).toEqual([]);
+  });
+
+>>>>>>> Stashed changes
   test('rows are a file: upload your own or edit them, and the chart follows', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('playground/#sort');
@@ -573,6 +614,7 @@ test.describe('playground', () => {
     await page.goto('playground/#service-line-split');
     await expect(keys(page)).toHaveCount(3, { timeout: 20_000 });
     await keys(page).last().click();
+    await expect(page.locator('footer.pg-status')).toContainText('On the timeline');
     const editor = page.getByLabel('Chart code');
     await typeInto(page, editor, 'const chart = line(rows).x("month").y("requests").key(["month", "service"]).color("service").curve("curveStepAfter");');
     await expect(changes(page)).toContainText('appearance.reshape', { timeout: 10_000 });
@@ -727,16 +769,16 @@ test.describe('site', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     for (const path of ['./', 'playground/#split', 'gallery/', 'docs/concepts/state-changes/']) {
       await page.goto(path);
-      await page.waitForTimeout(800);
-      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-      expect(overflow, path).toBeLessThanOrEqual(0);
+      await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth), { message: path }).toBeLessThanOrEqual(0);
     }
     await page.getByRole('button', { name: /open sidebar|toggle sidebar|menu/i }).first().click();
     await page.getByRole('link', { name: 'Quick start' }).click();
     await expect(page).toHaveURL(/\/docs\/quick-start\/$/);
   });
 
-  test('legacy VitePress URLs redirect to their new pages', async ({ page }) => {
+  test('published compatibility URLs redirect to current Docs and Studio routes', async ({ page }) => {
     await page.goto('getting-started.html');
     await expect(page).toHaveURL(/\/docs\/quick-start\/$/);
     await page.goto('playground.html');

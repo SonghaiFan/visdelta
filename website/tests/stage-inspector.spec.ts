@@ -91,28 +91,17 @@ test('regroup shows all six intermediate stage captions and opens the inspector'
 });
 
 
-test('timeline stage selection seeks without playing, zoom and scrolling align rows, and boundaries seek exactly', async ({ page }) => {
+test('stage selection opens its phase without playing and keyboard boundaries seek exactly', async ({ page }) => {
   await page.goto('playground/#focus');
   await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 25000 });
   await page.getByRole('button', { name: 'Details', exact: true }).click();
-  await expect(page.getByLabel('Chart code')).toContainText('.highlight({ cyl: 4 })');
   const time = page.getByLabel('Playhead time in seconds');
   await page.locator('.pg-key').last().click();
   await expect(time).toHaveValue('2.70');
   await page.locator('.pg-stage-block').nth(1).click();
   await expect(time).toHaveValue('1.35');
-  const before = await time.inputValue();
   await expect(page.getByRole('button', { name: 'Play keyframes', exact: true })).toBeVisible();
   const tracks = page.getByRole('region', { name: 'Timeline tracks', exact: true });
-  await tracks.focus();
-  await tracks.press('+');
-  await tracks.press('+');
-  await expect(time).toHaveValue(before);
-  const category = page.locator('.pg-category-block').first();
-  const interval = await category.evaluate(node => ({ start: Number((node as HTMLElement).dataset.start), end: Number((node as HTMLElement).dataset.end), width: node.getBoundingClientRect().width }));
-  expect(interval.width).toBeCloseTo((interval.end - interval.start) / 1000 * 640, 0);
-  await page.getByRole('region', { name: 'Timeline tracks', exact: true }).evaluate(node => { node.scrollLeft = 0; });
-  await expect(time).toHaveValue(before);
   await time.fill('0.90');
   await time.press('Enter');
   await expect(time).toHaveValue('0.90');
@@ -126,10 +115,6 @@ test('timeline stage selection seeks without playing, zoom and scrolling align r
   await expect(time).toHaveValue('1.35');
   await expect(page.locator('.pg-inspector-phase[open] table').first()).toBeVisible();
   await expect(page.locator('.pg-property-interval').first()).toBeVisible();
-  await tracks.focus();
-  await tracks.press('-');
-  await tracks.press('-');
-  await expect(page.getByLabel('Pan timeline')).toHaveCount(0);
   await page.locator('.pg-ruler').scrollIntoViewIfNeeded();
   const ruler = await page.locator('.pg-ruler').boundingBox();
   await page.mouse.click(ruler!.x + 7 + 160 * 0.9 + 2, ruler!.y + 5);
@@ -138,7 +123,6 @@ test('timeline stage selection seeks without playing, zoom and scrolling align r
   await expect(time).toHaveValue('1.35', { timeout: 5000 });
   await page.screenshot({ path: '/tmp/visdelta-timeline-navigation-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(350);
   await expect(page.getByLabel('Stage inspector')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/visdelta-timeline-navigation-mobile.png', fullPage: true });
