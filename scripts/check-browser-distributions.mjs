@@ -175,10 +175,11 @@ try {
       const strokeB = [...allStatic.host.querySelectorAll('.vd-line')].find(n => n.__data__.rows[0].ticker === 'B').getAttribute('stroke');
       check(prefixChange.host.querySelector('.vd-line').getAttribute('stroke') === strokeB, 'B color lost after filtering A');
       prefixChange.dispose(); prefixStatic.dispose(); allStatic.dispose();
-      const fixed = base.y('v', { domain: [250, 2250] }).x('date', { domain: [rows[0].date, rows.at(-1).date] });
+      // Keep this domain assertion independent of the compact default tick format.
+      const fixed = base.y('v', { domain: [250, 2250], format: ',d' }).x('date', { domain: [rows[0].date, rows.at(-1).date] });
       const fixedChange = await transition(fixed, fixed.where({ ticker: 'A' }));
       fixedChange.t.progress(1);
-      check(ys(fixedChange.host).includes('2,000'), 'filter overrode explicit domain');
+      check(ys(fixedChange.host).includes('2,000'), `filter overrode explicit domain: ${ys(fixedChange.host)}`);
       fixedChange.dispose();
       for (const layout of ['simple', 'grouped', 'stacked']) {
         const raw = vd.bar([{ p: 'A', g: 'one', v: 8 }, { p: 'A', g: 'two', v: 5 }, { p: 'B', g: 'one', v: 9 }]).x('p').y('v');

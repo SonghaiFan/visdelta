@@ -35,11 +35,24 @@ for (const width of [1280, 390]) test(`the first story animation follows its rea
   const last = frames.at(-1)!;
   expect(Math.abs(last.value - frames[0].value - (last.time - frames[0].time) / 1000)).toBeLessThan(.12);
   expect(new Set(frames.map(frame => frame.marks)).size).toBeGreaterThan(1);
+  expect(errors).toEqual([]);
+});
+
+// Exercise the controls before spending time sampling the finite autoplay leg.
+// A slow runner may otherwise reach the endpoint before the Pause click.
+for (const width of [1280, 390]) test(`the first story animation pauses and resumes at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 860 });
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('playground/#split');
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
-  const paused = await page.getByLabel('Keyframe timeline').inputValue();
+  await expect(page.getByRole('button', { name: 'Play keyframes', exact: true })).toBeVisible();
+  const timeline = page.getByLabel('Keyframe timeline');
+  const paused = await timeline.inputValue();
+  expect(Number(paused)).toBeLessThan(Number(await timeline.getAttribute('max')));
   await page.waitForTimeout(450);
-  await expect(page.getByLabel('Keyframe timeline')).toHaveValue(paused);
+  await expect(timeline).toHaveValue(paused);
   await page.getByRole('button', { name: 'Play keyframes', exact: true }).click();
-  await expect.poll(async () => Number(await page.getByLabel('Keyframe timeline').inputValue())).toBeGreaterThan(Number(paused));
+  await expect.poll(async () => Number(await timeline.inputValue())).toBeGreaterThan(Number(paused));
   expect(errors).toEqual([]);
 });

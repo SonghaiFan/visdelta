@@ -22,13 +22,13 @@ export function SiteHeader() {
   const inStudio = pathname.startsWith('/playground') || pathname.startsWith('/gallery') || pathname.startsWith('/studio') || pathname.startsWith('/liveshow') || pathname.startsWith('/story');
   return (
     <header className="vd-site-header sticky top-0 z-40 flex h-11 shrink-0 items-center gap-1 border-b bg-fd-background/95 px-1 backdrop-blur sm:gap-3 sm:px-3">
-      <Link href="/" className="sm:mr-1 inline-flex items-center rounded-sm px-1 py-1 text-sm" aria-label="VisDelta home">
+      <Link href="/" className="sm:mr-1 inline-flex shrink-0 items-center rounded-sm px-1 py-1 text-sm" aria-label="VisDelta home">
         <span className="inline-flex items-center gap-2 font-semibold tracking-tight">
           <Logo className="h-4 w-auto" />
           <span className="hidden sm:inline">VisDelta</span>
         </span>
       </Link>
-      <nav aria-label="Main navigation" className="min-w-0 flex items-center gap-0.5">
+      <nav aria-label="Main navigation" className="min-w-0 flex flex-1 items-center gap-0.5 overflow-x-auto overflow-y-hidden [&>*]:shrink-0">
         {tools.map((tool) => {
           const active = tool.label === 'Home' ? pathname === '' : pathname.startsWith('/docs');
           return (
