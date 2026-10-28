@@ -3,10 +3,24 @@ title: Author a downstream MDX story
 description: Use native VisDelta states in a narrative application, with explicit ownership of progress and asynchronous chart creation.
 ---
 
+## VisDelta Story
+
+The MDX editor and interactive examples are maintained in the independent
+**VisDelta Story** downstream application. [Open its entry page](/story/).
+Its source lives beside this repository in `../visdelta-story/`; it consumes
+VisDelta through public package exports. The app owns MDX compilation, scrolling,
+shared variables, controls, live Tailwind styling and project persistence.
+The application maintains its own [Story documentation](https://songhaifan.github.io/visdelta-story/docs/), with MDX authoring, controls, examples and deployment guides.
+
+The examples below describe how another MDX application can use VisDelta's
+native chart declarations and playback APIs.
+
+## Integrate with your own MDX application
+
 An MDX application can import native VisDelta states and supply them to its own
 narrative components. VisDelta supplies chart state and rendering; the application
 supplies MDX compilation, layouts, scrolling, editing and error presentation.
-There is no VisDelta MDX compiler or exported `Scrolly`/`Step` component.
+The VisDelta library itself does not export an MDX compiler or `Scrolly`/`Step` components; Studio implements these in its application layer.
 
 ## A paragraph and its chart belong together
 

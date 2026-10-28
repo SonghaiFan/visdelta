@@ -44,3 +44,8 @@ export function absoluteUrl(path: string) {
   const isFile = /\.[a-z0-9]+$/i.test(normalized);
   return `${siteUrl}${isFile || normalized.endsWith('/') ? normalized : `${normalized}/`}`;
 }
+
+/** Independent Story app. Set this when deploying the companion application. */
+export const storyAppUrl = process.env.NEXT_PUBLIC_STORY_URL ?? (process.env.NODE_ENV === 'development'
+  ? 'http://127.0.0.1:4322/story/'
+  : 'https://songhaifan.github.io/visdelta-story/story/');

@@ -375,3 +375,17 @@ connection). The source data and seven category presets live in
 uses `view.edit()` with revisions and request IDs; Grain uses a complete
 `view.update()` state. Both share the latest policy. Browser tests cover retries,
 conflicts, bursts, invalid JSON, cleanup, idle rendering and narrow layouts.
+
+### Story — independent downstream app
+
+The MDX editor, reactive controls, weather archive, analysis and browser tests
+moved to the sibling `../visdelta-story/` project. It uses installed VisDelta
+public exports rather than this website or library internals.
+
+The website keeps `/story/` and the Story navigation tab as its entry point.
+Set `NEXT_PUBLIC_STORY_URL` when building the website to select the deployed
+application URL. Development defaults to `http://127.0.0.1:4322/story/`;
+production defaults to `https://songhaifan.github.io/visdelta-story/story/`
+(the deployment itself is separate). Query parameters and hashes are forwarded.
+The entry page can download previous browser drafts as compatible project files;
+it does not delete or send local drafts to another origin.

@@ -21,6 +21,7 @@ jobs:
       # The site is served from https://songhaifan.github.io/visdelta/.
       DOCS_BASE_PATH: /visdelta
       SITE_URL: https://songhaifan.github.io/visdelta
+      NEXT_PUBLIC_STORY_URL: https://songhaifan.github.io/visdelta-story/story/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
