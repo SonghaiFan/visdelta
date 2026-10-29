@@ -1,3 +1,6 @@
+import { observeChart, captureChart } from './runtime/chart-observation.js';
+import type { ChartObservation, ChartCapture } from './runtime/chart-observation.js';
+export type { ChartObservation, ChartCapture, ChartMarkObservation } from './runtime/chart-observation.js';
 import { parseSpec, stringifySpec, visualizationChartModule } from './core.js';
 import type { Visualization } from './core.js';
 import type { ChartModule } from './charts/module.js';
@@ -37,6 +40,8 @@ export interface ChartView {
   render(spec: ChartInput, options?: Omit<UpdateOptions, 'animate'>): Promise<UpdateResult>;
   /** Latest validated, accepted declaration, not the current animation frame. */
   snapshot(): ChartSnapshot;
+  inspectMarks(): ChartObservation;
+  capture(): Promise<ChartCapture>;
   /** Exclusive manual control. Finish at an endpoint before submitting updates. */
   transition(spec: ChartInput, options?: Pick<UpdateOptions, 'data'>): Promise<VisualizationTransition>;
   resize(options?: Pick<TransitionOptions, 'width' | 'height'>): void;
@@ -247,6 +252,17 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
         return result;
       },
       render(next, settings) { return view.update(next, { ...settings, animate: false }); },
+      inspectMarks() {
+        alive(); if (busy || jobs.size || editWaiters.size || manual) throw new Error('Wait for settled chart updates before observation.');
+        return observeChart(live.controller.view, revision);
+      },
+      async capture() {
+        alive(); if (busy || jobs.size || editWaiters.size || manual) throw new Error('Wait for settled chart updates before capture.');
+        const observedRevision = revision; const observed = live;
+        const image = await captureChart(live.controller.view, revision);
+        alive(); if (revision !== observedRevision || observed !== live || busy || jobs.size) throw new Error('Chart changed during capture. Capture again.');
+        return image;
+      },
       snapshot() { alive(); return { revision, spec: cloneState(accepted) }; },
       async transition(next, settings = {}) {
         alive();

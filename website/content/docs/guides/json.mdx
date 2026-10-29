@@ -144,3 +144,19 @@ other built-in charts and arbitrary builder methods are unsupported; use full
 Try [Liveshow](/liveshow). Its Grain category deliberately uses `update()`.
 This is a local, tool-friendly API; an application can expose it through MCP,
 but VisDelta does not start an MCP server.
+
+## Observe the rendered chart
+
+```ts
+const marks = view.inspectMarks();
+const image = await view.capture();
+// image.dataUrl is a PNG; both results carry the accepted revision.
+```
+
+Call these after edits have settled. Mark observations contain bound scalar data,
+CSS-pixel bounds and explicit spatial orders, so a downstream agent can resolve
+“the third bar” against the actual display. Only visible keyed marks are listed.
+Capture includes the primary SVG canvas on white, not the surrounding application
+or separate legend SVGs. External images/foreignObject are unsupported. Observation
+rejects pending or manual transitions, and capture rejects revision changes while
+encoding; retry after the current update finishes.

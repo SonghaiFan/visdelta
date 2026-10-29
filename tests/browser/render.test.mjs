@@ -183,6 +183,13 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   }), /custom rejection/);
   assert.deepEqual(await page.evaluate(async () => (await Promise.all([customFirst,customPending])).map(r => r.status)), ['applied','applied']);
   assert.equal(await page.evaluate(() => customView.snapshot().spec.data[0].y), 3);
+  const observed = await page.evaluate(() => customView.inspectMarks());
+  assert.equal(observed.marks.length, 2);
+  assert.deepEqual(observed.orders.leftToRight.map(id => observed.marks.find(mark => mark.id === id).data.x), ['A', 'B']);
+  const captured = await page.evaluate(() => customView.capture());
+  assert.equal(captured.revision, observed.revision);
+  assert.match(captured.dataUrl, /^data:image\/png;base64,iVBOR/);
+  assert.ok(captured.width > 0 && captured.height > 0);
   const occupiedHeight = await page.locator('#chart').evaluate(node => node.getBoundingClientRect().height);
   await page.evaluate(async () => {
     const empty = api.bar([{ x: 'A', y: 3 }, { x: 'B', y: 10 }]).x('x').y('y').where({ y: { lt: 0 } });

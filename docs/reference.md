@@ -1158,3 +1158,23 @@ ticks with labels matched to their interval (years, months, dates, or times).
 Month and date labels include the year when the domain crosses a year boundary.
 An explicit channel `format` overrides the default: numeric channels accept D3
 number formats, and temporal channels accept D3 time formats such as `%b %Y`.
+
+### Observe an accepted chart
+
+Persistent views from `createRenderer().render()` expose `inspectMarks()` and
+`capture()`. Wait for pending edits/updates to settle before observing.
+
+`inspectMarks()` returns the accepted revision, view dimensions, visible keyed
+marks (IDs, keys, scalar bound data, CSS-pixel bounds, fill/opacity), and explicit
+left-to-right/top-to-bottom orders. Only keyed marks under the mark root are
+included; decorations and unkeyed custom geometry are excluded. IDs are scoped
+to the revision and geometry must be re-read after resize. This is a description
+of the rendered endpoint, not an inference from source row order.
+
+`await capture()` returns `{ revision, mimeType: 'image/png', dataUrl, width,
+height }` for the primary SVG canvas, with computed visual styles embedded and
+an opaque white background. It excludes application UI and separate external
+legend SVGs. External SVG images/foreignObject and canvases above 16 megapixels
+are rejected. A revision change during encoding invalidates the capture; retry
+against the current state. Active manual transitions and pending updates are
+rejected instead of labelling an intermediate frame as an accepted endpoint.
