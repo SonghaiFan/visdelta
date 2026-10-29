@@ -272,6 +272,9 @@ function renderCompiledView(node: SceneHostElement, effectiveViewSpec: ViewSpec,
     return;
   }
 
+  // Compiled seek/route frames can bypass drawView's entry cleanup.
+  scene.empty.style('display', 'none');
+
   const width = Math.max(60, node.clientWidth || 720);
   const layoutSpec = effectiveViewSpec as ViewLayoutSpec;
   const baseHeight = viewConfig.height ?? layoutSpec.height ?? 500;

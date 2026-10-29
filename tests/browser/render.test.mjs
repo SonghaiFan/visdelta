@@ -183,6 +183,15 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   }), /custom rejection/);
   assert.deepEqual(await page.evaluate(async () => (await Promise.all([customFirst,customPending])).map(r => r.status)), ['applied','applied']);
   assert.equal(await page.evaluate(() => customView.snapshot().spec.data[0].y), 3);
+  const occupiedHeight = await page.locator('#chart').evaluate(node => node.getBoundingClientRect().height);
+  await page.evaluate(async () => {
+    const empty = api.bar([{ x: 'A', y: 3 }, { x: 'B', y: 10 }]).x('x').y('y').where({ y: { lt: 0 } });
+    await customView.update(empty);
+  });
+  assert.equal(await page.locator('#chart .vd-empty').isVisible(), true);
+  assert.equal(await page.locator('#chart').evaluate(node => node.getBoundingClientRect().height), occupiedHeight, 'empty state must not add another canvas-height block');
+  await page.evaluate(async () => { await customView.update(make(3)); });
+  assert.equal(await page.locator('#chart .vd-empty').isVisible(), false, 'restoring data clears empty-state text even on compiled/seek render paths');
   await page.evaluate(() => customView.destroy());
   assert.equal(await page.locator('#chart').evaluate(n => n.childElementCount), 0);
   assert.deepEqual(errors, []);

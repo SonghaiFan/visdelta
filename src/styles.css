@@ -101,6 +101,7 @@
 }
 
 .vd-view {
+  position: relative;
   width: 100%;
   min-height: 420px;
 }
@@ -304,8 +305,10 @@
 }
 
 .vd-empty {
+  position: absolute;
+  inset: 0;
   display: grid;
-  min-height: 420px;
+  min-height: 0;
   place-items: center;
   color: var(--vd-muted);
   font-size: 0.95rem;
