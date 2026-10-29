@@ -367,14 +367,13 @@ highlights its snapshot; a position between keyframes highlights neither and
 shows an insertion caret in their gap. Editing replaces that caret with the
 unsaved draft snapshot at the same insertion position.
 
-### Liveshow
+### Liveshow — independent downstream app
 
-`/liveshow` demonstrates persistent JSON updates with local presets (no AI
-connection). The source data and seven category presets live in
-`components/liveshow/presets.ts` and are checked by `examples:check`. The page
-uses `view.edit()` with revisions and request IDs; Grain uses a complete
-`view.update()` state. Both share the latest policy. Browser tests cover retries,
-conflicts, bursts, invalid JSON, cleanup, idle rendering and narrow layouts.
+`/liveshow` retains the official entry to [VisDelta Liveshow](https://songhaifan.github.io/visdelta-liveshow/).
+Its source, presets, verification and agent integration guide now live in
+[SonghaiFan/visdelta-liveshow](https://github.com/SonghaiFan/visdelta-liveshow).
+The downstream app uses public VisDelta APIs for persistent JSON edits and
+animated updates. The current demo uses local presets without a connected model.
 
 ### Story — independent downstream app
 
