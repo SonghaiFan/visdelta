@@ -101,7 +101,9 @@ let gzipBytes = 0;
 // 0.4 also includes recorded phase endpoints and DOM ancestry for inspection.
 // Keep the selected-chart budget bounded while accounting for that public API.
 // The lazy fluent adapter adds shared authoring/codec chunk overhead (~0.6k over the prior cap).
-const maxSelectedTransitionGzipBytes = 102_000;
+// Likert distribution validation, geometry and public inspection add about 3k gzip.
+// This is chart-owned code; the unrelated-plugin exclusion below still applies.
+const maxSelectedTransitionGzipBytes = 106_000;
 for (const path of loaded) {
   gzipBytes += gzipSync(files.get(resolve(root, path))).byteLength;
   for (const source of Object.keys(outputs[path].inputs)) {

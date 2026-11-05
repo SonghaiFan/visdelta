@@ -2,9 +2,10 @@
   "title": "Guides",
   "pages": [
     "agent-workflow",
+    "mcp",
     "automatic-behaviors",
     "scroll-template",
-    "mdx",
+    "story",
     "controlling-playback",
     "stories",
     "updating-a-chart",

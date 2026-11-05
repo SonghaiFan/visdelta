@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { csvParse, autoType } from 'd3-dsv';
 import { preparedLabData, formatLabData } from '../scripts/prepare-lab-data.mjs';
-import { scenarios as lineScenarios } from '../examples/line/scenarios.js';
-import { scenarios as areaScenarios } from '../examples/area/scenarios.js';
+import { scenarios as lineScenarios } from './fixtures/scenarios/line/scenarios.js';
+import { scenarios as areaScenarios } from './fixtures/scenarios/area/scenarios.js';
 
 const root = new URL('../data/', import.meta.url);
 const read = async name => csvParse(await readFile(new URL(name, root), 'utf8'), autoType);

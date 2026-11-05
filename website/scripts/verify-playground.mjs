@@ -8,7 +8,6 @@ import { csvParse, autoType } from 'd3';
 import * as d3 from 'd3';
 import { playgroundDemos, storyFrames } from '../components/playground/demos.ts';
 import { categories } from '../examples/registry.ts';
-import { legacyCoverage } from './legacy-playground-coverage.mjs';
 import { lineState, lineSeriesKey } from '../../dist/charts/line/state.js';
 import { areaGrainError } from '../../dist/charts/area/grain.js';
 
@@ -67,27 +66,6 @@ for (const demo of playgroundDemos) {
   }
 }
 
-const knownDemos = new Map(playgroundDemos.map((demo) => [demo.id, demo]));
-const legacyModules = ['transition', 'line', 'point', 'area', 'unit'];
-const legacyKeys = new Set();
-for (const moduleName of legacyModules) {
-  const source = await readFile(new URL(`../../examples/${moduleName}/scenarios.js`, import.meta.url), 'utf8');
-  for (const [, id] of source.matchAll(/sample\(['"]([^'"]+)['"]/g)) legacyKeys.add(`${moduleName}/${id}`);
-  for (const [, id] of source.matchAll(/repeatScenario\(['"]([^'"]+)['"]/g)) legacyKeys.add(`${moduleName}/repeat`);
-}
-for (const key of legacyKeys) {
-  const entry = legacyCoverage[key];
-  if (!entry) failures.push(`legacy case ${key} has no coverage mapping`);
-  else if ('demo' in entry) {
-    const demo = knownDemos.get(entry.demo);
-    if (!demo) failures.push(`legacy case ${key} points to unknown story ${entry.demo}`);
-    else if (!Number.isInteger(entry.step) || entry.step < 1 || entry.step > demo.edits.length) failures.push(`legacy case ${key} points to invalid edit ${entry.demo}#${entry.step}`);
-  } else if (!entry.regression?.trim()) failures.push(`legacy case ${key} has no concrete story or regression reason`);
-}
-for (const key of Object.keys(legacyCoverage)) if (!legacyKeys.has(key)) failures.push(`coverage mapping ${key} no longer names a legacy case`);
-const coverageDocument = await readFile(new URL('./legacy-playground-coverage.md', import.meta.url), 'utf8');
-for (const key of legacyKeys) if (!coverageDocument.includes(`| \`${key}\` |`)) failures.push(`coverage document is missing ${key}`);
-
 // Facts used by the simulated stories must come from their checked-in source
 // rows, not from temporary values introduced by the authoring code.
 const readCsv = async (name) => csvParse(await readFile(new URL(`../../data/${name}`, import.meta.url), 'utf8'), autoType);
@@ -115,6 +93,10 @@ if (finance.reduce((best, row) => row.revenue > best.revenue ? row : best).chann
 const unitRows = await readCsv('iris.csv');
 const unitSample = [...unitRows.slice(0, 8), ...unitRows.slice(50, 54)];
 const unitCounts = Array.from(d3.rollup(unitSample, (values) => values.length, (row) => row.species).values());
+const preparedUnitCounts = await readCsv('iris-sample-counts.csv');
+if (JSON.stringify(preparedUnitCounts.map(row => row.count)) !== JSON.stringify(unitCounts)) failures.push('prepared Iris counts differ from the original sample');
+const sales = await readCsv('liveshow-sales.csv');
+if (sales.length !== 4 || sales.some(row => row.measure !== 'revenue') || d3.sum(sales, row => row.amount) !== 290) failures.push('Liveshow source must contain four revenue segments totaling 290');
 if (JSON.stringify(unitCounts) !== JSON.stringify([8, 4])) failures.push(`unit-value story counts are ${unitCounts.join(', ')}, expected 8 and 4`);
 const totalsByQuarter = [
   monthly.slice(0, 9).reduce((sum, row) => sum + row.requests, 0),

@@ -28,17 +28,23 @@ try {
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarball], consumer);
   const installed = JSON.parse(await readFile(join(consumer, 'node_modules/visdelta/package.json'), 'utf8'));
   console.log(`Installed consumer: ${installed.name}@${installed.version}`);
-  for (const file of ['network-states.mjs', 'sales.mjs', 'mount-story.mjs']) {
+  for (const file of ['network-states.mjs', 'sales.mjs', 'mount-story.mjs', 'complete-states.mjs', 'bar-layouts.mjs', 'likert.mjs']) {
     await writeFile(join(consumer, file), await readFile(join(root, 'examples/authoring', file)));
   }
+  await writeFile(join(consumer,'folded-bar.mjs'),await readFile(join(root,'tests/fixtures/folded-bar.mjs')));
   const bundle = (await build({ stdin: { contents: `
+    import { from as likertStack, to as likertDiverging } from './likert.mjs';
+    import { layouts } from './bar-layouts.mjs';
+    import { inspectBarSpec } from 'visdelta/bar';
     import { mountStory } from './mount-story.mjs';
     import { states, network } from './network-states.mjs';
     import { chart as salesChart } from './sales.mjs';
-    import { transition, sequence, point } from 'visdelta';
+    import { sales as completeSales } from './complete-states.mjs';
+    import { foldedBar } from './folded-bar.mjs';
+    import { transition, sequence, point, render, pie } from 'visdelta';
     import { defineChartType, registerChartModule } from 'visdelta/plugins';
     import { chartStylePresets, defineChartStyle } from 'visdelta/chart-style';
-    window.storyExample = { mountStory, states, network, salesChart, transition, sequence, point, defineChartType, registerChartModule, chartStylePresets, defineChartStyle };
+    window.storyExample = { likertStack, likertDiverging, layouts, inspectBarSpec, foldedSpec:foldedBar.toSpec(), completeSales, render, pie, mountStory, states, network, salesChart, transition, sequence, point, defineChartType, registerChartModule, chartStylePresets, defineChartStyle };
   `, resolveDir: consumer }, bundle: true, write: false, format: 'esm' })).outputFiles[0].text;
   const css = await readFile(join(consumer, 'node_modules/visdelta/dist/visdelta.css'));
   server = createServer((req, res) => {
@@ -53,6 +59,192 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.waitForFunction(() => window.storyExample);
+
+  const likert = await page.evaluate(async () => {
+    const { render, likertStack, likertDiverging, inspectBarSpec } = window.storyExample;
+    const view = await render('#a', likertStack);
+    const initial = view.snapshot().spec;
+    const options = inspectBarSpec(likertDiverging.toSpec()).distribution;
+    const message = {requestId:'installed-likert',baseRevision:0,edits:[{method:'layout',args:['diverging',options]}]};
+    const preview = await view.previewEdit(message);
+    const receipt = await view.edit(message, {duration:80});
+    const current = view.snapshot().spec;
+    const marks = [...document.querySelectorAll('#a .vd-bar')].map(n=>n.__data__);
+    const flip = await view.edit({requestId:'installed-likert-flip',baseRevision:receipt.revision,edits:[{method:'flip',args:[]}]},{duration:80});
+    const facts = inspectBarSpec(view.snapshot().spec);
+    const attention = [];
+    for (const target of [likertStack,likertDiverging]) {
+      await view.update(target,{animate:false});
+      const before=view.snapshot();
+      const highlight={requestId:`installed-highlight-${before.revision}`,baseRevision:before.revision,edits:[{method:'highlight',args:[{response:'Strongly agree'}]}]};
+      const proposed=await view.previewEdit(highlight);
+      await view.edit(highlight,{duration:60});
+      const accepted=view.snapshot();
+      const read=()=>[...document.querySelectorAll('#a .vd-bar')].map(node=>({key:node.getAttribute('data-key'),count:node.__data__.count,share:node.__data__.__distributionShare,opacity:+getComputedStyle(node).opacity}));
+      const lit=read();
+      await view.edit({requestId:`installed-lit-flip-${accepted.revision}`,baseRevision:accepted.revision,edits:[{method:'flip',args:[]}]},{duration:60});
+      const flipped=view.snapshot();
+      const afterFlip=read();
+      await view.edit({requestId:`installed-clear-${flipped.revision}`,baseRevision:flipped.revision,edits:[{method:'highlight',args:[null]}]},{duration:60});
+      attention.push({proposed:proposed.spec,accepted:accepted.spec,lit,afterFlip,cleared:read()});
+    }
+    const matrix=[];
+    for(const target of [likertStack.layout('stacked'),likertStack,likertDiverging]) {
+      for(const edits of [
+        [{method:'color',args:['#123456']}], [{method:'focus',args:[{question:'Parks n=200'}]}],
+        [{method:'sort',args:['question','descending']}], [{method:'where',args:[{question:'Parks n=200'}]}],
+        [{method:'x',args:['count',{label:'Responses'}]}],
+        [{method:'color',args:['#123456']},{method:'highlight',args:[{response:'Agree'}]}],
+        [{method:'flip',args:[]},{method:'highlight',args:[{response:'Agree'}]}],
+      ]) {
+        await view.update(target,{animate:false});
+        const before=view.snapshot();
+        const request={requestId:`installed-matrix-${before.revision}`,baseRevision:before.revision,edits};
+        const preview=await view.previewEdit(request);
+        const stable=view.snapshot().revision===before.revision;
+        await view.edit(request,{duration:40});
+        const after=view.snapshot();
+        matrix.push({stable,preview:preview.spec,actual:after.spec,count:document.querySelectorAll('#a .vd-bar').length,filter:edits[0].method==='where',ghosts:document.querySelectorAll('#a .vd-axis-ghost').length});
+      }
+    }
+    const ghosts = document.querySelectorAll('#a .vd-axis-ghost').length;
+    view.destroy();
+    return {matrix,attention,initial,preview,receipt,current,marks,flip,facts,ghosts};
+  });
+  assert.equal(likert.matrix.length,21);
+  for(const state of likert.matrix) {
+    assert.ok(state.stable);
+    assert.deepEqual(state.preview,state.actual);
+    assert.equal(state.count,state.filter?5:15);
+    assert.equal(state.ghosts,0);
+  }
+  for(const state of likert.attention) {
+    assert.deepEqual(state.proposed,state.accepted);
+    assert.equal(state.lit.length,15);
+    assert.equal(state.lit.filter(mark=>mark.opacity===1).length,3);
+    assert.equal(state.lit.filter(mark=>mark.opacity<1).length,12);
+    assert.deepEqual(state.afterFlip,state.lit);
+    assert.ok(state.cleared.every(mark=>mark.opacity===1));
+    assert.deepEqual(state.cleared.map(({opacity,...mark})=>mark),state.lit.map(({opacity,...mark})=>mark));
+  }
+  assert.equal(likert.receipt.status,'applied');
+  assert.equal(likert.flip.status,'applied');
+  assert.deepEqual(likert.current,likert.preview.spec);
+  assert.deepEqual(likert.current.data,likert.initial.data);
+  assert.equal(likert.facts.layout,'diverging');
+  assert.equal(likert.facts.distribution.normalize,'percent');
+  assert.equal(likert.marks.length,15);
+  assert.equal(likert.ghosts,0);
+  for (const total of [100,200,80]) {
+    const group = likert.marks.filter(row=>row.__distributionTotal===total);
+    assert.equal(group.length,5);
+    assert.ok(Math.abs(group.reduce((sum,row)=>sum+row.__stack1-row.__stack0,0)-1)<1e-12);
+  }
+  console.log('ok   installed Likert: semantic preview/edit/flip, source counts and full percentage denominator');
+
+  const layoutResults = await page.evaluate(async () => {
+    const { layouts, inspectBarSpec, render } = window.storyExample;
+    const results = [];
+    for (const [name, chart] of Object.entries(layouts)) {
+      const spec = chart.toSpec();
+      const facts = inspectBarSpec(spec);
+      const view = await render('#a', spec);
+      const bounds = [...document.querySelectorAll('#a .vd-bar')].map(node => {
+        const box = node.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      });
+      const axis = facts.orientation === 'vertical' ? 'x' : 'y';
+      results.push({ name, facts, count: bounds.length,
+        positions: new Set(bounds.map(box => Math.round(box[axis] * 100))).size,
+        positive: bounds.every(box => box.width > 0 && box.height > 0) });
+      view.destroy();
+    }
+    return results;
+  });
+  for (const result of layoutResults) {
+    assert.equal(result.facts.status, 'known');
+    assert.equal(result.count, 4);
+    assert.ok(result.positive);
+    assert.equal(result.positions, result.facts.layout === 'grouped' ? 4 : 1, result.name);
+  }
+  console.log('ok   installed Bar layout inspection agrees with four rendered stacked/grouped orientations');
+
+
+  const replacement = await page.evaluate(async () => {
+    const { render, pie, salesChart } = window.storyExample;
+    const view = await render('#a', salesChart);
+    const result = await view.replace(pie([{ region: 'North', revenue: 18 }, { region: 'South', revenue: 12 }])
+      .value('revenue').label('region').color({ field: 'region', type: 'nominal' }), { duration: 0 });
+    const observed = view.inspectMarks();
+    const capabilities = view.capabilities();
+    const edited = await view.edit({ requestId: 'installed-pie', baseRevision: result.revision,
+      edits: [{ method: 'highlight', args: [{ region: 'North' }] }] }, { animate: false });
+    view.destroy();
+    return { result, observed, capabilities, edited };
+  });
+  assert.equal(replacement.result.status, 'applied');
+  assert.deepEqual(replacement.capabilities.editMethods, ['color', 'where', 'sort', 'highlight']);
+  assert.equal(replacement.edited.status, 'applied');
+  assert.equal(replacement.observed.revision, replacement.result.revision);
+  assert.deepEqual(replacement.observed.marks.map(mark => mark.data.region).sort(), ['North', 'South']);
+  console.log('ok   installed persistent view: cross-type replacement and source-row observation');
+
+  const foldFlip = await page.evaluate(async () => {
+    const { render, foldedSpec, completeSales } = window.storyExample;
+    const view = await render('#a', foldedSpec, { data: { sales: completeSales } });
+    const message = { requestId: 'fold-flip', baseRevision: 0, edits: [{ method: 'flip', args: [] }] };
+    const preview = await view.previewEdit(message);
+    const unchanged = view.snapshot().revision === 0;
+    const result = await view.edit(message, { duration: 0 });
+    const actual = view.snapshot().spec;
+    view.destroy();
+    return { preview, unchanged, result, actual };
+  });
+  assert.ok(foldFlip.unchanged);
+  assert.equal(foldFlip.result.status, 'applied');
+  assert.equal(foldFlip.actual.encoding.y.type, 'quantitative');
+  assert.deepEqual(foldFlip.actual, foldFlip.preview.spec);
+  console.log('ok   installed fold stack: preview and actual orientation-only edit agree');
+
+  const layoutEdits = await page.evaluate(async () => {
+    const { render, foldedSpec, completeSales, inspectBarSpec } = window.storyExample;
+    const view = await render('#a', foldedSpec, { data: { sales: completeSales } });
+    const steps = [];
+    for (const [method, args] of [['layout', ['grouped']], ['flip', []], ['layout', ['stacked']]]) {
+      const before = view.snapshot();
+      const message = { requestId: `layout-${before.revision}`, baseRevision: before.revision, edits: [{ method, args }] };
+      const preview = await view.previewEdit(message);
+      const unchanged = view.snapshot().revision === before.revision;
+      const receipt = await view.edit(message, { animate: false });
+      const actual = view.snapshot().spec;
+      const facts = inspectBarSpec(actual);
+      const marks = Array.from(document.querySelectorAll('#a rect.vd-bar'));
+      steps.push({ before: before.spec, preview: preview.spec, actual, unchanged, receipt, facts,
+        positions: marks.map(mark => mark.getAttribute(facts.orientation === 'horizontal' ? 'y' : 'x')) });
+    }
+    const beforeRejected = view.snapshot().revision;
+    const compound = await view.previewEdit({requestId:'mixed-fold-valid',baseRevision:beforeRejected,edits:[{method:'layout',args:['grouped']},{method:'flip',args:[]}]});
+    if(inspectBarSpec(compound.spec).layout!=='grouped') throw Error('Compound fold layout lost');
+    let rejected;
+    try { await view.previewEdit({ requestId: 'mixed-fold', baseRevision: beforeRejected,
+      edits: [{ method: 'layout', args: ['grouped'] }, { method: 'color', args: [{field:'missing',type:'nominal'}] }] }); }
+    catch (error) { rejected = error.code; }
+    const stable = view.snapshot().revision === beforeRejected;
+    view.destroy();
+    return { steps, rejected, stable };
+  });
+  for (const [index, step] of layoutEdits.steps.entries()) {
+    assert.ok(step.unchanged);
+    assert.equal(step.receipt.status, 'applied');
+    assert.deepEqual(step.actual, step.preview);
+    assert.deepEqual(step.actual.transform, step.before.transform);
+    assert.deepEqual(step.actual.meta.object, step.before.meta.object);
+    assert.equal(step.facts.layout, index < 2 ? 'grouped' : 'stacked');
+    assert.equal(new Set(step.positions).size, index < 2 ? 4 : 1);
+  }
+  assert.equal(layoutEdits.rejected, 'MISSING_FIELD');
+  assert.ok(layoutEdits.stable);
+  console.log('ok   installed folded Bar: semantic layout/flip previews, receipts, geometry and atomic rejection');
 
   const scoped = await page.evaluate(async () => {
     const { sequence, transition, defineChartType, registerChartModule } = window.storyExample;

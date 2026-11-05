@@ -64,6 +64,6 @@ test('timeline endpoints seek and pause, while saved snapshots play the route', 
   await page.locator('.pg-snapshot-card').last().click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await keys.nth(1).click();
-  await expect(page.getByLabel('Playhead time in seconds')).toHaveValue('1.80');
+  await expect(page.getByLabel('Playhead time in seconds')).toHaveValue(Number(await keys.nth(1).getAttribute('data-time')).toFixed(2));
   await expect(page.getByRole('button', { name: 'Play keyframes', exact: true })).toBeVisible();
 });

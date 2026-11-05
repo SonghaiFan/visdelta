@@ -1,6 +1,8 @@
 // Minimal static server for `out/` that mirrors GitHub Pages: the export is
 // mounted under DOCS_BASE_PATH, `/path/` serves `/path/index.html`, and
 // unknown paths return the exported 404 page.
+import '../../scripts/env.mjs';
+import {createAIHandler} from '../server/liveshow/http.mjs';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
@@ -13,6 +15,7 @@ const basePath = exportBasePath();
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
+  '.mjs': 'text/javascript',
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.json': 'application/json',
@@ -47,7 +50,11 @@ function exportBasePath() {
   }
 }
 
-createServer(async (request, response) => {
+const exported=JSON.parse(readFileSync(new URL('../out/visdelta-build.json',import.meta.url),'utf8'));
+const library=JSON.parse(readFileSync(new URL(import.meta.resolve('visdelta/docs/index.json')),'utf8'));
+if(exported.buildSha256!==library.buildSha256)throw Error('Studio output is older than the library. Run npm run studio:build.');
+const handleAI=createAIHandler();
+const server=createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', 'http://localhost');
   let pathname = decodeURIComponent(url.pathname);
   if (basePath) {
@@ -57,6 +64,7 @@ createServer(async (request, response) => {
     }
     pathname = pathname.slice(basePath.length) || '/';
   }
+  if(await handleAI(request,response,pathname))return;
   // GitHub Pages redirects directory URLs without a trailing slash.
   const direct = normalize(join(root, pathname));
   const info = await stat(direct).catch(() => null);
@@ -75,3 +83,6 @@ createServer(async (request, response) => {
 }).listen(port, '127.0.0.1', () => {
   console.log(`Serving ${root} at http://127.0.0.1:${port}${basePath}/`);
 });
+
+const close=()=>{handleAI.close();server.close();};
+process.on('SIGINT',close);process.on('SIGTERM',close);

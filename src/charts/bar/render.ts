@@ -34,11 +34,13 @@ function createBarDraw(runtime: ChartRuntime, presentation: ChartPresentation): 
   const renderers = {
     grouped: createGroupedBarRenderer(runtime, kit),
     simple: createSimpleBarRenderer(runtime, kit),
-    stacked: createStackedBarRenderer(runtime, kit)
+    stacked: createStackedBarRenderer(runtime, kit),
+    diverging: createStackedBarRenderer(runtime, kit)
   };
 
   return function drawBar(chart, rows, spec, tooltip) {
     const bar = semanticBarState(spec);
+    if (bar.layout !== 'diverging') chart.g.selectAll('line.vd-bar-zero').remove();
     const renderer = renderers[isSegmentedLayout(bar.layout, bar.segmentField) ? bar.layout : 'simple'];
 
     if (renderer !== renderers.stacked) kit.renderBarSeams({ chart });
@@ -59,8 +61,8 @@ function createBarDraw(runtime: ChartRuntime, presentation: ChartPresentation): 
   };
 }
 
-function isSegmentedLayout(layout: BarLayout | undefined, segmentField: string | null | undefined): layout is 'grouped' | 'stacked' {
-  return Boolean(segmentField) && (layout === 'grouped' || layout === 'stacked');
+function isSegmentedLayout(layout: BarLayout | undefined, segmentField: string | null | undefined): layout is 'grouped' | 'stacked' | 'diverging' {
+  return Boolean(segmentField) && (layout === 'grouped' || layout === 'stacked' || layout === 'diverging');
 }
 
 function duplicateCategory(rows: RenderDatum[], channel: ChannelSpec = {}): { field: string; value: unknown } | null {

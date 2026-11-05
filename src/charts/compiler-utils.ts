@@ -1,14 +1,11 @@
 import { cloneState } from '../grammar/view-state.js';
 import type {
   ChannelSpec,
-  FilterSpec,
-  SelectionSpec,
   SemanticKey,
   ViewSpec
 } from '../types/index.js';
 import { semanticToMeta, specObjectKey, withSpecMeta } from '../spec-meta.js';
 import { titleize } from '../labels.js';
-import { normalizeFilter } from '../data/filter.js';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -21,38 +18,6 @@ interface AxisOrder {
   order: string[];
   duration?: number;
   stagger?: unknown;
-}
-
-export function compileFilter(spec: ViewSpec, operationSpec: SelectionSpec = {}): ViewSpec {
-  const filter = operationSpec.filter ? normalizeFilter(operationSpec.filter) : selectorToFilter(operationSpec);
-  if (!filter) return spec;
-  return withSceneState({
-    ...spec,
-    transform: [{ filter }, ...(spec.transform || [])]
-  }, { selection: { filter } });
-}
-
-export function compileHighlight(spec: ViewSpec, operationSpec: SelectionSpec = {}): ViewSpec {
-  const filter = operationSpec.filter ? normalizeFilter(operationSpec.filter) : selectorToFilter(operationSpec);
-  if (!filter) return spec;
-  return withSceneState(spec, {
-    selection: {
-      mode: 'highlight',
-      filter,
-      ...(operationSpec.opacity != null ? { opacity: operationSpec.opacity } : {})
-    }
-  });
-}
-
-export function compileFocus(spec: ViewSpec, operationSpec: SelectionSpec = {}): ViewSpec {
-  const filter = operationSpec.filter ? normalizeFilter(operationSpec.filter) : selectorToFilter(operationSpec);
-  if (!filter) return spec;
-  return withSceneState(spec, {
-    selection: {
-      mode: 'focus',
-      filter
-    }
-  });
 }
 
 export function compileCartesianCoordinate(spec: ViewSpec, operationSpec: AnyRecord = {}): ViewSpec {
@@ -94,14 +59,6 @@ export function withSceneState(spec: ViewSpec, sceneStatePatch: AnyRecord = {}):
 }
 
 export { semanticToMeta, semanticPartToMeta } from '../spec-meta.js';
-
-export function selectorToFilter(selector: AnyRecord = {}): FilterSpec | null {
-  if (!selector['field']) return null;
-  return normalizeFilter({
-    field: selector['field'] as string,
-    ...copyDefined(selector, ['equal', 'notEqual', 'oneOf', 'gte', 'gt', 'lte', 'lt'])
-  });
-}
 
 export function resolveAxisOrder(axisSpec: AnyRecord = {}, orientation: string): AxisOrder {
   return {

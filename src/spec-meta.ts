@@ -81,10 +81,6 @@ export function serializeViewSpec(spec: ViewSpec): ViewSpec {
 
   pruneDefaultSpecMeta(meta);
 
-  if (typeof next.data === 'string') {
-    next.data = { name: next.data };
-  }
-
   if (Object.keys(meta).length) {
     (next as Record<string, unknown>)[SPEC_META_KEY] = meta;
   }
@@ -128,24 +124,13 @@ export function specState(spec: ViewSpec): ResolvedChartState {
   };
 }
 
-/** Resolve attention scopes with the same precedence used by renderer code. */
+/** Attention has one canonical location, independent for each scope. */
 export function specScopes(spec: ViewSpec): ViewScopes {
-  const state = specState(spec);
-  const selections = [state.sceneState?.selection, state.selection, spec.selection];
-  const scopes = state.scopes ?? {};
-  const resolve = (target: 'focus' | 'highlight') =>
-    Object.prototype.hasOwnProperty.call(scopes, target)
-      ? scopes[target] ?? null
-      : selections.find((selection) => selection?.mode === target) ?? null;
-  return {
-    ...scopes,
-    focus: resolve('focus'),
-    highlight: resolve('highlight')
-  };
+  const scopes=specState(spec).scopes;
+  return {...scopes,focus:scopes.focus??null,highlight:scopes.highlight??null};
 }
 
 export function dataName(dataSpec: unknown): string | null {
-  if (typeof dataSpec === 'string') return dataSpec;
   return (dataSpec as { name?: string })?.name ?? null;
 }
 
@@ -177,11 +162,10 @@ function mergePlain<T extends Record<string, unknown>>(
 }
 
 export function semanticToMeta(semanticKey: SemanticKey = {}): Record<string, unknown> {
+  if(Object.keys(semanticKey).some(key=>!['entity','measure'].includes(key)))throw new Error('Semantic key roles are entity and measure.');
   return {
     ...(semanticKey.entity !== undefined ? { entity: semanticPartToMeta(semanticKey.entity) } : {}),
-    ...(semanticKey.entities !== undefined ? { entity: semanticPartToMeta(semanticKey.entities) } : {}),
     ...(semanticKey.measure !== undefined ? { measure: semanticPartToMeta(semanticKey.measure) } : {}),
-    ...(semanticKey.measures !== undefined ? { measure: semanticPartToMeta(semanticKey.measures) } : {})
   };
 }
 

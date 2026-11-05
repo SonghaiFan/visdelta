@@ -89,15 +89,11 @@ function normalizeUnitDeclaration(spec: UnitViewState): UnitViewState {
   const meta = result.meta ?? {};
   if (meta.state?.scopes && Object.keys(meta.state.scopes).length === 0) delete meta.state.scopes;
   const unit: Record<string, unknown> = { ...UNIT_DEFAULTS, ...(meta.unit ?? {}) };
-  if (unit.radius !== undefined) {
-    if (!result.encoding?.size) result.encoding = { ...result.encoding, size: { value: unit.radius as number } };
-    delete unit.radius;
-  }
   // A derived mirror with authored order or conflicting values is not safely
-  // reconstructible. Do not silently erase a legacy instruction or conflict.
-  const oldAxis = meta.state?.sceneState?.axis as Record<string, unknown> | undefined;
-  if (oldAxis) {
-    for (const [key, value] of Object.entries(oldAxis)) {
+  // reconstructible. Do not erase an authored order or conflict.
+  const axisMirror = meta.state?.sceneState?.axis as Record<string, unknown> | undefined;
+  if (axisMirror) {
+    for (const [key, value] of Object.entries(axisMirror)) {
       if (!['layout', 'group', 'value', 'x', 'y'].includes(key)) throw new Error('Unit axis instruction is outside the canonical mirror subset');
       const expected = unit[key] ?? null;
       if (value != null && !deepEqual(value, expected)) throw new Error('Unit axis metadata conflicts with its declaration');
@@ -131,13 +127,13 @@ function validateUnitDeclaration(spec: UnitViewState): string | void {
   if (meta?.object && Object.keys(meta.object).some(key => key !== 'key')) return 'Unit object metadata is outside the supported declaration subset';
   if (meta?.lineage && Object.keys(meta.lineage).some(key => key !== 'key')) return 'Unit lineage metadata is outside the supported declaration subset';
   const unit = meta?.unit ?? {};
-  if (Object.keys(unit).some(key => !['layout', 'columns', 'radius', 'group', 'value', 'unitValue', 'maxUnits'].includes(key))) return 'Unit metadata is outside the supported declaration subset';
+  if (Object.keys(unit).some(key => !['layout', 'columns', 'group', 'value', 'unitValue', 'maxUnits'].includes(key))) return 'Unit metadata is outside the supported declaration subset';
   const layout = unit['layout'] ?? UNIT_DEFAULTS.layout;
   if (typeof layout !== 'string' || !UNIT_LAYOUTS.includes(layout as typeof UNIT_LAYOUTS[number])) return 'Unit layout must be a supported layout name';
   for (const key of ['columns', 'maxUnits']) {
     if (unit[key] !== undefined && (!Number.isSafeInteger(unit[key]) || (unit[key] as number) <= 0)) return `Unit ${key} must be a positive safe integer`;
   }
-  for (const key of ['radius', 'unitValue']) {
+  for (const key of ['unitValue']) {
     if (unit[key] !== undefined && (typeof unit[key] !== 'number' || !Number.isFinite(unit[key]) || (unit[key] as number) <= 0)) return `Unit ${key} must be positive and finite`;
   }
   for (const key of ['group', 'value']) {

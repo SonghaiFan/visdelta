@@ -1,3 +1,4 @@
+import { distributionOptions } from './layout/distribution.js';
 import { createDeclarationOperationCodec, validateCanonicalAttentionScopes, validateCanonicalDataFields, validateCanonicalEncoding, validateCanonicalTransformPipeline, validateExplicitSourceDatumIdentity, deepEqual } from '../../grammar/declaration-operations.js';
 import { validateTransforms } from '../../data/validate.js';
 import { normalizeFilter } from '../../data/filter.js';
@@ -43,6 +44,7 @@ export function createBarGrainDeclarationOperationCodec(): DeclarationOperationC
   });
   return {
     supportsTransition(from, to) {
+      if (distributionOptions(from) || distributionOptions(to)) return 'Bar distribution layouts use the chart-owned presentation route';
       if (from.encoding?.facet || to.encoding?.facet) return 'Bar repeat uses its chart-owned bridge rather than declaration operation planning';
       if (hasAggregate(from) !== hasAggregate(to)) return 'Bar Grain planning requires aggregate transforms at both endpoints';
       if (!hasAggregate(from)) return;
@@ -51,6 +53,7 @@ export function createBarGrainDeclarationOperationCodec(): DeclarationOperationC
       }
     },
     normalize(spec) {
+      if (distributionOptions(spec)) return unsupported('Bar distribution layouts use chart-owned planning');
       if (!hasAggregate(spec)) return ordinary.normalize(spec);
       const reason = validateGrainBar(spec);
       return reason ? unsupported(reason) : { status: 'ok', value: normalizeBar(spec) };
@@ -253,8 +256,8 @@ function validateGrainBar(spec: BarSpec): string | null {
   const meta = serialized.meta;
   if (meta && Object.keys(meta).some(key => !['object', 'lineage', 'state', 'transition', 'unit', 'annotation'].includes(key))) return 'Bar metadata contains an unsupported field';
   if (meta?.lineage && Object.keys(meta.lineage).some(key => key !== 'key')) return 'Bar lineage metadata contains an unsupported field';
-  if (meta?.state && Object.keys(meta.state).some(key => !['selection', 'focus', 'highlight', 'axis', 'detail', 'sceneState', 'scopes'].includes(key))) return 'Bar state metadata contains an unsupported field';
-  if (meta?.state?.sceneState && Object.keys(meta.state.sceneState).some(key => !['selection', 'axis', 'detail'].includes(key))) return 'Bar scene metadata contains an unsupported field';
+  if (meta?.state && Object.keys(meta.state).some(key => !['axis', 'detail', 'sceneState', 'scopes'].includes(key))) return 'Bar state metadata contains an unsupported field';
+  if (meta?.state?.sceneState && Object.keys(meta.state.sceneState).some(key => !['axis', 'detail'].includes(key))) return 'Bar scene metadata contains an unsupported field';
   if (meta?.state?.scopes && Object.keys(meta.state.scopes).some(key => !['focus', 'highlight'].includes(key))) return 'Bar attention metadata contains an unsupported scope';
   if (meta?.object && Object.keys(meta.object).some(key => !['key', 'semantic'].includes(key))) return 'Bar object metadata contains an unsupported field';
   const rows = rowsFrom(serialized.data);
@@ -350,7 +353,8 @@ function validateOutputTransform(transform: TransformSpec, fields: Set<string>):
     const missing = requested.find(field => !fields.has(field));
     return missing ? `Bar sort references unknown aggregate output field "${missing}"` : null;
   }
-  return 'Bar Grain only supports sort transforms after aggregate';
+  if ('filter' in transform) return validateInputTransform(transform, fields);
+  return 'Bar Grain only supports filter and sort transforms after aggregate';
 }
 function rowsFrom(data: unknown): unknown[] | null {
   return Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray((data as { values?: unknown[] }).values) ? (data as { values: unknown[] }).values : null;
@@ -384,9 +388,9 @@ function validateOrdinaryBar(spec: BarSpec): string | void {
   if (meta && Object.keys(meta).some(key => !['object', 'lineage', 'state', 'transition', 'unit', 'annotation'].includes(key))) return 'Bar metadata contains an unsupported field';
   if (meta?.lineage && Object.keys(meta.lineage).some(key => key !== 'key')) return 'Bar lineage metadata contains an unsupported field';
   const stateMeta = meta?.state as Record<string, unknown> | undefined;
-  if (stateMeta && Object.keys(stateMeta).some(key => !['selection', 'focus', 'highlight', 'axis', 'detail', 'sceneState', 'scopes'].includes(key))) return 'Bar state metadata contains an unsupported field';
+  if (stateMeta && Object.keys(stateMeta).some(key => !['axis', 'detail', 'sceneState', 'scopes'].includes(key))) return 'Bar state metadata contains an unsupported field';
   const sceneState = stateMeta?.['sceneState'] as Record<string, unknown> | undefined;
-  if (sceneState && Object.keys(sceneState).some(key => !['selection', 'axis', 'detail'].includes(key))) return 'Bar scene metadata contains an unsupported field';
+  if (sceneState && Object.keys(sceneState).some(key => !['axis', 'detail'].includes(key))) return 'Bar scene metadata contains an unsupported field';
   const scopes = stateMeta?.['scopes'] as Record<string, unknown> | undefined;
   if (scopes && Object.keys(scopes).some(key => !['focus', 'highlight'].includes(key))) return 'Bar attention metadata contains an unsupported scope';
   const attentionError = validateCanonicalAttentionScopes(spec);

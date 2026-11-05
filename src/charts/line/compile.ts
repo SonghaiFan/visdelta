@@ -1,19 +1,13 @@
 import type { SpecCompiler, ViewSpec } from '../../types/index.js';
-import { aggregateFieldSpec, compileCartesianCoordinate, compileFilter, compileFocus, compileHighlight, identitySpec, withObject, withSceneState } from '../../charts/compiler-utils.js';
+import { aggregateFieldSpec, compileCartesianCoordinate, identitySpec, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 
 export function createLineSpecCompiler(_context: AnyRecord = {}): SpecCompiler {
   return {
-    stateOrder: ["selection","detail","axis"],
+    stateOrder: ["detail","axis"],
     base: compileLineBase,
     operations: {
-      selection: (spec, value) => {
-        const mode = value?.mode ?? 'filter';
-        const handler = { filter: compileFilter, focus: compileFocus, highlight: compileHighlight }[mode as 'filter' | 'focus' | 'highlight'];
-        if (!handler) throw new Error(`Unsupported selection mode: ${mode}`);
-        return handler(spec, value);
-      },
       axis: compileLineCoordinate,
       detail: compileLineAggregate
     }

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One hot day, a century of context · VisDelta Story</title>
+<link rel="stylesheet" href="./visdelta.css">
+<style>
+:root{color-scheme:light dark;--paper:#fafaf8;--ink:#141416;--line:#deded8;--muted:#66666e}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:48px 24px}header{max-width:760px;padding:4vh 0 8vh}h1{font-size:clamp(2.3rem,6vw,4.6rem);line-height:1.08;letter-spacing:-.05em}h2{line-height:1.2}a{color:inherit;text-underline-offset:4px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.story{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:48px;align-items:start}.visual{position:sticky;top:24px;min-width:0}#chart{height:420px}.controls{display:flex;gap:12px;flex-wrap:wrap;font-size:13px}.controls label{display:flex;align-items:center;gap:5px}input,select{font:inherit}input[type=range]{max-width:130px}#status{font-size:13px;color:var(--muted)}article{min-height:85vh;padding:30vh 0 12vh;border-top:1px solid var(--line)}article[aria-current=step]{border-color:#dc532d}footer{padding-top:32px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}@media(max-width:720px){main{padding:24px 16px}.story{display:block}.visual{top:0;background:var(--paper);z-index:1;padding-top:8px}#chart{height:280px}article{padding-top:24vh;min-height:75vh}.controls{gap:6px}}@media(prefers-color-scheme:dark){:root{--paper:#181819;--ink:#eeeeeb;--line:#414145;--muted:#aaaab1}}
+</style>
+<main>
+<header><p class="eyebrow">Archived Melbourne observations · 1910–2022</p><h1>One hot day,<br>a century of context.</h1><p>The archive records 45.9°C on 7 February 2009. A hot day tells us little on its own. Compare observations from the same 15-day seasonal window, then rearrange the same days to see their dates and temperatures.</p><p>This is a historical example, not a live weather service or a climate attribution study.</p></header>
+<section class="story" aria-label="Melbourne weather story">
+<div class="visual"><div id="chart" aria-label="Archived temperature chart"></div>
+<div class="controls"><label>Metric <select id="metric"><option value="tmax">Daily maximum</option><option value="tmin">Daily minimum</option></select></label><label>Archived percentile ≥ <input id="threshold" type="range" min="80" max="99" value="95"><output id="percentile">95</output></label><label>Story position <input id="position" type="range" min="0" max="4" step="0.01" value="0"></label></div><p id="status" role="status">Loading archived observations…</p></div>
+<div class="steps">
+<article data-step="0"><h2>Keep the season comparable.</h2><p>Each dot is one archived observation between January 31 and February 14. A common calendar aligns the same month and day across years. Missing observations remain missing.</p></article>
+<article data-step="1"><h2>Locate 2009 in that context.</h2><p>Highlighting preserves every observation. Orange marks identify 2009; the surrounding years remain available for comparison.</p></article>
+<article data-step="2"><h2>Ask which days were unusual.</h2><p>The filter uses the archive’s supplied percentile ranks. It changes the participating days. It does not recompute those ranks or establish a new climate baseline.</p></article>
+<article data-step="3"><h2>Spread the same days across years.</h2><p>Changing the horizontal field exposes when the selected observations occurred. Their keys, temperatures and archived ranks stay attached to the same dots.</p></article>
+<article data-step="4"><h2>Read temperature and year together.</h2><p>One final remapping places temperature horizontally and year vertically. This view invites a comparison, not a causal conclusion; station history and the original ranking method require independent evidence.</p></article>
+</div></section>
+<section aria-label="Counts in the selected seasonal window"><h2>Count the days behind the ranks.</h2><p>At the initial maximum-temperature threshold, 118 of 1,695 seasonal observations have archived rank ≥95. That is an observed archive count, not a return period or a recalculated percentile.</p><div id="distribution" style="height:280px"></div></section>
+<footer><p>The local archive contains 82,033 Melbourne observations. This page uses the complete January 31–February 14 window available in it, with no imputation or downsampling.</p><p>Original percentile reference population and full upstream preparation have not been recovered. <a href="./PROVENANCE.md">Data provenance and limits</a> · <a href="./ANALYSIS.md">Archived case analysis</a> · <a href="./chart.mjs">Chart declarations</a> · <a href="./main.mjs">Website lifecycle</a></p></footer>
+</main><script type="module" src="./app.js"></script>
+</html>

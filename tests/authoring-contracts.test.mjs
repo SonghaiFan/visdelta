@@ -135,18 +135,13 @@ test('built-in chart-style presets expose stable structural and CSS keys', () =>
   assert.equal(editorialChartStyle.legendPosition, 'top');
 });
 
-test('wide bar segments preserve their fold when rolling up to totals', () => {
+test('explicit fold pipelines survive a breakdown and rollup', () => {
   const ageBands = ['<10', '10-19', '≥80'];
   const detailed = bar({ url: './population.csv' })
     .x('name')
     .y('population')
-    .segment({
-      fields: ageBands,
-      as: ['age', 'population'],
-      category: 'name',
-      labels: Object.fromEntries(ageBands.map(age => [age, age])),
-      domain: ageBands
-    })
+    .with({ transform: [{ fold: { fields: ageBands, as: ['age', 'population'] } }] })
+    .breakdown('age')
     .color('age', { domain: ageBands, range: ['#d53e4f', '#fdae61', '#3288bd'] });
 
   const total = detailed.rollup().toSpec();
@@ -154,9 +149,7 @@ test('wide bar segments preserve their fold when rolling up to totals', () => {
     {
       fold: {
         fields: ageBands,
-        as: ['age', 'population'],
-        sourceAs: '__measure',
-        labels: Object.fromEntries(ageBands.map(age => [age, age]))
+        as: ['age', 'population']
       }
     },
     {
@@ -186,7 +179,7 @@ test('tidy bar detail preserves number format and rolls up without reshaping dat
   const total = detailed.rollup().toSpec();
   assert.equal(detailSpec.encoding.y.format, '~s');
   assert.equal(detailSpec.encoding.x.label, 'Region');
-  assert.equal(detailSpec.encoding.y.label, 'Sum of Residents');
+  assert.equal(detailSpec.encoding.y.label, 'Residents');
   assert.deepEqual(total.transform, [{
     aggregate: {
       groupby: ['state'],
@@ -310,7 +303,7 @@ test('unit separates group meaning from layout and preserves count identity', ()
   ];
   const base = unit(rows).value('count', { maxUnits: 20 }).key('id');
   const grouped = base.group('category');
-  const bars = grouped.layout('bar', { columns: 2, radius: 5 });
+  const bars = grouped.size(5).layout('bar', { columns: 2 });
   const groupedSpec = grouped.toSpec();
   const barSpec = bars.toSpec();
 
@@ -333,7 +326,7 @@ test('unit separates group meaning from layout and preserves count identity', ()
   assert.throws(() => base.layout('dodge'), /grid, force, bar, beeswarm/);
   assert.throws(() => base.layout('timeline'), /grid, force, bar, beeswarm/);
   assert.throws(() => base.columns(0), /positive integer/);
-  assert.throws(() => base.radius(0), /positive finite/);
+  assert.throws(() => base.size(0), /positive finite/);
   assert.throws(() => base.value('count', { maxUnits: 0 }), /positive integer/);
   assert.throws(() => base.value('count', { unitValue: 0 }), /positive finite/);
 });
@@ -649,7 +642,7 @@ test('point size and summary parent fields survive compilation', () => {
   ];
   const detailed = point(rows).x('x').y('y').key('id').pointSize(11).color('region');
   assert.equal(detailed.toSpec().size, 11);
-  assert.throws(() => detailed.radius(0), /positive finite number/);
+  assert.throws(() => detailed.pointSize(0), /positive finite number/);
 
   const summary = detailed.rollup('region', {
     size: { op: 'count', range: [10, 24] }
@@ -827,8 +820,8 @@ test('toSpec() serializes Date objects to ISO strings, so every chart state is J
 test('Unit compact and chained position declarations are equivalent and immutable', () => {
   const rows = [{ id: 'a', x: 2, y: 4 }];
   const base = unit(rows).key('id');
-  const target = base.layout('beeswarm', { x: 'x', radius: 5 });
-  assert.deepEqual(target.toSpec(), base.x('x').layout('beeswarm', { radius: 5 }).toSpec());
+  const target = base.size(5).layout('beeswarm', { x: 'x' });
+  assert.deepEqual(target.toSpec(), base.x('x').size(5).layout('beeswarm').toSpec());
   assert.deepEqual(base.layout('force', { x: { field: 'x', label: 'Position' }, y: 'y' }).toSpec(), base.x('x', { label: 'Position' }).y('y').layout('force').toSpec());
   assert.equal(base.toSpec().encoding?.x, undefined);
 });
@@ -837,10 +830,10 @@ test('Unit size is a constant mark channel and positional assignments are last-w
   const rows = [{ id: 'a', length: 3, width: 2 }];
   const base = unit(rows).key('id').size(6);
   assert.deepEqual(base.toSpec().encoding.size, { value: 6 });
-  assert.deepEqual(base.radius(9).toSpec(), base.size(9).toSpec());
-  assert.deepEqual(base.layout('grid', { radius: 9 }).toSpec(), base.size(9).layout('grid').toSpec());
-  assert.equal(base.layout('grid', { radius: 9 }).size(4).toSpec().encoding.size.value, 4);
-  assert.equal(base.size(4).layout('grid', { radius: 9 }).toSpec().encoding.size.value, 9);
+  assert.equal(typeof base.radius, 'undefined');
+  assert.throws(() => unit(rows).with({unit:{radius:9}}).toSpec(), /encoding.size/);
+  assert.throws(() => base.layout('grid', { radius: 9 }), /layout options/);
+  assert.equal(base.size(9).layout('grid').size(4).toSpec().encoding.size.value, 4);
   const first = base.layout('beeswarm', { x: { field: 'length', domain: [0, 10], label: 'Old' } });
   assert.deepEqual(first.x('width').toSpec(), base.layout('beeswarm', { x: 'width' }).toSpec());
   assert.deepEqual(base.x('width').layout('beeswarm', { x: 'length' }).toSpec(), base.layout('beeswarm', { x: 'length' }).toSpec());
@@ -877,4 +870,47 @@ test('channel labels survive compilation', () => {
     assert.equal('title' in spec.encoding.y, false);
     assert.equal(chart.toSpec().encoding.x.label, 'Horizontal');
   }
+});
+
+
+test('bar breakdown is the single tidy-data split API and preserves authored channels', () => {
+  const rows = [
+    { measure: 'revenue', product: 'Atlas', amount: 84 },
+    { measure: 'revenue', product: 'Beacon', amount: 62 },
+    { measure: 'revenue', product: 'Comet', amount: 96 },
+    { measure: 'revenue', product: 'Drift', amount: 48 }
+  ];
+  const y = { label: 'Revenue ($k)', format: '.0f', domain: [0, 300], scale: { type: 'linear', nice: false } };
+  const base = bar(rows).x('measure').y('amount', y);
+  assert.equal(typeof base.segment, 'undefined');
+  const split = base.breakdown('product');
+  const spec = split.toSpec();
+  assert.deepEqual(spec.encoding.y, base.toSpec().encoding.y);
+  assert.equal(spec.encoding.detail.field, 'product');
+  assert.deepEqual(spec.meta.object.key, ['measure', 'product']);
+  assert.equal(spec.encoding.color, undefined);
+  assert.equal(split.rows().length, 4);
+  assert.equal(split.rows().reduce((sum, row) => sum + row.amount, 0), 290);
+  assert.equal(split.rollup().rows()[0].amount, 290);
+  assert.equal(base.breakdown('product', { label: 'Sales' }).toSpec().encoding.y.label, 'Sales');
+  assert.equal(base.breakdown('product', { label: false }).toSpec().encoding.y.label, 'Revenue ($k)');
+  assert.equal(bar(rows).x('measure').y('amount').breakdown('product').toSpec().encoding.y.label, 'Amount');
+  const duplicate = bar([...rows, rows[0]]).x('measure').y('amount').breakdown('product');
+  assert.equal(duplicate.rows().find(row => row.product === 'Atlas').amount, 168);
+});
+
+test('with replaces Date-valued filter bounds instead of merging their empty properties', () => {
+  const before = new Date('2025-01-01T00:00:00Z');
+  const after = new Date('2025-02-01T00:00:00Z');
+  const rows = [{ day: new Date('2025-01-15T00:00:00Z'), amount: 1 },
+    { day: new Date('2025-02-15T00:00:00Z'), amount: 2 }];
+  const source = bar(rows).x('day').y('amount')
+    .with({ filter: { field: 'day', gte: before } });
+  const target = source.with({ filter: { gte: after } });
+  assert.equal(target.state.filter.gte.toISOString(), after.toISOString());
+  assert.equal(source.state.filter.gte.toISOString(), before.toISOString());
+  assert.equal(target.rows().length, 1);
+  assert.equal(source.rows().length, 2);
+  after.setUTCFullYear(2030);
+  assert.equal(target.state.filter.gte.getUTCFullYear(), 2025);
 });

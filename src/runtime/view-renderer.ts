@@ -543,6 +543,10 @@ function prepareSeekSourceState(
 ): void {
   const scene = getScene(node, viewConfig) as ViewRuntimeScene;
   const sourceSpec = transitionSource?.effectiveViewSpec || null;
+  // Reconstruct a complete source, not the outgoing copies from the last
+  // sampled frame. Cached phase snapshots retain their own detached nodes for
+  // reverse seeks; these live ghosts belong to the discarded recording.
+  scene.svg.selectAll('.vd-axis-ghost, .vd-grid-ghost').remove();
   if (!sourceSpec) {
     resetSceneToEmptySource(scene);
     return;

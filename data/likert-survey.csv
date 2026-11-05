@@ -1,0 +1,16 @@
+question,response,count
+Transit n=100,Strongly disagree,10
+Transit n=100,Disagree,20
+Transit n=100,Neutral,30
+Transit n=100,Agree,25
+Transit n=100,Strongly agree,15
+Parks n=200,Strongly disagree,10
+Parks n=200,Disagree,30
+Parks n=200,Neutral,40
+Parks n=200,Agree,70
+Parks n=200,Strongly agree,50
+Services n=80,Strongly disagree,16
+Services n=80,Disagree,24
+Services n=80,Neutral,8
+Services n=80,Agree,20
+Services n=80,Strongly agree,12

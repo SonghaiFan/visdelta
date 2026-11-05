@@ -3,7 +3,8 @@ import { bandOrLinear, position } from '../../toolkit/scales.js';
 import { keyFirstTravelMatching } from '../../toolkit/matching.js';
 import { matchesSelection, viewHighlight } from '../../focus.js';
 import { diffViewStates } from '../../grammar/diff.js';
-import { specObjectKey, specUnit } from '../../spec-meta.js';
+import {specUnit} from '../../spec-meta.js';
+import {resolveMarkIdentity,markKeyValue} from '../../identity/mark-correspondence.js';
 import type { RenderChannel, RenderDatum, RuntimeScale } from '../../runtime/render-types.js';
 import { max } from 'd3-array';
 import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force';
@@ -119,12 +120,10 @@ function unitTransitionPlan(chart: Pick<ChartContext, 'transitionPlan'>): UnitTr
 
 interface UnitSpecMeta {
   value?: string;
-  key?: string;
   unitValue?: number;
   maxUnits?: number;
   layout?: string;
   columns?: number;
-  radius?: number;
   group?: string;
 }
 
@@ -161,8 +160,7 @@ function unitMeta(spec: ViewSpec): UnitSpecMeta {
 export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
   const unit = unitMeta(spec);
   const valueKey = unit.value;
-  // An array object key reads as its joined string, exactly as a JS property lookup would.
-  const rowKey = String(unit.key || specObjectKey(spec) || 'id');
+  const identity=resolveMarkIdentity(spec);
   const unitValue = positiveNumber(unit.unitValue, UNIT_DEFAULTS.unitValue);
   const maxUnits = positiveInteger(unit.maxUnits, UNIT_DEFAULTS.maxUnits);
   const units: UnitDatum[] = [];
@@ -173,7 +171,7 @@ export function expandUnits(rows: RenderDatum[], spec: ViewSpec): UnitDatum[] {
     // A positive remainder receives a circle so the displayed units never
     // understate the source quantity (e.g. 51 at 10 per circle becomes 6).
     const count = Math.ceil(quantity / unitValue);
-    const parentKey = String(row[rowKey] ?? rowIndex);
+    const parentKey = identity?markKeyValue(row,identity,rowIndex):String(row.id??rowIndex);
     for (let unitIndex = 0; unitIndex < count; unitIndex++) {
       units.push({
         ...row,
@@ -196,7 +194,7 @@ export function unitLayout(units: UnitDatum[], chart: ChartContext, spec: ViewSp
   const unit = unitMeta(spec);
   const layout = unit.layout || UNIT_DEFAULTS.layout;
   const columns = positiveInteger(unit.columns, Math.max(8, Math.floor(Math.sqrt(units.length) * 1.4)));
-  const requestedRadius = positiveNumber(spec.encoding?.size?.value ?? unit.radius, 12);
+  const requestedRadius = positiveNumber(spec.encoding?.size?.value, 12);
   const xChannel = spec.encoding?.x || null;
   const yChannel = spec.encoding?.y || null;
   const groupKey = unit.group || null;
@@ -702,7 +700,7 @@ function unitPositionSignature(spec: ViewSpec): string {
   return stableStringify({
     layout: unit.layout || UNIT_DEFAULTS.layout,
     columns: unit.columns ?? null,
-    size: spec.encoding?.size ?? unit.radius ?? null,
+    size: spec.encoding?.size ?? null,
     group: unit.group ?? null,
     value: unit.value ?? null,
     unitValue: unitValueForSpec(spec),

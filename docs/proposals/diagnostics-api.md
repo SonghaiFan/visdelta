@@ -13,7 +13,7 @@ from screenshots. The answer must come from the same compiler, chart plugin,
 scale instances and frame evaluator that produce the chart. A parallel debug
 renderer would become a second source of truth.
 
-Respect the four layers in the [constitution](../language-framework.md):
+Respect the four layers in the [constitution](../internal/language-framework.md):
 identity/correspondence, semantic difference, route planning, and frame/control.
 A recorded track is not a semantic action; an inserted route state is not an
 authored keyframe. Diagnostics must name those distinctions.

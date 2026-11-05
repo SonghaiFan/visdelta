@@ -13,7 +13,6 @@ import {
   evaluateChart,
   loadCsv,
   loadFactory,
-  prefersReducedMotion,
   renderFrozen,
   yieldToBrowser,
   type ChartState,
@@ -53,8 +52,7 @@ function TileHost({ id, register }: { id: string; register: (id: string, element
 
 /**
  * Every visual idiom VisDelta can express, drawn live from its code and a
- * bundled dataset. Tiles are frozen renders; the viewer is a live chart that
- * morphs between idioms of the same mark.
+ * bundled dataset. Tiles and the viewer show static states; editing and animation live in Playground.
  */
 export function IdiomGallery({ children }: { children?: ReactNode }) {
   return <SidebarProvider><GalleryContent>{children}</GalleryContent></SidebarProvider>;
@@ -78,7 +76,6 @@ function GalleryContent({ children }: { children?: ReactNode }) {
   const pending = useRef(new Set<string>());
   const queue = useRef<Promise<void>>(Promise.resolve());
   const observer = useRef<IntersectionObserver | null>(null);
-  const viewerState = useRef<{ mark: string; state: ChartState } | null>(null);
   const viewerVersion = useRef(0);
   const disposed = useRef(false);
   const idiomsRef = useRef<Idiom[]>([]);
@@ -95,6 +92,7 @@ function GalleryContent({ children }: { children?: ReactNode }) {
     .map((group) => ({ ...group, idioms: filtered.filter((idiom) => idiom.mark === group.mark) }))
     .filter((group) => group.idioms.length);
   const current = idioms.find((idiom) => idiom.id === openId) ?? null;
+  const currentGuide = current?.guide ?? (current ? designGuides[current.mark] : undefined);
   const currentIndex = filtered.findIndex((idiom) => idiom.id === openId);
   const currentGroup = groups.find((group) => group.mark === current?.mark);
 
@@ -160,34 +158,10 @@ function GalleryContent({ children }: { children?: ReactNode }) {
       const advice = await visualizationWarnings(state as never);
       if (version !== viewerVersion.current || disposed.current) return;
       setWarnings(advice);
-      const previous = viewerState.current;
-      const from = previous && previous.mark === idiom.mark ? previous.state : state;
       const height = Math.max(300, Math.min(560, Math.round(window.innerHeight * 0.58)));
-      const props: ChartProps = {
-        state: [from as unknown as Visualization, state as unknown as Visualization],
-        height,
-        onReady(chart) {
-          if (version !== viewerVersion.current) return;
-          viewerState.current = { mark: idiom.mark, state };
-          if (from !== state && !prefersReducedMotion()) {
-            chart.progress(0);
-            chart.play({ from: 0, to: 1, duration: 700 });
-          } else chart.progress(1);
-          setViewerStatus('');
-        },
-        onError(cause) {
-          if (version !== viewerVersion.current) return;
-          if (from === state) setViewerStatus(errorMessage(cause));
-          else setScene({ ...props, state: state as unknown as Visualization,
-            onReady(chart) {
-              if (version !== viewerVersion.current) return;
-              viewerState.current = { mark: idiom.mark, state };
-              chart.progress(1);
-              setViewerStatus('');
-            },
-            onError: error => setViewerStatus(errorMessage(error)),
-          });
-        },
+      const props:ChartProps={state:state as unknown as Visualization,height,
+        onReady(){if(version===viewerVersion.current)setViewerStatus('');},
+        onError(cause){if(version===viewerVersion.current)setViewerStatus(errorMessage(cause));},
       };
       setScene(props);
     } catch (cause) {
@@ -204,7 +178,6 @@ function GalleryContent({ children }: { children?: ReactNode }) {
   const onClose = () => {
     viewerVersion.current += 1;
     setScene(null);
-    viewerState.current = null;
     setOpenId(null);
     if (window.location.hash) window.history.replaceState(null, '', window.location.pathname + window.location.search);
   };
@@ -379,11 +352,11 @@ function GalleryContent({ children }: { children?: ReactNode }) {
                     ))}
                   </div>
                 )}
-                {designGuides[current.mark] && (
+                {currentGuide && (
                   <div className="rounded-lg border p-3.5 text-sm">
                     <p className="mb-2 font-mono text-[0.62rem] font-semibold uppercase tracking-wider text-fd-muted-foreground">Choosing this chart</p>
-                    <p>{designGuides[current.mark]!.text}</p>
-                    <a href={designGuides[current.mark]!.url} target="_blank" rel="noopener" className="text-xs text-fd-primary hover:underline">
+                    <p>{currentGuide.text}</p>
+                    <a href={currentGuide.url} target="_blank" rel="noopener" className="text-xs text-fd-primary hover:underline">
                       Datawrapper guide ↗
                     </a>
                   </div>

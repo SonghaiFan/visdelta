@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseSpec, stringifySpec, delta, visualizationSpec } from '../dist/core.js';
-import { bar } from '../dist/bar.js';
+import { bar, BarState } from '../dist/bar.js';
 import { line } from '../dist/line.js';
 import { area } from '../dist/area.js';
 import { point } from '../dist/point.js';
@@ -58,4 +58,25 @@ test('JSON validates common structure without claiming plugin validity', () => {
   assert.throws(() => parseSpec({ mark: 'bar' }), /JSON string/);
   assert.throws(() => parseSpec('{"mark":"bar","meta":{"transform":[{"limit":-1}]}}'), /limit/);
   assert.deepEqual(parseSpec('{"mark":"unregistered-plugin"}'), { mark: 'unregistered-plugin' });
+});
+
+test('position scales reject nested domains without banning valid scale objects or plugin channels', async () => {
+  const invalid = bar(rows).x('category').y('value', {scale:{domain:[40,100]}}).toSpec();
+  const details = {code:'INVALID_CHANNEL_SCALE',specPath:'/encoding/y/scale/domain'};
+  assert.throws(()=>parseSpec(JSON.stringify(invalid)),details);
+  assert.throws(()=>visualizationSpec(invalid),details);
+  const {visualizationWarnings} = await import('../dist/visdelta.esm.js');
+  await assert.rejects(visualizationWarnings(invalid),details);
+  const valid = {...invalid, encoding:{...invalid.encoding,y:{...invalid.encoding.y,domain:[40,100],scale:{type:'log',base:10}}}};
+  assert.deepEqual(parseSpec(stringifySpec(valid)),valid);
+  assert.ok((await visualizationWarnings(new BarState(valid))).some(item=>item.code==='bar.truncated-baseline'));
+  const custom = {mark:'custom-scale-probe',encoding:{x:{field:'value',scale:{type:'custom',extension:true}},extra:{field:'value',scale:{domain:[1,2]}}}};
+  assert.deepEqual(parseSpec(stringifySpec(custom)),custom);
+  assert.throws(()=>parseSpec(JSON.stringify({...invalid,encoding:{y:{field:'value',scale:'log'}}})),{code:'INVALID_CHANNEL_SCALE'});
+});
+
+
+test('data bindings are explicit rather than inferred from strings',()=>{
+  assert.throws(()=>parseSpec(JSON.stringify({mark:'bar',data:'sales'})),/data/);
+  assert.equal(parseSpec(JSON.stringify({mark:'bar',data:{name:'sales'}})).data.name,'sales');
 });

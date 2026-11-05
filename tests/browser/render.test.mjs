@@ -9,7 +9,11 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   const bundle = await build({ stdin: { contents: `
     import { render, createRenderer, bar, availableChartTypes, registerChartType } from './dist/index.js';
     import { barModule } from './dist/bar.js';
-    window.api = { render, createRenderer, bar, barModule, availableChartTypes, registerChartType };
+    import { pie, pieModule } from './dist/pie.js';
+    import { defineChartType } from './dist/plugins.js';
+    import { specs, sales } from './examples/authoring/complete-states.mjs';
+    import { foldedBar } from './tests/fixtures/folded-bar.mjs';
+    window.api = { specs: {...specs,stacked:foldedBar.toSpec()}, sales, defineChartType, render, createRenderer, bar, barModule, pie, pieModule, availableChartTypes, registerChartType };
   `, resolveDir: process.cwd() }, bundle: true, format: 'iife', write: false });
   const css = await readFile(new URL('../../dist/visdelta.css', import.meta.url));
   const server = createServer((req, res) => {
@@ -129,6 +133,61 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   assert.equal(await page.locator('#chart svg').count(), 0);
   assert.ok(await page.evaluate(async () => { try { await view.update(make(12)); } catch (e) { return e.message; } }));
 
+  // Render each complete builder-generated declaration using actual named rows.
+  await page.evaluate(async () => {
+    for (const [name, spec] of Object.entries(api.specs)) {
+      const example = await api.render('#chart', spec, { data: { sales: api.sales }, height: 280 });
+      const observation = example.inspectMarks();
+      if (!observation.marks.length) throw Error(`No visible keyed marks for ${name}`);
+      if (name === 'stacked') {
+        const before = example.snapshot();
+        const message = { requestId: 'preview-flip', baseRevision: before.revision, edits: [{ method: 'flip', args: [] }] };
+        const preview = await example.previewEdit(message);
+        const colored = await example.previewEdit({ ...message, edits: [{ method: 'color', args: ['#ff0000'] }] });
+        if (colored.spec.encoding.color.value !== '#ff0000') throw Error('Fold color preview lost requested color');
+        if (JSON.stringify(colored.spec.transform) !== JSON.stringify(before.spec.transform)) throw Error('Color preview rewrote fold');
+        if (JSON.stringify(example.snapshot()) !== JSON.stringify(before)) throw Error('Preview accepted a revision');
+        if (document.querySelector('#chart [aria-hidden]')) throw Error('Preview leaked a mount');
+        if (preview.spec.encoding.y.type !== 'quantitative') throw Error('Preview did not flip horizontal to vertical');
+        if (JSON.stringify(preview.spec.transform) !== JSON.stringify(before.spec.transform)) throw Error('Preview rewrote transforms');
+        await example.edit(message, { duration: 40 });
+        if (JSON.stringify(example.snapshot().spec) !== JSON.stringify(preview.spec)) throw Error('Applied endpoint differs from preview');
+        const endpoint = example.inspectMarks();
+        if (endpoint.marks.length !== 4) throw Error('Flip lost stacked segments');
+        const second = { requestId: 'restore-flip', baseRevision: example.snapshot().revision, edits: [{ method: 'flip', args: [] }] };
+        await example.previewEdit(second);
+        await example.edit(second, { duration: 40 });
+        if (JSON.stringify(example.snapshot().spec) !== JSON.stringify(before.spec)) throw Error('Second flip did not restore declaration');
+        const after = example.inspectMarks();
+        if (JSON.stringify(after.marks.map(mark => mark.bounds)) !== JSON.stringify(observation.marks.map(mark => mark.bounds))) throw Error('Double flip did not restore geometry');
+      }
+      if (name !== 'stacked') {
+        const capabilities = example.capabilities();
+        if (!capabilities.editMethods.includes('highlight')) throw Error(`Missing capability for ${name}`);
+        capabilities.editMethods.length = 0;
+        if (!example.capabilities().editMethods.length) throw Error('Leaked capabilities');
+        const prior = example.snapshot();
+        try {
+          await example.edit({ requestId: 'atomic', baseRevision: prior.revision, edits: [
+            { method: 'color', args: [{ value: 'red' }] },
+            { method: 'highlight', args: [{ product: {} }] },
+          ] });
+          throw Error('Accepted invalid selector');
+        } catch (error) {
+          if (error.editIndex !== 1 || error.path !== '/edits/1/args/0/product' || error.method !== 'highlight') throw error;
+        }
+        if (JSON.stringify(example.snapshot()) !== JSON.stringify(prior)) throw Error('Partially accepted edits');
+        await example.edit({ requestId: 'common', baseRevision: prior.revision, edits: [
+          { method: 'color', args: [{ value: '#ff0000' }] },
+          { method: 'highlight', args: [{ product: 'Atlas' }] },
+          { method: 'sort', args: ['revenue', 'descending'] },
+        ] }, { animate: false });
+        if (example.snapshot().spec.encoding.color.value !== '#ff0000') throw Error('Lost explicit color');
+      }
+      example.destroy();
+    }
+  });
+
   // Scoped modules must be independent of global overrides.
   await page.evaluate(async () => {
     api.registerChartType({ key: 'bar', scenes: [], prepareSpec: s => s, renderer() { throw Error('global override'); } });
@@ -201,5 +260,114 @@ test('persistent JSON view: latest policy, validation, data races, resize and de
   assert.equal(await page.locator('#chart .vd-empty').isVisible(), false, 'restoring data clears empty-state text even on compiled/seek render paths');
   await page.evaluate(() => customView.destroy());
   assert.equal(await page.locator('#chart').evaluate(n => n.childElementCount), 0);
+  // Explicit replacement is generic; the scoped renderer still owns its module list.
+  await page.evaluate(async () => {
+    window.switchView = await api.createRenderer({ modules: [api.barModule, api.pieModule] }).render('#chart', make(3), { height: 280 });
+    window.pieSpec = api.pie([{ x: 'A', y: 3 }, { x: 'B', y: 10 }]).value('y').label('x').color('x').toSpec();
+    await switchView.replace(pieSpec, { duration: 80 });
+  });
+  assert.equal(await page.locator('#chart .vd-pie-slice').count(), 2);
+  assert.equal(await page.evaluate(() => switchView.snapshot().spec.mark), 'pie');
+  assert.deepEqual(await page.evaluate(() => switchView.inspectMarks().marks.map(mark => mark.data.x).sort()), ['A', 'B']);
+  const attention = await page.evaluate(async () => {
+    const opacities = () => switchView.inspectMarks().marks.map(mark => mark.appearance.opacity);
+    const highlighted = api.pie([{ x: 'A', y: 3 }, { x: 'B', y: 10 }]).value('y').label('x').highlight({ x: 'A' });
+    await switchView.update(highlighted, { animate: false });
+    const one = opacities();
+    const cleared = switchView.snapshot().spec;
+    delete cleared.meta.state.scopes.highlight;
+    await switchView.update(cleared, { animate: false });
+    const none = opacities();
+    await switchView.update(highlighted.with({ scopes: { highlight: { mode: 'highlight', filters: [] } } }), { animate: false });
+    const empty = opacities();
+    await switchView.update(highlighted.with({ scopes: { highlight: null } }).highlight({ x: ['A', 'B'] }), { animate: false });
+    const all = opacities();
+    return { one, none, empty, all, hasAllScope: !!switchView.snapshot().spec.meta.state.scopes.highlight };
+  });
+  assert.equal(attention.one.filter(value => value === 1).length, 1);
+  assert.ok(attention.none.every(value => value === 1));
+  assert.ok(attention.empty.every(value => value < 1));
+  assert.ok(attention.all.every(value => value === 1));
+  assert.ok(attention.hasAllScope, 'select all retains an authored scope');
+  const beforeReplacementFailure = await page.evaluate(() => switchView.snapshot());
+  assert.match(await page.evaluate(async () => { try { await switchView.replace({ ...pieSpec, encoding: {} }); } catch (error) { return error.message; } }), /value|angle/i);
+  assert.deepEqual(await page.evaluate(() => switchView.snapshot()), beforeReplacementFailure);
+  await page.evaluate(async () => { await switchView.replace(make(3), { animate: false }); });
+  assert.equal(await page.locator('#chart .vd-pie-slice').count(), 0);
+  assert.equal(await page.evaluate(() => switchView.snapshot().spec.mark), 'bar');
+  await page.evaluate(() => switchView.destroy());
+  // A genuinely independent chart module exercises replacement lifecycle without built-in geometry.
+  await page.evaluate(async () => {
+    const module = { key: 'probe', async load() { return { plugin: api.defineChartType({
+      key: 'probe', createRenderer() { return (chart, rows, spec) => {
+        if (spec.meta?.rejectRender) throw Error('probe rejection');
+        chart.scene.markRoot.selectAll('circle').data(rows).join('circle')
+          .attr('data-key', d => d.id).attr('cx', 30).attr('cy', 30).attr('r', 10);
+      }; },
+    }) }; } };
+    window.probeModule = module;
+    window.probe = { mark: 'probe', data: [{ id: 'a', value: 3 }], encoding: {}, key: 'id' };
+    window.probeView = await api.createRenderer({ modules: [api.barModule, module] }).render('#chart', make(1));
+    window.fading = probeView.replace(probe, { duration: 1500 });
+  });
+  await page.waitForFunction(() => {
+    const mount = document.querySelector('#chart > div');
+    return mount?.style.opacity !== '' && Number(mount?.style.opacity) > 0;
+  });
+  assert.equal(await page.evaluate(() => {
+    const mount = document.querySelector('#chart > div');
+    const opacity = mount.style.opacity;
+    probeView.resize({ width: 320 });
+    return mount.style.opacity === opacity;
+  }), true, 'resize preserves replacement fade');
+  assert.equal(await page.evaluate(async () => (await fading).status), 'applied');
+  assert.equal(await page.evaluate(() => probeView.inspectMarks().marks[0].data.value), 3);
+  await page.evaluate(() => { window.crossActive = probeView.replace(make(2), { duration: 600 }); });
+  await page.waitForFunction(() => probeView.snapshot().spec.mark === 'bar' && !document.querySelector('#chart [aria-hidden]'));
+  await page.evaluate(() => { window.crossPending = probeView.replace(probe); });
+  await page.waitForFunction(() => probeView.snapshot().spec.mark === 'probe');
+  await page.evaluate(() => { window.crossLatest = probeView.replace(make(3), { animate: false }); });
+  assert.deepEqual(await page.evaluate(async () => (await Promise.all([crossActive, crossPending, crossLatest])).map(r => r.status)),
+    ['applied', 'superseded', 'applied'], 'cross-type replacements retain latest scheduling');
+  await page.evaluate(async () => { await probeView.replace(probe, { animate: false }); });
+  assert.deepEqual(await page.evaluate(() => probeView.capabilities()), { mark: 'probe', fluentEdits: false, editMethods: [] });
+  const probeBefore = await page.evaluate(() => probeView.snapshot());
+  assert.match(await page.evaluate(async () => {
+    try { await probeView.replace({ ...probe, meta: { rejectRender: true } }); } catch (e) { return e.message; }
+  }), /probe rejection/);
+  assert.deepEqual(await page.evaluate(() => probeView.snapshot()), probeBefore);
+  assert.equal(await page.evaluate(async () => {
+    const capture = probeView.capture().then(() => 'unexpected', e => e.message);
+    probeView.resize({ width: 330 });
+    return capture;
+  }), 'Chart changed during capture. Capture again.');
+  assert.equal(await page.evaluate(async () => {
+    const pending = probeView.transition(probe);
+    let blocked = false;
+    try { probeView.inspectMarks(); } catch { blocked = true; }
+    const controller = await pending;
+    controller.progress(1);
+    await probeView.replace(make(1), { animate: false });
+    return blocked;
+  }), true, 'manual preparation cannot be observed as a settled endpoint');
+  await page.evaluate(() => { window.destroyedFade = probeView.replace(probe, { duration: 2000 }); });
+  await page.waitForFunction(() => document.querySelector('#chart circle') && document.querySelector('#chart > div')?.style.opacity !== '');
+  await page.evaluate(() => probeView.destroy());
+  assert.equal(await page.evaluate(async () => (await destroyedFade).status), 'destroyed');
+  assert.equal(await page.locator('#chart').evaluate(n => n.childElementCount), 0);
+  const legacyCapabilities = await page.evaluate(async () => {
+    const legacy = await api.createRenderer({ modules: [{ ...probeModule, edit: async spec => spec }] }).render('#chart', probe);
+    const capabilities = legacy.capabilities();
+    const preview = await legacy.previewEdit({ requestId: 'legacy-preview', baseRevision: 0, edits: [{ method: 'custom', args: [] }] });
+    if (preview.revision !== 0 || legacy.snapshot().revision !== 0) throw Error('Custom preview mutated revision');
+    await legacy.edit({ requestId: 'legacy', baseRevision: 0, edits: [{ method: 'custom', args: [] }] }, { animate: false });
+    try {
+      await legacy.previewEdit({ requestId: 'stale-preview', baseRevision: 0, edits: [{ method: 'custom', args: [] }] });
+      throw Error('Stale preview accepted');
+    } catch (error) { if (error.code !== 'REVISION_CONFLICT') throw error; }
+    legacy.destroy();
+    return capabilities;
+  });
+  assert.deepEqual(legacyCapabilities, { mark: 'probe', fluentEdits: true, editMethods: null });
   assert.deepEqual(errors, []);
 });

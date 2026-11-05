@@ -90,6 +90,15 @@ try {
     import { bar, delta, parseSpec, stringifySpec, render } from 'visdelta';
     import { createRenderer } from 'visdelta/render';
     if (typeof render !== 'function' || typeof createRenderer !== 'function') throw new Error('Render entry missing');
+    const { readFile } = await import('node:fs/promises');
+    const { createHash } = await import('node:crypto');
+    const docs = JSON.parse(await readFile(new URL(import.meta.resolve('visdelta/docs/index.json')), 'utf8'));
+    if (docs.packageVersion !== '${JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version}') throw new Error('Documentation version mismatch');
+    for (const document of docs.documents) {
+      const content = await readFile(new URL(import.meta.resolve(document.path)));
+      if (createHash('sha256').update(content).digest('hex') !== document.sha256) throw new Error('Documentation hash mismatch');
+    }
+
     const a = bar([{ key: 'A', value: 1, next: 2 }]).x('key').y('value');
     if (a.rollup().rows()[0].value !== 1) throw new Error('Normal install did not materialize transforms.');
     if (stringifySpec(parseSpec(stringifySpec(a))) !== stringifySpec(a)) throw new Error('JSON round trip failed.');
@@ -138,7 +147,7 @@ import { network, states as authoredStates, rows as storyRows } from './network-
 import { chart as salesChart, sales } from './sales.mjs';
 import * as browserApi from "visdelta/browser";
 import { D3_AREA_CURVE_NAMES as selectedAreaCurveNames, area as selectedArea, areaModule } from "visdelta/area";
-import { bar as selectedBar, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
+import { bar as selectedBar, inspectBarSpec, barModule, createBarGrainDeclarationOperationCodec as selectedBarGrainCodec } from "visdelta/bar";
 import { pie as selectedPie, pieModule } from "visdelta/pie";
 import { point as selectedPoint, pointModule } from "visdelta/point";
 import { D3_CURVE_NAMES as selectedCurveNames, line as selectedLine, lineModule } from "visdelta/line";
@@ -194,6 +203,9 @@ const grainRows = [
 const grainBase = selectedBar(grainRows).datumKey("id").x("category").y("amount", { label: "Metric" });
 const grainFrom = grainBase.rollup({ label: "Metric" }).toSpec();
 const grainTo = grainBase.breakdown("segment", { label: "Metric" }).toSpec();
+const groupedInspection = inspectBarSpec(selectedBar([{ group: 'All', part: 'A', value: 2 }])
+  .x('group').y('value').breakdown('part').layout('grouped').flip().toSpec());
+if (groupedInspection.layout !== 'grouped' || groupedInspection.offsetChannel !== 'yOffset') throw Error('installed layout inspection disagrees with builder');
 const grainCodec = selectedBarGrainCodec();
 const grainPlan = api.planDeclarationTransition(grainFrom, grainTo, grainCodec);
 if (grainPlan.status !== "planned" || grainPlan.stages.length !== 1) throw new Error("Packed Bar Grain planner did not produce a one-operation path: " + grainPlan.reason);

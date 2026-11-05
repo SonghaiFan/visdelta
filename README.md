@@ -1,239 +1,84 @@
-<p align="center">
-  <img src="website/public/visdelta-logo.svg" width="160" alt="VisDelta logo">
-</p>
-
 # VisDelta
 
-VisDelta is a declarative visualization-transition library. Describe a chart
-before and after a change; VisDelta finds the difference and lets any external
-control play or seek the transition.
+Declare chart states. VisDelta tracks their objects and renders a transition you
+can play, reverse or scrub.
 
-> This project is evolving quickly and will remain free and open source forever. If you’ve downloaded it or are using it, please **Star** the repository and [**Follow @SonghaiFan**](https://github.com/SonghaiFan) to keep up with my projects. Your Star is my biggest source of support and motivation to keep building.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/SonghaiFan/visdelta/main/website/public/demo.gif" width="760" alt="A bar chart scrubbed from a rollup to an age breakdown to a grouped layout and back, driven by progress(t)">
-</p>
-
-Every frame above is `change.progress(t)` — the same frames play forward,
-backward, or under a scrollbar. Try it in the [documentation and playground](https://songhaifan.github.io/visdelta/).
-
-```text
-Data -> Chart state -> Difference -> Transition -> Frame
+```sh
+npm install visdelta
 ```
 
 ```js
-import { bar } from "visdelta/bar";
-import { transition } from "visdelta/transition";
-import "visdelta/style.css";
+import {bar, transition} from 'visdelta';
+import 'visdelta/style.css';
 
-const revenue = bar(rows)
-  .x("category")
-  .y("revenue");
-
-const profit = revenue.y("profit");
-const change = await transition(revenue, profit, {
-  target: "#chart"
+const rows = [
+  {product:'Atlas', revenue:84, profit:22},
+  {product:'Beacon', revenue:62, profit:31},
+];
+const from = bar(rows).x('product').y('revenue');
+const change = await transition(from, from.y('profit'), {
+  target:'#chart', width:'auto', height:400,
 });
-
-change.progress(0.42);
-change.play({ duration: 800 });
+change.progress(0.5);
+// On removal: change.destroy();
 ```
 
-Chart states are immutable: creating `profit` does not change `revenue`.
+Supply tidy data. The surrounding application owns its data preparation, page,
+controls and intent. VisDelta owns chart declarations, identity, validation,
+rendering and transitions. Import a selected chart from `visdelta/bar`,
+`visdelta/line`, `visdelta/area`, `visdelta/point`, `visdelta/pie` or `visdelta/unit`
+when you want only that module.
 
-## Building with an agent
+[Quick start](https://songhaifan.github.io/visdelta/docs/quick-start/) ·
+[API](https://songhaifan.github.io/visdelta/docs/api/) ·
+[Agent guide](https://songhaifan.github.io/visdelta/docs/guides/agent-workflow/)
 
-For downstream MDX applications, see the [authoring integration guide](website/content/docs/guides/mdx.mdx)
-and the [minimal Bar declaration](examples/authoring/sales.mjs). Each
-[MDX step](examples/authoring/story.mdx) pairs its text with `chart={...}`.
-The accompanying
-[mount example](examples/authoring/mount-story.mjs) covers asynchronous generations,
-pending progress, single states and cleanup. Run `npm run authoring:check` to verify
-these examples against an installed package.
+## Studio
 
-Start with [llms.txt](llms.txt), the [automatic behavior table](https://songhaifan.github.io/visdelta/docs/guides/automatic-behaviors/),
-and the runnable [single-file scroll story](examples/templates/scroll-story.html).
-The [diagnostic API design](docs/proposals/diagnostics-api.md) is a proposal,
-not an implemented API.
+One website contains four ways to use the same library:
 
-## Install
+- **Gallery** — static chart idioms, their data and minimal declarations.
+- **Playground** — edit a declaration and inspect the live chart and transition.
+- **Story** — copy complete scrollytelling websites; no narrative DSL or parser.
+- **Liveshow** — edit the existing chart through MCP, with optional local text/voice AI.
+
+Studio requires Node.js 22.18 or later.
 
 ```sh
-npm install visdelta@0.4.2
-```
-
-Or import it directly in a browser, using the same jsDelivr `+esm` convention
-as D3:
-
-```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
-<script type="module">
-  import * as vd from "https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm";
-
-  const state = vd.bar(rows);
-</script>
-```
-
-See the [complete CDN example](https://songhaifan.github.io/visdelta/docs/guides/cdn/) for a slider-controlled
-transition and the optional focused entry points.
-
-VisDelta depends only on the `d3-*` modules it renders with. Declared transforms
-such as `.where()`, `.sort()`, `.breakdown()`, and `.rollup()` run without any
-extra package. The package is ESM-only.
-
-VisDelta expects tidy input. Data cleaning and reshaping belong before the
-library.
-
-## Chart types
-
-| Import | Use |
-| --- | --- |
-| `visdelta/area` | Ordered magnitude and composition |
-| `visdelta/bar` | Categorical comparison |
-| `visdelta/line` | Ordered trends |
-| `visdelta/point` | Relationships between quantities |
-| `visdelta/unit` | Countable items in `grid`, `force`, `bar`, or `beeswarm` layouts |
-
-The chart modules are peers. Each owns its builder, compiler, marks, axes,
-matching, and transition rules. Core has no branches for built-in chart types.
-
-```js
-base.where({ region: "North" })     // remove other rows
-base.highlight({ region: "North" }) // keep rows; change attention
-base.focus({ region: "North" })     // keep rows; move the camera
-```
-
-Every visual mapping is explicit. VisDelta can supply presentation defaults,
-but it never decides that a data field should mean x, y, color, size, or detail.
-
-## Public entries
-
-| Entry | Responsibility |
-| --- | --- |
-| `visdelta` | All built-in builders plus the core API |
-| `visdelta/core` | State normalization, data types, camera math, and `delta()` |
-| `visdelta/transition` | `transition()`, seek, play, pause, resize, and destroy |
-| `visdelta/area`, `/bar`, `/line`, `/pie`, `/point`, `/unit` | Focused chart modules |
-| `visdelta/plugins` | Define and register independent chart modules |
-| `visdelta/chart-style` | Structural chart-style modules |
-| `visdelta/browser` | Browser-global dependency adapter |
-| `visdelta/style.css` | Required chart styles |
-
-## React
-
-The optional `visdelta/react` entry provides one `Chart` component for React 18/19. Keep chart states and arrays stable between renders.
-`pair` below is `[a, b]`; `states` can contain any non-empty ordered sequence.
-
-```jsx
-import { Chart } from 'visdelta/react';
-
-<Chart state={a} height={320} />
-<Chart state={pair} progress={progress} />
-<Chart state={states} progress={position} />
-```
-
-A single state (or one-element array) displays immediately at progress 0. Empty
-arrays report an error. Pair progress is 0–1; sequence progress uses
-state boundaries 0, 1, 2, … . Omit `progress` and use `onReady` for imperative
-playback. See the [React guide](https://songhaifan.github.io/visdelta/docs/guides/react/).
-
-## Design rules
-
-- Every frame is true: marks, scales, ticks, grid lines, and titles agree.
-- Exit marks before changing the scale; change the scale before entering marks.
-- Canonical reversible paths use the same frames backward; explicit directional easing profiles are an exception (see [design rules](docs/language-framework.md#reverse-means-the-same-frames-backward)).
-- `focus()` is a camera move, never a data filter.
-- Core stays chart-agnostic; chart-specific behavior stays in its module.
-
-Read the [documentation](https://songhaifan.github.io/visdelta/docs/), the
-[API reference](https://songhaifan.github.io/visdelta/docs/api/) and the
-[playground](https://songhaifan.github.io/visdelta/playground/).
-The [design principles](docs/language-framework.md) are the semantic
-constitution the implementation follows.
-
-## Development
-
-```sh
-npm ci
-npm run check
-npm run build
-npm run docs:check
-```
-
-The documentation site lives in [`website/`](website/README.md), a separate
-Fumadocs project that renders live examples with the built library:
-
-```sh
-npm run build
-cd website
 npm ci
 npm run dev
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before adding a chart type. Generated
-`dist/`, site output, test results, and screenshots are not source files.
+Open http://127.0.0.1:4347/. To serve a production build:
 
-Released under the MIT License.
-
-
-Pie and donut charts are available through `visdelta/pie`:
-
-```js
-import { pie } from 'visdelta/pie';
-const chart = pie([{ part: 'A', value: 25 }, { part: 'B', value: 75 }])
-  .value('value').color('part').key('part').innerRadius(0.75);
+```sh
+npm run studio:build
+npm start
 ```
 
-See [Design comparisons](docs/design-guides.md) for contextual alternatives,
-runnable data and code, and seekable arc examples.
+MCP is available locally at `/api/liveshow/mcp` while Liveshow is open. Any MCP
+client can connect; it does not require the demonstration model. For the built-in
+text/voice client, add `OPENAI_API_KEY` to a local `.env.local` and restart. Keys
+stay on the server. Static hosting supports the Gallery, Playground, Story and
+manual Liveshow controls; MCP and AI require the local service.
 
-## JSON specs
+## Source and checks
 
-`parseSpec(json)` and `stringifySpec(state, space?)`, exported from `visdelta`
-and `visdelta/core`, read and write the existing `ViewSpec` declaration.
-`state` may be a builder or plain spec. Parsed specs work directly with `delta`,
-`transition`, `sequence`, and the React components. Register the required chart
-modules before rendering JSON-only states.
+- `src/` — independently usable library.
+- `website/` — Studio, public documentation and optional AI demonstration.
+- `examples/story/` — ordinary websites using the public API.
+- `integrations/mcp/` — a thin MCP tool adapter over a browser bridge.
+- `docs/internal/` — architecture and engineering evidence.
 
-```ts
-import { parseSpec, stringifySpec } from 'visdelta/core';
-const restored = parseSpec(stringifySpec(chart));
+Public documentation has one editable source: `website/content/docs/`. Builds
+generate the package's version-matched Markdown and hashes under `dist/docs/`.
+Read `visdelta/docs/index.json` to discover those documents without network access.
+
+```sh
+npm test                    # library, examples, docs, package and unit contracts
+npm run render:check        # real browser rendering and lifecycle
+npm run pack:check          # isolated installed-package and type contracts
+npm run test:studio         # MCP/AI server and Studio browser contracts
 ```
 
-The helpers validate JSON values, common structure and transforms; chart-specific
-validity and data availability remain runtime/plugin concerns. Custom fields are
-preserved. Dates serialize to ISO strings and undefined object properties are
-omitted. Non-finite numbers, functions, symbols, bigints, cycles, unsupported
-object classes and undefined array entries are rejected. Builder validation starts
-with `toSpec()` output. Existing aliases normalize into `meta`; no separate JSON
-timeline, renderer or module implementation is serialized.
-
-### JSON and agent updates
-
-```ts
-import { render } from 'visdelta';
-
-const view = await render('#chart', json, { data: { sales }, height: 280 });
-await view.update(nextSpec);
-view.destroy();
-```
-
-Pass complete JSON strings or spec objects. Built-in modules load automatically.
-The default `latest` policy finishes the active update and retains only the
-newest validated pending state. Update promises report `applied`, `superseded`
-or `destroyed`; invalid updates reject. See the persistent-view section in
-[the API reference](docs/reference.md) for data, revisions and manual control.
-
-For small Bar edits, send a fluent batch against the accepted revision:
-
-```ts
-await view.edit({
-  requestId: 'turn-1-flip',
-  baseRevision: view.snapshot().revision,
-  edits: [{ method: 'flip', args: [] }],
-});
-```
-
-Identical retries reuse their outcome; stale revisions reject. See the
-[fluent edit reference](docs/reference.md#fluent-json-edits-on-a-persistent-view)
-for the supported Bar methods, per-view request limit and custom adapter contract.
+VisDelta is MIT licensed.

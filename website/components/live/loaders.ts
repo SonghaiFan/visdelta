@@ -21,6 +21,7 @@ export const exampleLoaders: Record<string, () => Promise<ExampleModule>> = {
   'bar-focus': () => import('@/examples/bar-focus'),
   'bar-grouped-split': () => import('@/examples/bar-grouped-split'),
   'bar-highlight': () => import('@/examples/bar-highlight'),
+  'bar-likert': () => import('@/examples/bar-likert'),
   'bar-layout': () => import('@/examples/bar-layout'),
   'bar-remap': () => import('@/examples/bar-remap'),
   'bar-repeat': () => import('@/examples/bar-repeat'),

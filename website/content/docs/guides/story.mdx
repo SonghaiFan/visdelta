@@ -1,0 +1,36 @@
+---
+title: Story websites
+description: Copy a complete scrollytelling website built with native VisDelta APIs.
+---
+
+[Story](/story) contains two complete websites: a fictional network in one HTML
+file and an archived Melbourne weather case. Read the source, replace the prose
+and tidy data, and design the surrounding website freely. No Story parser,
+component language or editor is required.
+
+## Own the page, reuse the controller
+
+```js
+import { sequence } from 'visdelta';
+
+const story = await sequence(states, { target: chart, width: 'auto', height: 400 });
+story.progress(1.5); // halfway between the second and third authored states
+story.resize();
+// When leaving the page:
+story.destroy();
+```
+
+Construct the controller once outside the scroll handler. Map scroll position to
+progress and coalesce updates with requestAnimationFrame. A sequence prepares its legs once and reuses their frames. Reverse scrolling uses the same path.
+Resize the existing controller rather than recreating it for every event.
+
+The weather example uses native select/range controls and ordinary JavaScript
+state. For its larger dataset, `mount.mjs` prepares only the requested endpoint or pair,
+using public render/transition calls. Updating a control creates a new cache in
+a temporary mount; obsolete
+async work is destroyed before it can replace the current chart. Each dot keeps
+its observation key across rearrangements. Data preparation happens offline,
+with provenance and missing observations preserved.
+
+For one self-contained file, [open the network example](/story/examples/network/index.html).
+For lifecycle, scroll and iframe details, see the [scroll example guide](/docs/guides/scroll-template).

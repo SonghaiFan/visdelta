@@ -366,26 +366,26 @@ test.describe('playground', () => {
     await page.goto('playground/#split');
     await expect(keys(page)).toHaveCount(3, { timeout: 25_000 });
     const track = page.getByRole('region', { name: 'Keyframes' });
-    // Split is planned in two route stages, the grouped layout in one: 3 × 0.9s.
+    // Split changes grouping, color and the axis title; grouped layout adds one stage: 4 × 0.9s.
     await expect(track.locator('.pg-clip')).toHaveCount(2);
     await details(page);
     await keys(page).last().click();
-    await expect(track.locator('.pg-stage-block')).toHaveCount(3);
-    await expect(track.locator('.pg-clip').first()).toHaveAttribute('title', /2 planned stages/);
-    await expect(track.locator('.pg-stage-block').nth(1)).toHaveAttribute('aria-label', /stage 2 of 2:/);
-    await expect(keys(page).nth(1)).toHaveAttribute('data-time', '1.8');
-    await expect(keys(page).nth(2)).toHaveAttribute('data-time', '2.7');
-    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('2.70');
-    await expect(track).toContainText('s / 2.70s');
+    await expect(track.locator('.pg-stage-block')).toHaveCount(4);
+    await expect(track.locator('.pg-clip').first()).toHaveAttribute('title', /3 planned stages/);
+    await expect(track.locator('.pg-stage-block').nth(1)).toHaveAttribute('aria-label', /stage 2 of 3:/);
+    await expect(keys(page).nth(1)).toHaveAttribute('data-time', '2.7');
+    await expect(keys(page).nth(2)).toHaveAttribute('data-time', '3.6');
+    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('3.60');
+    await expect(track).toContainText('s / 3.60s');
     // Measure the settled track, not the scale-in entrance transform.
     await track.locator('.pg-clip').evaluateAll(clips => Promise.all(clips.flatMap(clip => clip.getAnimations().map(animation => animation.finished))));
     const clipWidths = await track.locator('.pg-clip').evaluateAll((clips) => clips.map((clip) => clip.getBoundingClientRect().width));
-    expect(clipWidths[0] / clipWidths[1]).toBeCloseTo(2, 1);
+    expect(clipWidths[0] / clipWidths[1]).toBeCloseTo(3, 1);
 
     // Scrubbing to 1.25s sits in the first leg's second stage.
     await page.getByLabel('Keyframe timeline').fill('1.25');
     await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('1.25');
-    await expect(track).toContainText('s / 2.70s');
+    await expect(track).toContainText('s / 3.60s');
     await expect(track.locator('.pg-clip').first()).toHaveAttribute('data-active', 'true');
     await expect(track.locator('.pg-stage-block[data-active]')).toHaveCount(1);
     expect(await track.locator('.pg-stage-block').evaluateAll((blocks) => blocks.findIndex((block) => block.hasAttribute('data-active')))).toBe(1);
@@ -396,9 +396,9 @@ test.describe('playground', () => {
     await page.getByRole('button', { name: 'Play keyframes' }).click();
     await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Play keyframes' })).toBeVisible({ timeout: 10_000 });
-    expect(Date.now() - started).toBeGreaterThan(2_300);
-    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('2.70');
-    await expect(track).toContainText('s / 2.70s');
+    expect(Date.now() - started).toBeGreaterThan(3_200);
+    await expect(track.getByLabel('Playhead time in seconds')).toHaveValue('3.60');
+    await expect(track).toContainText('s / 3.60s');
     expect(errors).toEqual([]);
   });
 
@@ -722,13 +722,6 @@ test.describe('site', () => {
     await page.getByRole('button', { name: /open sidebar|toggle sidebar|menu/i }).first().click();
     await page.getByRole('link', { name: 'Quick start' }).click();
     await expect(page).toHaveURL(/\/docs\/quick-start\/$/);
-  });
-
-  test('published compatibility URLs redirect to current Docs and Studio routes', async ({ page }) => {
-    await page.goto('getting-started.html');
-    await expect(page).toHaveURL(/\/docs\/quick-start\/$/);
-    await page.goto('playground.html');
-    await expect(page).toHaveURL(/\/playground\/$/);
   });
 
   test('machine-readable outputs are published', async ({ request }) => {

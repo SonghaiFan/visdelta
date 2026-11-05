@@ -20,7 +20,6 @@ import { unit } from 'visdelta/unit';
 | `.layout('grid' \| 'force' \| 'bar' \| 'beeswarm', options?)` | Arrange the same units                   |
 | `.columns(number)`                                | Set grid or unit-bar columns                         |
 | `.size(number)`                                   | Set constant mark size (requested circle radius in pixels) |
-| `.radius(number)`                                 | Compatibility alias for `.size(number)`               |
 | `.x(field, options?)`, `.y(field, options?)`      | Declare force targets; x also positions a beeswarm   |
 
 The available layout names are exported as `UNIT_LAYOUTS`.
@@ -61,8 +60,7 @@ unit(rows)
 Reversing those x assignments makes `petalLength` win. Omitted layout options
 retain earlier settings: `.x("petalWidth").layout("beeswarm")` keeps
 `petalWidth`. Equivalent final states produce the same difference and transition
-route; normal overwrites do not issue warnings. `.radius(6)` and layout `{ radius: 6 }` remain aliases
-for `.size(6)` and obey the same last-assignment rule.
+route; normal overwrites do not issue warnings.
 
 Currently Unit renders circles: size is their requested radius in pixels,
 which layout fitting can reduce when space is limited. Field-driven size,

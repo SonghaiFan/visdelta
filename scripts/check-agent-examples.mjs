@@ -9,8 +9,8 @@ import { build } from 'esbuild';
 import { chromium } from '@playwright/test';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const html = await readFile(new URL('../examples/templates/scroll-story.html', import.meta.url), 'utf8');
-const guide = await readFile(new URL('../llms.txt', import.meta.url), 'utf8');
+const html = await readFile(new URL('../examples/story/network/index.html', import.meta.url), 'utf8');
+const guide = await readFile(new URL('../website/content/docs/guides/agent-workflow.mdx', import.meta.url), 'utf8');
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const quickStart = guide.match(/```html\n([\s\S]*?)```/)[1];
 const bundled = (await build({

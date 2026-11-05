@@ -1,3 +1,5 @@
+import { distributionOptions, distributionRows, validateDistributionOptions } from './distribution.js';
+import { semanticBarState } from '../semantic.js';
 import { channelDomain, position } from '../../../toolkit/scales.js';
 import { applyBarIdentity, barKeyAccessor } from '../keys.js';
 import { cameraScale, focusCamera, viewSelection } from '../../../focus.js';
@@ -56,7 +58,11 @@ export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
     const categories = channelDomain(rows, categoryChannel) as string[];
     // A display sort may reorder categories, but must not silently reorder the
     // stack's segment meaning. Domain rows deliberately exclude sort/filter.
-    const segments = channelDomain(domainRows, { field: segmentField, domain: stateSegments });
+    const layout = semanticBarState(spec).layout;
+    const distribution = distributionOptions(spec);
+    // Validate raw counts before an aggregate could coerce nulls or cancel signs.
+    if (distribution && chart.sourceRows) distributionRows(chart.sourceRows, categoryField, segmentField, valueField, layout, distribution);
+    const segments = validateDistributionOptions(layout, distribution) ?? channelDomain(domainRows, { field: segmentField, domain: stateSegments });
     const color = colorScale(domainRows, enc.color);
     const key = barKeyAccessor(chart, spec, [categoryField, segmentField]);
     const splitLineage = kit.splitLineage(chart);
@@ -64,13 +70,21 @@ export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
     const stackBaseExit = kit.baselineExitPlan(chart, 'stack-base');
 
     const categoryRange: [number, number] = horizontal ? [0, chart.innerHeight] : [0, chart.innerWidth];
-    const stackedRows = stackBarRows(rows, categoryField, segmentField, valueField, segments);
-    const domainStackedRows = stackBarRows(domainRows, categoryField, segmentField, valueField, segments);
-    const stackDomain = stackedValueDomain(domainStackedRows, measureChannel);
+    const stackRows = (input: BarDatum[]) => distribution
+      ? distributionRows(input, categoryField, segmentField, valueField, layout, distribution)
+      : stackBarRows(input, categoryField, segmentField, valueField, segments);
+    const stackedRows = stackRows(rows);
+    const domainStackedRows = stackRows(domainRows);
+    let stackDomain = stackedValueDomain(domainStackedRows, measureChannel);
+    if (distribution?.normalize === 'percent' && layout === 'stacked') stackDomain = [0, 1];
+    if (layout === 'diverging') {
+      const extent = Math.max(...stackDomain.map(Math.abs));
+      stackDomain = [-extent, extent];
+    }
     const baseCategoryScale = asRuntimeScale(scaleBand().domain(categories).range(categoryRange).padding(0.24));
     const baseMeasureScale = asRuntimeScale(scaleLinear().domain(stackDomain)
       .range(horizontal ? [0, chart.innerWidth] : [chart.innerHeight, 0]));
-    if (!Array.isArray(measureChannel.domain)) baseMeasureScale.nice!();
+    if (!Array.isArray(measureChannel.domain) && !(distribution?.normalize === 'percent' && layout === 'stacked')) baseMeasureScale.nice!();
     const baseX = horizontal ? baseMeasureScale : baseCategoryScale;
     const baseY = horizontal ? baseCategoryScale : baseMeasureScale;
     const baseGeom: StackedGeom = { x: baseX, y: baseY, categoryField, valueField, chart, horizontal };
@@ -98,10 +112,18 @@ export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
       y: (d: BarDatum) => horizontal ? position(y, d[categoryField]) : scaled(y, stackMidpoint(d))
     };
 
-    drawBarAxes(chart, x, y, enc, runtime, kit.presentation, horizontal, {
+    const axisEncoding = distribution?.normalize === 'percent'
+      ? { ...enc, [horizontal ? 'x' : 'y']: { ...measureChannel, format: '.0%', label: layout === 'diverging' ? 'Position (share; neutral centered)' : 'Share of responses' } } : enc;
+    drawBarAxes(chart, x, y, axisEncoding, runtime, kit.presentation, horizontal, {
       xTransition: xAxisTransition,
       yTransition: yAxisTransition
     });
+
+    const zeroLine = chart.g.selectAll<SVGLineElement, number>('line.vd-bar-zero').data(layout === 'diverging' ? [0] : []);
+    zeroLine.exit().remove();
+    runtime.motion(zeroLine.enter().append('line').attr('class', 'vd-bar-zero').attr('stroke', 'currentColor').attr('stroke-opacity', 0.5).merge(zeroLine), chart.transition.base)
+      .attr('x1', horizontal ? scaled(x, 0) : 0).attr('x2', horizontal ? scaled(x, 0) : chart.innerWidth)
+      .attr('y1', horizontal ? 0 : scaled(y, 0)).attr('y2', horizontal ? chart.innerHeight : scaled(y, 0));
 
     kit.renderBarJoin({
       chart, rows: stackedRows, spec, tooltip, bindTooltip, key,
@@ -111,6 +133,13 @@ export function createStackedBarRenderer(runtime: ChartRuntime, kit: BarRenderKi
       fill: (d) => color(d),
       applyIdentity: applyBarIdentity, steps, geometry
     });
+
+    chart.g.selectAll('line.vd-bar-zero').raise();
+    if (distribution && (spec.encoding?.tooltip as unknown) !== false) {
+      chart.g.selectAll<SVGRectElement, BarDatum>('rect.vd-bar').on('mouseenter.distribution', (_event, row) => {
+        tooltip.innerHTML += `<br><strong>Share of all responses</strong>: ${(Number(row.__distributionShare) * 100).toFixed(1)}%<br><strong>Total responses</strong>: ${Number(row.__distributionTotal)}`;
+      });
+    }
 
     const seamRows = stackedInternalSeams(stackedRows, categoryField);
     kit.renderBarSeams({

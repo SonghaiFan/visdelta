@@ -1,0 +1,43 @@
+---
+title: MCP and Liveshow
+description: Connect an MCP client to the live VisDelta workspace using native API calls.
+---
+
+Run `npm run dev` and open [Liveshow](/liveshow). Connect an MCP client to
+`http://127.0.0.1:4347/api/liveshow/mcp` using Streamable HTTP. The browser must
+remain open. External clients do not need the optional demonstration model or an
+OpenAI key.
+
+## Native calls, browser receipts
+
+Read `get_chart_state` for the accepted declaration, revision, data and method
+capabilities. `edit_chart` uses the same call shape as `view.edit`:
+
+```json
+{
+  "revision": 0,
+  "edits": [
+    {"method": "y", "args": ["profit", {"label": "Profit ($k)"}]},
+    {"method": "color", "args": [{"value": "blue"}]}
+  ]
+}
+```
+
+VisDelta validates the complete batch. The browser applies it and returns its
+receipt and resulting declaration. Invalid edits fail atomically; stale revisions
+require a fresh snapshot. Use `set_chart` for a complete declaration and
+`restore_chart` for reset/undo/redo.
+
+`inspect_marks` returns keyed marks and spatial order; `capture_chart` captures an
+image when needed. `search_visdelta_docs` reads generated docs from the installed
+package. Design advice is advisory and requires no separate approval tool.
+
+## Optional text and voice client
+
+For the built-in OpenAI Realtime example, add `OPENAI_API_KEY` to the root
+`.env.local` and restart. Text and push-to-talk share MCP tools and browser
+receipts. Speech is transcribed first; only a verified reply is spoken. Keys stay
+on the server. Static hosting retains examples and manual controls.
+
+The adapter in `integrations/mcp/` wraps a caller-owned bridge. Chart rules,
+layout compilation and identity stay in VisDelta.

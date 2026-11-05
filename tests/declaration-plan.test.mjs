@@ -162,7 +162,7 @@ const peerCases = [
   ['Point', pointPlugin, { mark: 'point', encoding: { x: { field: 'x' }, y: { field: 'y' }, color: { value: '#ff0000' } } }],
   ['Line', linePlugin, { mark: 'line', encoding: { x: { field: 'x' }, y: { field: 'y' }, color: { value: '#ff0000' } } }],
   ['Area', areaPlugin, { mark: 'area', encoding: { x: { field: 'x' }, y: { field: 'y' }, color: { value: '#ff0000' } } }],
-  ['Unit', unitPlugin, unit(rows).layout('grid').radius(12).color('group').toSpec()]
+  ['Unit', unitPlugin, unit(rows).layout('grid').size(12).color('group').toSpec()]
 ].map(([name, plugin, state]) => [name, plugin.createChartType(DEFAULT_CHART_RUNTIME).declarationOperations, state]);
 
 for (const [name, peerCodec, state] of peerCases) {
@@ -222,7 +222,7 @@ test('peer codecs reject invalid transforms, malformed scopes, and missing multi
 
 test('Unit canonical planning supports independent grouping, quantity, unit value and layout changes', () => {
   const peerCodec = peerCases[3][1];
-  const builder = unit(rows).layout('grid').radius(12).color('group');
+  const builder = unit(rows).layout('grid').size(12).color('group');
   const from = builder.toSpec();
   const valued = builder.value('y').toSpec();
   for (const [source, target, id] of [
@@ -572,7 +572,7 @@ test('route rendering consumes prepared leg states without re-preparing waypoint
 
 
 test('Unit route retains the exact Swarm declaration operation for each stage', () => {
-  const a = unit(rows).key('id').layout('grid', { columns: 15, radius: 6 }).color('group').toSpec();
+  const a = unit(rows).key('id').size(6).layout('grid', { columns: 15 }).color('group').toSpec();
   const b = unit(rows).key('id').size(6).x('x').layout('beeswarm').color('group').toSpec();
   const policy = unitPlugin.createChartType(DEFAULT_CHART_RUNTIME);
   const route = selectTransitionRoute(policy, a, b);

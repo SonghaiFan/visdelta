@@ -33,7 +33,10 @@ export function observeChart(root: Element, revision: number): ChartObservation 
       if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) visible = false;
     }
     if (!visible) continue;
-    const datum = (node as SVGElement & { __data__?: unknown }).__data__;
+    const bound = (node as SVGElement & { __data__?: unknown }).__data__;
+    // RenderDatum wrappers may carry their source record in the shared __row slot.
+    const row = bound && typeof bound === 'object' && '__row' in bound ? (bound as { __row: unknown }).__row : undefined;
+    const datum = row && typeof row === 'object' && !Array.isArray(row) ? row : bound;
     const data: Record<string, unknown> = {};
     if (datum && typeof datum === 'object' && !Array.isArray(datum)) {
       for (const [key, value] of Object.entries(datum)) {

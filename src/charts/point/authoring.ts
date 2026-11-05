@@ -32,10 +32,6 @@ export class PointState extends ChartState<PointViewState> {
     return this.with({ size: value });
   }
 
-  radius(value: number): this {
-    return this.pointSize(value);
-  }
-
   connector(options: ConnectorSpec): this {
     const hasBaseline = typeof options?.from === 'number' && Number.isFinite(options.from);
     const groupFields = Array.isArray(options?.by) ? options.by : [options?.by].filter(Boolean);

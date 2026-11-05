@@ -222,9 +222,7 @@ export type SemanticKeyPartInput = string | SemanticKeyPart | Array<string | Sem
 
 export interface SemanticKey {
   entity?: SemanticKeyPartInput;
-  entities?: SemanticKeyPartInput;
   measure?: SemanticKeyPartInput;
-  measures?: SemanticKeyPartInput;
 }
 
 // ─── Spec metadata ───────────────────────────────────────────────────────────
@@ -236,8 +234,6 @@ export interface ObjectMeta {
 
 export interface ChartChangeState {
   selection?: SelectionSpec;
-  focus?: SelectionSpec | null;
-  highlight?: SelectionSpec | null;
   axis?: AxisSpec;
   detail?: DetailSpec;
   [key: string]: unknown;
@@ -277,7 +273,7 @@ export type Mark = string;
 
 export interface ViewSpec {
   mark?: Mark;
-  data?: string | { name: string } | Record<string, unknown> | Record<string, unknown>[];
+  data?: { name: string } | Record<string, unknown> | Record<string, unknown>[];
   encoding?: EncodingSpec;
   transform?: TransformSpec[];
   filter?: FilterSpec;
@@ -299,7 +295,15 @@ export interface ViewSpec {
 
 // ─── Bar-specific ─────────────────────────────────────────────────────────────
 
-export type BarLayout = 'simple' | 'grouped' | 'stacked';
+export type BarLayout = 'simple' | 'grouped' | 'stacked' | 'diverging';
+
+export interface BarLayoutOptions extends TransitionOrder {
+  normalize?: 'none' | 'percent';
+  segments?: string[];
+  negative?: string[];
+  neutral?: string | null;
+  positive?: string[];
+}
 export type BarOrientation = 'vertical' | 'horizontal';
 
 export interface ChannelSignature {
@@ -325,6 +329,7 @@ export interface BarGeometrySegment {
 }
 
 export interface BarGeometryState {
+  offset?: unknown;
   orientation: BarOrientation;
   layout: BarLayout;
   category?: BarGeometryRole;

@@ -1,6 +1,8 @@
+import { chartError } from '../../edit-errors.js';
+import { distributionOptions, validateDistributionOptions } from './layout/distribution.js';
 import { validateFacetLayout } from '../facet-layout.js';
 import type { FacetLayout } from '../../facet.js';
-import { serializeViewSpec } from '../../spec-meta.js';
+import { serializeViewSpec, specScopes, specState } from '../../spec-meta.js';
 import { cloneState } from '../../grammar/view-state.js';
 import { aggregateTitle, titleize } from '../../labels.js';
 import { ChartState, channelFrom, colorFrom, normalizeDataSource, resolveInlineDataTypes } from '../authoring.js';
@@ -9,6 +11,7 @@ import { createBarSpecCompiler } from './compile.js';
 import { chartModule as barModule } from './module.js';
 import type {
   BarLayout,
+  BarLayoutOptions,
   ChannelSpec,
   FilterSpec,
   DetailSpec,
@@ -93,6 +96,17 @@ export class BarState extends ChartState<BarViewState> {
     return super.where(selector);
   }
 
+  /** Clear highlight explicitly without changing filters, rows or focus. */
+  override highlight(selector: Record<string, unknown> | FilterSpec | null,
+    options: { opacity?: number } = {}): this {
+    const scopes = { ...specState(this.state).scopes,
+      ...Object.fromEntries(Object.entries(specScopes(this.state)).filter(([, value]) => value != null)),
+      ...this.state.scopes };
+    const hydrated = Object.keys(scopes).length ? this.with({ scopes } as Partial<BarViewState>) : this;
+    if (selector === null) return hydrated.with({ scopes: { ...scopes, highlight: null } } as Partial<BarViewState>);
+    return super.highlight.call(hydrated, selector, options);
+  }
+
   flip(options: TransitionOrder & {
     domain?: unknown[];
     scale?: Record<string, unknown>;
@@ -130,7 +144,7 @@ export class BarState extends ChartState<BarViewState> {
     const currentY = (this.state as BarViewState).encoding?.y;
     const nextTitle = options.label === false
       ? currentY?.label ?? titleize(value)
-      : options.label ?? aggregateTitle(op, currentY?.label ?? value);
+      : options.label ?? currentY?.label ?? titleize(value);
     const { by, category: _cat, value: _val, ...rest } = options;
     const next = aggregateBarState(this, {
       ...rest,
@@ -144,8 +158,9 @@ export class BarState extends ChartState<BarViewState> {
     return options.label === false
       ? next
       : next.y(value, {
-          label: nextTitle,
-          format: currentY?.format
+          ...currentY,
+          field: value,
+          label: nextTitle
         });
   }
 
@@ -231,77 +246,29 @@ export class BarState extends ChartState<BarViewState> {
     return nextState;
   }
 
-  segment(
-    fieldOrConfig:
-      | string
-      | {
-          segment?: string;
-          category?: string;
-          value?: string;
-          as?: [string, string];
-          fields?: string[];
-          labels?: Record<string, string>;
-          categoryTitle?: string;
-          valueTitle?: string;
-          layout?: BarLayout;
-          color?: ChannelSpec;
-          domain?: unknown[];
-          source?: string;
-          groupby?: string[];
-          key?: string | string[];
-          tooltip?: unknown;
-        } = {},
-    maybeConfig: Record<string, unknown> = {}
-  ): this {
-    const config =
-      typeof fieldOrConfig === 'string'
-        ? { ...maybeConfig, segment: fieldOrConfig }
-        : fieldOrConfig;
-
+  layout(layout: BarLayout, options: BarLayoutOptions = {}): this {
+    if (Object.keys(options).some(key => !['normalize', 'segments', 'negative', 'neutral', 'positive', 'order', 'duration', 'stagger'].includes(key))) {
+      throw chartError('INVALID_EDIT_ARGUMENTS', 'Unknown Bar layout option.', 'Use normalize, segments, negative, neutral, positive or transition timing; separate neutral is unsupported.', {chartType:'bar',method:'layout'});
+    }
+    const { normalize, segments, negative, neutral, positive } = options;
+    const stack = layout === 'diverging' || [normalize, segments, negative, neutral, positive].some(value => value !== undefined)
+      ? Object.fromEntries(Object.entries({ normalize, segments, negative, neutral, positive }).filter(([, value]) => value !== undefined)) : null;
+    validateDistributionOptions(layout, stack);
     const state = this.state as BarViewState;
-    const category = config.category ?? state.encoding?.x?.field;
-    const value = config.value ?? config.as?.[1] ?? 'value';
-    const segment = config.segment ?? config.as?.[0] ?? 'segment';
-    const fields = config.fields ?? [];
-    const tidy = !fields.length && Boolean(config.segment);
-    const labels = config.labels ?? Object.fromEntries(fields.map((f) => [f, titleize(f)]));
-
-    return this.with({
-      key: config.key ?? [category, segment],
-      detail: {
-        category,
-        categoryTitle: config.categoryTitle ?? state.encoding?.x?.label,
-        fields,
-        labels,
-        segment,
-        value,
-        valueTitle: config.valueTitle ?? state.encoding?.y?.label ?? titleize(value),
-        layout: config.layout ?? 'stacked',
-        color: cloneState(config.color),
-        domain: config.domain,
-        source: tidy ? segment : config.source,
-        groupby: tidy ? [category, segment].filter(Boolean) as string[] : config.groupby
-      } as DetailSpec,
-      ...(config.tooltip
-        ? { encoding: { tooltip: cloneState(config.tooltip) } }
-        : {})
-    } as Partial<BarViewState>, { captureResetBaseline: true });
-  }
-
-  layout(layout: BarLayout, options: TransitionOrder = {}): this {
-    const state = this.state as BarViewState;
-    return this.with({
+    return this.derive({
+      ...cloneState(state),
       detail: state.detail
         ? { ...state.detail, layout }
         : undefined,
       axis: {
         ...(state.axis ?? {}),
         layout,
+        ...(stack || distributionOptions(state) || state.axis?.stack ? { stack } : {}),
         ...(options.order ? { order: options.order } : {}),
         ...(options.duration != null ? { duration: options.duration } : {}),
         ...(options.stagger ? { stagger: options.stagger } : {})
       } as AxisSpec
-    } as Partial<BarViewState>, { captureResetBaseline: true });
+    } as BarViewState, { captureResetBaseline: true });
   }
 
 }
@@ -442,14 +409,10 @@ function pruneAuthoringState(spec: ViewSpec): ViewSpec {
   const sceneState = (state.sceneState ?? {}) as Record<string, unknown>;
   const preservedSceneState: Record<string, unknown> = {};
 
-  const selection = sceneState.selection ?? state.selection;
   const axis = sceneState.axis ?? state.axis;
 
-  if (['highlight', 'focus'].includes(String((selection as Record<string, unknown> | undefined)?.mode))) {
-    preservedSceneState.selection = selection;
-  }
-  if (hasCustomAxisOrder(axis as Record<string, unknown> | null)) {
-    const g = axis as Record<string, unknown>;
+  if (hasCustomAxisOrder(axis as Record<string, unknown> | null) || (sceneState.detail as Record<string, unknown> | null)?.offset) {
+    const g = (axis ?? {}) as Record<string, unknown>;
     preservedSceneState.axis = {
       ...(g.layout ? { layout: g.layout } : {}),
       ...(g.orientation ? { orientation: g.orientation } : {}),
@@ -459,7 +422,9 @@ function pruneAuthoringState(spec: ViewSpec): ViewSpec {
     };
   }
 
-  delete state.selection;
+  const offset = (sceneState.detail as Record<string, unknown> | undefined)?.offset;
+  if (offset) preservedSceneState.detail = { offset };
+
   delete state.axis;
   delete state.detail;
   state.sceneState = preservedSceneState;

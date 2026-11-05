@@ -1,4 +1,3 @@
-import { agentGuide } from '@/lib/agent-guide';
 import { docsLlms, source } from '@/lib/source';
 import { absoluteUrl, appDescription, appName, getPageMarkdownUrl, siteUrl } from '@/lib/shared';
 
@@ -21,7 +20,7 @@ export async function GET() {
     /\]\((\/[^)\s]*)\)/g,
     (_, path: string) => `](${markdownByPage.get(path) ?? absoluteUrl(path)})`,
   );
-  return new Response(`${await agentGuide()}\n\n${header}\n${index}`, {
+  return new Response(`${header}\n${index}`, {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
   });
 }

@@ -1,6 +1,6 @@
 // Runs before `dev`, `build` and type checks. The site renders the library's
 // built output, so fail early with a clear message when it is missing.
-import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,10 @@ if (!process.env.VISDELTA_ALLOW_STALE_DIST && statSync(dist).mtimeMs < newest(so
   process.exit(1);
 }
 
+// The browser and local MCP service report the same build, without vendor snapshots.
+const manifest=JSON.parse(readFileSync(new URL('../../dist/docs/index.json',import.meta.url),'utf8'));
+writeFileSync(new URL('../lib/visdelta-build.json',import.meta.url),JSON.stringify({version:manifest.packageVersion,buildSha256:manifest.buildSha256})+'\n');
+
 // The playground and gallery load the repository's bundled demo datasets.
 // They stay in root data/ (shared with library checks); copy them into the
 // site's public folder so the export serves them under <base>/data/.
@@ -35,11 +39,13 @@ const dataTarget = fileURLToPath(new URL('../public/data/', import.meta.url));
 mkdirSync(dataTarget, { recursive: true });
 cpSync(dataSource, dataTarget, { recursive: true, filter: (path) => !path.endsWith('README.md') });
 
-// Single-file templates are authored once in examples/ and copied verbatim.
-const templateSource = fileURLToPath(new URL('../../examples/templates/', import.meta.url));
-const templateTarget = fileURLToPath(new URL('../public/templates/', import.meta.url));
-mkdirSync(templateTarget, { recursive: true });
-cpSync(templateSource, templateTarget, { recursive: true });
+// Copy standalone story sites without rewriting their source.
+const storySource = fileURLToPath(new URL('../../examples/story/', import.meta.url));
+const storyTarget = fileURLToPath(new URL('../public/story/examples/', import.meta.url));
+mkdirSync(storyTarget, {recursive:true});
+cpSync(storySource, storyTarget, {recursive:true,filter:path=>!path.endsWith('archive.json')});
+const buildStory = spawnSync(process.execPath,[fileURLToPath(new URL('../../scripts/build-story.mjs',import.meta.url))],{stdio:'inherit'});
+if(buildStory.status!==0) process.exit(buildStory.status??1);
 
 const verify = spawnSync(process.execPath, [fileURLToPath(new URL('./verify-examples.mjs', import.meta.url))], {
   stdio: 'inherit',

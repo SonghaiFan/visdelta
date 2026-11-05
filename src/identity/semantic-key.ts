@@ -15,8 +15,8 @@ export function semanticKeyForDatum(datum: Record<string, unknown> | null, spec:
   if (!semanticKey || !datum) return null;
 
   const parts = [
-    ...semanticKeyParts(semanticKey.entity ?? (semanticKey as Record<string, unknown>)['entities'], datum, 'field'),
-    ...semanticKeyParts(semanticKey.measure ?? (semanticKey as Record<string, unknown>)['measures'], datum, 'value')
+    ...semanticKeyParts(semanticKey.entity, datum, 'field'),
+    ...semanticKeyParts(semanticKey.measure, datum, 'value')
   ];
 
   if (!parts.length || parts.some((part) => part == null || part === '')) return null;
@@ -26,7 +26,7 @@ export function semanticKeyForDatum(datum: Record<string, unknown> | null, spec:
 export function semanticMeasureForDatum(datum: Record<string, unknown> | null, spec: ViewSpec = {}): unknown {
   const semanticKey = specSemanticKey(spec);
   if (!semanticKey || !datum) return null;
-  return semanticKeyParts(semanticKey.measure ?? (semanticKey as Record<string, unknown>)['measures'], datum, 'value')[0] ?? null;
+  return semanticKeyParts(semanticKey.measure, datum, 'value')[0] ?? null;
 }
 
 function semanticKeyParts(parts: unknown, datum: Record<string, unknown>, stringRole: string): unknown[] {

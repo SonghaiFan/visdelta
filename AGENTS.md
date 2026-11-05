@@ -1,125 +1,37 @@
-# VisDelta agent guide
+# VisDelta
 
-This file governs how to modify and review VisDelta. Semantic definitions and
-transition contracts belong in the constitution; do not copy them into a second
-rule set here.
+## Sources
 
-## Source of truth
+- Before changing semantics, planning or playback, read `docs/internal/language-framework.md`.
+- Public contracts live in `src/types/index.ts`; classification lives in `src/grammar/state-changes.ts`.
+- `website/content/docs/` is the only editable public documentation. `scripts/build-docs.mjs` generates package Markdown; never edit generated docs.
+- Studio has Gallery (static idioms), Playground (live chart editing), Story (ordinary website examples) and Liveshow (MCP wrapper). Keep these responsibilities small.
 
-- [docs/language-framework.md](docs/language-framework.md) is the semantic
-  constitution. Read its layer boundaries, vocabulary governance and transition
-  contracts before changing state, planning or playback behavior.
-- `src/types/index.ts` defines the public state-change vocabulary.
-- `src/grammar/state-changes.ts` implements its classification.
-- [docs/reference.md](docs/reference.md) records the implemented API, supported
-  operation subsets and fallback boundaries.
-- The published documentation site is the Fumadocs project in `website/`; see
-  [website/README.md](website/README.md). Its live examples are real modules in
-  `website/examples/`, checked against `delta()` by `npm run examples:check`.
-  Public API changes must also update the affected site pages.
-- For vocabulary or public API changes, update constitution, types, classifier,
-  reference, examples and tests together as applicable.
-- Document only behavior that exists in the current checkout. Mark uncertain
-  behavior as unsupported; do not turn roadmap ideas into present-tense claims.
+## Design
 
-## Implementation and review
+- Core is chart-agnostic. Chart modules own semantics, geometry, codecs and validation. Never branch on chart names in the generic runtime.
+- Applications use public package exports. Keep source preparation outside visualization code. Do not copy chart rules into MCP or UI adapters.
+- Identify authored slots and derived fields before changing an API. Normalize only proven equivalents; do not erase data-dependent or explicit author intent.
+- Validate against actual transformed fields, grain, identity and layout dependencies. A planner's bounded coverage is not permission to reject unrelated edits.
+- Keep search deterministic and bounded. Valid endpoints may use a chart-owned fallback; never invent fields or weaken constraints to obtain a route.
+- Greenfield: replace redundant APIs directly. Remove aliases, old parameter translation, compatibility modes, redirects and duplicate documentation together with their obsolete tests.
+- Preserve unrelated work and user data. Do not overwrite dirty changes, clear browser drafts, copy credentials or publish without authorization.
 
-- Extend the chart plugin before changing the generic runtime. Keep codecs,
-  validity constraints, correspondence, motion bridges and geometry in chart
-  modules. Generic fixes must work through plugin contracts without chart-name
-  branches. Share behavior only when its semantics are actually shared.
-- Before adding an operation, identify its authored slot and derived fields.
-  Reconstruct aliases, bindings and mark keys through the codec instead of
-  treating every serialized leaf as an independent edit. Keep independently
-  authored presentation controls separate.
-- Normalize only renderer-proven equivalents. Check omitted versus explicit
-  defaults, overwritten calls and equivalent declaration formats. Preserve
-  values whose meaning depends on data, themes or explicit author intent;
-  matching pixels in one example do not prove equivalence.
-- Validate candidates against the actual transformed data and chart constraints,
-  including field availability, grain, identity and layout dependencies. Require
-  normalization to reach a fixed point and operations to round-trip exactly.
-- Keep search bounded and deterministic. Test unsupported and search-limit
-  outcomes and the documented fallback. Do not invent fields, loosen validity
-  rules or force every chart to support the same combinations to obtain a route.
-- Inspect canonical direction at every phase boundary and during cleanup.
-  Evaluate a reversed leg's physical endpoint before cancelling its tracks;
-  preserve forward completion callbacks. Distinguish local phase reversal from
-  whole-route reversal. Cover generic runtime fixes with a custom plugin test.
-- Cache keys must include inputs that affect geometry. For endpoint reuse, verify
-  visible mark identities and geometry against the cached result, including keys,
-  coordinates and radii where applicable. Test changed dimensions, anchors and
-  data, same-host A -> B -> A, and restored reverse endpoints; do not reuse a
-  trajectory solely by its destination declaration.
-- Avoid hard-coded visual fixes when behavior can be derived from data,
-  geometry or container size. Bar marks always use square corners; do not add
-  corner-radius style or transition geometry to Bars.
-- Keep React chart-host callback refs stable across status updates. An inline
-  ref callback changes identity on every render, causing detach/attach callbacks;
-  if those callbacks clear render caches or re-register visibility observers,
-  completing one chart can enqueue the same charts indefinitely. Use a
-  module-level host component with a dependency-stable `useCallback` ref.
-  Wrapping the registration function alone is insufficient if JSX still passes
-  a new inline wrapper. Preserve cleanup for actual unmounts and invalidation
-  for real size or input changes. This caused the Gallery and Design Comparisons
-  redraw loops fixed on 2026-10-12.
+## Runtime and tests
 
-## Verification
+- Object identity, state changes, planning and rendered frames are distinct contracts. Preserve each one.
+- Check physical endpoints before cancelling reversed tracks. Cancellation must not run completion cleanup needed for reverse playback.
+- Cache keys include geometry inputs, dimensions, anchors and data. Compare identities and geometry, not only destination declarations.
+- Runtime fixes require custom-plugin coverage. Planner changes require valid stages, one operation per stage, exact destination, deterministic replay, inverse route and input immutability.
+- Test actual phase boundaries, forward/reverse progress, scrubbing, axes, resize and clean endpoints. Compare endpoints with independent static renders.
+- Keep React chart-host refs stable. Idle Gallery thumbnails must stop rendering; filtering, clearing and resizing must redraw then settle.
+- Build once, freeze dist during browser checks, and verify package changes through a real installed consumer. Never weaken timing assertions before ruling out contention.
+- Keep behavioral regressions when removing legacy tests. Run focused checks first, then required gates; report build, browser and deployment evidence separately.
 
-- Tests must demonstrate every public claim. A build alone does not prove
-  transition behavior or browser appearance.
-- For planner changes, independently check deterministic paths, one operation
-  per stage, valid complete states, replay, input immutability, the exact
-  normalized destination and the inverse route. Check authored sequence
-  boundaries and declared color preservation.
-- Test motion at the actual phase's local progress, not a guessed global value
-  or a phase count equated with operation count. Separately verify the complete
-  route and endpoints. Compare boundary frames with independent static renders
-  under the same dimensions, margins and chart initialization.
-- For transition changes, test forward play, reverse play, scrubbing, axes,
-  resize and clean endpoints in the relevant lab. Respect documented directional
-  easing exceptions when choosing frame-equality assertions. Test narrow and
-  desktop layouts for docs UI changes.
-- Regression tests must retain the behavioral assertion. Where practical,
-  verify that the test fails with the old behavior, especially for runtime fixes.
-- For static chart galleries, measure render invocations after loading settles:
-  an idle page must not keep drawing unchanged thumbnails. Merely finding an SVG
-  or passing a build does not detect a redraw loop. Verify all tiles load when
-  scrolled into view, filtering and clearing the filter remount charts correctly,
-  and resizing redraws at the new dimensions then settles. Check desktop and
-  narrow layouts against a frozen production build.
-- Run the narrowest relevant tests first, then the available release gates.
-  Verify public export or packaging changes through an installed package
-  consumer as well as source imports. Report environment or pre-existing
-  failures separately from regressions.
+## Product
 
-## Product and documentation
-
-- The homepage should show the result immediately: code changes drive the real
-  VisDelta transition. Keep ontology explanation in the documentation.
-- Homepage chart-type tabs choose the demonstration; the selected demo then
-  auto-plays. The chart is a projection of the changing code, not a separately
-  synchronized fake animation.
-- In the ontology UI, label public syntax and emitted actions separately.
-- Organize playground and lab examples by the seven state-change categories.
-  Categories are the primary navigation; do not collapse the example system
-  back into one undifferentiated dropdown. A composite example may declare one
-  primary teaching category while its inspector reports every emitted change.
-- Prefer concise, geometric, restrained UI with small corner radii. Preserve
-  VisDelta's own visual identity rather than copying another design system.
-- Keep responsive order legible: source data -> chart code -> animated chart.
-- Keep live examples and the playground together around ontology and transition
-  contracts; avoid duplicate inspectors or decorative controls.
-
-## Working rules
-
-- Preserve unrelated changes in a dirty worktree.
-- When delegating chart extensions, assign one owner per chart and keep design
-  and independent review explicit. Coordinate ownership of shared files.
-- Integrate through one coordinated build and freeze its output during browser
-  runs. Do not rebuild shared dist while another agent is testing it.
-- Before changing timing assertions, isolate resource contention from product
-  failures. Re-run affected tests without competing browsers before increasing
-  readiness budgets, changing playback duration or weakening motion assertions.
-- Review both working and staged diffs before committing. Include new files in
-  whitespace and scope checks; an unstaged diff omits untracked files.
+- Lead with the chart and working code. Keep internal planning details out of ordinary user flows.
+- Gallery and Playground share idiom declarations/data. Story examples use native VisDelta controllers; do not introduce a Story language or generic editor platform.
+- MCP schemas mirror public calls. Warnings are advisory. Require actual browser receipts before claiming a change was applied.
+- Prefer concise prose and a restrained UI. Use square corners for Bar marks. Verify narrow and desktop layouts for UI changes.
+- Update affected docs, examples and types with public API changes. State only implemented behavior; put engineering evidence under `docs/internal/`.

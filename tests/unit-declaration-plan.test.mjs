@@ -144,7 +144,7 @@ test('Unit unverifiable explicit datum identity reports the identity boundary be
 
 
 test('Unit complete layout options are one operation with exact reversible endpoints', () => {
-  const from = base().layout('grid', { columns: 15, radius: 6 }).toSpec();
+  const from = base().size(6).layout('grid', { columns: 15 }).toSpec();
   const to = base().size(6).layout('beeswarm', { x: 'x' }).toSpec();
   const plan = verify(from, to);
   assert.equal(plan.stages.length, 1);
@@ -162,8 +162,6 @@ test('Unit mark size is independent of the complete layout slot', () => {
   const to = base().size(9).layout('beeswarm', { x: 'x' }).toSpec();
   const plan = verify(from, to);
   assert.deepEqual(plan.stages.map(stage => stage.operation.id).sort(), ['encoding/size', 'layout']);
-  const alias = base().radius(6).layout('grid', { columns: 15 }).toSpec();
-  assert.deepEqual(normalized(alias), normalized(from));
 });
 
 
@@ -178,4 +176,16 @@ test('Unit compact and chained declarations have identical differences and rever
     assert.deepEqual(delta(base(), state).stateChanges, delta(base(), compact).stateChanges);
     assert.deepEqual(verify(from, state.toSpec()), verify(from, compact.toSpec()));
   }
+});
+
+
+test('Unit compound identity uses Core keys and survives sorting or filtering',()=>{
+  const rows=[{team:'A',product:'x',count:2},{team:'B',product:'x',count:1}];
+  const state=unit(rows).key(['team','product']).value('count');
+  const keys=input=>expandUnits(input,state.toSpec()).map(row=>row.__unitKey).sort();
+  assert.deepEqual(keys(rows),keys([...rows].reverse()));
+  assert.equal(new Set(keys(rows)).size,3);
+  const remaining=expandUnits([rows[1]],state.toSpec());
+  assert.equal(remaining[0].__parentKey,JSON.stringify(['x','B']));
+  assert.ok(keys(rows).includes(remaining[0].__unitKey));
 });

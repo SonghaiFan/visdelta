@@ -87,8 +87,8 @@ const demos: { key: string; name: string; note: string; states: (api: Api) => [V
     name: 'Unit',
     note: 'individual counts',
     states: (api) => {
-      const from = api.unit(unitRows).value('count', { maxUnits: 60 }).key('id').layout('grid', { columns: 10, radius: 5 });
-      return [from, from.group('team').layout('bar', { columns: 4, radius: 5 }).color('team')];
+      const from = api.unit(unitRows).value('count', { maxUnits: 60 }).key('id').size(5).layout('grid', { columns: 10 });
+      return [from, from.group('team').layout('bar', { columns: 4 }).color('team')];
     },
   },
 ];

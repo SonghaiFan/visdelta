@@ -15,7 +15,7 @@ export const plugin: ChartPlugin<PointViewState> = defineChartType<PointViewStat
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
-  scenes: ['selection', 'axis', 'detail', 'mapping'],
+  scenes: ['axis', 'detail', 'mapping'],
   // Two readable header rows: legend first, then the upward y-axis title.
   presentation: pointPresentation,
   createRenderer: createPointRenderer,

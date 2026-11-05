@@ -33,6 +33,13 @@ view.destroy();
 ```
 
 No parsing or registration step is needed for built-in charts with `render()`.
+To change chart type, call
+`await view.replace(destinationSpec)`. Build the destination with its public
+builder, for example `pie({ name: 'sales' }).value('revenue').label('product').toSpec()`.
+Cross-type replacement fades in the new chart; it does not infer a geometric
+morph or field mappings. Validation, revision checks and latest scheduling remain
+shared with updates. With a scoped renderer, include both modules in its fixed module list. Undo/redo can restore complete declarations across types.
+
 Each update is a complete state of the same chart type. The default `latest`
 policy finishes the active update, then plays only the newest valid pending
 state. Invalid JSON, missing named data and runtime validation failures reject
@@ -115,7 +122,7 @@ of the spec. A sequence remains an array of states supplied to `sequence()` or
 
 ## Small edits from an agent
 
-The Bar module accepts fluent JSON commands on the existing chart:
+Built-in modules accept a bounded set of fluent JSON commands on the existing chart:
 
 ```ts
 const { revision } = view.snapshot();
@@ -134,11 +141,12 @@ request. Identical request IDs and payloads reuse their original outcome; changi
 a payload requires a new ID. Each view retains up to 1024 requests, including
 failures; start a new view session after that limit.
 
-Bar supports `flip`, `color`, `x`, `y`, `sort`, `where`, `focus`
+Bar supports `layout` (`grouped`, `stacked` or configured `diverging` on segmented Bars), `flip`, `color`, `x`, `y`, `sort`, `where`, `focus`
 and `highlight`. Axis options support `type`, `label` and `format` strings. Axis
 bindings refer to the current channels after a flip. Filters and highlights
-accumulate as they do in native chains. Aggregation edits, aggregate axis remaps,
-other built-in charts and arbitrary builder methods are unsupported; use full
+accumulate as they do in native chains. Same-field axis edits preserve the current
+type; field changes must remain valid at the current transformed grain. Aggregation
+edits and arbitrary builder methods are unsupported; use full
 `update()` states for these. Edits cannot replace dataset bindings.
 
 Try [Liveshow](/liveshow). Its Grain category deliberately uses `update()`.
@@ -160,3 +168,260 @@ Capture includes the primary SVG canvas on white, not the surrounding applicatio
 or separate legend SVGs. External images/foreignObject are unsupported. Observation
 rejects pending or manual transitions, and capture rejects revision changes while
 encoding; retry after the current update finishes.
+
+## Complete stacked declaration
+
+A color channel alone does not make segments. `.breakdown()` emits `encoding.detail`,
+an aggregate at category/series grain and a stable compound mark key. For four
+products with a single revenue measure, supply tidy rows with `measure`,
+`product` and `amount` columns. Each row contributes to the `revenue` category:
+
+```ts
+const stacked = bar({ name: 'sales' })
+  .x('measure').y('amount', { label: 'Revenue ($k)' })
+  .breakdown('product').color('product').flip();
+await view.update(stacked.toSpec());
+```
+
+This produces the following complete JSON. Bind `sales` to your actual source
+rows. Four products become four segments with the same total; do not invent
+rows or add profit to revenue to obtain a stack.
+
+```json
+{
+  "data": {
+    "name": "sales"
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "amount",
+      "type": "quantitative",
+      "label": "Revenue ($k)"
+    },
+    "y": {
+      "field": "measure",
+      "type": "nominal",
+      "label": "Measure"
+    },
+    "color": {
+      "field": "product",
+      "type": "nominal"
+    },
+    "detail": {
+      "field": "product",
+      "type": "nominal"
+    }
+  },
+  "transform": [
+    {
+      "aggregate": {
+        "groupby": [
+          "measure",
+          "product"
+        ],
+        "fields": [
+          {
+            "op": "sum",
+            "field": "amount",
+            "as": "amount"
+          }
+        ]
+      }
+    }
+  ],
+  "meta": {
+    "object": {
+      "key": [
+        "measure",
+        "product"
+      ],
+      "semantic": {
+        "entity": [
+          {
+            "field": "measure"
+          },
+          {
+            "field": "product"
+          }
+        ],
+        "measure": {
+          "value": "amount"
+        }
+      }
+    }
+  }
+}
+```
+
+Keep source-column filters and sorts before fold/aggregation if those columns
+will disappear. A transform array is ordered; moving a filter may change meaning.
+See [all six executable builder examples](https://github.com/SonghaiFan/visdelta/blob/main/examples/authoring/complete-states.mjs).
+They cover Bar, Pie, Line, Area, Point and Unit; repository tests serialize,
+validate with real named data, and render each complete declaration.
+
+## Explicit colors and editing limits
+
+Use `encoding.color: { value: 'red' }` for a fixed CSS color, or
+`{ field: 'product', type: 'nominal', scheme: 'Tableau10' }` for categories.
+For a fixed category palette use `range: ['#4269d0', '#ff725c']` and an explicit
+`domain` when the mapping must be pinned. For continuous color use
+`{ field: 'revenue', type: 'quantitative', scheme: 'Viridis' }`.
+A builder's string `.color('red')` means a field named red; only strings starting
+with `#` use the fixed-color shorthand. Prefer `.color({ value: 'red' })`.
+Object input is a complete channel; its second options argument is ignored.
+The [machine-readable color subset](https://github.com/SonghaiFan/visdelta/blob/main/docs/color-channel.schema.json)
+is a tool-authoring aid, not full chart validation.
+
+All six built-in modules support `color`, `where`, `sort` and `highlight` edits.
+Bar also supports its documented `flip`, axis and focus subset. Query
+`view.capabilities()` for the current accepted chart. Color edits take one string
+or explicit channel object; a builder method does not imply an edit adapter. Pie highlight preserves slices
+and shares; filtering changes the denominator. Pie focus cameras are unsupported,
+even though the inherited builder method can construct a declaration.
+
+## Remove a filter or restore a state
+
+Copy `view.snapshot().spec`, remove the intended entry from its `transform`
+array, and pass that complete declaration to `update()`. Keep other transforms
+and their order. Undo, redo and reset store complete states in the application;
+use `replace()` for restoration across chart types. Keep dataset bindings with
+history if they change, since named rows are not embedded in the snapshot.
+
+Observation uses scalar fields of the transformed bound row (including shared
+render wrappers), not a guarantee of original rows for aggregate or series marks.
+Unit marks can repeat a source row; series paths can expose no scalar row data.
+Bounding-box left-to-right order is not Pie clockwise order. Re-inspect after
+resize. Capture only when a visual question needs an image; manual preparation
+and explicit resize during encoding also prevent a stale receipt.
+
+## Capabilities, recovery and intent
+
+`view.capabilities()` returns `{ mark, fluentEdits, editMethods }` for accepted
+intent. Pie/Line/Area/Point/Unit list `color`, `where`, `sort`, `highlight`;
+Bar also lists `flip`, `x`, `y`, `focus`. Custom adapters without an advertised
+list return `editMethods: null`. This is method discovery, not validation of all
+argument/state combinations. Final runtime validation remains atomic.
+
+Read an error's `code`, `message`, `hint`, `method`, `editIndex`, `path` and optional
+`revision`. Built-in selector errors use a zero-based edit index and JSON Pointer:
+`/edits/1/args/0/product` identifies a bad product selector in the second call.
+Endpoint errors may not identify one call. Correct arguments rather than repeating
+an invalid request; stale revisions require a fresh snapshot and request ID.
+
+For type replacement, `delta()` is same-type only. Use the existing
+`diffViewStates(before, candidate).hasDelta('highlight', 'remove')` to detect a
+lost highlight before applying. Review differences against user intent; do not
+silently copy attention to an incompatible chart. An applied receipt proves the
+declaration was rendered, not that the model preserved every requested intent.
+
+To clear canonical highlight without removing other changes:
+
+```ts
+const { spec } = view.snapshot();
+if (spec.meta?.state?.scopes) delete spec.meta.state.scopes.highlight;
+await view.update(spec);
+// Builder alternative: state.with({ scopes: { highlight: null } })
+```
+
+Empty `filters: []` means select no marks (all dim); selecting every
+current product keeps a scope that may exclude new products. Neither clears
+attention. A null product selector is not a removal command.
+
+Attention belongs at `meta.state.scopes`, never `meta.object.state`. Transport
+preserves extension metadata: accepted/renderable does not mean all supplied
+fields are recognized. Use the documented paths and semantic differences.
+
+Host tools can read `visdelta/docs/index.json` with `import.meta.resolve` and
+`readFile`, then load `visdelta/docs/reference.md` and the color schema from the
+same installed package. The index records package version and document SHA-256
+hashes, so local builds sharing a version can still identify their exact docs.
+The package Markdown is generated from these same documentation pages; use its
+index to locate the matching page and verify its hash.
+
+## Check support for this exact state
+
+A method in `view.capabilities().editMethods` is advertised by the module; it is
+not a guarantee for every pipeline. Use `await view.previewEdit(message)` when
+support for the current declaration is uncertain. It returns `{ revision, spec }`
+without accepting changes or consuming the request ID, after resolving data and
+validating a hidden static endpoint. Dispose/cleanup is automatic. Submit the
+same message to `edit` afterward; acceptance still rechecks the revision. Preview
+is not a reservation or a guarantee about later playback, and is not necessary
+for every ordinary edit.
+
+Bar presentation edits preserve a renderable fold/aggregate pipeline, keys and
+unrelated attention. Ordinary, normalized stacked and diverging states share the
+same sequential edit adapter; layout, flip, color and attention can be combined.
+The complete candidate is validated atomically. Planner fallback is not an edit
+permission rule. `where` appends after existing transforms: whole-question filtering
+preserves a distribution's denominator; removing response categories is invalid.
+Do not replace a failed edit with a guessed chart rewrite.
+
+The Gallery's tidy stack uses state as category, age as segment and population
+as measure. Four product/profit rows have no second grouping dimension. Clarify
+whether “stacked” means one total segmented by product or several category totals.
+The tidy single-measure declaration above implements the former, once explicitly
+requested. It does not invent another grouping dimension or justify adding
+profit to revenue. Rendering support, fluent-edit support and Grain-planning
+support are separate contracts.
+
+
+### Position scale syntax
+
+Place the domain directly on the channel. `scale` is an object with scale options,
+not a string and not a container for domain:
+
+```js
+.y('amount', { domain: [40, 100], scale: { type: 'linear' } })
+// For a log scale: scale: { type: 'log', base: 10 }
+```
+
+`encoding.y.scale.domain` is unsupported. `parseSpec`, `visualizationSpec`, and
+`visualizationWarnings` reject it with `code: "INVALID_CHANNEL_SCALE"` and
+`specPath: "/encoding/y/scale/domain"`; the hint points to `encoding.y.domain`.
+The same rule applies to x. Legal scale objects remain supported; do not reject
+all objects or convert them to strings. A malformed declaration is an error,
+separate from soft design advice. Once corrected, a Bar domain excluding zero
+can produce the existing `bar.truncated-baseline` advice.
+
+### Recover from a rejected edit
+
+Errors are ordinary `Error` objects with recovery fields. Read fields explicitly
+when crossing a JSON/tool boundary; `Error.message` is not JSON-enumerable.
+
+```ts
+try {
+  await view.edit(message);
+} catch (error) {
+  const receipt = { code: error.code, message: error.message, hint: error.hint,
+    chartType: error.chartType, method: error.method,
+    editIndex: error.editIndex, path: error.path, revision: error.revision };
+  // Return receipt to the author; do not retry the same invalid arguments.
+}
+```
+
+| Code | Recovery |
+| --- | --- |
+| `INVALID_EDIT_MESSAGE` | Correct message shape, JSON values, revision or batch size. |
+| `UNSUPPORTED_EDIT` | Read method capabilities; use a complete supported declaration. |
+| `INVALID_EDIT_ARGUMENTS` | Correct the indicated zero-based edit and argument path. |
+| `MISSING_FIELD` | Use a transformed field or place source-column work before aggregation. |
+| `UNSUPPORTED_EDIT_STATE` / `INVALID_EDIT_STATE` | Use a complete state for unsupported rehydration or chart constraints. |
+| `INVALID_CHART_STATE` | Correct the complete destination; validation rejected before acceptance. |
+| `CHART_TYPE_MISMATCH` | Use `replace()` for a different chart type. |
+| `REVISION_CONFLICT` | Read a fresh snapshot and use a new request ID. |
+
+For this invalid batch:
+
+```js
+[{method:'where',args:[{profit:{gte:25}}]},
+ {method:'highlight',args:[{product:null}]}]
+```
+
+The built-in adapters report
+`editIndex: 1`, `method: 'highlight'`, `path: '/edits/1/args/0/product'`
+(JSON Pointer) and a scope-removal hint. No part of that batch is accepted.
+Endpoint validation after a complete batch cannot always attribute a failure to
+one call, so index/path may be absent. Custom adapter errors and lifecycle errors
+may retain their own codes or no code; this is not a universal error taxonomy.

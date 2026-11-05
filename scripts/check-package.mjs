@@ -69,7 +69,8 @@ const publicExports = {
   "./themes/dark.css": "./dist/themes/dark.css",
   "./themes/paper.css": "./dist/themes/paper.css",
   "./react": { types: "./dist/react.d.ts", import: "./dist/react.js" },
-  "./render": { types: "./dist/render.d.ts", import: "./dist/render.js" }
+  "./render": { types: "./dist/render.d.ts", import: "./dist/render.js" },
+  "./docs/*": "./dist/docs/*"
 };
 const requiredFiles = [
   "CHANGELOG.md",

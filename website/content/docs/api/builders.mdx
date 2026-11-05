@@ -65,9 +65,16 @@ See [Bar](/docs/charts/bar).
 .flip(options?)
 .breakdown(field?, { layout?, op?, label?, ... })
 .rollup(groupby?, options?)
-.segment(fieldOrConfig?, config?)
 .layout('simple' | 'grouped' | 'stacked', options?)
 ```
+
+
+For tidy Bar data, use `.breakdown(field)` to split the category declared by
+`.x()` using the measure declared by `.y()`. It defaults to sum and stacked
+layout; `.layout("grouped")` changes placement, and `.color(field)` declares
+color separately. An explicit `.y()` label, format, domain and scale are
+preserved, including the default field title when no label was supplied.
+`{ label: "Custom title" }` overrides it.
 
 ## Line
 
@@ -103,7 +110,6 @@ See [Point](/docs/charts/point).
 
 ```ts
 .pointSize(number)
-.radius(number)
 .connector({ from: number, channel?: 'x' | 'y' })
 .connector({ by: string | string[], orderBy?: string })
 .flip(options?)
@@ -121,7 +127,6 @@ See [Unit](/docs/charts/unit).
 .size(number)
 .layout('grid' | 'force' | 'bar' | 'beeswarm', { x?, y?, columns? })
 .columns(number)
-.radius(number) // compatibility alias for size(number)
 ```
 
 ## Pie

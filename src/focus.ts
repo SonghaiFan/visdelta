@@ -34,7 +34,7 @@ export function viewSelection(spec: ViewSpec): SelectionSpec | null {
   return (specScopes(spec).focus ?? null) as SelectionSpec | null;
 }
 
-/** Resolve the independent highlight scope, retaining legacy selection specs. */
+/** Resolve the independent canonical highlight scope. */
 export function viewHighlight(spec: ViewSpec): SelectionSpec | null {
   return (specScopes(spec).highlight ?? null) as SelectionSpec | null;
 }

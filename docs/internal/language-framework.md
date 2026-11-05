@@ -1,0 +1,703 @@
+# Ontology and transition contracts
+
+This page is VisDelta's semantic constitution: the source of truth for how the
+library names identity, state difference, transition planning, frames, and
+control. It records behavior implemented now. Possible features and roadmap
+ideas do not belong in the public language.
+
+## The four-layer constitution
+
+Two immutable chart states are the endpoints. VisDelta reasons about the change
+between them through four layers that must remain separate:
+
+1. **Identity and correspondence** determine which source records and marks can
+   be related across the endpoints. Core infers source-record `datumKey` fields;
+   `.datumKey()` overrides that inference when the data is ambiguous. `.key()`
+   identifies marks at the current grain. Lineage and contributions provide
+   additional correspondence evidence.
+2. **State difference** reports what changed using seven non-exclusive
+   categories: Data, Grain, Encoding, Coordinate, Layout, Attention, and
+   Appearance. Directional actions such as `remove`, `split`, and `reorient`
+   are emitted semantic facts, not builder methods or animation phases.
+3. **Transition plan** chooses a path and phase order. It may use chart-owned
+   intermediate states or author-supplied `sequence()` waypoints. The endpoints
+   do not determine one universal route.
+4. **Frame and control** evaluate the chosen path and supply progress. A frame
+   is the picture at one progress value; time, scroll, sliders, or other input
+   can control that value.
+
+```text
+Identity / correspondence: what continues?
+              ↓
+State difference: what changed, and in which direction?
+              ↓
+Transition plan: which route and phase order?
+              ↓
+Frame / control: what is drawn at this progress value?
+```
+
+These layers are normative boundaries. A term must not move between them merely
+because one chart currently implements a transition in a particular way.
+
+## The seven state-change categories
+
+`delta().stateChanges` reports directional facts using this closed vocabulary:
+
+See the public state-change table in `website/content/docs/concepts/state-changes.mdx`.
+
+The labels under **Public syntax** are existing ways to declare relevant chart
+state. The labels under **Emitted actions** are exact `stateChanges` values;
+they are not additional fluent methods. Attention additionally reports a
+`focus` or `highlight` target.
+
+Category boundaries are strict:
+
+- **Data** is source-record membership or value change. An update is reported
+  only when stable datum identity provides evidence.
+- **Grain** includes grouping and measure semantics. `sum` to `mean` is
+  `change-reducer`, even when grouping is unchanged. Unit `unitValue` also
+  belongs here because it changes the quantity represented by one mark.
+- **Encoding** is a data-field binding. A field-driven `.color("region")` is an
+  encoding; a constant `.color("#3366ff")` is Appearance.
+- **Coordinate** is the positional scale, domain, or orientation. Remapping y
+  from one field to another remains Encoding; `.flip()` is Coordinate.
+- **Layout** is the arrangement, order, or connection of the same objects.
+- **Attention** preserves the data and marks while focus moves the camera or
+  highlight changes emphasis.
+- **Appearance** is fixed visual styling or form that does not bind a field. A
+  constant mark color is Appearance.
+
+The array's stable categorical order is for inspection only. It is not a
+priority list, route, or playback schedule.
+
+## Vocabulary governance
+
+This ontology changes only when implementation evidence requires it:
+
+1. Reuse an existing category and action when they describe the implemented
+   semantic distinction without loss.
+2. Add a term only when the distinction is observable in chart state,
+   implemented by `delta().stateChanges`, represented in the public TypeScript
+   type, and protected by tests.
+3. Remove a term when no implemented state difference can emit it. Do not keep
+   roadmap vocabulary in the contract.
+4. Keep builder syntax, state-change actions, correspondence operations, and
+   transition phases visibly distinct in code and documentation.
+5. Update this page, the API reference, types, classifier, and tests together.
+
+## Run a state difference
+
+Use the unified [Playground](/playground) to edit immutable chart states,
+save and restore snapshots, render transitions between them, and inspect the
+computed state changes across all five chart modules. The category list does not prescribe playback order.
+
+## Transition contracts
+
+1. **State is fact; operation history is not an animation script.** Planning
+   consumes endpoint states, not the sequence of builder method calls that
+   produced them. Transform order remains part of state semantics: sorting
+   before a limit can change membership. Ignoring builder history does not
+   permit reordering the data pipeline.
+2. **Correspondence is evidence, not a route command.** A shared source atom
+   establishes a relationship, not a required visual trajectory. A `split`
+   correspondence does not by itself justify arithmetic decomposition; measure
+   compatibility and reliable contributions must also support that motion.
+   Missing or unsafe evidence keeps the chart's ordinary fallback.
+3. **A route is a default choice satisfying constraints; authors can specify
+   waypoints with `sequence()`.** Chart policies choose readable paths using
+   correspondence, measure compatibility, retained selector fields, and visual
+   constraints. Another route may be valid. Author-supplied states are fixed
+   boundaries; automatic states may be inserted only within each adjacent pair.
+   An empty chart intermediate list permits endpoint planning only when the
+   chart supplies a canonical declaration-operation codec. Otherwise the
+   transition keeps its ordinary direct path, not no animation.
+
+Bar orientation changes such as `.flip()` are not split into single-channel
+planner stages: each intermediate must retain one nominal or ordinal category
+axis and one quantitative measure axis. When a flip cannot be represented as a
+valid one-operation route, Bar uses its existing direct coordinate transition.
+
+Every generated waypoint is a complete chart state. Each leg derives its own
+difference and motion plan; simultaneous scale/axis/mark changes remain coupled
+when required for a truthful frame. Explicit sequence and automatic waypoints
+share pair/frame execution, while keeping their distinct timeline ownership.
+The shared planner searches only the canonical operations supplied by a chart
+plugin. Its bounded, deterministic search applies one operation insertion,
+removal, or update per edge; the plugin evaluates, normalizes, and validates
+each full intermediate chart state. The planner does not recover setter
+history or infer operations from fluent calls. Equivalent normalized endpoints
+produce the same operation path, including when earlier builder calls were
+overwritten. A codec may also constrain each
+route edge with `validateStep(from, to, endpoints)` after validation and
+operation round-trip checks. The endpoint pair stays canonical and fixed for
+the search; reverse planning and playback traverse the same accepted path backward.
+The hook runs only in canonical search direction. Its constraints must be
+stable and direction-symmetric or defined by the canonical pair, without
+depending on builder history.
+Rejecting an edge does not invalidate either complete chart state. These
+chart-owned constraints do not impose an ontology-category playback order.
+Source data and datum identity remain protected boundaries. Each built-in
+chart supplies its own validated operation subset:
+
+- Bar represents supported single-measure aggregates as separate grouping,
+  measure and grouped-offset slots while preserving the aggregate's pipeline
+  position.
+- Point represents summary grouping and its complete x/y measure bundle,
+  including an optional aggregate-size measure, with derived bindings and
+  identity kept consistent.
+- Line and Area keep raw y remapping as Encoding. For supported summaries,
+  source measure, reducer, output alias and derived y binding form one Grain
+  operation. Area's stream layout remains an independent layout modifier.
+- Unit keeps quantity, `unitValue`, cap and grouping independent. Layout type,
+  columns and complete x/y bindings form one chart-owned Layout
+  operation; its axis metadata mirrors the declarations. Changing layout
+  parameters together does not create preparation or cleanup time slots.
+  Constant mark size is an independent Appearance channel declared with `.size()`. Grouping changes arrangement, while `unitValue` changes Grain.
+
+The subsets do not promise a route between every pair. Point, Line and Area
+raw/summary pairs retain their chart-owned structural transition or direct
+fallback. Complex aggregates, unverifiable identities, unavailable fields and
+unsupported runtime stages remain outside the planner. See the
+[operation subset reference](/docs/api/) for chart-specific
+limits. All five built-in plugins plan supported declarations before refining
+each stage with native motion. A single semantic operation can require several
+rendered motion legs; phase count does not measure operation count.
+Unknown declaration fields, unsupported values, invalid endpoints, and
+operation sets with no valid route return an explicit unsupported or
+search-limit result with no planned stages; runtime then uses the chart's
+authored route or ordinary direct fallback. `sequence()` continues to fix the
+endpoints for each separately planned pair.
+
+## Execution flow
+
+The concepts above are implemented through this pipeline:
+
+```text
+Data -> Transform -> Chart state -> Difference -> Transition -> Frame -> Control
+```
+
+- **Data** is a tidy table supplied by the user.
+- A **Transform** changes which tidy rows a chart state uses. It is not data
+  cleaning.
+- A **Chart state** is an immutable description made by `area()`, `bar()`,
+  `line()`, `point()`, or `unit()`.
+- A **Difference** says what changed between two states. The API is `delta()`.
+- A **Transition** executes a chosen path between two states of the same chart type.
+- A **Frame** is the picture evaluated along that path at a progress value from
+  `0` to `1`, under the chart's declared motion profile.
+- A **Control** supplies progress. Time, a slider, a button, scroll, or any other
+  input can control the same transition from outside the library.
+
+The optional React `Chart` component adapts these same contracts: its `state`
+prop accepts one state, a pair, or an array of authored waypoints. A `progress` prop supplies control; it does not add a state-change
+category or change route planning.
+
+Other public terms stay literal:
+
+| Term | Meaning |
+| --- | --- |
+| Chart type | A chart family with its own builder, compiler, marks, and motion |
+| Mapping | An explicit link from a field to x, y, color, size, or another channel |
+| Scale | A function that maps data values to screen positions or sizes |
+| Axis | Ticks, grid lines, and a title that explain one scale |
+| Marks | Bars, points, lines, areas, or units made from data |
+| Match | The rule that identifies the same mark in both states |
+| Enter / stay / exit | A mark appears, remains, or disappears |
+| Step | One ordered part of a transition |
+| Plugin | An independent chart-type module loaded by the runtime |
+
+## Rules that guide implementation
+
+### Frame evaluation and ownership
+
+Cached and reconstructed evaluation use the same time boundaries: a zero-duration
+step takes effect at its start, including when seeking backward. Progress alone
+must not invalidate compiled geometry when the layout inputs are unchanged.
+Actual size/theme changes still invalidate it. Inspection restores the visible
+frame and does not change playback progress. Transition endpoint snapshots expose
+resolved data and return detached copies; callers cannot mutate future snapshots.
+Temporary outgoing axes and grids belong to their recorded phase. Reconstructing
+a complete source clears live leftovers while phase snapshots retain the nodes
+needed for reverse seeking. These are Core contracts, independent of chart type.
+
+### Every frame is true
+
+At any progress value, marks must agree with the scales and axes that explain
+them. An x or y step therefore moves the scale, ticks, grid lines, title, and
+existing marks together.
+
+For observation membership changes, the default order is:
+
+```text
+Remove: exiting marks -> scale, axis, and remaining marks
+Add:    scale, axis, and existing marks -> entering marks
+```
+
+Line and area chart modules may add chart-specific path steps, but the same
+truth rule still applies.
+
+### Reverse means the same frames backward
+
+For a reversible pair, forward progress `p` and reverse progress `1 - p` show
+the same frame. Bar's canonical routes obey this strict frame-reversal contract.
+The existing opt-in `directionalEase()` profile (used by Unit) is an explicit
+exception: evaluation depends on both progress and direction, so the same
+numeric progress need not produce the same geometry. It must still preserve
+endpoint meaning and matching. This exception must not be described as strict
+frame reversal or introduced implicitly by automatic route planning.
+
+### Data meaning is explicit
+
+VisDelta expects tidy data. It does not clean, pivot, join, or repair data.
+Transforms only express changes needed by a chart state.
+
+Bar uses `.breakdown(field)` as its single public split declaration. It reuses
+the declared category and measure, preserves authored quantitative channel
+options, and defaults to sum with stacked placement. `.layout()` and `.color()`
+remain separate declarations. There is no `.segment()` authoring method.
+
+Every visual encoding is declared. VisDelta may choose presentation defaults
+such as radius, line width, margins, colors for an already-declared category,
+or duration. It never decides that a field should mean position, color, size,
+or detail unless the author maps it.
+
+Without a declared color channel, marks in every chart use black (`#000000`)
+and produce no color legend. Theme accents do not supply an implicit mark color.
+An explicit constant or field color keeps its authored meaning and may use the
+theme palette. Categorical color keeps every category and legend entry; when
+more than five categories share a color channel, VisDelta emits a warning but
+does not collapse or recolor them as an `others` group. Explicit color
+`range` and `scheme` values keep their authored palette; composite
+hue/luminance encodings also retain their declared behavior. Generated
+waypoints must not invent or remap a color channel to a temporary segment
+field, even when grouping is refined.
+
+Ordinary stacked Area derives one layer order from descending whole-domain
+series totals, with stable first-appearance ties. Display filtering retains
+that order. Default categorical color for the same series follows the ranking;
+authored palettes and domains are preserved. This chart-owned derived geometry
+does not add an operation or state-change action. Stream layouts retain their
+explicit/default D3 order policy.
+
+```js
+point(rows)
+  .x("income")
+  .y("health")
+  .color("region")
+  .size("population");
+```
+
+Explicit supported numeric and temporal position domains retain their authored
+bounds. The current log guard prevents exact bounds below 0.1; those remain
+unsupported. Automatic domain rounding applies only when bounds are inferred. Line infers
+position domains from its visible transformed rows, while full lineage remains
+available for topology, colors and legends; shared repeated panels retain their
+shared domain. A filter can therefore change both membership and derived scale
+geometry without adding a new authored Coordinate operation.
+
+### Selection words have separate meanings
+
+```js
+base.where({ region: "North" })     // remove other rows
+base.highlight({ region: "North" }) // keep rows; change attention
+base.focus({ region: "North" })     // keep rows; move the camera
+```
+
+`focus()` changes neither data membership nor mark identity. The shared core
+fits a two-dimensional camera around selected mark bounds; each chart module
+provides those bounds.
+
+Selection calls form a narrowing chain rather than replacing one another:
+
+```js
+base
+  .where({ region: ["North", "South"] })
+  .where({ age: { gt: 80 } })
+  .focus({ gender: "female" });
+```
+
+Each call acts on the previous state. `where`, `focus`, and `highlight` keep
+independent scopes, so focus remains a camera operation and highlight remains
+an attention operation. Calling `.reset()` returns to `base`; ordinary chaining
+still contributes only its final endpoint to `delta(base, next)`.
+
+### Identity, grain, and lineage are different
+
+A source datum keeps one stable identity, while each visualization derives its
+own mark identity from its grouping grain. Aggregated marks also retain the
+source atoms and their numeric contributions:
+
+```text
+datum key     id of an immutable source record
+mark grain    dimensions defining one mark in this view
+lineage       source records contributing to that mark
+contribution  amount each source record contributes to an additive measure
+```
+
+Core infers the first line from the smallest unique categorical field set,
+preferring identifier-like fields such as `id` and `flowerId`. If no stable
+categorical identity exists, it exposes an explicit row-index fallback;
+`.datumKey("id")` remains an override for ambiguous data. `.key()` declares the
+second line. They must not be aliases: aggregation can change mark identity
+while datum identity remains stable. Every transformed mark retains the mapping
+to all contributing source datum keys, which is also exposed in its tooltip.
+
+Core resolves one-to-one mark correspondence independently of lineage. An
+explicit `.key()` has priority; otherwise each chart module declares its
+default mark key through the chart-type interface. Core validates the resolved
+key at both endpoints and reports `updates`, `enter`, and `exit`. Runtime
+membership timing and ordinary keyed joins consume this same identity
+contract. A chart module may add topology or motion rules, but it must not
+reinterpret datum identity as mark identity.
+
+Default mark keys are semantic declarations by chart modules, not guesses from
+partially matching field values. Shared values can be evidence for a chart's
+special matching policy, but do not by themselves prove object continuity.
+Lineage remains the relation for one-to-many, many-to-one, and many-to-many
+structure; those relations cannot be represented by duplicate D3 join keys.
+
+This lets a change from `sum(case) by year` to `sum(case) by location` compile
+to a many-to-many transport graph through the common refinement
+`{year, location}`. A grouping tree explains the structural change; lineage
+explains which values actually move between its branches.
+
+The common refinement is the joint grain of the two endpoint partitions. Each
+non-empty intersection of a source mark and a target mark is one lineage edge.
+Connected components of this bipartite graph derive every primitive operation:
+
+```text
+1 -> 1  update       1 -> N  split       N -> 1  merge
+N -> M  reaggregate  1 -> 0  exit        0 -> 1  enter
+```
+
+Several disconnected components may coexist; `mixed` means that they have
+different operations. A grouping tree is therefore optional planning metadata,
+not the source of object identity or correspondence.
+
+Core reports this topology but does not choose its visual form. A chart plugin
+normally uses the target layout for a direct split. For Bar `sum` and `count`,
+a total splitting into grouped detail first reaches the target's finer grain
+as a stack, where its additive total remains readable, then opens that same
+grain into grouped marks. The reverse merge reuses these frames backward.
+This bridge requires the same source rows and preparation transforms on both
+sides; a changed dataset or non-additive operator keeps the direct fallback.
+
+When reaggregation requires a synthetic joint-grain stage with no authored
+target layout, Bar uses grouped marks as the common visual presentation of
+that maximum common grain. How a chart reaches that grouped view is chart- and
+operation-specific. For Bar `sum` and `count`, the path is aggregate A, stacked
+common-grain marks under A, grouped under A, grouped under B, stacked under B,
+then aggregate B. This conserved route remains specific to compatible `sum`
+and `count` aggregates. A safe single-measure reducer change may still form a
+declaration planner stage; it does not imply conserved motion. Other forms
+keep the ordinary fallback transition.
+
+Core also exposes lossless declaration edits through `delta().edits` and
+`applyDeclarationEdits()`. Those edits describe exact serialized differences;
+arrays remain indivisible there. Transition planning uses a separate,
+chart-owned operation codec. Bar supports complete channel slots, separate
+focus/highlight scopes, represented mark keys, supported ordinary ordered
+transforms, and a narrow Grain subset. It synchronizes Bar's derived semantic
+key and validates inline field references at every state. The Grain codec
+keeps its single aggregate at the original pipeline position and represents
+grouping, measure, and grouped offsets in separate operation slots. Category
+and measure field bindings stay coupled to their Grain slots; other channel
+properties remain ordinary encoding operations. Bar-authored motion routes
+refine each planned leg.
+The peer codecs follow their own chart semantics. Point couples aggregate
+position measures to their derived channels. Line and Area couple a summary
+measure to its y binding, while raw y remains an ordinary Encoding slot. Unit
+keeps quantity and layout declarations independent and regenerates their axis
+mirror. Codecs validate complete candidate states and explicitly reject
+unsupported declarations.
+Chart policies may add chart-specific motion bridges between operation states
+without changing operation order. The built-in plugins use this policy to
+refine their supported planner legs with chart-local motion routes.
+
+The operation planner finds valid declaration states; it does not decide how
+those states should look while marks move. Chart plugins continue to own
+motion bridges for structural changes such as grouping and reaggregation.
+Those bridges must preserve the endpoint's measure semantics and correspondence
+evidence, and may use a direct fallback when no truthful intermediate form is
+available.
+
+For additive Bar grain changes, focus and safe sort transforms can form
+separate steps around the structural change. A focused detail merging to an
+unfocused total follows `focused detail -> focused total -> total`. Detail
+merging to a sorted total follows `detail -> total -> sorted total`. With both
+changes, merge finishes the grain change, sorts, then changes focus. The split
+direction reuses the same complete route backward. Grouped detail still passes
+through the existing stacked bridge inside the structural leg.
+
+The Bar declaration planner also constrains focus changes for its supported
+single-aggregate refinement pairs: with the same category and a strict subset
+relationship between groupings, focus changes only where both states have the
+coarse endpoint's grouping, detail, and mark key. Thus a focused finer grain
+merges before focus changes, including supported non-additive measures; the
+reverse uses the same route backward. This route constraint permits valid
+focused detail states and leaves measure, appearance, and layout edits separate.
+It does not imply conserved motion for non-additive measures.
+
+Sorted detail merging to a plain total instead follows
+`sorted detail -> detail -> total`. Detail compilation can place its sort
+immediately before the aggregate; that sort is isolated at the detail grain,
+not copied onto total values. Input sorts on either endpoint are restored only
+at that endpoint's grain, outside the structural and focus/output-sort route.
+
+This inference requires matching source rows, datum-key declarations, and
+preparation transforms, with compatible `sum` or `count` measures. A focus
+selector carried to a total must refer to retained grouping fields. Only
+trailing sorts on available aggregate-output fields can be carried across a
+grain change. Contiguous sorts immediately before the single additive aggregate
+can form a separate step at their original grain, provided only output sorts
+follow the aggregate. Sorting across an intervening filter or other transform
+is not inferred. All other preparation retains its data-pipeline position and
+must match on both endpoints. Rollup-to-rollup
+routes can compose these presentation steps with the existing common-grain
+bridge, in its canonical direction. Unsupported combinations retain their
+existing transition route.
+
+Intermediate states are generated route stages within an authored pair. Each
+adjacent pair derives its own difference and reversible frame path. A shared
+endpoint displays the complete state, without the preceding leg's exit marks
+or ticks. Progress still spans the pair's `0..1` interval, but playback time
+is stage-based: `play({ duration })` gives each serial route stage that
+duration. Thus two serial stages take `2 × duration`; parallel changes in one
+stage still take one duration. A pair controller reports its count as
+`stageCount()`. In an authored `sequence([A, B, C])`, progress
+`1` still identifies B even if A-to-B contains generated intermediate states.
+
+For strict reversible routes, every adjacent leg is canonicalized independently.
+Reverse playback evaluates the same canonical frame at `1 - p`; details such as Bar dividers must
+not introduce direction-specific logic. Problems that reveal a missing rule are
+preserved in the [Transition Regression Log](./transition-regression-log.md).
+
+### Core knows no chart types
+
+Core owns shared state, difference, progress, frame evaluation, lifecycle, and
+camera math. It does not contain branches for Area, Bar, Line, Point, or Unit.
+
+Each chart module owns:
+
+- its builder and chart-specific grammar;
+- compilation and data-to-geometry rules;
+- matching, transition steps, and reversible paths;
+- axes and presentation differences;
+- examples and tests.
+
+Adding a chart type should not require editing the transition runtime. An
+imported builder carries its own lazy chart module; registration is needed only
+when rendering a plain JSON spec that cannot carry that reference.
+
+### Chart types are peers
+
+Area, Bar, Line, Point, and Unit have the same architectural status. Their
+visual rules differ because their reader questions differ, not because one is
+built into Core.
+
+| Chart type | Primary question | Chart-owned rule |
+| --- | --- | --- |
+| `bar()` | How do categories compare? | Bars share a quantitative baseline |
+| `point()` | How do two quantities relate? | Compact Cartesian axes; ordinary enters grow at the target |
+| `line()` | How does a value change in order? | Keys control points inside paths; gaps stay honest by default |
+| `area()` | How does magnitude or composition change in order? | Explicit baseline and stacked boundaries |
+| `unit()` | How many countable items are there? | `grid`, centered `force`, `bar`, and `beeswarm` layouts; key-first shortest travel |
+
+### Keep the language small
+
+Use plain English and one word for one concept. Public names, exported types,
+examples, tests, and documentation change together. Compact options and chained
+setters may express the same authored property as equally supported forms. They
+must immediately write the same canonical state, not parallel declarations or
+setter history. For Unit, `.layout("beeswarm", { x: "length" })` is equivalent to
+`.layout("beeswarm").x("length")`. The last explicit assignment to a channel
+replaces the complete channel, including its options; omitted layout options
+preserve earlier assignments. Thus a later `.x("width")` replaces that binding,
+while a later `.layout("force")` preserves it. This ordinary overwrite requires
+no warning. Equivalent final states must produce the same difference and route,
+regardless of declaration form. This does not require separate planner stages:
+Unit still plans layout and position bindings as one complete operation.
+
+Channel display names use the `label` property.
+
+The detailed signatures live in the [API reference](/docs/api/). Working
+behavior lives in the unified Playground.
+
+## Advisory visualization warnings
+
+Visualization design advice is separate from state differences, validity and
+transition planning. Chart plugins may inspect a prepared state and its
+transformed rows through `warnings(spec, rows)`. Warnings never rewrite data,
+encodings, authored domains or routes, and do not prevent rendering. They are
+not an eighth state-change category. Core transports these diagnostics without
+chart-name branches. See [the warning reference](/docs/guides/warnings/)
+for the implemented rules and their limits.
+
+### Area layer labels
+
+Area `.labels("inside" | "none")` is an independently authored presentation
+control. It emits Appearance `restyle` with property `labels`, using the existing
+public vocabulary. Series names come from the declared breakdown; placement and
+fit are chart-owned geometry, not a new encoding, grain, layout or mark key.
+The Area operation codec keeps this control in its own slot. Omitted labels
+retain the default of no direct labels; thin or narrow layers may omit text
+without changing the authored declaration or color legend.
+
+### Chart captions
+
+Add titles and subtitles in the surrounding page markup. VisDelta renders the
+visualization and its legends; chart captions are not part of chart state.
+
+### Legend placement
+
+A top legend is figure chrome: it is drawn in a block above the
+canvas, outside the chart's SVG, so it never counts toward the canvas's `width`
+or `height`. This changes where the legend lives, not what it means: it remains
+advisory presentation derived from the declared color binding, still emits no
+state change of its own, and is still measured with the same wrapping that draws
+it. Its room interpolates between complete route states with progress, so an
+appearing or disappearing legend opens or closes its space as it fades. Each chart type reports the height it will draw through
+`legendHeight`; a state that draws no top-level legend, such as repeated panels,
+reports 0. A style with `legendPosition: "right"` keeps its legend inside the
+canvas, in its right margin.
+
+### Pie bindings and fallback
+
+Pie adds quantitative `encoding.angle` and nominal `encoding.label` bindings;
+they use the existing Encoding bind/unbind/remap actions. `.labels()` is an
+independently authored presentation control and emits Appearance `restyle`
+with property `labels`. It is not a grain or layout change. `.innerRadius()` is Appearance `reshape`
+with property `innerRadius`; it controls the donut hole as a fraction of the
+outer radius. Slice keys obey the
+ordinary mark identity contract. Pie has no declaration-operation codec or
+automatic intermediate states; it keeps the direct runtime fallback. Changing
+slice values does not authorize a cross-chart morph. The Playground's five
+existing chart editors remain its current supported subset.
+
+## Small-multiple composition
+
+`.repeat()` partitions transformed rows into typed, keyed panels without
+changing their measure or discarding records. Its `encoding.facet` is a field
+binding and emits Encoding `bind`, `unbind` or `remap`. The independently authored
+`facetLayout` direction, columns, gap and minimum width control panel arrangement
+and emit Layout `rearrange`. Numeric scale sharing emits Coordinate `rescale`.
+The x/y field bindings retain their authored meaning; titles appear once in
+the ordinary chart style while each panel retains its scale ticks. Panel identity
+and each child's mark identity are distinct levels of continuity.
+
+The compositor delegates rendering to the carried child plugin, using common
+data domains and one motion recorder. Facet-to-facet transitions retain the
+carried child's cached or reconstructed evaluation policy. Bar and Line preserve their native chart type under repeat and own direct flat-to-repeat bridges for unchanged keyed marks. Line partitions its existing series field; observation membership, x/y bindings and declared domains stay unchanged. Its source panels share the original chart frame, then separate in container coordinate stages before child reflow. Repeat uses the ordinary Bar axis-order policy: x and width form one
+coordinate stage; y and height form another. Vertical defaults to x then y,
+horizontal to y then x; authored order takes priority. Panel layout direction
+does not replace coordinate order. Repeated child Bars also use their ordinary
+coordinate planner, including flip.
+For repeated-panel rearrangements with unchanged panel membership, the compositor
+first moves the entire keyed container rectangle through x/width and y/height
+stages, resizing through source child coordinates with source data and domains. It then runs the child plugin's recorded
+motion inside the settled container. Axes, grid, titles and marks share the panel
+coordinate system without SVG group scaling. These nested motion stages remain one semantic route leg; reverse
+replays the same container and child frames backward.
+Reverse uses the same geometry path backward, including independent scales; no
+declaration-operation codec is added for repeat. Area, Point and Unit do not
+currently implement flat-to-repeat routes. Column count responds to container size during resize, within the authored
+layout bounds. Repeat preserves canvas height by default; opt-in `autoHeight`
+reserves enough height for `minHeight` per complete panel, gaps and margins.
+Explicit heights take priority. A transition reserves the maximum required
+height across its route at the current width, so playback does not change the
+outer canvas. Standalone controllers observe container width and re-evaluate
+the same progress and direction after resize, preserving the playback clock.
+An explicit `resize({ height })` sets the canvas height without changing progress.
+Resize invalidates geometry caches; marks, ticks and grids use the new dimensions
+together. The [API reference](https://songhaifan.github.io/visdelta/docs/charts/repeat/) records
+the implemented controls and unsupported combinations.
+
+### Render diagnostics
+
+Compiled property inspection belongs to the frame/control layer. Its SVG node
+references, phase-boundary values and scheduled intervals describe a particular
+render at particular dimensions. They do not classify semantic changes, define
+new actions, or equate category membership with phase order. Opaque custom
+motion and unrecorded DOM writes must be identified as coverage limits.
+
+### JSON transport
+
+JSON transports the existing `ViewSpec` state declaration. `parseSpec` and
+`stringifySpec` reuse declaration normalization; they do not define new state-change
+categories or a playback grammar. Shared structural checks do not replace chart-owned
+validity checks. Modules, host elements and playback controls remain outside the spec.
+
+### Persistent view control
+
+`render()` mounts a persistent view from a complete declaration. `view.update()`
+accepts complete same-chart states and supplies time control automatically. Its
+`latest` policy finishes the active route and retains only the latest accepted
+pending state. This scheduling policy introduces no state-change category or
+planner operation. `snapshot()` reports the accepted declaration and revision,
+not a frame; pending intent may be ahead of playback. Manual `view.transition()`
+requires an idle view and must reach a physical endpoint before another state
+is submitted. JSON transport and agent request ordering remain outside the
+four semantic layers.
+
+### Fluent messages on persistent views
+
+`view.edit()` is an authoring adapter, not a new state-change category or playback
+language. A chart module interprets an allowlisted batch of fluent calls against
+the latest accepted declaration and validates one complete destination. Existing
+endpoint classification and transition contracts remain authoritative. Call order
+preserves builder semantics but does not prescribe animation stages. Revision
+conflicts reject atomically; accepted intent persists even when its pending
+animation is superseded by the latest policy. Request deduplication is view-local.
+
+`view.replace()` shares persistent-view acceptance and scheduling, but permits a
+different chart type. Cross-type replacement removes the old view and fades the
+validated destination in; it is neither correspondence nor a geometric transition
+between chart families. Modules remain responsible for destination validity.
+
+Module `editMethods` and persistent-view `capabilities()` describe authoring
+availability only, not validity of every endpoint or a new semantic category.
+Structured edit diagnostics identify a rejected call without accepting any part
+of its batch. Clearing attention removes its scope; an empty selection remains
+an authored scope. Cross-family intent audits can use `diffViewStates`, while
+`delta()` and geometric transitions retain their same-chart restriction.
+
+`previewEdit()` validates an exact authoring batch against accepted state without
+accepting or playing it. Static method discovery, endpoint validity and route
+planning remain separate. Bar's bounded single-presentation path supports layout, flip and distribution highlight while preserving
+an existing data pipeline and grain. It does not extend the Grain codec. Layout
+intent belongs in the Bar semantic adapter; offsets are derived by its compiler,
+including after declaration rehydration. No parallel root layout slot is added.
+
+
+### Declaration facts and runtime evidence
+
+Chart-specific declaration diagnostics belong to the chart module. Bar exposes
+`inspectBarSpec()` through `visdelta/bar`, sharing the renderer's layout semantics.
+It reports unknown for ambiguous/noncanonical channel declarations. Declaration
+facts, edit capabilities, validated candidates and browser application receipts
+are distinct evidence; none should be substituted for another by an agent.
+
+
+### Bar distribution geometry
+
+Bar owns nonnegative response distributions. `layout('diverging', options)`
+orders declared negative/neutral/positive categories around zero; centered neutral
+is one mark with unchanged data and identity. `normalize: 'percent'` changes only
+geometric units using each category group's complete count denominator. Policies
+compile into existing chart-owned `meta.state.sceneState.detail.offset` and axis
+layout metadata; policy changes emit `layout.rearrange`. Core gains no chart-name
+branch or new state-change category. Source counts and unsigned shares remain
+separate from signed position, and no net-score semantics are implied. Initial
+support requires tidy complete category counts; combined grain/policy edits reject.
+
+Bar `highlight(null)` explicitly clears only highlight attention. Distribution highlight edits preserve data, normalization and identity, and cannot substitute filtering for attention.
+
+### Edit validity and planning coverage
+
+A layout name does not determine permission to edit independent presentation slots.
+Chart modules validate the complete candidate against transformed data, grain,
+identity and layout dependencies. A declaration codec's bounded planning coverage
+is a routing constraint, not a substitute for that validity check. Sequential edit
+batches materialize each operation against its predecessor and accept one complete
+validated destination. Filtering keeps its authored position in the data pipeline;
+normalization must not silently change its denominator to make a filter renderable.

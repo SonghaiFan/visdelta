@@ -9,6 +9,7 @@ export interface Idiom {
   note: string;
   data: string;
   code: string;
+  guide?: { text: string; url: string };
 }
 
 export interface IdiomGroup {

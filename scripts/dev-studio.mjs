@@ -1,0 +1,14 @@
+import './env.mjs';
+import {createServer} from 'node:http';
+import {spawn} from 'node:child_process';
+import {createRequire} from 'node:module';
+import {createAIHandler} from '../website/server/liveshow/http.mjs';
+const port=Number(process.env.STUDIO_PORT??4347);
+const apiPort=Number(process.env.LIVESHOW_API_PORT??4325);
+const handle=createAIHandler({allowedOrigin:`http://127.0.0.1:${port}`});
+const api=createServer(async(req,res)=>{if(!await handle(req,res,new URL(req.url,'http://localhost').pathname))res.writeHead(404).end();});
+await new Promise((resolve,reject)=>{api.once('error',reject);api.listen(apiPort,'127.0.0.1',resolve);});
+const next=spawn(process.execPath,[createRequire(new URL('../website/package.json',import.meta.url)).resolve('next/dist/bin/next'),'dev','--webpack','--port',String(port)],{cwd:new URL('../website/',import.meta.url),stdio:'inherit',env:{...process.env,LIVESHOW_API_PORT:String(apiPort)}});
+const close=()=>{handle.close();next.kill('SIGTERM');if(api.listening)api.close();};
+process.on('SIGINT',close);process.on('SIGTERM',close);
+next.on('exit',code=>{handle.close();if(api.listening)api.close();process.exitCode=code??1;});

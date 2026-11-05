@@ -30,12 +30,12 @@ export function barOffsetChannelName(orientation: BarOrientation): 'xOffset' | '
 
 export function barRendererKey(layout: BarLayout, orientation: BarOrientation): string {
   if (layout === 'grouped') return `grouped-${orientation}`;
-  if (layout === 'stacked') return `stacked-${orientation}`;
+  if (layout === 'stacked' || layout === 'diverging') return `stacked-${orientation}`;
   return orientation;
 }
 
 export function isSegmentLayout(layout: BarLayout | undefined): boolean {
-  return layout === 'grouped' || layout === 'stacked';
+  return layout === 'grouped' || layout === 'stacked' || layout === 'diverging';
 }
 
 function isQuantitative(channel: ChannelSpec | undefined): boolean {

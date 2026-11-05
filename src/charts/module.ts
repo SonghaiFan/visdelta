@@ -9,7 +9,9 @@ export interface LoadedChartModule<S extends ViewSpec = ViewSpec> {
 export interface ChartModule<S extends ViewSpec = ViewSpec> {
   key: string;
   load(): Promise<LoadedChartModule<S>>;
-  /** Derive and validate one endpoint; resolvedSource contains the actual data. */
+  /** Advertised fluent methods, not a guarantee that every state/argument is valid. */
+  editMethods?: readonly string[];
+  /** Derive one endpoint; runtime validates it before acceptance. resolvedSource contains actual data. */
   edit?(spec: S, calls: readonly FluentEdit[], resolvedSource: S): Promise<S>;
 }
 
@@ -19,5 +21,9 @@ export function defineChartModule<S extends ViewSpec = ViewSpec>(
   const key = String(module?.key ?? '').replace(/\s+/g, '').toLowerCase();
   if (!key) throw new Error('Chart module key is required.');
   if (typeof module.load !== 'function') throw new Error(`Chart module "${key}" requires load().`);
-  return Object.freeze({ key, load: module.load, ...(module.edit ? { edit: module.edit } : {}) });
+  return Object.freeze({ key, load: module.load,
+    ...(module.edit ? { edit: module.edit,
+      ...(module.editMethods ? { editMethods: Object.freeze([...module.editMethods]) } : {}),
+    } : {}),
+  });
 }

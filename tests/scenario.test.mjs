@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { csvParse, autoType } from 'd3-dsv';
 import { bar } from '../dist/bar.js';
-import { scenarios } from '../examples/transition/scenarios.js';
-import { transitionScenario } from '../examples/scenario.js';
+import { scenarios } from './fixtures/scenarios/transition/scenarios.js';
+import { transitionScenario } from './fixtures/scenarios/scenario.js';
 
 const evaluate = (code, name, rows) => new Function('bar', 'rows', `${code}\nreturn ${name};`)(bar, rows);
 

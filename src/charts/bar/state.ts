@@ -1,3 +1,5 @@
+import { distributionOptions } from './layout/distribution.js';
+import { chartError } from '../../edit-errors.js';
 import { specDatumKey, specTransition } from '../../spec-meta.js';
 import { viewSelection } from '../../focus.js';
 import { inferTransition } from '../../grammar/infer-transition.js';
@@ -251,6 +253,15 @@ export function barIntermediateSpecs(
   previousSpec: ViewSpec,
   nextSpec: ViewSpec
 ): IntermediateSpec[] {
+  if (distributionOptions(previousSpec) || distributionOptions(nextSpec)) {
+    const from = semanticBarState(previousSpec), to = semanticBarState(nextSpec);
+    const structural = (spec: ViewSpec) => (spec.transform ?? []).filter(t => !('filter' in t) && !('sort' in t));
+    if (!sameValue(structural(previousSpec), structural(nextSpec)) || from.categoryField !== to.categoryField
+      || from.measureField !== to.measureField || from.segmentField !== to.segmentField) {
+      throw chartError('UNSUPPORTED_EDIT_STATE', 'Distribution layout transitions require unchanged grain and structural transforms.', 'Finish the layout edit before changing grain; use an independent complete chart for a new pipeline.', { chartType: 'bar' });
+    }
+    return [];
+  }
   const canonical = canonicalBarTransitionPair(previousSpec, nextSpec);
   const waypoints = barPresentationRoute(canonical.from, canonical.to);
   const states = [canonical.from];
@@ -385,9 +396,6 @@ function presentationSteps(spec: ViewSpec, reference: ViewSpec): ViewSpec[] | nu
     const state = meta.state ??= {};
     const scopes = state.scopes ??= {};
     delete scopes.focus;
-    // Remove legacy focus aliases too, so removal cannot reactivate one.
-    if (state.selection?.mode === 'focus') delete state.selection;
-    if (state.sceneState?.selection?.mode === 'focus') delete state.sceneState.selection;
     if (focus) scopes.focus = cloneSpec(focus);
     states.push(current);
   }

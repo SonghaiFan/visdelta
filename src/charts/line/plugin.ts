@@ -38,7 +38,7 @@ export const plugin: ChartPlugin<LineViewState> = defineChartType<LineViewState>
   prepareSpec: spec => { validateFacetLayout(spec.facetLayout ?? {}); return spec; },
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
-  scenes: ['selection', 'axis', 'detail', 'mapping'],
+  scenes: ['axis', 'detail', 'mapping'],
   presentation: linePresentation,
   createRenderer: (runtime, presentation) => createRepeatedLineRenderer(runtime, presentation, createLineRenderer(runtime, presentation), resolveLineTransitionPlan),
   createSpecCompiler: createLineSpecCompiler,

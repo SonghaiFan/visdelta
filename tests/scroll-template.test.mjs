@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 // Test the actual functions shipped in the single-file page, not a copy of its
 // scroll formula. The bounded region contains only the two exported functions.
-const html = await readFile(new URL('../examples/templates/scroll-story.html', import.meta.url), 'utf8');
+const html = await readFile(new URL('../examples/story/network/index.html', import.meta.url), 'utf8');
 const source = html.split('// BEGIN SCROLL MAPPING')[1].split('// END SCROLL MAPPING')[0];
 const { positionForScroll, scrollForPosition } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 

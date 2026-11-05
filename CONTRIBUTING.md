@@ -6,7 +6,7 @@ the same semantic concept.
 
 ## Local checks
 
-Use Node 20.19+ or 22.12+ for development tooling. The package supports Node 18
+Use Node 22.18+ for development tooling and Studio. The package supports Node 18
 consumers.
 
 ```sh
@@ -45,8 +45,8 @@ After adding or removing a built-in chart folder, run:
 node scripts/sync-chart-manifest.mjs
 ```
 
-Then add the focused package entry and update `docs/chart-types.md` plus
-`docs/reference.md`. A focused-module browser test must show that unrelated
+Then add the focused package entry and update `website/content/docs/charts/index.mdx` plus
+`website/content/docs/guides/json.mdx`. A focused-module browser test must show that unrelated
 chart implementations are not loaded.
 
 Document the chart on the site as well: add `website/content/docs/charts/<name>.mdx`

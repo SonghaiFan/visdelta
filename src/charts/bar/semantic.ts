@@ -37,6 +37,8 @@ export function semanticBarState(
   const detail = barDetailState({ layout, categoryField, measureField, segmentField, state });
   const geometry = barGeometryState({ enc, filters: resolveFilters(spec), layout, orientation, categoryField, measureField, segmentField });
 
+  const offset = state.sceneState?.detail?.offset ?? state.detail?.offset;
+  if (offset) geometry[orientation === 'horizontal' ? 'x' : 'y'].offset = offset;
   return {
     orientation,
     layout,

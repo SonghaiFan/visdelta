@@ -49,3 +49,5 @@ export type { TransitionInspection, InspectedStage, InspectedProperty } from './
 export { render } from './render-default.js';
 export { createRenderer } from './render.js';
 export type { EditMessage, FluentEdit, ChartInput, RenderOptions, UpdateOptions, UpdateResult, ChartSnapshot, ChartView, ChartRenderer } from './render.js';
+
+export type { ChartCapabilities, ChartErrorDetails } from './render.js';

@@ -21,23 +21,17 @@ jobs:
       # The site is served from https://songhaifan.github.io/visdelta/.
       DOCS_BASE_PATH: /visdelta
       SITE_URL: https://songhaifan.github.io/visdelta
-      NEXT_PUBLIC_STORY_URL: https://songhaifan.github.io/visdelta-story/story/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            website/package-lock.json
+          cache-dependency-path: package-lock.json
       # The site renders live examples with the library's built output.
       - run: npm ci
       - run: npm run build
-      - run: npm ci
-        working-directory: website
-      - run: npm run build
-        working-directory: website
+      - run: npm run build --workspace website
       - uses: actions/upload-pages-artifact@v3
         with:
           path: website/out

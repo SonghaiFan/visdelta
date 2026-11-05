@@ -178,15 +178,15 @@ correspondence.edges;
 correspondence.components;
 selectedDelta(a, b).hasDelta('encoding.y');
 selectedBar().data([]).x('key');
-selectedPoint().data([]).x('x').y('y').radius(6);
+selectedPoint().data([]).x('x').y('y').pointSize(6);
 selectedLine().data([]).x('x').y('y').curve('curveMonotoneX').strokeWidth(3).pointSize(4);
 selectedArea().data([]).x('x').y('y').curve('curveMonotoneX').labels('inside').labels('none');
 // @ts-expect-error Area direct labels support only inside or none.
 selectedArea().labels('outside');
 selectedArea().data([]).x('x').y('y').breakdown('industry')
   .layout('stream', { offset: 'silhouette', order: 'ascending' });
-selectedUnit().data([]).value('count', { unitValue: 10 }).group('category').layout('bar', { columns: 2 }).radius(4);
-selectedUnit().data([]).layout('force', { radius: 5 });
+selectedUnit().data([]).value('count', { unitValue: 10 }).group('category').layout('bar', { columns: 2 }).size(4);
+selectedUnit().data([]).size(5).layout('force');
 // @ts-expect-error VisDelta uses exact D3 curve names rather than aliases.
 selectedLine().curve('smooth');
 // @ts-expect-error D3 curveBundle is for Line and does not implement the Area interface.
@@ -254,7 +254,7 @@ function fitContainer(change: ResizableTransition, story: SizedSequence, size: C
 void fixedSize; void fitSize; void fitContainer;
 const headed = bar([{ city: 'Oslo', visitors: 31 }]).x('city').y('visitors');
 
-selectedUnit([{ x: 1, y: 2 }]).layout('beeswarm', { x: 'x', radius: 5 });
+selectedUnit([{ x: 1, y: 2 }]).size(5).layout('beeswarm', { x: 'x' });
 selectedUnit([{ x: 1, y: 2 }]).layout('force', { x: { field: 'x', label: 'X' }, y: 'y' });
 selectedUnit([{ x: 1, y: 2 }]).size(6).layout('beeswarm', { x: 'x' }).x('y');
 
@@ -293,3 +293,17 @@ void editMessage;
 bar([]).title('Title');
 // @ts-expect-error Figure headings belong in the surrounding page.
 bar([]).subtitle('Subtitle');
+
+// @ts-expect-error Unit mark size is declared with size(), not radius().
+selectedUnit().radius(4);
+// @ts-expect-error Unit layout options do not include mark size.
+selectedUnit().layout('grid', { radius: 4 });
+
+// @ts-expect-error Point uses pointSize() for a constant radius.
+selectedPoint().radius(4);
+
+// @ts-expect-error A data binding names its role explicitly.
+const ambiguousData: import('visdelta').ViewSpec={mark:'bar',data:'sales'};
+void ambiguousData;
+// @ts-expect-error Semantic identity uses singular roles even when their values are arrays.
+bar([]).semanticKey({entities:'id'});

@@ -47,3 +47,5 @@ await esbuild.build({
 });
 
 console.log(`Built ${join(root, "dist")}`);
+
+await (await import('./build-docs.mjs')).buildDocs();

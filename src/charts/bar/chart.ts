@@ -1,3 +1,5 @@
+import { distributionOptions, distributionRows, validateDistributionOptions } from './layout/distribution.js';
+import { chartError } from '../../edit-errors.js';
 import { validateFacetLayout } from '../facet-layout.js';
 import { canonicalFacetPair } from '../facet-motion.js';
 import { createRepeatedBarRenderer } from './repeat-render.js';
@@ -57,6 +59,20 @@ function prepareBarSpec(spec: BarSpec): BarSpec {
   if (spec.mark !== 'bar') return spec;
   if (spec.encoding?.facet) validateFacetLayout((spec.facetLayout ?? {}) as import('../../facet.js').FacetLayout);
 
+  const distribution = distributionOptions(spec);
+  if (distribution || semanticBarState(spec).layout === 'diverging') {
+    const facts = semanticBarState(spec);
+    validateDistributionOptions(facts.layout, distribution);
+    const measure = spec.encoding?.[facts.orientation === 'horizontal' ? 'x' : 'y'];
+    if (!facts.segmentField || spec.encoding?.facet || measure?.domain || measure?.scale
+      || (spec.transform ?? []).some(t => Object.keys(t).some(key => !['aggregate','filter','sort'].includes(key)))
+      || (spec.transform ?? []).some(t => (t.aggregate as import('../../types/index.js').AggregateTransform | undefined)?.fields?.some(f => f.op !== 'sum' || f.field !== facts.measureField || f.as !== facts.measureField))) {
+      throw chartError('UNSUPPORTED_EDIT_STATE', 'Distribution layout requires tidy counts, a sum at the same value field, automatic linear domains and no facets.',
+        'Use one complete row per question/response, including zeros; remove fold, custom domains, nonlinear scales and facet before applying this layout.', {chartType:'bar',method:'layout'});
+    }
+    const raw = Array.isArray(spec.data) ? spec.data : (spec.data as {values?: unknown[]})?.values;
+    if (raw) distributionRows(raw as import('./render-pattern.js').BarDatum[], facts.categoryField!, facts.segmentField!, facts.measureField!, facts.layout, distribution!);
+  }
   const next = cloneSpec(spec) as BarSpec;
   const enc = (next.encoding ?? {}) as Record<string, { type?: string; field?: string; aggregate?: string | boolean; timeUnit?: string }>;
   inferChannelTypes(enc);

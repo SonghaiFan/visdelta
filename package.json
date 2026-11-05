@@ -93,7 +93,8 @@
     "./render": {
       "types": "./dist/render.d.ts",
       "import": "./dist/render.js"
-    }
+    },
+    "./docs/*": "./dist/docs/*"
   },
   "files": [
     "dist",
@@ -127,7 +128,12 @@
     "authoring:check": "node scripts/check-authoring-consumer.mjs",
     "agent:check": "node scripts/check-agent-examples.mjs",
     "react:check": "node --test tests/browser/react.test.mjs",
-    "render:check": "node --test tests/browser/render.test.mjs tests/browser/edit.test.mjs tests/browser/ticks.test.mjs"
+    "render:check": "node --test tests/browser/render.test.mjs tests/browser/edit.test.mjs tests/browser/ticks.test.mjs tests/browser/distribution.test.mjs",
+    "dev": "npm run build && npm run predev --workspace website && node scripts/dev-studio.mjs",
+    "studio:build": "npm run build && npm run build --workspace website",
+    "start": "node website/scripts/serve-out.mjs 4347",
+    "test:studio:server": "node --test tests/studio/*.test.mjs",
+    "test:studio": "npm run test:studio:server && npm run test --workspace website"
   },
   "dependencies": {
     "@types/d3-axis": "^3.0.6",
@@ -184,5 +190,9 @@
     "react": {
       "optional": true
     }
-  }
+  },
+  "workspaces": [
+    "website",
+    "integrations/mcp"
+  ]
 }

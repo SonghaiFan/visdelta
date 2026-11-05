@@ -325,3 +325,24 @@ test('before-chart planning falls back when bounded search reaches its state lim
   assert.equal(route.planning, 'authored');
   assert.equal(calls, 1);
 });
+
+test('aggregate output filters have deterministic valid reversible plans', () => {
+  const from = stacked();
+  const to = {...structuredClone(from),transform:[...from.transform,{filter:{field:'population',gte:15}}]};
+  const frozen=structuredClone([from,to]);
+  const forward=planDeclarationTransition(from,to,codec);
+  assert.equal(forward.status,'planned',forward.reason);
+  assertSingleOperationPerStage(forward);
+  assert.deepEqual(planDeclarationTransition(from,to,codec),forward);
+  for(const stage of forward.stages) {
+    assert.equal(codec.validate(stage.from).status,'ok');
+    assert.equal(codec.validate(stage.to).status,'ok');
+    assert.deepEqual(aggregate(stage.to),aggregate(from));
+  }
+  assert.deepEqual(serializeViewSpec(forward.stages.at(-1).to),serializeViewSpec(to));
+  const reverse=planDeclarationTransition(to,from,codec);
+  assert.equal(reverse.status,'planned',reverse.reason);
+  assertSingleOperationPerStage(reverse);
+  assert.deepEqual(reverse.stages.map(stage=>serializeViewSpec(stage.to)),forward.stages.slice().reverse().map(stage=>serializeViewSpec(stage.from)));
+  assert.deepEqual([from,to],frozen);
+});

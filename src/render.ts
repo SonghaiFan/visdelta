@@ -1,3 +1,5 @@
+import { chartError, chartFailure } from './edit-errors.js';
+export type { ChartErrorDetails } from './edit-errors.js';
 import { observeChart, captureChart } from './runtime/chart-observation.js';
 import type { ChartObservation, ChartCapture } from './runtime/chart-observation.js';
 export type { ChartObservation, ChartCapture, ChartMarkObservation } from './runtime/chart-observation.js';
@@ -33,9 +35,21 @@ export interface UpdateResult {
   revision?: number;
 }
 export interface ChartSnapshot { revision: number; spec: ViewSpec }
+export interface ChartCapabilities {
+  mark: string;
+  fluentEdits: boolean;
+  /** null means an adapter exists but did not publish a method list. */
+  editMethods: string[] | null;
+}
 export interface ChartView {
+  /** Capabilities of the latest accepted chart, not the visible animation frame. */
+  capabilities(): ChartCapabilities;
+  /** Validate an exact batch against current accepted state without accepting it or consuming its request ID. */
+  previewEdit(message: EditMessage | string): Promise<ChartSnapshot>;
   edit(message: EditMessage | string, options?: UpdateOptions): Promise<UpdateResult>;
   update(spec: ChartInput, options?: UpdateOptions): Promise<UpdateResult>;
+  /** Complete state replacement; different chart types fade in without a geometric morph. */
+  replace(spec: ChartInput, options?: UpdateOptions): Promise<UpdateResult>;
   /** Immediate replacement, scheduled with the same latest policy. */
   render(spec: ChartInput, options?: Omit<UpdateOptions, 'animate'>): Promise<UpdateResult>;
   /** Latest validated, accepted declaration, not the current animation frame. */
@@ -89,6 +103,7 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
     let live: Mounted;
     let manual: { from: ViewSpec; to: ViewSpec; playing: boolean } | undefined;
     let preparingManual = false;
+    let geometryRevision = 0;
 
     interface Mounted { controller: VisualizationTransition; mount: HTMLElement }
     interface Job {
@@ -132,7 +147,8 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
       busy = true;
       let candidate: Mounted | undefined;
       try {
-        candidate = await prepare(settled, job.resolved!);
+        const changingType = settled.mark !== job.resolved!.mark;
+        candidate = await prepare(changingType ? job.resolved! : settled, job.resolved!);
         if (destroyed) { dispose(candidate); return; }
         commit(candidate);
         candidate = undefined;
@@ -142,7 +158,19 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
           busy = false;
           void drain();
         };
-        if (job.options.animate === false || job.options.duration === 0) {
+        if (changingType && job.options.animate !== false && job.options.duration !== 0) {
+          live.controller.progress(1);
+          const mount = live.mount, started = performance.now(), elapsed = job.options.duration ?? defaultDuration;
+          mount.style.opacity = '0';
+          const fade = () => {
+            if (destroyed) return;
+            const progress = Math.min(1, (performance.now() - started) / elapsed);
+            mount.style.opacity = String(progress);
+            if (progress >= 1) { mount.style.removeProperty('opacity'); frame = undefined; end(); }
+            else frame = requestAnimationFrame(fade);
+          };
+          frame = requestAnimationFrame(fade);
+        } else if (job.options.animate === false || job.options.duration === 0) {
           live.controller.progress(1);
           end();
         } else {
@@ -173,11 +201,12 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
         manual = undefined;
       }
     }
-    async function submitUpdate(next: ChartInput, updateOptions: UpdateOptions = {}, expectedRevision?: number, resolveData?: ReturnType<typeof createSpecDataResolver>): Promise<UpdateResult> {
+    async function submitUpdate(next: ChartInput, updateOptions: UpdateOptions = {}, expectedRevision?: number, resolveData?: ReturnType<typeof createSpecDataResolver>, allowChartChange = false): Promise<UpdateResult> {
         alive();
         releaseManual();
-        const spec = declaration(next);
-        if (spec.mark !== accepted.mark) throw new Error('update() requires the same chart type.');
+        let spec: ViewSpec;
+        try { spec = declaration(next); } catch (error) { throw chartFailure(error, 'INVALID_CHART_STATE', 'Submit one complete valid ViewSpec.'); }
+        if (!allowChartChange && spec.mark !== accepted.mark) throw chartError('CHART_TYPE_MISMATCH', 'update() requires the same chart type. Use replace() with a complete declaration.', 'Use replace() for a different chart type.', { chartType: spec.mark });
         const settings = { ...updateOptions, duration: duration(updateOptions.duration ?? defaultDuration) };
         const data = cloneState(updateOptions.data ?? bindings);
         const id = ++submitted;
@@ -205,20 +234,65 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
             } catch (error) {
               if (validation) dispose(validation);
               jobs.delete(job);
-              if (!destroyed) reject(error);
+              if (!destroyed) reject(chartFailure(error, 'INVALID_CHART_STATE', 'Correct the complete declaration using the chart documentation; previous accepted intent is retained.', spec.mark));
             }
           })();
         });
     }
     function checkRevision(expected: number) {
-      if (expected !== revision) throw Object.assign(new Error(`Stale edit: expected revision ${expected}, current revision ${revision}. Read snapshot() and submit a new request.`), { code: 'REVISION_CONFLICT', revision });
+      if (expected !== revision) throw chartError('REVISION_CONFLICT', `Stale edit: expected revision ${expected}, current revision ${revision}. Read snapshot() and submit a new request.`, 'Read snapshot() and use a new request ID with the current revision.', { revision });
+    }
+    function editMessage(input: EditMessage | string) {
+      try { return parseEdit(input); }
+      catch (error) { throw chartFailure(error, 'INVALID_EDIT_MESSAGE', 'Supply requestId, integer baseRevision, and 1–32 method/args edits.'); }
+    }
+    async function deriveEdit(message: EditMessage) {
+      checkRevision(message.baseRevision);
+      const source = cloneState(accepted);
+      const module = localModules.find(module => module.key === source.mark);
+      if (!module?.edit) throw chartError('UNSUPPORTED_EDIT', `Chart module "${source.mark}" does not support fluent edits.`, 'Use update() with a complete declaration.', { chartType: source.mark });
+      const unsupported = module.editMethods && message.edits.find(call => !module.editMethods!.includes(call.method));
+      if (unsupported) throw chartError('UNSUPPORTED_EDIT', `Chart module "${source.mark}" does not support edit ${unsupported.method}.`, 'Read capabilities().editMethods; use a complete supported state or choose another supported operation.', { chartType: source.mark, method: unsupported.method, editIndex: message.edits.indexOf(unsupported), path: `/edits/${message.edits.indexOf(unsupported)}/method` });
+      const resolveData = createSpecDataResolver(bindings);
+      const resolved = await resolveData(source);
+      let candidate: ViewSpec;
+      try { candidate = await module.edit(source, message.edits, resolved); }
+      catch (error) { throw chartFailure(error, 'INVALID_EDIT_STATE', 'Correct the arguments or submit a complete state with update().', source.mark); }
+      alive();
+      checkRevision(message.baseRevision);
+      return { candidate, resolveData };
     }
     const requests = new Map<string, { fingerprint: string; result: Promise<UpdateResult> }>();
     const view: ChartView = {
       update: submitUpdate,
+      capabilities() {
+        alive();
+        const module = localModules.find(module => module.key === accepted.mark);
+        return { mark: accepted.mark!, fluentEdits: !!module?.edit,
+          editMethods: module?.edit ? (module.editMethods ? [...module.editMethods] : null) : [] };
+      },
+      async previewEdit(input) {
+        alive();
+        if (preparingManual || manual) throw new Error('Finish and release the manual transition before previewing edits.');
+        const message = editMessage(input);
+        let validation: Mounted | undefined;
+        try {
+          const { candidate, resolveData } = await deriveEdit(message);
+          const spec = declaration(candidate);
+          if (spec.mark !== accepted.mark) throw chartError('CHART_TYPE_MISMATCH', 'An edit must retain the chart type.', 'Use replace() for a different chart type.', { chartType: spec.mark });
+          const resolved = await resolveData(spec);
+          alive();
+          validation = await prepare(resolved, resolved);
+          alive();
+          checkRevision(message.baseRevision);
+          return { revision: message.baseRevision, spec: cloneState(spec) };
+        } catch (error) {
+          throw chartFailure(error, 'INVALID_CHART_STATE', 'Correct the candidate; preview has not accepted any changes.', accepted.mark);
+        } finally { if (validation) dispose(validation); }
+      },
       async edit(input, settings = {}) {
         alive();
-        const message = parseEdit(input);
+        const message = editMessage(input);
         // Dataset replacements belong to update(); edits retain current bindings.
         if (settings.data !== undefined) throw new Error('Use update() to replace data bindings.');
         const frozenSettings = { animate: settings.animate ?? true, duration: duration(settings.duration ?? defaultDuration) };
@@ -232,15 +306,7 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
         if (requests.size >= 1024) throw new Error('This view has reached its 1024 edit request limit. Create a new view.');
         const operation = (async () => {
           releaseManual();
-          checkRevision(message.baseRevision);
-          const source = cloneState(accepted);
-          const module = localModules.find(module => module.key === source.mark);
-          if (!module?.edit) throw new Error(`Chart module "${source.mark}" does not support fluent edits.`);
-          const resolveData = createSpecDataResolver(bindings);
-          const resolved = await resolveData(source);
-          const candidate = await module.edit(source, message.edits, resolved);
-          alive();
-          checkRevision(message.baseRevision);
+          const { candidate, resolveData } = await deriveEdit(message);
           return submitUpdate(candidate, frozenSettings, message.baseRevision, resolveData);
         })();
         const result = new Promise<UpdateResult>((resolve, reject) => {
@@ -251,16 +317,17 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
         requests.set(message.requestId, { fingerprint, result });
         return result;
       },
+      replace(next, settings) { return submitUpdate(next, settings, undefined, undefined, true); },
       render(next, settings) { return view.update(next, { ...settings, animate: false }); },
       inspectMarks() {
-        alive(); if (busy || jobs.size || editWaiters.size || manual) throw new Error('Wait for settled chart updates before observation.');
+        alive(); if (busy || jobs.size || editWaiters.size || preparingManual || manual) throw new Error('Wait for settled chart updates before observation.');
         return observeChart(live.controller.view, revision);
       },
       async capture() {
-        alive(); if (busy || jobs.size || editWaiters.size || manual) throw new Error('Wait for settled chart updates before capture.');
-        const observedRevision = revision; const observed = live;
+        alive(); if (busy || jobs.size || editWaiters.size || preparingManual || manual) throw new Error('Wait for settled chart updates before capture.');
+        const observedRevision = revision; const observedGeometry = geometryRevision; const observed = live;
         const image = await captureChart(live.controller.view, revision);
-        alive(); if (revision !== observedRevision || observed !== live || busy || jobs.size) throw new Error('Chart changed during capture. Capture again.');
+        alive(); if (revision !== observedRevision || geometryRevision !== observedGeometry || observed !== live || busy || jobs.size || editWaiters.size || preparingManual || manual) throw new Error('Chart changed during capture. Capture again.');
         return image;
       },
       snapshot() { alive(); return { revision, spec: cloneState(accepted) }; },
@@ -329,7 +396,9 @@ export function createRenderer({ modules }: { modules: readonly ChartModule<any>
         assertCanvasSize('resize height', next.height);
         if (next.width !== undefined) size.width = next.width;
         if (next.height !== undefined) size.height = next.height;
-        live.mount.style.cssText = size.height === 'auto' ? 'height:100%' : '';
+        // Preserve a replacement fade while changing layout.
+        live.mount.style.height = size.height === 'auto' ? '100%' : '';
+        geometryRevision++;
         live.controller.resize(size);
       },
       destroy() {

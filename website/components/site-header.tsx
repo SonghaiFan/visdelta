@@ -14,12 +14,11 @@ const tools = [
 export function SiteHeader() {
   const pathname = usePathname().replace(new RegExp(`^${basePath}(?=/|$)`), '').replace(/\/$/, '');
   const studioViews = [
-    { href: '/playground', label: 'Playground' },
     { href: '/gallery', label: 'Gallery' },
-    { href: '/liveshow', label: 'Liveshow' },
+    { href: '/playground', label: 'Playground' },
     { href: '/story', label: 'Story' },
+    { href: '/liveshow', label: 'Liveshow' },
   ];
-  const inStudio = pathname.startsWith('/playground') || pathname.startsWith('/gallery') || pathname.startsWith('/studio') || pathname.startsWith('/liveshow') || pathname.startsWith('/story');
   return (
     <header className="vd-site-header sticky top-0 z-40 flex h-11 shrink-0 items-center gap-1 border-b bg-fd-background/95 px-1 backdrop-blur sm:gap-3 sm:px-3">
       <Link href="/" className="sm:mr-1 inline-flex shrink-0 items-center rounded-sm px-1 py-1 text-sm" aria-label="VisDelta home">
@@ -47,7 +46,7 @@ export function SiteHeader() {
         })}
         <div role="group" aria-label="Studio views" className="ml-1 inline-flex items-center gap-0.5 rounded-md border bg-fd-muted p-0.5">
           {studioViews.map(({ href, label }) => {
-            const active = inStudio && (pathname === href || pathname.startsWith(`${href}/`));
+            const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link
                 key={href}

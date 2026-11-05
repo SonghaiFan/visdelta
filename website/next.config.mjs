@@ -37,6 +37,9 @@ const config = {
       },
     ],
   },
+  ...(process.env.NODE_ENV === 'development' ? {
+    async rewrites(){return [{source:'/api/liveshow/:path*',destination:`http://127.0.0.1:${process.env.LIVESHOW_API_PORT??4325}/api/liveshow/:path*`}];},
+  } : {}),
   outputFileTracingRoot: repositoryRoot,
 };
 

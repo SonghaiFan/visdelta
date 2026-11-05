@@ -125,8 +125,10 @@ function scrub(entry: Scheduled, elapsed: number, direction: number): void {
   if (elapsed < entry.start && !entry.started) return;
   ensureTweens(entry);
   if (!entry.tweens) return;
-  const duration = entry.item.duration || 1;
-  const eased = easeForDirection(entry.item.ease, direction)(clamp((elapsed - entry.start) / duration, 0, 1));
+  const duration = entry.item.duration;
+  const local = duration > 0 ? clamp((elapsed - entry.start) / duration, 0, 1)
+    : elapsed >= entry.start ? 1 : 0;
+  const eased = easeForDirection(entry.item.ease, direction)(local);
   entry.tweens.forEach((tween) => tween.apply.call(entry.item.node, eased));
 }
 

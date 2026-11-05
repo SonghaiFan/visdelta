@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- Unify Gallery, Playground, Story and Liveshow in Studio with one workspace,
+  startup command and documentation source. Generate offline package docs from
+  the website MDX. Replace the Story editor/parser with ordinary website examples
+  and make Liveshow a native MCP adapter with verified browser receipts.
+- Remove Point `.radius()` in favor of `.pointSize()`, legacy attention aliases,
+  bare-string data bindings and plural semantic-key roles. Preserve Unit compound
+  mark identity across sorting and filtering.
+
+- Remove Unit radius aliases; use `.size()` for mark size and x/y/columns for
+  layout options. Remove the old documentation URL redirect generator.
+
+- Separate Bar edit validity from planner coverage: enable distribution color, focus,
+  sorting, whole-question filtering, axis labels and sequential compound edits.
+  Preserve normalization denominators and reject invalid final batches atomically.
+
+- Add `inspectBarSpec` in `visdelta/bar` for declaration-level layout facts and
+  unknown diagnostics, with builder-generated complete grouped JSON examples.
+
+- Replace Date-valued state leaves when applying `.with()` patches instead of
+  silently retaining the old date.
+
+- Keep unchanged transition layouts cached without floating-point invalidations;
+  align zero-duration boundaries in live and compiled frame sampling.
+- Return fresh resolved endpoint snapshots from `transition.from` and `.to`.
+
+- Remove Bar `.segment()`; use `.breakdown(field)` with tidy input instead.
+  Breakdown preserves the y label (including a default field title) and authored
+  channel options instead of automatically prefixing the label with an operation.
+
 - Use compact numeric axis labels and UTC interval-aware date labels by default;
   preserve explicit channel formats.
 
@@ -259,3 +288,9 @@ The implementation rules are documented in
 - Liveshow sends compact edits against the accepted chart; Grain remains a
   complete-state update. Request retries, conflicts and cumulative edits are
   covered by browser regressions.
+
+- Bar semantic edits accept grouped/stacked layout on segmented declarations, with a bounded single-operation path for folded pipelines. Serialized grouped declarations preserve their offsets through flip using the renderer's shared layout interpretation.
+
+- Add Bar Likert centered divergence and normalized 100% stacking for tidy counts, semantic editing/inspection, strict category/count validation, stable neutral identity, a zero baseline, percentage tooltips and paired Gallery/Playground guide examples.
+
+- Allow single highlight edits on normalized stacked and diverging Bars; Bar highlight(null) clears attention while retaining counts, normalization, identity, focus and layout across flip.

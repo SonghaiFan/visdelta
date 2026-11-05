@@ -6,7 +6,7 @@ import type { ChartModule } from './charts/module.js';
 import { resolveSpecDataTypes } from './data/types.js';
 import { analyzeViewLineage } from './data/view-lineage.js';
 import { classifyStateChanges } from './grammar/state-changes.js';
-import { assertSpecShape, assertSpecValues } from './spec-json.js';
+import { assertPositionScaleShape, assertSpecShape, assertSpecValues } from './spec-json.js';
 import { declarationEdits } from './grammar/declaration-edits.js';
 
 export type Visualization = ViewSpec | {
@@ -30,9 +30,11 @@ function declaredSpec(input: Visualization): ViewSpec {
   if (!input || typeof input !== 'object') {
     throw new Error('Expected a visualization instance or view spec.');
   }
-  return serializeViewSpec(cloneState(
+  const spec = serializeViewSpec(cloneState(
     typeof input.toSpec === 'function' ? input.toSpec() : input as ViewSpec
   ));
+  assertPositionScaleShape(spec);
+  return spec;
 }
 
 function withInferredTypes(spec: ViewSpec): ViewSpec {

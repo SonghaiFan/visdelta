@@ -15,8 +15,8 @@
  */
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --color-state-a: #4269d0;
   --color-state-b: #ff725c;
@@ -146,8 +146,8 @@ html > body[data-scroll-locked] {
   --vd-figure-bg: transparent;
   --vd-figure-border: none;
   --vd-figure-radius: 0;
-  --vd-type-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --vd-font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --vd-type-family: ui-sans-serif, system-ui, sans-serif;
+  --vd-font-family: ui-sans-serif, system-ui, sans-serif;
 }
 .vd-docs-chart .vd-view {
   min-height: 0;

@@ -1,13 +1,9 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import { SiteHeader } from '@/components/site-header';
 import { Provider } from '@/components/provider';
 import { appDescription, appName, basePath, siteUrl } from '@/lib/shared';
 import 'visdelta/style.css';
 import './global.css';
-
-const sans = Geist({ subsets: ['latin'], variable: '--font-geist-sans' });
-const mono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(`${siteUrl}/`),
@@ -39,7 +35,7 @@ export const viewport: Viewport = {
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col font-sans">
         <Provider><SiteHeader />{children}</Provider>
       </body>

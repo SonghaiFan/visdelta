@@ -91,7 +91,7 @@ test('Point canonical grouping, measures, appearance and attention ignore overwr
   }).color('#3366ff').pointSize(7).focus({ region: 'N' });
   const overwritten = base().rollup('cohort').rollup(['region', 'cohort'], {
     x: { field: 'x', op: 'sum', label: 'X' }, y: { field: 'y', op: 'sum', label: 'Y' }
-  }).color('#ff0000').color('#3366ff').radius(4).pointSize(7).focus({ region: 'N' });
+  }).color('#ff0000').color('#3366ff').pointSize(4).pointSize(7).focus({ region: 'N' });
   const to = target.toSpec();
   const plan = planDeclarationTransition(from, to, codec);
   assertPlan(plan, from, to);

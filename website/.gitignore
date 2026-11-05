@@ -28,8 +28,8 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 
-# demo datasets copied from ../docs/public/data by scripts/prepare.mjs
+# demo datasets copied from ../data by scripts/prepare.mjs
 /public/data/
 
-# single-file examples copied by scripts/prepare.mjs
-/public/templates/
+# standalone examples copied by scripts/prepare.mjs
+/public/story/

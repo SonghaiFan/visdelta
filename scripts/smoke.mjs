@@ -66,24 +66,20 @@ for (const mark of expectedTypes) {
     mark,
     data: { values: [] },
     encoding: {},
-    selection: { mode: 'focus', field: 'x', equal: 'one' }
-  }, { scene: ['selection'] });
+    scopes: {highlight:{mode:'highlight',filters:[{field:'x',equal:'one'}]}}
+  }, { scene: [] });
   const state = result.effectiveViewSpec?.meta?.state;
-  if (
-    result.sceneTransition.scene.includes('selection') &&
-    state?.sceneState?.selection?.mode === 'focus' &&
-    state.selection === undefined
-  ) compiledTypes.push(mark);
+  if (state?.scopes?.highlight?.mode==='highlight' && state.selection===undefined) compiledTypes.push(mark);
 }
 
 assertSame(Object.keys(sourceApi).sort(), publicApi.sort(), 'source public API');
 assertSame(Object.keys(distApi).sort(), publicApi.sort(), 'dist public API');
 assertSame(Object.keys(browserApi).sort(), publicApi, 'browser public API');
 assertSame(Object.keys(barApi).sort(), [
-  'BarState', 'bar', 'barModule', 'createBarGrainDeclarationOperationCodec'
+  'BarState', 'bar', 'barModule', 'createBarGrainDeclarationOperationCodec', 'inspectBarSpec'
 ], 'Bar subentry public API');
 assertSame(resolvedTypes.sort(), expectedTypes, 'production chart type registries');
-assertSame(compiledTypes, ['area', 'bar', 'line', 'point', 'unit'], 'charts declaring selection compile that state slot');
+assertSame(compiledTypes, expectedTypes, 'charts preserve canonical attention through compilation');
 
 const first = sourceApi.bar([{ category: 'A', value: 1, other: 2 }])
   .x('category')

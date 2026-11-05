@@ -3,14 +3,15 @@ title: Copy a scroll story
 description: A runnable single-file template with measured step positions, holds, replay, themes and an explicit iframe contract.
 ---
 
-[Open the complete HTML template](/templates/scroll-story.html). Save that file
+[Open the complete HTML example](/story/examples/network/index.html). Copy the portable source linked below
 as `index.html`, run a static server such as `npx serve .`, and open its HTTP
 URL. It pins both JavaScript and CSS to VisDelta **0.4.2**; it needs network
 access to jsDelivr, but no bundler, application framework or external dataset.
 
 The source of truth is
-[`examples/templates/scroll-story.html`](https://github.com/SonghaiFan/visdelta/blob/main/examples/templates/scroll-story.html).
-The documentation build copies it unchanged. Its inline data is fictional.
+[`examples/story/network/index.html`](https://github.com/SonghaiFan/visdelta/blob/main/examples/story/network/index.html).
+The Studio build resolves its two dependency URLs to the local library assets;
+the portable source keeps pinned CDN URLs. Its inline data is fictional.
 
 ## Replace data, then authored states
 

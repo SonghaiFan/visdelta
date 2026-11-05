@@ -1,0 +1,77 @@
+[
+  {
+    "question": "Public transport",
+    "response": "Strongly disagree",
+    "count": 7
+  },
+  {
+    "question": "Public transport",
+    "response": "Disagree",
+    "count": 20
+  },
+  {
+    "question": "Public transport",
+    "response": "Neutral",
+    "count": 12
+  },
+  {
+    "question": "Public transport",
+    "response": "Agree",
+    "count": 23
+  },
+  {
+    "question": "Public transport",
+    "response": "Strongly agree",
+    "count": 38
+  },
+  {
+    "question": "Parks",
+    "response": "Strongly disagree",
+    "count": 22
+  },
+  {
+    "question": "Parks",
+    "response": "Disagree",
+    "count": 44
+  },
+  {
+    "question": "Parks",
+    "response": "Neutral",
+    "count": 30
+  },
+  {
+    "question": "Parks",
+    "response": "Agree",
+    "count": 24
+  },
+  {
+    "question": "Parks",
+    "response": "Strongly agree",
+    "count": 80
+  },
+  {
+    "question": "Community services",
+    "response": "Strongly disagree",
+    "count": 6
+  },
+  {
+    "question": "Community services",
+    "response": "Disagree",
+    "count": 36
+  },
+  {
+    "question": "Community services",
+    "response": "Neutral",
+    "count": 14
+  },
+  {
+    "question": "Community services",
+    "response": "Agree",
+    "count": 17
+  },
+  {
+    "question": "Community services",
+    "response": "Strongly agree",
+    "count": 7
+  }
+]

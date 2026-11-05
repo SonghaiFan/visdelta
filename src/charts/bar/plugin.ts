@@ -19,7 +19,7 @@ export const plugin: ChartPlugin<BarSpec> = defineChartType<BarSpec>({
   transition: {
     declarationOperations: createBarGrainDeclarationOperationCodec()
   },
-  scenes: ['selection', 'axis', 'detail', 'mapping'],
+  scenes: ['axis', 'detail', 'mapping'],
   presentation: barPresentation,
   createChart: createBarChart,
   createSpecCompiler: createBarSpecCompiler

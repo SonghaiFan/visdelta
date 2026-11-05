@@ -1,0 +1,890 @@
+{
+  "bar-change-after": [
+    {
+      "label": "2021",
+      "year": 2021,
+      "value": 98,
+      "change": 2
+    },
+    {
+      "label": "2022",
+      "year": 2022,
+      "value": 97,
+      "change": -1
+    },
+    {
+      "label": "2023",
+      "year": 2023,
+      "value": 99,
+      "change": 2
+    }
+  ],
+  "stack-shares-after": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 60
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 13.333333333333334
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 6.666666666666667
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Support",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 47.05882352941177
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 17.647058823529413
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 11.764705882352942
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Support",
+      "value": 23.529411764705884
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 45.16129032258065
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 12.903225806451612
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 9.67741935483871
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Support",
+      "value": 32.25806451612903
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 50
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 6.25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Support",
+      "value": 18.75
+    }
+  ],
+  "stack-total-duplicate-before": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 90
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Support",
+      "value": 30
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 30
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Support",
+      "value": 40
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 70
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 15
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Support",
+      "value": 50
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 40
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Support",
+      "value": 30
+    },
+    {
+      "label": "North",
+      "part": "Total",
+      "value": 150
+    },
+    {
+      "label": "South",
+      "part": "Total",
+      "value": 170
+    },
+    {
+      "label": "East",
+      "part": "Total",
+      "value": 155
+    },
+    {
+      "label": "West",
+      "part": "Total",
+      "value": 160
+    }
+  ],
+  "stack-tiny-after": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 90
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 30
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 5.714285714285714
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 70
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 15
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 7.142857142857143
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 40
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 4.285714285714286
+    }
+  ],
+  "area-shares-before": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 60
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 13.333333333333334
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 6.666666666666667
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Support",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 47.05882352941177
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 17.647058823529413
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 11.764705882352942
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Support",
+      "value": 23.529411764705884
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 45.16129032258065
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 12.903225806451612
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 9.67741935483871
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Support",
+      "value": 32.25806451612903
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 50
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 6.25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Support",
+      "value": 18.75
+    }
+  ],
+  "area-shares-after": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 60
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 13.333333333333334
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 6.666666666666667
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Support",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 47.05882352941177
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 17.647058823529413
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 11.764705882352942
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Support",
+      "value": 23.529411764705884
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 45.16129032258065
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 12.903225806451612
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 9.67741935483871
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Support",
+      "value": 32.25806451612903
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 50
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 6.25
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Support",
+      "value": 18.75
+    }
+  ],
+  "area-anchor-before": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 30
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 40
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 20
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 15
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 90
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 70
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Support",
+      "value": 30
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Support",
+      "value": 40
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Support",
+      "value": 50
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Support",
+      "value": 30
+    }
+  ],
+  "area-tiny-after": [
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Core",
+      "value": 90
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "North",
+      "year": 2020,
+      "part": "Others",
+      "value": 29.999999999999996
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Growth",
+      "value": 30
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Services",
+      "value": 20
+    },
+    {
+      "label": "South",
+      "year": 2021,
+      "part": "Others",
+      "value": 40
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Core",
+      "value": 70
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Services",
+      "value": 15
+    },
+    {
+      "label": "East",
+      "year": 2022,
+      "part": "Others",
+      "value": 50.00000000000001
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Core",
+      "value": 80
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Growth",
+      "value": 40
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "label": "West",
+      "year": 2023,
+      "part": "Others",
+      "value": 29.999999999999996
+    }
+  ],
+  "pie-tiny-after": [
+    {
+      "part": "Core",
+      "value": 90
+    },
+    {
+      "part": "Growth",
+      "value": 20
+    },
+    {
+      "part": "Services",
+      "value": 10
+    },
+    {
+      "part": "Others",
+      "value": 29.999999999999996
+    }
+  ]
+}

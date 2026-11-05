@@ -40,6 +40,7 @@ export const categories: { id: StateChangeCategory; label: string; summary: stri
 ];
 
 export const registry: ExampleMeta[] = [
+  { id: 'bar-likert', chart: 'bar', category: 'layout', title: 'Likert: 100% to diverging', description: 'Synthetic survey, n=100/200/80. Neutral stays one group across zero; side positions are not approval shares.', height: 420 },
   { id: 'bar-filter', chart: 'bar', category: 'data', title: 'Filter rows', description: 'where() keeps matching rows. Exiting bars leave before the scale settles.' },
   { id: 'line-add', chart: 'line', category: 'data', title: 'Add an observation', description: 'The line extends to the new day before its point appears.' },
   { id: 'bar-split', chart: 'bar', category: 'grain', title: 'Split totals into detail', description: 'Regional totals split into stacked channel segments that preserve each total.' },

@@ -293,8 +293,11 @@ export function createTransitionSurface(
       const legPosition = routeProgress * Math.max(1, legendRooms.length - 1);
       const legIndex = Math.min(Math.floor(legPosition), Math.max(0, legendRooms.length - 2));
       const fraction = legPosition - legIndex;
-      const legendHeight = (legendRooms[legIndex] ?? 0) * (1 - fraction)
-        + (legendRooms[legIndex + 1] ?? legendRooms[legIndex] ?? 0) * fraction;
+      const legendFrom = legendRooms[legIndex] ?? 0;
+      const legendTo = legendRooms[legIndex + 1] ?? legendFrom;
+      // Equal endpoints must stay bit-for-bit equal. Weighted sums can drift
+      // by a floating-point ulp and invalidate otherwise reusable frames.
+      const legendHeight = legendFrom + (legendTo - legendFrom) * fraction;
       const height = fittedHeight > 0
         ? Math.max(1, fittedHeight - legendHeight)
         : config.height;
@@ -304,7 +307,7 @@ export function createTransitionSurface(
         const after = invariantTransitionMargin(chartType, [layoutStates[Math.min(legIndex + 1, layoutStates.length - 1)]], layoutWidth, height!, false);
         margin = { ...config.margin };
         for (const side of ['top', 'right'] as const) {
-          margin[side] = Number(before[side]) * (1 - fraction) + Number(after[side]) * fraction;
+          margin[side] = Number(before[side]) + (Number(after[side]) - Number(before[side])) * fraction;
         }
       }
       if (config.height !== height || config.legendHeight !== legendHeight

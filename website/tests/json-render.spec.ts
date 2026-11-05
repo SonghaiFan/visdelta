@@ -6,7 +6,7 @@ for (const width of [1280, 390]) {
     await page.goto('docs/guides/json/');
     const comparison = page.locator('section[aria-label="Chart authoring comparison"]');
     await comparison.getByRole('tab', { name: 'JSON spec', exact: true }).click();
-    const panel = comparison.locator('[role="tabpanel"]:visible');
+    const panel = comparison.getByRole('tabpanel', { name: 'JSON spec', exact: true });
     await expect(panel).toContainText("import { render } from 'visdelta'");
     await expect(panel).toContainText('await view.update(nextSpec)');
     await expect(panel).not.toContainText('registerChartModule');

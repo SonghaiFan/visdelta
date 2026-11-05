@@ -1,3 +1,4 @@
+import {surveyData,percentCode,stacked,diverging} from '../interactive/likert-idiom.js';
 /**
  * The playground's curated stories, grouped by the state-change category each
  * one teaches. A story starts from working chart code and then edits it, one
@@ -54,6 +55,34 @@ const underTen = `const chart = bar(rows)
   .where({ age: "<10" });`;
 
 export const playgroundDemos: PlaygroundDemo[] = [
+  {
+    id: 'likert-diverging', title: 'Likert: 100% stack to centered divergence', category: 'layout', chart: 'bar',
+    line: 'Synthetic survey: n=100/200/80. Neutral spans zero as one group, never half-agreement. Hover for raw count and share; signed axis positions are not shares.',
+    data: surveyData,
+    code: percentCode,
+    edits: [{replace:stacked,with:diverging }, { remove: '.flip()' }]
+  },
+  {
+    id: 'liveshow-stacked',
+    title: 'Liveshow: flip a four-product revenue stack',
+    category: 'coordinate',
+    chart: 'bar',
+    line: 'One $290k revenue total, four product segments. Scrub between horizontal and vertical without changing the data or colors.',
+    data: './data/liveshow-sales.csv',
+    code: `const chart = bar(rows)
+  .x("measure")
+  .y("amount", { label: "Revenue ($k)" })
+  .breakdown("product")
+  .color("product", {
+    domain: ["Atlas", "Beacon", "Comet", "Drift"],
+    range: ["#4269d0", "#efb118", "#ff725c", "#6cc5b0"]
+  })
+  .flip();`,
+    edits: [
+      { remove: '.flip()' },
+      { add: '.flip()' },
+    ],
+  },
   {
     id: 'filter',
     title: 'Which states clear the planning threshold?',
@@ -372,18 +401,12 @@ const chart = bar(cases)
     category: 'grain',
     chart: 'unit',
     line: 'The same grouped counts expand from coarse units to one circle per flower; no individual is added or removed.',
-    data: './data/iris.csv',
-    code: `const sampleRows = [...rows.slice(0, 8), ...rows.slice(50, 54)];
-const counts = Array.from(
-  d3.rollup(sampleRows, values => values.length, row => row.species),
-  ([species, count]) => ({ species, count })
-);
-
-const chart = unit(counts)
+    data: './data/iris-sample-counts.csv',
+    code: `const chart = unit(rows)
   .value("count", { unitValue: 4, maxUnits: 40 })
   .key("species")
   .group("species")
-  .layout("bar", { columns: 5, radius: 8 })
+  .size(8).layout("bar", { columns: 5 })
   .color("species");`,
     edits: [
       { replace: 'unitValue: 4', with: 'unitValue: 2' },

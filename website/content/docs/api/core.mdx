@@ -106,7 +106,7 @@ transition. Built-in charts use this planner internally. Pie has no codec.
 
 A codec may also constrain individual route edges with
 `validateStep(from, to, endpoints)`. See the
-[language framework](https://github.com/SonghaiFan/visdelta/blob/main/docs/language-framework.md#transition-contracts)
+[language framework](https://github.com/SonghaiFan/visdelta/blob/main/docs/internal/language-framework.md#transition-contracts)
 for the complete contract.
 
 ## Identity
@@ -148,3 +148,12 @@ resolveEncodingTypes(...)   // fill missing channel types from data
 `fitCamera`, `focusCamera`, `cameraPosition`, `cameraScale`, `cameraSize`,
 `pointBounds` and `rectBounds` implement the aspect-preserving camera used by
 `.focus()`. Chart plugins supply mark bounds; Core fits one pan and zoom.
+
+
+## Transition snapshots
+
+`transition.from` and `transition.to` expose the resolved endpoint specs, including
+rows from named or URL sources. Each access returns a detached copy. Editing that
+copy changes neither the chart nor subsequent snapshots. `inspect()` preserves the
+visible frame and playback position. Zero-duration steps take effect exactly at
+their start in both cached and reconstructed playback.

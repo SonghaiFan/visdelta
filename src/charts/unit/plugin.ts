@@ -14,7 +14,7 @@ export const plugin: ChartPlugin<UnitViewState> = defineChartType<UnitViewState>
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
-  scenes: ['selection', 'axis', 'mapping'],
+  scenes: ['axis', 'mapping'],
   presentation: unitPresentation,
   layoutChannels: unitLayoutChannels,
   createRenderer: createUnitRenderer,

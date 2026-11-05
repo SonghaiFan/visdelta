@@ -1,3 +1,4 @@
+import {surveyData, percentCode, divergingCode} from './likert-idiom.js';
 // Visual idioms VisDelta can express today, grouped by mark. Each idiom is the
 // exact code a reader can paste into the Playground: `rows` is the parsed CSV
 // named by `data`, and the chart factory is in scope under its own name.
@@ -22,6 +23,14 @@ export const idiomGroups = [
 ];
 
 export const idioms = [
+  { id: 'likert-percent', mark: 'bar', title: '100% stacked bar chart',
+    note: 'survey response shares · all five answers in each denominator', data: surveyData,
+    guide: { text: 'Compare response shares across questions with different sample sizes. Every question sums to 100%, including Neutral; the source counts stay unchanged. Synthetic data: Public transport n=100, Parks n=200, Community services n=80. Use ordinary stacked bars when absolute totals matter.', url: 'https://www.datawrapper.de/blog/divergingbars' },
+    code: percentCode },
+  { id: 'likert-diverging', mark: 'bar', title: 'Diverging stacked bar chart',
+    note: 'survey response shares · one centered Neutral category', data: surveyData,
+    guide: { text: 'Compare the balance of disagreement and agreement around a shared center. Neutral remains one real category centered across zero; zero is an alignment point, not a net score. Positions on either side are not approval percentages. Use the 100% stacked view to compare absolute response shares. These are synthetic counts, normalized within each question.', url: 'https://www.datawrapper.de/blog/divergingbars' },
+    code: divergingCode },
   // Bar ------------------------------------------------------------------
   {
     id: 'vertical-bars', mark: 'bar', title: 'Vertical bar chart', note: 'one bar = one state · height = residents under 10', data: POPULATION,
@@ -62,65 +71,45 @@ export const idioms = [
   .flip();`
   },
   {
-    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', note: 'one segment = one age group in one state · bar = state total', data: POPULATION,
-    code: `const bands = rows.map(row => ({ ...row,
-  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
-    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
-}));
-const chart = bar(bands)
+    id: 'stacked-bars', mark: 'bar', title: 'Stacked bar chart', note: 'one segment = one age group in one state · bar = state total', data: './data/us-population-state-age-bands.csv',
+    code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
-  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
-  .rollup(["state", "age"]);`
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" });`
   },
   {
-    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked totals', note: 'three age groups · six states · complete state totals', data: POPULATION,
-    code: `const bands = rows.map(row => ({ ...row,
-  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
-    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
-}));
-const chart = bar(bands)
+    id: 'stacked-bars-all', mark: 'bar', title: 'Stacked totals', note: 'three age groups · six states · complete state totals', data: './data/us-population-state-age-bands.csv',
+    code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
-  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
-  .rollup(["state", "age"]);`
+  .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" });`
   },
   {
-    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', note: 'one segment = one age group · bar length = state total', data: POPULATION,
-    code: `const bands = rows.map(row => ({ ...row,
-  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
-    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
-}));
-const chart = bar(bands)
+    id: 'horizontal-stacked-bars', mark: 'bar', title: 'Horizontal stacked bars', note: 'one segment = one age group · bar length = state total', data: './data/us-population-state-age-bands.csv',
+    code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
   .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
-  .rollup(["state", "age"])
   .flip();`
   },
   {
-    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', note: 'one bar = one age group · grouped by state', data: POPULATION,
-    code: `const bands = rows.map(row => ({ ...row,
-  age: ["<10", "10-19"].includes(row.age) ? "Under 20"
-    : ["20-29", "30-39", "40-49", "50-59"].includes(row.age) ? "20–59" : "60+"
-}));
-const chart = bar(bands)
+    id: 'grouped-bars', mark: 'bar', title: 'Grouped bar chart', note: 'one bar = one age group · grouped by state', data: './data/us-population-state-age-bands.csv',
+    code: `const chart = bar(rows)
   .x("state")
   .y("population", { format: "~s" })
   .key(["state", "age"])
   .where({ field: "state", oneOf: ${SIX_STATES} })
   .breakdown("age")
   .color("age", { domain: ["Under 20", "20–59", "60+"], scheme: "Blues" })
-  .rollup(["state", "age"])
   .layout("grouped");`
   },
   {
@@ -394,7 +383,7 @@ const chart = bar(bands)
   .y("species")
   .key("flowerId")
   .color("species")
-  .radius(4);`
+  .pointSize(4);`
   },
   {
     id: 'aggregated-points', mark: 'point', title: 'Aggregated points', note: 'one dot = one cylinder count · area = number of cars', data: CARS,
@@ -425,7 +414,7 @@ const chart = bar(bands)
     code: `const chart = unit(rows)
   .key("flowerId")
   .color("species")
-  .layout("grid", { columns: 15, radius: 6 });`
+  .size(6).layout("grid", { columns: 15 });`
   },
   {
     id: 'unit-bars', mark: 'unit', title: 'Unit bar chart', note: 'one circle = one flower · stacked by species', data: IRIS,
@@ -458,13 +447,13 @@ const chart = bar(bands)
   .value("hp", { unitValue: 50, maxUnits: 200 })
   .group("cyl")
   .color("cyl", { type: "nominal" })
-  .layout("bar", { columns: 6, radius: 5 });`
+  .size(5).layout("bar", { columns: 6 });`
   },
   {
     id: 'highlighted-units', mark: 'unit', title: 'Highlighted units', note: 'virginica in ink · the other flowers as context', data: IRIS,
     code: `const chart = unit(rows)
   .key("flowerId")
-  .layout("grid", { columns: 25, radius: 5 })
+  .size(5).layout("grid", { columns: 25 })
   .highlight({ species: "virginica" }, { opacity: 0.12 });`
   }
 ];

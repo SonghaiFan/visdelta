@@ -3,11 +3,35 @@ title: Start here for agents
 description: A verified entry point, observable API facts and a short workflow for building a correct VisDelta story.
 ---
 
-Start with the [machine-readable quick start](/llms.txt). Its first example is
-a complete, version-pinned HTML page; the same quick start is included before
-the reference in [llms-full.txt](/llms-full.txt).
+Copy this complete example into `index.html` and serve it over HTTP.
 
-For a scrolling story, copy the [single-file template](/templates/scroll-story.html)
+```html
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
+<div id="chart" style="width:100%;max-width:640px;height:400px"></div>
+<script type="module">
+  import { bar, transition, visualizationWarnings }
+    from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm';
+  const rows = [
+    { product: 'Hardware', revenue: 12, profit: 5 },
+    { product: 'Software', revenue: 18, profit: 11 },
+    { product: 'Services', revenue: 9, profit: 7 },
+  ];
+  const from = bar(rows).x('product').y('revenue').key('product');
+  const to = from.y('profit');
+  console.log(await visualizationWarnings(to));
+  const change = await transition(from, to, {
+    target: '#chart', width: 'auto', height: 400,
+  });
+  // A complete, synchronous endpoint. play() returns a controller, not a Promise.
+  change.progress(1);
+</script>
+```
+
+
+For a scrolling story, copy the [single-file template](/story/examples/network/index.html)
 and follow its [scroll and iframe contract](/docs/guides/scroll-template).
 It contains inline fictional data, real chart states and controls. Serve the
 file over HTTP; no bundler or data service is required.
@@ -80,3 +104,34 @@ Do not invent `scale.nice`, `axis.endpointTicks`, `utc`, `domain: 'filtered'`,
 Do not assume every combination of data, grain and scale edits has a planned
 route; the [chart contracts](/docs/concepts/transitions) define the supported
 subsets and fallback boundaries.
+
+## Persistent-view tool loop
+
+1. Read the current `snapshot()` and available data fields. Reuse current context
+   instead of repeating observations. Pin documentation to the installed package
+   version and matching repository revision; copied snippets can drift. The
+   checked-in examples may include unreleased changes.
+2. Consult the [JSON guide](/docs/guides/json) for a complete declaration. A docs
+   lookup does not finish a requested mutation. `parseSpec` checks structure;
+   chart-owned runtime validation checks the destination with resolved data.
+3. Apply one complete destination through `update`, or `replace` across types.
+   Query `view.capabilities()` before fluent `edit`; it requires a fresh base
+   revision and request ID. Do not infer capabilities from inherited builder method names.
+4. Await the result. Only `status: 'applied'` confirms playback completion;
+   `superseded` and `destroyed` do not. Check the current revision before reporting
+   a receipt; other requests may have advanced accepted intent. Wait for the
+   application's latest pending work before `inspectMarks()` when needed.
+
+On rejection, retain the previous chart and use the specific error to correct
+the declaration. Do not retry identical invalid arguments. A snapshot describes
+accepted intent; a later route failure can leave an older chart visible. Capture
+only for visual inspection, not automatically after each tool call. App-specific
+source restrictions, model quotas, voice, transport and conversation history
+belong to the application. Core accepts inline rows, named bindings and URLs.
+
+Read `visdelta/docs/index.json` and its listed documents from the installed
+package for version-matched authoring context. Before cross-type replacement,
+`diffViewStates(before, candidate).hasDelta('highlight', 'remove')` can detect
+lost attention; `delta` itself is same-type only. An applied receipt does not
+prove intent preservation. Removing a scope, selecting no marks and selecting
+all marks remain distinct; follow the [clearing example](/docs/guides/json).

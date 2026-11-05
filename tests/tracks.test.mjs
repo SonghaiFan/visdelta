@@ -191,3 +191,21 @@ test('independently loaded custom plugin records into its scene for the host con
   assert.notEqual(recordedTracks(scene), items, 'subsequent renders own a fresh batch');
   drainRecordedTracks(scene);
 });
+
+test('zero-duration steps agree in live and compiled sampling at their boundary', () => {
+  function setup() {
+    const node = fakeNode({ x: 0, y: 0 });
+    const sink = [];
+    record(fakeSelection([node]), sink, timing()).attr('y', 100);
+    record(fakeSelection([node]), sink, timing({ delay: 50, duration: 0 })).attr('x', 10);
+    return { node, controller: createProgressController(sink) };
+  }
+  const live = setup(), compiled = setup();
+  const frame = compiled.controller.compile();
+  for (const progress of [0, 0.49, 0.5, 0.51, 1, 0.5, 0.49, 0]) {
+    live.controller.progress(progress);
+    frame.progress(progress);
+    assert.equal(x(live.node), x(compiled.node), `progress ${progress}`);
+    assert.equal(x(live.node), progress >= 0.5 ? 10 : 0);
+  }
+});

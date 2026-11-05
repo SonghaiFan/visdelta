@@ -21,8 +21,6 @@ export interface UnitLayoutOptions {
   x?: string | ChannelSpec;
   y?: string | ChannelSpec;
   columns?: number;
-  /** Compatibility alias for size(); prefer a separate size() call. */
-  radius?: number;
 }
 
 export interface UnitValueOptions {
@@ -77,11 +75,6 @@ export class UnitState extends ChartState<UnitViewState> {
     return this.replaceState('encoding', { ...this.state.encoding, size: { value: size } });
   }
 
-  /** Compatibility alias for size(). */
-  radius(value: number): this {
-    return this.size(value);
-  }
-
   override channel(name: string, field: string | ChannelSpec, options: Partial<ChannelSpec> = {}): this {
     return this.replaceState('encoding', { ...this.state.encoding, [name]: channelFrom(field, options) });
   }
@@ -100,11 +93,10 @@ export class UnitState extends ChartState<UnitViewState> {
       throw new Error(`Unit layout must be one of: ${UNIT_LAYOUTS.join(', ')}.`);
     }
     if (options.columns != null) assertPositiveInteger(options.columns, 'Unit columns');
-    if (options.radius != null && (!Number.isFinite(options.radius) || options.radius <= 0)) {
-      throw new Error('Unit radius must be a positive finite number.');
+    if (Object.keys(options).some(key => !['x', 'y', 'columns'].includes(key))) {
+      throw new Error('Unit layout options are x, y and columns. Declare mark size with .size(number).');
     }
     let chart: this = this;
-    if (options.radius !== undefined) chart = chart.size(options.radius);
     if (options.x !== undefined) chart = chart.x(options.x);
     if (options.y !== undefined) chart = chart.y(options.y);
     return withUnitAxis(chart, {

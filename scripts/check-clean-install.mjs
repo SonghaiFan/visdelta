@@ -6,8 +6,9 @@ import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-if (Number(process.versions.node.split('.')[0]) < 20) {
-  throw new Error('Release tooling requires Node 20+ (Playwright). Node 18 package consumption is checked separately with pack:check.');
+const [major,minor]=process.versions.node.split('.').map(Number);
+if (major < 22 || (major === 22 && minor < 18)) {
+  throw new Error('Release tooling requires Node 22.18+ (Playwright). Node 18 package consumption is checked separately with pack:check.');
 }
 const target = await mkdtemp(join(tmpdir(), 'visdelta-clean-release-'));
 const env = { ...process.env, CI: '1', npm_config_cache: join(tmpdir(), 'visdelta-npm-cache') };
@@ -31,7 +32,11 @@ try {
   console.log(`Clean candidate workspace: ${target} (Node ${process.version})`);
   await run(['ci', '--ignore-scripts', '--no-audit', '--no-fund']);
   await run(['run', 'release:check']);
-  console.log('Clean install, rebuild, browser and installed-consumer gates passed.');
+  await run(['run', 'studio:build']);
+  await run(['run', 'test:studio:server']);
+  env.SITE_TEST_PORT = env.VISDELTA_TEST_PORT;
+  await run(['run', 'test', '--workspace', 'website', '--', 'tests/mcp.spec.ts', 'tests/liveshow.spec.ts', 'tests/story-entry.spec.ts', 'tests/voice.spec.ts']);
+  console.log('Clean workspace install, library and Studio builds, browser and installed-consumer gates passed.');
 } finally {
   await rm(target, { recursive: true, force: true });
 }

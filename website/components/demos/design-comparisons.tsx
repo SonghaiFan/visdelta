@@ -14,7 +14,7 @@ interface ComparisonSide {
   detail?: string;
   compact?: boolean;
   height?: number;
-  charts?: { mark: ChartName; code: string }[];
+  charts?: { mark: ChartName; code: string; rows?: Rows }[];
 }
 interface Comparison {
   id: string;
@@ -72,7 +72,7 @@ export function DesignComparisons() {
     let height = item[side].height ?? (item[side].charts!.length > 1 ? 180 : 280);
     try {
       const [factory, { visualizationWarnings }] = await Promise.all([loadFactory(declaration.mark), import('visdelta')]);
-      const chart = await evaluateChart(declaration.code, { [declaration.mark]: factory }, item.rows, { withD3: false });
+      const chart = await evaluateChart(declaration.code, { [declaration.mark]: factory }, declaration.rows ?? item.rows, { withD3: false });
       const spec = chart.toSpec() as { encoding?: { facet?: { field: string } }; facetLayout?: { gap?: number; columns?: number; minWidth?: number } };
       if (spec.encoding?.facet) {
         const layout = spec.facetLayout ?? {};
@@ -260,7 +260,7 @@ export function DesignComparisons() {
                               <details>
                                 <summary className="cursor-pointer py-1 text-fd-muted-foreground">Data &amp; runnable code{panel}</summary>
                                 <div className="vd-code-surface overflow-hidden rounded-lg">
-                                  <CodeView code={`const rows = ${JSON.stringify(item.rows, null, 2)};\n\n${chart.code}`} lineNumbers={false} className="max-h-80 px-4" />
+                                  <CodeView code={`const rows = ${JSON.stringify(chart.rows ?? item.rows, null, 2)};\n\n${chart.code}`} lineNumbers={false} className="max-h-80 px-4" />
                                 </div>
                               </details>
                             </div>

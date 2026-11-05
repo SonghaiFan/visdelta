@@ -1,3 +1,4 @@
+import { chartError } from './edit-errors.js';
 import type { ViewSpec } from './types/index.js';
 import { validateTransforms } from './data/validate.js';
 import { normalizeFilter } from './data/filter.js';
@@ -33,7 +34,7 @@ function object(value: unknown, path: string): asserts value is Record<string, u
 export function assertSpecShape(value: unknown): asserts value is ViewSpec {
   object(value, '$');
   if (typeof value.mark !== 'string' || !value.mark.trim()) throw new Error('$.mark: expected a non-empty chart type.');
-  if (value.data !== undefined && typeof value.data !== 'string') {
+  if (value.data !== undefined) {
     const data = value.data;
     if (!Array.isArray(data)) object(data, '$.data');
     const rows = Array.isArray(data) ? data : data.values;
@@ -60,4 +61,22 @@ export function assertSpecShape(value: unknown): asserts value is ViewSpec {
   if (value.meta !== undefined) object(value.meta, '$.meta');
   if (value.transform !== undefined) validateTransforms(value.transform);
   if (value.filter !== undefined) normalizeFilter(value.filter);
+}
+
+
+/** Shared positional channel syntax; plugin-specific channels remain opaque. */
+export function assertPositionScaleShape(spec: ViewSpec): void {
+  for (const name of ['x', 'y'] as const) {
+    const scale: unknown = spec.encoding?.[name]?.scale;
+    if (scale === undefined) continue;
+    const path = `/encoding/${name}/scale`;
+    if (!scale || typeof scale !== 'object' || Array.isArray(scale)) {
+      throw chartError('INVALID_CHANNEL_SCALE', `${path} must be an object, for example {type:"log",base:10}.`,
+        `Declare domain directly at encoding.${name}.domain; scale is an object, not a string.`, {specPath:path});
+    }
+    if (Object.prototype.hasOwnProperty.call(scale, 'domain')) {
+      throw chartError('INVALID_CHANNEL_SCALE', `${path}/domain is unsupported and would be ignored.`,
+        `Move domain to encoding.${name}.domain; retain supported type/base options inside scale.`, {specPath:`${path}/domain`});
+    }
+  }
 }

@@ -115,7 +115,6 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
   const transforms = (spec.transform ?? []) as Array<Record<string, unknown>>;
   const selection = sceneState.selection ?? stateFields.selection ?? spec.selection ?? null;
   const scopes = specScopes(spec);
-  const selectionMode = selection?.mode;
 
   const state: SemanticViewState = {
     mark: spec.mark ?? null,
@@ -127,7 +126,7 @@ function toSemanticState(spec: ViewSpec): SemanticViewState {
       ...transforms.filter((t) => t.filter).map((t) => t.filter as FilterSpec)
     ],
     nonFilterTransforms: transforms.filter((t) => !t.filter),
-    selection: selectionMode === 'focus' || selectionMode === 'highlight' ? null : selection,
+    selection,
     scopes,
     axis: sceneState.axis ?? stateFields.axis ?? null,
     detail: (sceneState.detail ?? stateFields.detail ?? null) as DetailSpec | null

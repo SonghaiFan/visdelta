@@ -21,7 +21,7 @@ export const plugin: ChartPlugin<AreaViewState> = defineChartType<AreaViewState>
   declarationPlanning: true,
   declarationPlanningOrder: 'before-chart',
   transitionEvaluation: 'cached',
-  scenes: ['selection', 'axis', 'detail', 'mapping'],
+  scenes: ['axis', 'detail', 'mapping'],
   presentation: areaPresentation,
   layoutChannels: areaLayoutChannels,
   createRenderer: createAreaRenderer,

@@ -155,8 +155,8 @@ export async function transitionWithModules(
   }
   const controller: TimedVisualizationTransition = {
     // Expose copies: caller inspection cannot change the rendered endpoints.
-    from: cloneState(source),
-    to: cloneState(target),
+    get from() { return cloneState(resolvedFrom); },
+    get to() { return cloneState(resolvedTo); },
     delta: transitionDelta,
     view: surface.view,
     get value() { return value; },

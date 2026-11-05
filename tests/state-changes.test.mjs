@@ -121,67 +121,13 @@ test('grain topology and reducer changes are both reported for one endpoint pair
   ]);
 });
 
-test('legacy focus and highlight selectors normalize to attention changes', () => {
-  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
-  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
-  const focused = { ...baseSpec, selection: { mode: 'focus', field: 'group', equal: 'one' } };
-  const highlighted = { ...baseSpec, selection: { mode: 'highlight', field: 'group', equal: 'one' } };
-  assert.deepEqual(summary(delta(baseSpec, focused).stateChanges), [
-    { category: 'attention', action: 'enter', target: 'focus' }
-  ]);
-  assert.deepEqual(summary(delta(baseSpec, highlighted).stateChanges), [
-    { category: 'attention', action: 'enter', target: 'highlight' }
-  ]);
-});
-
-test('legacy focus and highlight fields do not mask one another during normalization', () => {
-  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
-  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
-  const legacy = (focus, highlight) => ({
-    ...baseSpec,
-    meta: { state: {
-      selection: { mode: 'focus', field: 'group', equal: focus },
-      sceneState: { selection: { mode: 'highlight', field: 'group', equal: highlight } }
-    } }
-  });
-
-  const from = legacy('one', 'one');
-  const to = legacy('two', 'one');
-  assert.deepEqual(viewSelection(from), from.meta.state.selection);
-  assert.deepEqual(viewHighlight(from), from.meta.state.sceneState.selection);
-  assert.deepEqual(viewSelection(to), to.meta.state.selection);
-  assert.deepEqual(viewHighlight(to), to.meta.state.sceneState.selection);
-  assert.deepEqual(summary(delta(from, to).stateChanges), [
-    { category: 'attention', action: 'shift', target: 'focus' }
-  ]);
-
-  const swappedLegacy = (focus, highlight) => ({
-    ...baseSpec,
-    meta: { state: {
-      selection: { mode: 'highlight', field: 'group', equal: highlight },
-      sceneState: { selection: { mode: 'focus', field: 'group', equal: focus } }
-    } }
-  });
-  assert.deepEqual(summary(delta(swappedLegacy('one', 'one'), swappedLegacy('one', 'two')).stateChanges), [
-    { category: 'attention', action: 'shift', target: 'highlight' }
-  ]);
-});
-
-test('explicit attention scopes take precedence over legacy selection fields', () => {
-  const data = { values: [{ id: 'a', group: 'one', value: 1 }] };
-  const baseSpec = { mark: 'point', data, key: 'id', encoding: { x: { field: 'id' }, y: { field: 'value' } } };
-  const explicit = (scope, legacy) => ({
-    ...baseSpec,
-    meta: { state: {
-      scopes: { focus: { mode: 'focus', field: 'group', equal: scope } },
-      selection: { mode: 'focus', field: 'group', equal: legacy }
-    } }
-  });
-
-  assert.deepEqual(summary(delta(explicit('one', 'legacy-a'), explicit('two', 'legacy-b')).stateChanges), [
-    { category: 'attention', action: 'shift', target: 'focus' }
-  ]);
-  assert.deepEqual(summary(delta(explicit('one', 'legacy-a'), explicit('one', 'legacy-b')).stateChanges), []);
+test('canonical focus and highlight scopes remain independent',()=>{
+  const spec=(focus,highlight)=>({mark:'point',data:{values:[{id:'a',group:'one',value:1}]},key:'id',encoding:{x:{field:'id'},y:{field:'value'}},meta:{state:{scopes:{focus:{mode:'focus',filters:[{field:'group',equal:focus}]},highlight:{mode:'highlight',filters:[{field:'group',equal:highlight}]}}}}});
+  const from=spec('one','one'),to=spec('two','one');
+  assert.deepEqual(viewSelection(from),from.meta.state.scopes.focus);
+  assert.deepEqual(viewHighlight(from),from.meta.state.scopes.highlight);
+  assert.deepEqual(summary(delta(from,to).stateChanges),[{category:'attention',action:'shift',target:'focus'}]);
+  assert.deepEqual(summary(delta(from,spec('one','two')).stateChanges),[{category:'attention',action:'shift',target:'highlight'}]);
 });
 
 test('axis swaps still report scale changes against the destination channels', () => {
@@ -189,15 +135,15 @@ test('axis swaps still report scale changes against the destination channels', (
   const source = {
     mark: 'point', data, key: 'id',
     encoding: {
-      x: { field: 'x', type: 'quantitative', scale: { domain: [0, 1] } },
-      y: { field: 'y', type: 'quantitative', scale: { domain: [0, 2] } }
+      x: { field: 'x', type: 'quantitative', domain: [0, 1] },
+      y: { field: 'y', type: 'quantitative', domain: [0, 2] }
     }
   };
   const target = {
     ...source,
     encoding: {
-      x: { field: 'y', type: 'quantitative', scale: { domain: [0, 3] } },
-      y: { field: 'x', type: 'quantitative', scale: { domain: [0, 4] } }
+      x: { field: 'y', type: 'quantitative', domain: [0, 3] },
+      y: { field: 'x', type: 'quantitative', domain: [0, 4] }
     }
   };
   assert.deepEqual(summary(delta(source, target).stateChanges), [

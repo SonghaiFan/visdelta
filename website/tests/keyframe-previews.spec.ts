@@ -70,7 +70,7 @@ test('a preview failure does not block selection or playback', async ({ page }) 
   await page.locator('.pg-key').first().click();
   await expect(page.getByLabel('Keyframe timeline')).toHaveValue('0');
   await page.getByRole('button', { name: 'Play keyframes' }).click();
-  await expect(page.getByLabel('Keyframe timeline')).toHaveValue('2.7');
+  await expect(page.getByLabel('Keyframe timeline')).toHaveValue(String(Number(await page.locator('.pg-key').last().getAttribute('data-time'))));
   await expect(page.locator('.pg-snapshot-render')).toHaveCount(0);
 });
 

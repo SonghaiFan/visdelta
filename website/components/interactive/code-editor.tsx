@@ -141,6 +141,7 @@ export function CodeEditor({
         mode === 'javascript'
           ? [closeBrackets(), language.bracketMatching(), language.indentOnInput(), javascript(), autocompletion({ override: [complete], icons: false })]
           : [];
+      if (destroyed || !hostRef.current) return;
       const gutters = lineNumbers ? [gutter(), highlightActiveLineGutter(), highlightActiveLine()] : [];
       const view = new View({
         doc: initialValue.current,
@@ -171,6 +172,9 @@ export function CodeEditor({
           ])),
           language.syntaxHighlighting(
             language.HighlightStyle.define([
+              { tag: tags.heading, fontWeight: '600', color: 'var(--code-keyword)' },
+              { tag: tags.strong, fontWeight: '700' },
+              { tag: tags.emphasis, fontStyle: 'italic' },
               { tag: tags.keyword, color: 'var(--code-keyword)' },
               { tag: [tags.string, tags.regexp], color: 'var(--code-string)' },
               { tag: [tags.number, tags.bool, tags.null], color: 'var(--code-number)' },

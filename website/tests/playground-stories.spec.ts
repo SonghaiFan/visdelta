@@ -133,3 +133,58 @@ test('scrubbing changes chart code at keyframes rather than leg midpoints', asyn
     await expect.poll(async () => (await lines.allTextContents()).join('\n'), { message: `code at ${time}s` }).toBe(frames[reached]);
   }
 });
+
+test('Liveshow stack preserves four segments through horizontal and vertical keyframes', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const demo = playgroundDemos.find(demo => demo.id === 'liveshow-stacked')!;
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 860 });
+    await page.goto('playground/#liveshow-stacked');
+    await expect(page.locator('.pg-key')).toHaveCount(3, { timeout: 30_000 });
+    await expect.poll(async () => (await page.getByLabel('Chart code').locator('.cm-line').allTextContents()).join('\n')).toBe(storyFrames(demo).at(-1));
+    const bars = page.locator('.pg-layer[data-state="shown"] .vd-bar');
+    const times = await page.locator('.pg-key').evaluateAll(keys => keys.map(key => Number((key as HTMLElement).dataset.time)));
+    const frames = [];
+    for (const index of [0, 1, 2]) {
+      await page.getByLabel('Keyframe timeline').fill(String(times[index]));
+      await expect.poll(async () => (await page.getByLabel('Chart code').locator('.cm-line').allTextContents()).join('\n')).toBe(storyFrames(demo)[index]);
+      await expect(bars).toHaveCount(4);
+      await expect.poll(() => bars.evaluateAll(nodes => nodes.every(node => { const box = node.getBoundingClientRect(); return box.width > 0 && box.height > 0; }))).toBe(true);
+      const axis = index === 1 ? 'x' : 'y';
+      await expect.poll(() => bars.evaluateAll((nodes, axis: "x" | "y") => {
+        const positions = nodes.map(node => node.getBoundingClientRect()[axis]);
+        return Math.max(...positions) - Math.min(...positions);
+      }, axis)).toBeLessThan(1);
+      const frame = await bars.evaluateAll(nodes => nodes.map(node => {
+        const bounds = node.getBoundingClientRect();
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height, fill: getComputedStyle(node).fill };
+      }));
+      expect(frame.every(mark => mark.width > 0 && mark.height > 0)).toBe(true);
+      expect(new Set(frame.map(mark => mark.fill)).size).toBe(4);
+      expect(Math.max(...frame.map(mark => mark[axis])) - Math.min(...frame.map(mark => mark[axis]))).toBeLessThan(1);
+      frames.push(frame);
+    }
+    expect(frames[2]).toEqual(frames[0]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+  }
+});
+
+
+test('flip scrubbing clears outgoing axis ticks near each keyframe', async ({ page }) => {
+  await page.goto('playground/#liveshow-stacked');
+  await expect(page.locator('.pg-key')).toHaveCount(3);
+  const timeline = page.getByLabel('Keyframe timeline');
+  await expect(timeline).toHaveValue('1.8');
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 850 });
+    for (const time of ['0.45', '0.89', '0.9', '0.91', '1.35', '1.79', '1.8', '0.89', '0']) {
+      await timeline.fill(time);
+      const ghosts = page.locator('.pg-layer[data-state="shown"] .vd-axis-ghost');
+      await expect.poll(() => ghosts.count()).toBeLessThanOrEqual(2);
+      if (['0.89', '1.79'].includes(time)) {
+        await expect.poll(() => ghosts.evaluateAll(nodes => Math.max(0, ...nodes.map(node => Number(getComputedStyle(node).opacity))))).toBeLessThan(0.01);
+      }
+      if (['0', '0.9', '1.8'].includes(time)) await expect(ghosts).toHaveCount(0);
+    }
+  }
+});

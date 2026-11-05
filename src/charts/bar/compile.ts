@@ -1,3 +1,4 @@
+import { cloneState } from '../../grammar/view-state.js';
 import type { BarOrientation, ChannelSpec, SemanticKey, SemanticKeyPart, SpecCompiler, ViewSpec } from '../../types/index.js';
 import {
   specObjectKey,
@@ -8,23 +9,17 @@ import {
   barOffsetChannelName,
   barOrientationFromEncoding
 } from './layout/index.js';
-import { barSegmentField } from './semantic.js';
-import { channelFromField, cloneEncoding, compileFilter, compileFocus, compileHighlight, identitySpec, resolveAxisOrder, withObject, withSceneState } from '../../charts/compiler-utils.js';
+import { barLayoutState, barSegmentField } from './semantic.js';
+import { channelFromField, cloneEncoding, identitySpec, resolveAxisOrder, withObject, withSceneState } from '../../charts/compiler-utils.js';
 
 type AnyRecord = Record<string, unknown>;
 type Encoding = Record<string, ChannelSpec>;
 
 export function createBarSpecCompiler(_context: AnyRecord = {}): SpecCompiler {
   return {
-    stateOrder: ["selection","detail","axis"],
+    stateOrder: ["detail","axis"],
     base: compileBarBase,
     operations: {
-      selection: (spec, value) => {
-        const mode = value?.mode ?? 'filter';
-        const handler = { filter: compileFilter, focus: compileFocus, highlight: compileHighlight }[mode as 'filter' | 'focus' | 'highlight'];
-        if (!handler) throw new Error(`Unsupported selection mode: ${mode}`);
-        return handler(spec, value);
-      },
       axis: compileBarCoordinate,
       detail: compileBarAggregate
     }
@@ -38,6 +33,13 @@ function compileBarBase(spec: ViewSpec, _context: AnyRecord = {}): ViewSpec {
 function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context: AnyRecord = {}): ViewSpec {
   let workingSpec = spec;
   const layout = (axisSpec['layout'] as string) || null;
+  const stateBefore = specState(spec);
+  const stack = axisSpec['stack'] !== undefined ? axisSpec['stack'] : stateBefore.sceneState?.detail?.offset ?? stateBefore.detail?.offset;
+  const distribution = stack !== undefined ? { offset: stack } : {};
+  if (axisSpec['stack'] !== undefined) {
+    workingSpec = cloneState(spec);
+    if (workingSpec.meta?.state?.sceneState?.detail) delete workingSpec.meta.state.sceneState.detail.offset;
+  }
   const flipsOrientation = Boolean(axisSpec['flip']);
 
   if (axisSpec['layout']) {
@@ -53,7 +55,7 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
       encoding: encodingWithBarLayout(workingSpec.encoding as Encoding, layout, segmentField, orientation) as ViewSpec['encoding']
     }, {
       axis: { layout, ...resolveAxisOrder(axisSpec, orientation) },
-      ...(segmentField ? { detail: { ...(detail as AnyRecord), layout } } : {})
+      ...(segmentField ? { detail: { ...(detail as AnyRecord), layout, ...distribution } } : {})
     });
 
     if (!flipsOrientation && !axisSpec['scale']) return workingSpec;
@@ -75,15 +77,9 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
     encoding['y'] = { ...measure, ...((axisSpec['scale'] as AnyRecord | undefined) ? { domain: (axisSpec['scale'] as AnyRecord)['domain'] as unknown[] } : {}) };
   }
 
-  const state = specState(workingSpec);
-  const stateRecord = state as unknown as AnyRecord;
-  const resolvedLayout =
-    layout ||
-    (stateRecord['sceneState'] as AnyRecord | undefined)?.['detail'] as AnyRecord | undefined && ((stateRecord['sceneState'] as AnyRecord)['detail'] as AnyRecord)?.['layout'] ||
-    (stateRecord['detail'] as AnyRecord | undefined)?.['layout'] ||
-    (stateRecord['sceneState'] as AnyRecord | undefined)?.['axis'] as AnyRecord | undefined && ((stateRecord['sceneState'] as AnyRecord)['axis'] as AnyRecord)?.['layout'] ||
-    (stateRecord['axis'] as AnyRecord | undefined)?.['layout'] ||
-    null;
+  // Serialized declarations may express grouping solely through the offset.
+  // Use the same layout interpretation as rendering before moving that offset.
+  const resolvedLayout = layout || barLayoutState(workingSpec);
 
   encoding = encodingWithBarLayout(encoding, resolvedLayout as string | null, barSegmentField(workingSpec), orientation) as Encoding;
 
@@ -97,6 +93,7 @@ function compileBarCoordinate(spec: ViewSpec, axisSpec: AnyRecord = {}, _context
   }, {
     key: (axisSpec['key'] as string) || specObjectKey(workingSpec) as string || (category as ChannelSpec).field || ''
   }), {
+    ...(stack !== undefined ? { detail: { ...(specState(workingSpec).sceneState?.detail ?? {}), ...distribution } } : {}),
     axis: {
       ...(resolvedLayout ? { layout: resolvedLayout } : {}),
       orientation,
@@ -151,6 +148,7 @@ function compileBarAggregate(spec: ViewSpec, detailSpec: AnyRecord = {}, _contex
       ...channelFromField(valueField, (detailSpec['valueTitle'] as string) || (encoding['y'] as ChannelSpec)?.label || null, 'quantitative'),
       // Aggregation reconstructs field bindings, not independently authored bounds.
       ...(encoding['y']?.domain ? { domain: [...encoding['y'].domain] } : {}),
+      ...(encoding['y']?.scale ? { scale: { ...encoding['y'].scale } } : {}),
       ...((encoding['y'] as ChannelSpec)?.format
         ? { format: (encoding['y'] as ChannelSpec).format }
         : {})
@@ -249,7 +247,7 @@ export function semanticKeyFromEncoding(encoding: Encoding, previousSemanticKey:
   const meas = measureChannel(encoding);
   if (!cat?.field || !meas?.field) return previousSemanticKey;
   return semanticKeyFromParts(
-    previousSemanticKey?.entity || previousSemanticKey?.entities || { field: cat.field },
+    previousSemanticKey?.entity || { field: cat.field },
     { value: meas.field }
   );
 }

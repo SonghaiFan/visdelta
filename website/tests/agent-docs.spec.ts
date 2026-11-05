@@ -1,25 +1,26 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-const guide = () => readFile(new URL('../../llms.txt', import.meta.url), 'utf8');
-
-test('both agent endpoints start with the tested repository quick start', async ({ request }) => {
-  const source = await guide();
-  for (const path of ['llms.txt', 'llms-full.txt']) {
-    const response = await request.get(path);
-    expect(response.ok()).toBe(true);
-    const text = await response.text();
-    expect(text.startsWith(source)).toBe(true);
-    expect(text).toContain('Automatic behaviors');
-    expect(text).toContain('Copy a scroll story');
-    if (path === 'llms-full.txt') expect(text).toContain('Tick spacing is part of the chart style');
-  }
+test('agent endpoints index and render the canonical documentation source', async ({ request }) => {
+  const index=await request.get('llms.txt');
+  expect(index.ok()).toBe(true);
+  expect(await index.text()).toContain('Start here for agents');
+  const full=await request.get('llms-full.txt');
+  const text=await full.text();
+  expect(full.ok()).toBe(true);
+  const source=await readFile(new URL('../content/docs/guides/agent-workflow.mdx',import.meta.url),'utf8');
+  const html=source.match(/```html\n([\s\S]*?)```/)![1];
+  expect(text).toContain(html.trim());
+  expect(text.match(/# Start here for agents/g)).toHaveLength(1);
+  expect(text).toContain('Tick spacing is part of the chart style');
 });
 
-test('the exported scroll template is the canonical single file, without rewrites', async ({ request }) => {
-  const response = await request.get('templates/scroll-story.html');
+test('the exported website uses the canonical source with local runtime assets', async ({ request }) => {
+  const response = await request.get('story/examples/network/index.html');
   expect(response.ok()).toBe(true);
-  expect(await response.text()).toBe(await readFile(new URL('../../examples/templates/scroll-story.html', import.meta.url), 'utf8'));
+  const source=await readFile(new URL('../../examples/story/network/index.html',import.meta.url),'utf8');
+  expect(await response.text()).toBe(source.replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/visdelta@[^/]+\/dist\/visdelta\.css/g,'./visdelta.css').replace(/https:\/\/cdn\.jsdelivr\.net\/npm\/visdelta@[^/]+\/\+esm/g,'./visdelta.js'));
+  expect((await request.get('story/examples/network/visdelta.js')).ok()).toBe(true);
 });
 
 for (const width of [1280, 390]) {
@@ -29,16 +30,9 @@ for (const width of [1280, 390]) {
       if (response.status() >= 400 && new URL(response.url()).origin === new URL(baseURL!).origin) resourceErrors.push(response.url());
     });
     await page.setViewportSize({ width, height: 840 });
-    for (const slug of ['agent-workflow', 'automatic-behaviors', 'mdx', 'scroll-template']) {
+    for (const slug of ['agent-workflow', 'automatic-behaviors', 'story', 'scroll-template']) {
       await page.goto(`docs/guides/${slug}/`);
       await expect(page.locator('h1').first()).toBeVisible();
-      if (slug === 'mdx') {
-        const content = await page.locator('main').innerText();
-        expect(content).toContain('<Step chart={chart}>');
-        expect(content).toContain("chart.highlight({ region: 'North' })");
-        expect(content).toContain('<Scrolly chartStyle="paper">');
-        expect(content).not.toContain('<Scrolly states=');
-      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
       const origin = new URL(page.url()).origin;
       const links = await page.locator('main a[href]').evaluateAll(nodes => nodes.map(n => (n as HTMLAnchorElement).href));
@@ -48,12 +42,12 @@ for (const width of [1280, 390]) {
         expect((await request.get(`${url.pathname}${url.search}`)).ok(), href).toBe(true);
       }
     }
-    const template = page.locator('a[href$="/templates/scroll-story.html"]').first();
+    const template = page.locator('a[href$="/story/examples/network/index.html"]').first();
     await expect(template).toBeVisible();
     const base = new URL(page.url()).pathname.split('/docs/')[0];
-    await expect(template).toHaveAttribute('href', `${base}/templates/scroll-story.html`);
+    await expect(template).toHaveAttribute('href', `${base}/story/examples/network/index.html`);
     await template.click();
-    await expect(page).toHaveURL(/\/templates\/scroll-story\.html$/);
+    await expect(page).toHaveURL(/\/story\/examples\/network\/index\.html$/);
     await expect(page.getByRole('heading', { name: 'One route becomes a network' })).toBeVisible();
     expect(resourceErrors).toEqual([]);
   });
