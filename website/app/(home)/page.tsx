@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { CodePipeline } from '@/components/home/code-pipeline';
 import { ScrollStory } from '@/components/home/scroll-story';
-import { libraryVersion, repositoryUrl, siteUrl } from '@/lib/shared';
+import { basePath, libraryVersion, repositoryUrl, siteUrl } from '@/lib/shared';
 
 export const metadata: Metadata = {
   alternates: { canonical: `${siteUrl}/` },
@@ -85,6 +85,16 @@ export default function HomePage() {
           GitHub
         </a>
         <span className="ml-auto font-mono text-xs text-fd-muted-foreground">v{libraryVersion} · MIT</span>
+        {/* Frank's signature as a sign-off; a mask so it takes the muted text colour in light and dark themes. */}
+        <span
+          role="img"
+          aria-label="Frank"
+          className="block h-5 w-12 self-center bg-fd-muted-foreground"
+          style={{
+            mask: `url(${basePath}/frank-signature.svg) center / contain no-repeat`,
+            WebkitMask: `url(${basePath}/frank-signature.svg) center / contain no-repeat`,
+          }}
+        />
       </footer>
     </main>
   );

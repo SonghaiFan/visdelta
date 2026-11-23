@@ -1,15 +1,18 @@
 import type { SVGProps } from 'react';
 
-/** The VisDelta mark: circle, triangle and their overlap, in the brand palette. */
+/**
+ * The VisDelta mark: state A (circle) and state B (triangle) overlap; their difference Δ is cut apart in amber.
+ * This is the 16-px cut (1-px gaps), cropped to its ink, because the site shows the mark at 16 px.
+ * Masters and the full kit: output/brand-kit (source/vdkit.py).
+ */
 export function Logo(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 640 380" fill="none" aria-hidden="true" {...props}>
-      <circle cx="302.5" cy="162.5" r="162.5" fill="#4269D0" />
-      <path d="M460 33L615.885 325.5H304.115L460 33Z" fill="#FF725C" />
-      <path
-        d="M438.444 73.4453C455.233 99.0217 465 129.62 465 162.5C465 251.616 393.265 323.975 304.389 324.987L438.444 73.4453Z"
-        fill="#EFB118"
-      />
+    <svg viewBox="12 44 232 167" fill="none" aria-hidden="true" {...props}>
+      <g transform="translate(147.75 210.35) scale(1.09)">
+        <path fill="#4269d0" d="M-16.5 -138.47A68 68 0 1 0 -84.17 -21.26Z" />
+        <path fill="#ff725c" d="M0 -152.42L88 0L-88 0L-81 -12.12A75.31 75.31 0 0 0 -7 -140.3Z" />
+        <path fill="#efb118" d="M-9.26 -121.76A60.69 60.69 0 0 1 -66.07 -23.35Z" />
+      </g>
     </svg>
   );
 }

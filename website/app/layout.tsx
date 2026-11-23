@@ -13,7 +13,13 @@ export const metadata: Metadata = {
   },
   description: appDescription,
   applicationName: appName,
-  icons: { icon: `${basePath}/visdelta-logo.svg` },
+  icons: {
+    icon: [
+      { url: `${basePath}/visdelta-logo.svg`, type: 'image/svg+xml' },
+      { url: `${basePath}/favicon.ico`, sizes: '48x48' },
+    ],
+    apple: `${basePath}/apple-touch-icon.png`,
+  },
   openGraph: {
     type: 'website',
     siteName: appName,
