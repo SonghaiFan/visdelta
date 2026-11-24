@@ -2,6 +2,11 @@ import { test, expect } from '@playwright/test';
 
 for (const width of [1280, 390]) test(`the first story animation follows its real clock on a fixed leg at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 860 });
+  // Reproduce slow CI frames without changing the timing tolerance.
+  if (process.env.VISDELTA_TEST_CPU_RATE) {
+    const session = await page.context().newCDPSession(page);
+    await session.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.VISDELTA_TEST_CPU_RATE) });
+  }
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('playground/#split');
@@ -11,12 +16,17 @@ for (const width of [1280, 390]) test(`the first story animation follows its rea
     const samples = [];
     const started = performance.now();
     while (performance.now() - started < 650) {
-      await new Promise(requestAnimationFrame);
+      // Let React commit this frame's playhead before reading its geometry.
+      const frameTime = await new Promise<number>(resolve => {
+        requestAnimationFrame(time => setTimeout(() => resolve(time), 0));
+      });
       const input = document.querySelector<HTMLInputElement>('[aria-label="Keyframe timeline"]')!;
       const track = document.querySelector('.pg-track')!.getBoundingClientRect();
       const head = document.querySelector('.pg-head')!.getBoundingClientRect();
       samples.push({
-        time: performance.now(), value: input.valueAsNumber, total: Number(input.max),
+        // Use the same frame clock as playback. Geometry reads above can force
+        // a slow layout; their cost must not become elapsed animation time.
+        time: frameTime, value: input.valueAsNumber, total: Number(input.max),
         clips: [...document.querySelectorAll('.pg-clip')].map(clip => clip.getBoundingClientRect().width),
         x: head.left + head.width / 2 - track.left, width: track.width,
         marks: [...document.querySelectorAll('.pg-stage .vd-bar')].map(mark => ['x', 'y', 'width', 'height', 'transform', 'fill', 'style'].map(name => mark.getAttribute(name)).join(',')).join(';'),
