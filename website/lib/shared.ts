@@ -7,7 +7,7 @@ export const appDescription =
 
 /** Deployed origin plus base path, used for canonical URLs and the sitemap. */
 export const siteUrl = (
-  process.env.SITE_URL ?? 'https://songhaifan.github.io/visdelta'
+  process.env.SITE_URL ?? 'https://visdelta.songhai.site'
 ).replace(/\/$/, '');
 
 /** Next.js applies this automatically to links; raw asset URLs need it too. */

@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/SonghaiFan/visdelta/issues"
   },
-  "homepage": "https://songhaifan.github.io/visdelta/",
+  "homepage": "https://visdelta.songhai.site/",
   "main": "./dist/visdelta.esm.js",
   "module": "./dist/visdelta.esm.js",
   "types": "./dist/index.d.ts",

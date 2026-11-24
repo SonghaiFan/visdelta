@@ -18,9 +18,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # The site is served from https://songhaifan.github.io/visdelta/.
-      DOCS_BASE_PATH: /visdelta
-      SITE_URL: https://songhaifan.github.io/visdelta
+      # The site is served from https://visdelta.songhai.site/.
+      DOCS_BASE_PATH: ''
+      SITE_URL: https://visdelta.songhai.site
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
