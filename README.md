@@ -1,7 +1,22 @@
-# VisDelta
+<h1 align="center">
+  <a href="https://visdelta.songhai.site">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/brand/lockup-dark.svg" />
+      <img src=".github/brand/lockup-light.svg" width="260" alt="VisDelta" />
+    </picture>
+  </a>
+</h1>
 
-Declare chart states. VisDelta tracks their objects and renders a transition you
-can play, reverse or scrub.
+<p align="center"><b>Declare chart states. VisDelta tracks their objects and renders a transition you can play, reverse or scrub.</b></p>
+
+<p align="center">
+  <a href="https://visdelta.songhai.site">Website</a> ·
+  <a href="https://visdelta.songhai.site/docs/quick-start/">Quick start</a> ·
+  <a href="https://visdelta.songhai.site/docs/api/">API</a> ·
+  <a href="https://visdelta.songhai.site/docs/guides/agent-workflow/">Agent guide</a>
+</p>
+
+![A VisDelta transition between two chart states.](website/public/demo.gif)
 
 ```sh
 npm install visdelta
@@ -28,10 +43,6 @@ controls and intent. VisDelta owns chart declarations, identity, validation,
 rendering and transitions. Import a selected chart from `visdelta/bar`,
 `visdelta/line`, `visdelta/area`, `visdelta/point`, `visdelta/pie` or `visdelta/unit`
 when you want only that module.
-
-[Quick start](https://visdelta.songhai.site/docs/quick-start/) ·
-[API](https://visdelta.songhai.site/docs/api/) ·
-[Agent guide](https://visdelta.songhai.site/docs/guides/agent-workflow/)
 
 ## Studio
 
@@ -82,3 +93,23 @@ npm run test:studio         # MCP/AI server and Studio browser contracts
 ```
 
 VisDelta is MIT licensed.
+
+<br />
+
+<p align="center">
+  <a href="https://syuze.songhai.site"><img src=".github/brand/series/syuze.svg" width="32" height="32" alt="syuze 叙仄" title="syuze 叙仄" /></a>&nbsp;
+  <a href="https://news-metro.songhai.site"><img src=".github/brand/series/news-metro.svg" width="32" height="32" alt="News Metro" title="News Metro" /></a>&nbsp;
+  <a href="https://narrative-graph.songhai.site"><img src=".github/brand/series/ttng.svg" width="32" height="32" alt="ttng" title="ttng" /></a>&nbsp;
+  <a href="https://visdelta.songhai.site"><img src=".github/brand/series/visdelta.svg" width="32" height="32" alt="VisDelta" title="VisDelta" /></a>&nbsp;
+  <a href="https://cytocausal.songhai.site"><img src=".github/brand/series/cytocausal.svg" width="32" height="32" alt="cytocausal" title="cytocausal" /></a>&nbsp;
+  <a href="https://aethel.songhai.site"><img src=".github/brand/series/aethel.svg" width="32" height="32" alt="Aethel" title="Aethel" /></a>
+</p>
+
+<p align="center"><sub>VisDelta is part of the Frank series.</sub></p>
+
+<p align="right">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/brand/frank-signature-dark.svg" />
+    <img src=".github/brand/frank-signature-light.svg" width="72" alt="Frank" />
+  </picture>
+</p>
