@@ -29,9 +29,9 @@ rendering and transitions. Import a selected chart from `visdelta/bar`,
 `visdelta/line`, `visdelta/area`, `visdelta/point`, `visdelta/pie` or `visdelta/unit`
 when you want only that module.
 
-[Quick start](https://songhaifan.github.io/visdelta/docs/quick-start/) ·
-[API](https://songhaifan.github.io/visdelta/docs/api/) ·
-[Agent guide](https://songhaifan.github.io/visdelta/docs/guides/agent-workflow/)
+[Quick start](https://visdelta.songhai.site/docs/quick-start/) ·
+[API](https://visdelta.songhai.site/docs/api/) ·
+[Agent guide](https://visdelta.songhai.site/docs/guides/agent-workflow/)
 
 ## Studio
 
