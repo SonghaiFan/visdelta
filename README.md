@@ -13,7 +13,8 @@
   <a href="https://visdelta.songhai.site">Website</a> ·
   <a href="https://visdelta.songhai.site/docs/quick-start/">Quick start</a> ·
   <a href="https://visdelta.songhai.site/docs/api/">API</a> ·
-  <a href="https://visdelta.songhai.site/docs/guides/agent-workflow/">Agent guide</a>
+  <a href="https://visdelta.songhai.site/docs/guides/agent-workflow/">Agent guide</a> ·
+  <a href="README.zh-CN.md">中文</a>
 </p>
 
 ![A VisDelta transition between two chart states.](website/public/demo.gif)
