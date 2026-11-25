@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "VisDelta explicit color channel authoring subset",
-  "description": "Tool authoring subset for encoding.color, checked against the 0.4.2 checkout. Not a complete ViewSpec schema or chart/data validator. Do not combine value and field. Built-in edit adapters accept one string or explicit channel object; this schema describes the object subset.",
+  "description": "Tool authoring subset for encoding.color, checked against the 0.5.0 checkout. Not a complete ViewSpec schema or chart/data validator. Do not combine value and field. Built-in edit adapters accept one string or explicit channel object; this schema describes the object subset.",
   "oneOf": [
     {
       "type": "object",

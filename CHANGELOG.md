@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-26
+
+### Upgrade from 0.4.x
+
+- Replace Point `.radius()` with `.pointSize()`; replace Unit radius aliases
+  with `.size()`.
+- For segmented bars, reshape the input to tidy rows and replace `.segment()`
+  with `.breakdown(field)`.
+- Move chart titles and subtitles into the surrounding HTML. Existing legend
+  and axis-label options still work.
+- Update legacy JSON to use explicit data bindings and singular semantic-key
+  roles. Remove legacy attention aliases.
+
+### Changes
+
 - Unify Gallery, Playground, Story and Liveshow in Studio with one workspace,
   startup command and documentation source. Generate offline package docs from
   the website MDX. Replace the Story editor/parser with ordinary website examples

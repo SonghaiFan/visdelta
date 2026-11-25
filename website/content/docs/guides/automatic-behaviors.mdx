@@ -1,9 +1,9 @@
 ---
 title: Automatic behaviors
-description: What VisDelta derives automatically, what affects it and which controls exist in 0.4.2.
+description: What VisDelta derives automatically, what affects it and which controls exist in 0.5.0.
 ---
 
-This table describes **implemented behavior in 0.4.2**. “No switch” means that
+This table describes **implemented behavior in 0.5.0**. “No switch” means that
 an option is unavailable, not that an agent should try an undocumented spelling.
 A declaration (`toSpec()`) is not a resolved layout; actual ticks and geometry
 also depend on chart type, dimensions, margins, theme and sometimes fonts.
@@ -13,7 +13,7 @@ also depend on chart type, dimensions, margins, theme and sometimes fonts.
 | Field types | Missing channel types are inferred from bound data. Authored types take priority. | Set `type` on the channel. Validate the actual values; inference does not clean data. |
 | Line position domains | Inferred x/y domains fit visible transformed observations. Lineage remains available for gaps, category colors and legends. Repeated panels with shared scales retain their shared domain. | Declare a channel `domain: [min, max]` for fixed bounds; there is no `'filtered'` / `'source'` domain mode. |
 | Other position domains | Bar's category axis follows displayed categories; its measure domain uses lineage values and includes the baseline unless overridden. Area retains lineage-derived stack/position domains. Point uses its plotted/view rows, or a shared panel domain. Unit domains depend on its layout. | Read each [chart's contract](/docs/charts). Do not generalize Line's filter behavior to every chart. |
-| Rounding inferred domains | The numeric linear/sqrt/log and temporal scale helpers apply D3 `nice()` to inferred domains. The log helper uses 1 as its default lower bound before rounding; declare valid positive bounds when that is not the intended range. | Explicit supported position bounds are preserved, including Bar measure domains. The current log guard clamps positive bounds below 0.1; exact sub-0.1 log domains are unsupported in 0.4.2. `scale: { nice: false }` is not a supported switch. |
+| Rounding inferred domains | The numeric linear/sqrt/log and temporal scale helpers apply D3 `nice()` to inferred domains. The log helper uses 1 as its default lower bound before rounding; declare valid positive bounds when that is not the intended range. | Explicit supported position bounds are preserved, including Bar measure domains. The current log guard clamps positive bounds below 0.1; exact sub-0.1 log domains are unsupported in 0.5.0. `scale: { nice: false }` is not a supported switch. |
 | Data-endpoint ticks | Continuous non-log axes prioritize available data endpoints, then admit ordinary ticks with sufficient space. | Tick spacing is part of the chart style. No `axis.endpointTicks` switch exists. Log axes use ordinary log ticks without injected data endpoints. |
 | Color and legends | A declared field color creates a legend. Categorical mappings/legend membership retain lineage rather than changing slots after a display filter. With no color mapping, marks are black and there is no color legend. | Declare a constant `.color('#3269b5')` when a field legend is not needed. This changes color meaning; it is not a “hide legend” toggle. A global `legend: false` switch is unavailable. |
 | Legend layout | Top legends occupy a separate block above the canvas. Width and label measurement affect wrapping. | Chart styles support `legendPosition: 'right'`; panels own their local legends. Constrained `height: 'auto'` may hide a legend when there is insufficient room. |
