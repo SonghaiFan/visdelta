@@ -41,10 +41,10 @@ file over HTTP; no bundler or data service is required.
 1. Supply tidy rows and check the fields and types you will bind.
 2. Choose stable source-record identity separately from mark identity. A line
    with several series commonly uses `.key(['date', 'series'])`.
-3. Decide whether dates are local calendar dates or absolute instants. ISO
-   date-only strings are parsed by JavaScript as UTC instants; the current
-   temporal axis uses local time. Neither “always local midnight” nor “always
-   UTC” is a safe universal conversion rule.
+3. Decide whether your source dates describe calendar dates or instants.
+   Date-only ISO strings are parsed as UTC instants. The built-in temporal
+   scale and default date tick labels use UTC. For local timestamps, supply
+   an explicit offset or a `Date` representing the intended instant.
 4. Declare position domains when a story requires fixed comparison scales.
    Leave them inferred when the axis should fit visible data. Read the
    [chart-specific domain rules](/docs/guides/automatic-behaviors).
