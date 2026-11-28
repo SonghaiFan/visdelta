@@ -9,11 +9,11 @@ Copy this complete example into `index.html` and serve it over HTTP.
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.4.2/dist/visdelta.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/visdelta@0.5.0/dist/visdelta.css">
 <div id="chart" style="width:100%;max-width:640px;height:400px"></div>
 <script type="module">
   import { bar, transition, visualizationWarnings }
-    from 'https://cdn.jsdelivr.net/npm/visdelta@0.4.2/+esm';
+    from 'https://cdn.jsdelivr.net/npm/visdelta@0.5.0/+esm';
   const rows = [
     { product: 'Hardware', revenue: 12, profit: 5 },
     { product: 'Software', revenue: 18, profit: 11 },
@@ -41,10 +41,10 @@ file over HTTP; no bundler or data service is required.
 1. Supply tidy rows and check the fields and types you will bind.
 2. Choose stable source-record identity separately from mark identity. A line
    with several series commonly uses `.key(['date', 'series'])`.
-3. Decide whether dates are local calendar dates or absolute instants. ISO
-   date-only strings are parsed by JavaScript as UTC instants; the current
-   temporal axis uses local time. Neither “always local midnight” nor “always
-   UTC” is a safe universal conversion rule.
+3. Decide whether your source dates describe calendar dates or instants.
+   Date-only ISO strings are parsed as UTC instants. The built-in temporal
+   scale and default date tick labels use UTC. For local timestamps, supply
+   an explicit offset or a `Date` representing the intended instant.
 4. Declare position domains when a story requires fixed comparison scales.
    Leave them inferred when the axis should fit visible data. Read the
    [chart-specific domain rules](/docs/guides/automatic-behaviors).
